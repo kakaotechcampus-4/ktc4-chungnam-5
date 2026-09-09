@@ -13,4 +13,7 @@ class AppColors {
 
   static const Color textPrimary = Color(0xFF3A2E22);
   static const Color divider = Color(0xFFEFEDEA);
+
+  static const Color cardBorder = Color(0xFFE1E6E4);
+  static const Color thumbnailPlaceholder = Color(0xFFEDF1F0);
 }
