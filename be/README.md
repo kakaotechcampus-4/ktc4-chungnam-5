@@ -70,24 +70,20 @@ ANALYZING → REVIEW_REQUIRED → EVALUATED   (+ feedbackStatus 별도)
 ## 실행
 
 ```bash
-# 로컬 (Docker Postgres + LocalDiskStorage + LocalQueue)
-python -m venv .venv
-.venv/Scripts/Activate.ps1        # Windows PowerShell
-# source .venv/bin/activate       # macOS · Linux
-pip install -r requirements.txt
-cp .env.example .env      # 값 채우기
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+# python3.12 -m venv .venv && source .venv/bin/activate   # macOS · Linux
 
-# API
+pip install -r requirements.txt
+
+# API — http://127.0.0.1:8000/docs
 uvicorn app.main:app --reload
 
-# Worker
-python -m app.worker_main
-
-# 테스트
-pytest
-
-# 전체 스택 (api · worker · ai · postgres · caddy)
-cd ../infra && docker compose up
+# ── 아래는 아직 없다 (구현되면 주석을 푼다) ──────────────────
+# cp .env.example .env             # .env.example 미작성
+# python -m app.worker_main        # worker_main.py 미작성
+# pytest                           # pytest 미설치 · 테스트 미작성
+# cd ../infra && docker compose up # infra/docker-compose.yml 미작성
 ```
 
 ## 환경변수
