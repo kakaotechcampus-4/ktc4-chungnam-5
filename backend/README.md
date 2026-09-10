@@ -1,4 +1,4 @@
-# be — Backend (FastAPI)
+# be — Backend
 
 GLP-1 포즈 단계별 식사 코치의 **백엔드**. 공개 API·내부 API·비동기 워커·도메인 로직을 담당한다.
 
