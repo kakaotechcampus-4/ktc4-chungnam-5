@@ -38,6 +38,7 @@ be/
 │  ├─ feedback/          단기·일일·장기 피드백 · 가드레일 판정
 │  ├─ user/              계정 · 상태(체중/수면/GI) · 디바이스 토큰
 │  └─ notification/      FCM 발송 · 알림 스케줄
+├─ test/
 └─ infra/                FileStorage · TaskQueue 추상화 · FCM · AiServiceClient
 ```
 
