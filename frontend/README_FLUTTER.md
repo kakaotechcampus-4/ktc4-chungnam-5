@@ -13,7 +13,10 @@
 | 프레임워크 | **Flutter** 3.44.8 stable |
 | UI | Material 3 (`useMaterial3: true`) |
 | 배포 타깃 | **Android** (APK 직배포) |
-| 의존성 | `cupertino_icons`, `flutter_lints` (아직 외부 패키지 없음) |
+| 상태관리 | **Provider** (`lib/state/`) |
+| 라우팅 | `Navigator.push` + `MaterialPageRoute` (라이브러리 없음) |
+| 폰트 | Pretendard (번들, `assets/fonts/`) |
+| 의존성 | `provider`, `cupertino_icons`, `flutter_lints` |
 
 Dart는 Flutter 전용 언어라 따로 설치할 필요가 없다. `flutter` SDK를 깔면 Dart가 같이 들어온다.
 
@@ -108,19 +111,57 @@ flutter test                 # 위젯 테스트
 
 ```
 frontend/lib/
-├─ main.dart              앱 진입점 · MaterialApp 설정
+├─ main.dart              앱 진입점 · MaterialApp 설정 · MultiProvider 등록
 ├─ theme/
 │  ├─ app_colors.dart     색상 상수
-│  ├─ app_spacing.dart    여백 스케일 (xs~xxl)
-│  ├─ app_radius.dart     모서리 반경 (chip/thumbnail/card)
+│  ├─ app_spacing.dart    여백 스케일 (xs~xxl) · AppLayout
+│  ├─ app_radius.dart     모서리 반경 (sm/md/lg/xl/pill)
+│  ├─ app_typography.dart 타이포그래피 (Pretendard)
 │  └─ app_theme.dart      ThemeData 조립
+├─ state/
+│  └─ app_state.dart      화면 2개 이상이 공유하는 상태 (ChangeNotifier)
 ├─ navigation/
 │  └─ root_shell.dart     하단 탭 4개(홈·피드백·기록·마이) 셸
 └─ screens/               탭별 화면
 ```
 
-색상·여백·모서리 값은 **하드코딩하지 말고** `theme/`의 상수를 쓴다.
+색상·여백·모서리·타이포그래피 값은 **하드코딩하지 말고** `theme/`의 상수를 쓴다.
+디자인 토큰의 출처와 의미는 [`docs/design-system.md`](./docs/design-system.md)를 본다
+(디자인 규칙 문서다 — API 명세 아님).
 디자인 토큰이 바뀔 때 한 곳만 고치면 되도록 하기 위함이다.
+
+---
+
+## 상태관리 — Provider
+
+- **화면 하나에서만 쓰는 상태**는 그 화면의 `StatefulWidget`/`setState`로 충분하다. 전역으로 올리지 않는다.
+- **화면 2개 이상이 같이 봐야 하는 상태**만 `ChangeNotifier`로 만들어 `lib/state/`에 두고
+  `main.dart`의 `MultiProvider`에 등록한다.
+- 기능별로 별도 `ChangeNotifier` 클래스를 만든다 (예: `MealState`, `AuthState`).
+  하나의 거대한 상태 클래스로 합치지 않는다.
+- 화면에서는 `context.watch<T>()`(빌드 시 구독) / `context.read<T>()`(콜백 안에서 1회 접근)로 꺼내 쓴다.
+
+`lib/state/app_state.dart`가 패턴을 보여주는 예시다. 실제 기능(로그인, 오늘의 식사 등)을 추가할 때
+이 파일을 참고해 새 클래스를 만들고, 예시 코드는 지워도 된다.
+
+---
+
+## 화면 간 이동 — Navigator.push
+
+라우팅 라이브러리(`go_router` 등)는 쓰지 않는다. 딥링크·웹 URL 동기화가 필요한 제품이 아니고,
+기본 `Navigator`만으로 README의 화면 흐름(①촬영→②분석→③폴링→④확인→⑤확정→⑥피드백)을 다 표현할 수 있다.
+
+```dart
+Navigator.push(
+  context,
+  MaterialPageRoute(builder: (_) => MealResultScreen(mealId: mealId)),
+);
+```
+
+- 화면 위젯은 필요한 값을 **생성자 파라미터로 받는다.** `Navigator` 의 `arguments`나 전역 상태로
+  화면 간 값을 넘기지 않는다.
+- 이름 있는 라우트(`onGenerateRoute` 등)는 쓰지 않는다. 화면이 늘어나도 딥링크가 필요해지기 전까지는
+  `push`/`pop` 만으로 충분하다.
 
 ---
 

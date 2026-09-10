@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment secrets (API_BASE_URL, KAKAO_NATIVE_APP_KEY, FCM_SENDER_ID 등)
+# README 의 "실행" 절 참고 — 절대 커밋하지 않는다.
+.env
+.env.*
+!.env.example
