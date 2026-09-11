@@ -94,6 +94,34 @@ uvicorn app.main:app --reload
 # pytest                           # pytest 미설치 · 테스트 미작성
 ```
 
+### 세팅 확인
+
+위 절차가 제대로 끝났는지 확인한다. 셋 다 기대값과 같아야 한다.
+
+```bash
+# 1. 테이블 수 — 18 이 나와야 한다
+docker exec glp1-db psql -U glp1 -d glp1_dev -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';"
+
+# 2. 시드 건수 — GENERAL 19617 / PROCESSED 316734
+docker exec glp1-db psql -U glp1 -d glp1_dev -c "SELECT category, count(*) FROM food_refs GROUP BY category;"
+
+# 3. 모델과 DB 가 어긋나지 않았는지
+alembic check
+```
+
+| 확인 | 기대값 |
+| --- | --- |
+| 테이블 수 | **18** — 도메인 테이블 17개 + Alembic 이 쓰는 `alembic_version` 1개 |
+| `food_refs` | GENERAL 19,617 · PROCESSED 316,734 (합 336,351) |
+| `alembic check` | `No new upgrade operations detected.` |
+
+> 테이블 목록을 직접 보려면 `docker exec -it glp1-db psql -U glp1 -d glp1_dev -c "\dt"`.
+> 한글이 깨지면 PowerShell 에서 `chcp 65001` 을 한 번 실행한다.
+
+> **`alembic check` 가 `Target database is not up to date` 로 실패하면** DB 가 최신
+> 마이그레이션까지 올라와 있지 않다는 뜻이다. `alembic upgrade head` 를 먼저 돌린다.
+> 검사는 항상 스키마 적용 **뒤에** 한다.
+
 ### 공공 영양DB 적재
 
 `food_refs` 는 식약처 식품영양성분DB 복제본이다(336,351건). 엑셀 원본은 204MB 라 레포에
