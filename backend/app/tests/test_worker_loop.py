@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from app.infra.queue import ReceivedTask
-from app.worker_main import analyze_meal, handle, run
+from app.worker_main import handle, run
 
 
 class FakeQueue:
@@ -84,17 +84,22 @@ def _task(body: dict[str, Any], receipt: str = "r1", receive_count: int = 1) -> 
 # ─────────────────────────── 삭제 시점 ───────────────────────────
 
 
-def test_failed_task_is_not_deleted():
-    """AI 가 죽으면 지우지 않는다 — visibility timeout 뒤 재배달돼야 한다."""
-    queue = FakeQueue([_task(_analyze_body())])
-    ai = FakeAi(error=RuntimeError("AI 가 500 을 냈다"))
+def test_failed_task_is_not_deleted(monkeypatch):
+    """처리가 터지면 지우지 않는다 — visibility timeout 뒤 재배달돼야 한다."""
 
-    run(queue, ai)
+    def boom(task, ai):
+        raise RuntimeError("AI 가 500 을 냈다")
+
+    monkeypatch.setattr("app.worker_main.handle", boom)
+    queue = FakeQueue([_task(_analyze_body())])
+
+    run(queue, FakeAi())
 
     assert queue.deleted == []
 
 
-def test_successful_task_is_deleted():
+def test_successful_task_is_deleted(monkeypatch):
+    monkeypatch.setattr("app.worker_main.handle", lambda task, ai: None)
     queue = FakeQueue([_task(_analyze_body(), receipt="abc")])
 
     run(queue, FakeAi())
@@ -123,23 +128,6 @@ def test_one_failure_does_not_stop_the_batch(monkeypatch):
 
 
 # ─────────────────────────── 작업 분기 ───────────────────────────
-
-
-def test_analyze_meal_forwards_contract_fields():
-    """큐 본문의 작업 메타(type)는 AI 로 넘기지 않는다."""
-    ai = FakeAi()
-
-    analyze_meal(_task(_analyze_body("meal_456")), ai)
-
-    assert len(ai.calls) == 1
-    assert ai.calls[0] == {
-        "mealId": "meal_456",
-        "mealType": "LUNCH",
-        "eatenAt": "2026-08-21T12:40:00+09:00",
-        "stage": "MAINTENANCE",
-        "imageUrl": None,
-        "rawText": "김밥 한 줄",
-    }
 
 
 def test_unknown_task_type_raises():

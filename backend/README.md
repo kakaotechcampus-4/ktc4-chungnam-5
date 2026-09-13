@@ -263,8 +263,8 @@ Q/Q/S 채점은 Rule Engine(순수 함수)이 한다. 그런데도 큐를 거치
 두 갈래인 게 이것이다.
 
 > 현재 구현 상태: `meal.analyze` 만 AI 까지 왕복이 돈다. 나머지 네 타입은
-> `NotImplementedError` 로 자리만 잡혀 있고, `analyze_meal()` 도 응답을 받아 로그만 찍고
-> DB 저장은 하지 않는다 — 모델이 아직 이 브랜치에 없다.
+> `NotImplementedError` 로 자리만 잡혀 있다. `meal.analyze` 는 AI 응답을 `meal_items` 에
+> 저장하고 `status` 를 `REVIEW_REQUIRED` 로 넘기는 것까지 동작한다.
 
 ### API 3개
 
