@@ -121,34 +121,56 @@ ai/
 
 ```json
 {
-  "mealId": "uuid",
+  "mealId": "meal_456",
   "modelVersion": "stub-vision-0",
   "safetyStatus": "SAFE",
   "items": [
-    { "originalFoodName": "김치찌개", "candidateFoodRefId": "D000123",
-      "estimatedAmountG": 350, "confidence": 0.82, "clarifyQuestion": null },
-    { "originalFoodName": "흰쌀밥", "candidateFoodRefId": null,
-      "estimatedAmountG": 210, "confidence": 0.41,
-      "clarifyQuestion": "밥은 한 공기 정도였나요?" }
+    { "originalFoodName": "참치김밥", "candidateFoodRefId": "D000123",
+      "estimatedAmount": 250, "unit": "g", "confidence": 0.62,
+      "clarifyQuestion": "김밥 속재료가 참치가 맞나요?" },
+    { "originalFoodName": "삶은 계란", "candidateFoodRefId": null,
+      "estimatedAmount": 2, "unit": "개", "confidence": 0.96,
+      "clarifyQuestion": null }
   ]
 }
 ```
 
 `items[]`는 `meal_items` 행에 1:1 대응한다.
 
-| 응답 필드 | `meal_items` 컬럼 |
-|---|---|
-| `originalFoodName` | `original_food_name` |
-| `candidateFoodRefId` | `food_ref_id` (nullable) |
-| `estimatedAmountG` | `estimated_amount_g` |
-| `confidence` | `confidence` — `CHECK (0 ~ 1)`을 Pydantic `ge=0, le=1`로 |
-| 응답 전체 | `raw_ai_result` (JSONB 원본 저장) |
+| 응답 필드 | `meal_items` 컬럼 | 비고 |
+|---|---|---|
+| `originalFoodName` | `original_food_name` | |
+| `candidateFoodRefId` | `food_ref_id` (nullable) | 공개 API의 `matched`·`nutritionSource`는 이 값의 해석 결과다 |
+| `estimatedAmount` + `unit` | `estimated_amount_g` | **BE가 g로 환산해 저장한다** — 아래 참조 |
+| `confidence` | `confidence` | `CHECK (0 ~ 1)`을 Pydantic `ge=0, le=1`로 |
+| 응답 전체 | `raw_ai_result` | JSONB 원본 저장 |
+
+### 양은 g가 아니라 자연 단위로 받는다
+
+공개 API 명세가 `{ "amount": 2, "unit": "개" }`를 돌려주고 "**g 환산은 서버**"라고 못박았다.
+비전 모델은 "계란 100g"이 아니라 "계란 2개"라고 본다 — 그게 사진에서 읽히는 형태다.
+개→g 환산에는 `food_refs`의 1회 제공량이 필요한데 AI는 그 테이블을 볼 수 없다(규칙 1).
+
+따라서 AI는 `estimatedAmount` + `unit`(`g` / `개` / `ml` / `공기` 등)을 주고,
+BE가 `food_ref_id`로 `food_refs`를 조회해 `estimated_amount_g`에 넣는다.
+`candidateFoodRefId`가 `null`이면 환산이 불가능하므로 원본 단위를 `raw_ai_result`에 두고
+`matched: false`로 내보낸다 — 명세의 "`matched: false` → 영양정보 없음"과 같은 상태다.
+
+### clarifyQuestion은 항목별, 노출은 식사별
+
+AI는 애매한 **항목마다** `clarifyQuestion`을 붙인다(`ai/README.md`의 "애매한 항목에는 `clarifyQuestion`을 붙여").
+반면 공개 API `GET /meals/{mealId}`는 식사 단위로 `clarifyQuestion` 하나를 돌려준다.
+
+BE가 좁힌다 — `confidence`가 가장 낮은 항목의 질문 하나를 고른다. 정보를 버리지 않으려고 AI 쪽은 배열로 받는다.
+나중에 FE가 여러 질문을 받을 수 있게 되면 계약을 안 고쳐도 된다.
+
+### 성분값은 여전히 AI가 만들지 않는다
+
+`kcal`·`proteinG` 같은 필드는 응답 스키마에 존재하지 않는다. 규칙 2를 프롬프트가 아니라 타입으로 강제하는 지점이다.
+공개 API `GET /meals/{mealId}`의 `nutrition` 블록은 전부 BE가 `food_refs`에서 채운 값이다.
 
 `display_name`은 AI가 주지 않는다 — 최초에는 `original_food_name`을 복사하고, 사용자가 고치면 그때 갱신된다.
 `source`는 BE가 `MODEL`로 채운다.
-
-**성분 숫자 필드(`kcal`·단백질 등)는 스키마에 존재하지 않는다.** 규칙 2를 프롬프트가 아니라 타입으로 강제하는 지점이다.
-`estimatedAmountG`(양)는 AI가 주고, 성분은 BE가 `food_ref_id`로 `food_refs`에서 채운다.
 
 ### 픽스처 동작
 
@@ -163,11 +185,17 @@ ai/
 {
   "scope": "MEAL",
   "userId": "uuid",
-  "mealId": "uuid",
-  "stage": "TITRATION",
-  "qqs": { "quantity": 72.0, "quality": 64.5, "satiety": 80.0 },
-  "items": [{ "displayName": "김치찌개", "confirmedAmountG": 320 }],
-  "satiety": { "before": 20, "after": 85, "hungerReturnMinutes": 240,
+  "mealId": "meal_456",
+  "stage": "MAINTENANCE",
+  "qqs": { "quantity": 75, "quality": 80, "satiety": 68 },
+  "items": [
+    { "displayName": "참치김밥", "amount": 250, "unit": "g",
+      "nutrition": { "kcal": 400, "proteinG": 12, "fatG": 10,
+                     "carbG": 65, "fiberG": 4, "sodiumMg": 780 } }
+  ],
+  "satiety": { "beforePct": 20, "afterPct": 68,
+               "checkins": [{ "checkinOffsetHours": 3, "satietyPct": 40 }],
+               "hungerReturnMinutes": 60,
                "userComment": "저녁까지 안 배고팠어요" }
 }
 ```
@@ -178,9 +206,9 @@ ai/
 {
   "scope": "DAILY",
   "userId": "uuid",
-  "date": "2026-09-13",
-  "stage": "TITRATION",
-  "qqs": { "quantity": 68.0, "quality": 71.0, "satiety": 74.0 },
+  "date": "2026-08-21",
+  "stage": "MAINTENANCE",
+  "qqs": { "quantity": 68, "quality": 71, "satiety": 74 },
   "meals": [
     { "mealType": "BREAKFAST", "summary": "...", "qqs": { "quantity": 70, "quality": 65, "satiety": 72 } }
   ]
@@ -190,13 +218,27 @@ ai/
 `qqs`는 **요청에 실려 온다.** AI는 점수를 계산하지 않는다 — 채점은 Rule Engine(순수 함수)이 이미 끝냈고,
 AI는 그 숫자를 문장으로 옮기는 역할만 한다. `scope=DAILY`의 `qqs`는 BE가 그날 `qqs_evaluations`를 집계한 값이다(S6).
 
+### `items[].nutrition`은 규칙 2의 예외가 아니다
+
+공개 API의 `reasoning` 예시는 "지금은 포만감 유지가 중요한데 **단백질 비중이 낮았어요**"다.
+이 문장을 쓰려면 AI가 성분을 알아야 한다.
+
+규칙 2는 AI가 성분을 **생성**하는 것을 금지한다. 받는 것은 금지하지 않는다.
+`nutrition`은 BE가 `food_refs`에서 조회해 넣어 주는 **컨텍스트 선주입**(규칙 4)이고, 방향이 BE→AI다.
+응답 스키마에는 여전히 성분 필드가 없으므로 AI가 숫자를 지어낼 경로는 없다.
+
 ### 응답
 
 ```json
 {
-  "body": "...",
-  "suggestions": "...",
-  "reasoning": "...",
+  "body": "유지기 기준 포만감이 부족한 식사예요.",
+  "reasoning": "지금은 포만감 유지가 중요한데 단백질 비중이 낮았어요.",
+  "suggestions": [
+    { "foodName": "두부 반 모", "candidateFoodRefId": "D004512",
+      "advice": "단백질을 조금 더 채우는 쪽이에요" },
+    { "foodName": "나물 한 접시", "candidateFoodRefId": null,
+      "advice": "식이섬유가 포만감을 늘리는 데 도움이 돼요" }
+  ],
   "modelVersion": "stub-short-0",
   "safetyStatus": "SAFE"
 }
@@ -205,12 +247,38 @@ AI는 그 숫자를 문장으로 옮기는 역할만 한다. `scope=DAILY`의 `q
 | 응답 필드 | `scope=MEAL` → `meal_feedbacks` | `scope=DAILY` → `daily_feedbacks` |
 |---|---|---|
 | `body` | `body` | `summary` |
-| `suggestions` | `suggestions` | **`null`** — 대응 컬럼 없음 |
 | `reasoning` | `reasoning` | **`null`** — 대응 컬럼 없음 |
+| `suggestions` | `suggestions` | **`null`** — 대응 컬럼 없음 |
 | `modelVersion` | `model_version` | `model_version` |
 | `safetyStatus` | `safety_status` | `safety_status` |
 
 `daily_feedbacks`의 `quantity_score`·`quality_score`·`satiety_score`는 응답에 없다 — BE가 집계해 채운다(S6).
+
+공개 API가 `summary`라고 부르는 필드를 AI 계약은 `body`라고 부른다. DB 컬럼명(`meal_feedbacks.body`)을 따랐다.
+BE가 공개 API로 내보낼 때 이름을 바꾼다.
+
+### suggestions에서 AI가 채우는 것과 BE가 채우는 것
+
+공개 API의 제안 한 건은 이렇게 생겼다:
+
+```json
+{ "foodName": "두부 반 모",
+  "nutrients": [{ "code": "PROTEIN", "amountG": 10 }],
+  "advice": "단백질을 10g 더 채워요" }
+```
+
+`nutrients`는 숫자다. 규칙 2에 따라 AI가 만들지 않는다.
+
+| 필드 | 채우는 쪽 | 근거 |
+|---|---|---|
+| `foodName` | AI | 어떤 음식을 제안할지는 판단의 영역 |
+| `candidateFoodRefId` | AI | 지목만 한다. `null`이면 BE가 `foodName`으로 `food_refs`를 검색 |
+| `advice` | AI | 문장 |
+| `nutrients[]` | **BE** | `food_ref_id`로 `food_refs` 조회. AI가 지어내면 검증할 방법이 없다 |
+
+`expectedSatietyPct`(`{ "current": 62, "after": 79 }`)도 **BE가 채운다.**
+`current`는 `qqs_evaluations.satiety_score`이고, `after`는 제안 음식을 더한 상태로 Rule Engine을 다시 돌린 값이다.
+같은 채점기를 쓰므로 화면의 숫자와 점수가 어긋나지 않는다 — LLM에게 맡기면 그 보장이 깨진다.
 
 ## 8. 계약 — `POST /long-feedback`
 
@@ -230,7 +298,28 @@ AI는 그 숫자를 문장으로 옮기는 역할만 한다. `scope=DAILY`의 `q
 }
 ```
 
-`periodType`은 `WEEKLY | MONTHLY`. `DAILY`는 `/short-feedback`이 받는다 (S2).
+### periodType — 명세와 DB가 어긋난다
+
+공개 API는 `?period=7d | 28d | all`이고, `long_term_feedbacks.period_type` ENUM은 `WEEKLY | MONTHLY`다.
+`7d`≈`WEEKLY`, `28d`≈`MONTHLY`로 대응되지만 **`all`에 대응하는 ENUM 값이 없다.**
+
+AI 계약은 `WEEKLY | MONTHLY | ALL` 세 값을 받는다. AI에게 필요한 건 "어느 구간을 요약하는가"이고
+그건 `periodStart`·`periodEnd`·`series`가 이미 말해 준다 — `periodType`은 어조를 고르는 힌트에 가깝다.
+세 값을 그대로 받아도 AI 쪽에서는 아무 문제가 없다.
+
+문제는 BE 쪽이다. `all`을 저장하려면 ENUM에 값을 추가하거나, `MONTHLY`로 접고
+`UNIQUE (user_id, period_type, period_start)` 충돌을 감수해야 한다. 14절에 열린 질문으로 남긴다.
+
+`DAILY`는 여기 없다 — `/short-feedback`이 받는다 (S2).
+
+### AI가 받지 않는 것
+
+| 공개 API 필드 | 채우는 쪽 | 근거 |
+|---|---|---|
+| `dataSufficient` | BE | `daily_feedbacks` 행 수를 세면 안다. **`false`면 AI를 호출하지 않는다** — 근거가 없는데 문장을 만들게 할 이유가 없다 |
+| `stale` · `staleReason` | BE | `MEAL_DELETED` 같은 무효화 사유는 DB 변경 이벤트다 |
+| `generatedAt` | BE | `long_term_feedbacks.created_at` |
+| `status` | BE | 잡의 진행 상태 |
 
 ### 응답
 
@@ -277,11 +366,24 @@ AI는 그 숫자를 문장으로 옮기는 역할만 한다. `scope=DAILY`의 `q
 | 시나리오 | 스텁 동작 | 검증되는 Worker 경로 |
 |---|---|---|
 | `SUCCESS` | 정상 응답 | `ANALYZING → REVIEW_REQUIRED` |
-| `LOW_CONFIDENCE` | `confidence` 낮음 + `clarifyQuestion` 부착 | 사용자 확인 분기 |
-| `NO_MATCH` | `candidateFoodRefId` 전부 `null` | `food_ref_id` NULL 경로 |
+| `LOW_CONFIDENCE` | `confidence`를 `0.8` 미만으로 + `clarifyQuestion` 부착 | 명세의 "0.8 미만은 FE 강조" 분기 |
+| `NO_MATCH` | `candidateFoodRefId` 전부 `null` | `matched: false` · `nutrition: null` 경로 |
 | `BLOCKED` | `safetyStatus=BLOCKED` | `medical_handoff_logs` 기록 |
 | `ERROR_500` | 5xx 반환 | 재시도 → DLQ → `status=FAILED` |
-| `SLOW` | `STUB_LATENCY_MS`만큼 지연 후 응답 | 타임아웃 처리 |
+| `SLOW` | `STUB_LATENCY_MS`만큼 지연 후 응답 | `timeoutMs: 30000` 초과 처리 |
+
+공개 API가 `steps[]`로 파이프라인을 FE에 노출한다 —
+`FOOD_RECOGNITION` · `DB_MATCHING` · `STAGE_RULE_APPLY`. 시나리오는 이 중 첫 단계를 조작한다.
+
+| step | 담당 | 스텁이 건드리는가 |
+|---|---|---|
+| `FOOD_RECOGNITION` | AI `/analyze-meal` | **그렇다** — 6개 시나리오 전부 이 단계에 작용한다 |
+| `DB_MATCHING` | BE — `candidateFoodRefId` → `food_refs` | 간접적. `NO_MATCH`가 이 단계를 빈손으로 만든다 |
+| `STAGE_RULE_APPLY` | BE Rule Engine | 아니다. AI와 무관하다 |
+
+세 단계가 AI·BE로 정확히 갈리는 게 이 설계가 맞게 잡혔다는 신호다.
+`ERROR_500`으로 `FOOD_RECOGNITION`을 죽여도 `STAGE_RULE_APPLY`는 독립적으로 돌 수 있다 —
+"AI가 죽어도 Q/Q/S는 남는다"가 `steps[]` 수준에서 그대로 보인다.
 
 시나리오는 가드레일보다 **먼저** 평가된다. `X-Stub-Scenario: BLOCKED`은 키워드가 없어도 `BLOCKED`을 돌려주고,
 `ERROR_500`은 가드레일을 거치지 않고 5xx를 낸다. 테스트가 입력 문구를 꾸며내지 않고 경로를 고를 수 있어야 하기 때문이다.
@@ -342,7 +444,247 @@ BE API가 8000을 쓰므로 스텁은 8001로 띄운다.
 
 ## 14. 열린 질문
 
+### 이 브랜치 밖
+
 - 스텁 작업 디렉터리가 `ai/`인데 브랜치 접두사가 `be/`다. 팀에서 파트별 접두사를 엄격히 보는지 확인 필요.
 - `docs/architecture.md`와 `docs/decisions.md`가 `ai/README.md`·`backend/README.md`에서 참조되지만 아직 없다. D 번호(D2·D4·D5·D9·D13, R3·R7)의 원본이 어디인지 확인 필요.
 - `contracts/` 폐기에 따라 `ai/README.md`의 두 군데를 고쳐야 한다 — "실행" 절의 Prism 목 서버 안내와
   `[../contracts/]` 링크. 이 브랜치에서 같이 고칠지, AI 파트에 넘길지 정할 것.
+
+### 공개 API 명세와 DB 스키마의 불일치
+
+명세를 `meals`·`meal_items`·`satiety_logs`·`meal_feedbacks`·`long_term_feedbacks`와 대조하며 찾은 것들이다.
+전부 BE DB 쪽 결정이라 이 스펙에서 확정하지 않는다. 다만 AI 계약이 어느 쪽으로 가든 버틸 수 있게
+원본 단위·구조를 보존하는 방향으로 설계해 뒀다.
+
+| # | 불일치 | 선택지 |
+|---|---|---|
+| 1 | 명세는 `amount` + `unit`(`개`·`ml`)을 돌려주는데 `meal_items`에는 `estimated_amount_g`만 있고 단위 컬럼이 없다 | `raw_ai_result` JSONB에서 읽기 / `unit` 컬럼 추가 |
+| 2 | 명세의 `suggestions`는 `{foodName, nutrients[], advice}` 배열인데 `meal_feedbacks.suggestions`는 TEXT다 | TEXT에 JSON 직렬화 / JSONB로 변경 / `feedback_suggestions` 테이블 분리 |
+| 3 | 명세의 `satiety.checkins[]`(`checkinOffsetHours`·`satietyPct`)에 대응하는 저장 위치가 없다. `satiety_logs`는 식사당 1행이고 체크인 배열을 담을 컬럼이 없다 | `satiety_checkins` 테이블 추가 / JSONB 컬럼 |
+| 4 | 명세의 `?period=all`에 대응하는 `long_term_feedbacks.period_type` ENUM 값이 없다 | ENUM에 `ALL` 추가 / `MONTHLY`로 접고 `UNIQUE (user_id, period_type, period_start)` 충돌 감수 |
+| 5 | 규칙 3은 명령형 처방 톤을 금지하는데("이만큼 드세요" 금지, 서술형만), 명세의 예시 문구가 명령형이다 — "단백질을 10g 더 채워요", "단백질을 앞으로 당겨 보세요" | 명세 예시를 서술형으로 고치기 / 규칙 3의 경계를 다시 정의하기 |
+
+5번은 가드레일 구현에 직접 영향을 준다. 출력 검증을 어디까지 엄격하게 걸지가 이 결정에 달려 있다.
+스텁 픽스처는 일단 규칙 3을 따라 서술형으로만 쓴다 — 나중에 느슨하게 푸는 쪽이 조이는 쪽보다 쉽다.
+
+1·3번은 이미 머지 대기 중인 BE-2 스키마에 걸린다. 컬럼을 추가하는 선택지를 고르면 alembic 마이그레이션이 하나 더 필요하다.
+
+## 참고 API 명세
+
+### 식사 입력 · 분석
+
+#### POST /meals
+
+```
+multipart:  inputType=PHOTO, image=<file>, mealType=DINNER,
+            eatenAt=2026-08-21T18:10:00+09:00, satietyBeforePct=20
+```
+
+```json
+// JSON (텍스트 입력)
+{ "inputType": "TEXT", "rawText": "김밥 한 줄",
+  "mealType": "LUNCH", "eatenAt": "2026-08-21T12:40:00+09:00",
+  "satietyBeforePct": 20 }
+
+// 202
+{ "mealId": "meal_456",
+  "status": "ANALYZING",
+  "steps": [
+    { "key": "FOOD_RECOGNITION", "state": "RUNNING" },
+    { "key": "DB_MATCHING",      "state": "PENDING" },
+    { "key": "STAGE_RULE_APPLY", "state": "PENDING" }
+  ],
+  "pollIntervalMs": 1500,
+  "timeoutMs": 30000 }
+```
+
+`satietyBeforePct` 는 선택 입력. 미입력 시 `null`.
+
+#### GET /meals/{mealId}
+
+`status` 에 따라 폴링 · 확인 · 상세 조회에 모두 쓰입니다.
+
+```json
+{
+  "mealId": "meal_456",
+  "status": "REVIEW_REQUIRED",
+  "isRecalculation": false,
+  "stage": "MAINTENANCE",
+  "mealType": "LUNCH",
+  "eatenAt": "2026-08-21T12:40:00+09:00",
+  "imageUrl": "https://…",
+  "steps": [
+    { "key": "FOOD_RECOGNITION", "state": "DONE" },
+    { "key": "DB_MATCHING", "state": "RUNNING" },
+    { "key": "STAGE_RULE_APPLY", "state": "PENDING" }
+  ],
+  "clarifyQuestion": "김밥 속재료가 참치가 맞나요?",
+  "items": [
+    {
+      "itemId": "item_1",
+      "displayName": "참치김밥",
+      "amount": 250,
+      "unit": "g",
+      "confidence": 0.62,
+      "matched": true,
+      "nutritionSource": "PUBLIC_DB",
+      "userConfirmed": false,
+      "nutrition": {
+        "kcal": 400,
+        "proteinG": 12,
+        "fatG": 10,
+        "carbG": 65,
+        "fiberG": 4,
+        "sodiumMg": 780
+      }
+    },
+    {
+      "itemId": "item_2",
+      "displayName": "삶은 계란",
+      "amount": 2,
+      "unit": "개",
+      "confidence": 0.96,
+      "matched": false,
+      "nutritionSource": null,
+      "userConfirmed": false,
+      "nutrition": null
+    }
+  ]
+}
+```
+
+`status: EVALUATED` 일 때 추가되는 필드:
+
+```json
+{ "scores": { "quantity": 75, "quality": 80, "satiety": 68 },
+  "nutrients": [ … ],
+  "satiety": { "beforePct": 20, "afterPct": 68,
+               "checkins": [ { "checkinOffsetHours": 3, "satietyPct": 40 } ],
+               "hungerReturnMinutes": 60 },
+  "feedback": { "summary": "…", "suggestions": [ … ] } }
+```
+
+| 필드              | 설명                                |
+| ----------------- | ----------------------------------- |
+| `amount` + `unit` | `g` / `개` / `ml` 등. g 환산은 서버 |
+| `confidence`      | 0.0~1.0. 0.8 미만은 FE 강조         |
+| `matched`         | `false` → 영양정보 없음             |
+| `isRecalculation` | 사용자 수정 후 재분석 여부          |
+
+---
+
+#### 평가
+
+### GET /meals/{mealId}/feedback
+
+```json
+{
+  "feedbackStatus": "READY",
+  "summary": "유지기 기준 포만감이 부족한 식사예요.",
+  "reasoning": "지금은 포만감 유지가 중요한데 단백질 비중이 낮았어요.",
+  "suggestions": [
+    {
+      "foodName": "두부 반 모",
+      "nutrients": [{ "code": "PROTEIN", "amountG": 10 }],
+      "advice": "단백질을 10g 더 채워요"
+    },
+    {
+      "foodName": "나물 한 접시",
+      "nutrients": [{ "code": "FIBER", "amountG": 4 }],
+      "advice": "식이섬유로 포만감을 늘려요"
+    }
+  ],
+  "expectedSatietyPct": { "current": 62, "after": 79 },
+  "safetyStatus": "SAFE"
+}
+```
+
+`safetyStatus: BLOCKED` → `summary` · `suggestions` 미표시, 상담 안내로 대체.
+
+#### 장기 피드백
+### GET /insights/long-term
+
+```
+?period=7d | 28d | all
+```
+
+```json
+{ "period": { "from": "2026-07-25", "to": "2026-08-21" },
+  "status": "READY",
+  "dataSufficient": true,
+  "trendSummary": "이번 달은 지난달보다 Quality가 올랐어요.",
+  "recommendation": "저녁 포만감이 낮은 편이라 단백질을 앞으로 당겨 보세요.",
+  "generatedAt": "2026-08-21T23:10:00+09:00",
+  "stale": true,
+  "staleReason": "MEAL_DELETED" }
+```
+
+`dataSufficient: false` → `recommendation` 미표시.
+
+### POST /insights/long-term/refresh
+
+```json
+// request
+{ "period": "28d" }
+
+// 202
+{ "status": "GENERATING", "pollIntervalMs": 1500 }
+```
+
+---
+
+#### 일일 피드백
+
+> 이 절은 기존 명세에 없어 새로 작성했다. 장기 피드백의 규약을 그대로 따랐다.
+
+### GET /insights/daily
+
+```
+?date=2026-08-21     생략 시 오늘
+```
+
+```json
+{
+  "date": "2026-08-21",
+  "status": "READY",
+  "dataSufficient": true,
+  "mealCount": 3,
+  "scores": { "quantity": 68, "quality": 71, "satiety": 74 },
+  "summary": "단백질이 고르게 들어간 하루였어요. 저녁만 포만감이 짧게 끝났어요.",
+  "generatedAt": "2026-08-21T23:10:00+09:00",
+  "stale": false,
+  "staleReason": null,
+  "safetyStatus": "SAFE"
+}
+```
+
+| 필드 | 설명 |
+| --- | --- |
+| `status` | `GENERATING` / `READY` / `UNAVAILABLE` |
+| `dataSufficient` | `false` → `summary` 미표시. 그날 `EVALUATED` 식사가 없으면 `false` |
+| `mealCount` | 집계에 들어간 끼니 수. `dataSufficient` 판단 근거를 화면에 보여주기 위함 |
+| `scores` | 그날 `qqs_evaluations` 집계. `daily_feedbacks`의 점수 3개 |
+| `stale` · `staleReason` | 장기 피드백과 동일. `MEAL_DELETED` 등 |
+| `safetyStatus` | `BLOCKED` → `summary` 미표시, 상담 안내로 대체 |
+
+### POST /insights/daily/refresh
+
+```json
+// request
+{ "date": "2026-08-21" }
+
+// 202
+{ "status": "GENERATING", "pollIntervalMs": 1500 }
+```
+
+**설계 근거**
+
+- 경로를 `/insights/daily`로 잡았다. 하루 요약은 특정 식사에 속하지 않으므로 `/meals/{mealId}/feedback` 계열이 아니라
+  기간 집계인 `/insights/*` 계열이다. `GET`·`POST .../refresh` 쌍도 장기 피드백과 같게 뒀다.
+- `recommendation`이 없다. `long_term_feedbacks`에는 있지만 `daily_feedbacks`에는 `summary` 컬럼뿐이다.
+  "다음에 뭘 할지"는 이미 끼니별 `suggestions`가 담당한다 — 하루 단위에서 또 제안하면 중복된다.
+- 장기 피드백의 `period` 대신 `date`를 쓴다. `daily_feedbacks`의 `UNIQUE (user_id, feedback_date)`와 1:1로 맞는다.
+- AI 쪽은 `/short-feedback`의 `scope=DAILY`가 받는다(S2). 라우터를 새로 만들지 않는다.
+
+이후 `GET /insights/long-term` 폴링.
