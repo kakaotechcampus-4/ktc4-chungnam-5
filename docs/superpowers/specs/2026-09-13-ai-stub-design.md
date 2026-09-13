@@ -17,6 +17,10 @@ AI Service의 실제 구현(LLM 연동)은 아직 없고, BE Worker 역시 아�
 "BE 없이 단독 개발하려면 `contracts/`의 OpenAPI로 Prism 목 서버를 띄운다(R7)".
 BE가 AI 없이 개발하는 방법은 아직 정의돼 있지 않다. 이 문서가 그것을 정의한다.
 
+그리고 `contracts/`는 폐기하기로 했다(S7). R7이 쓰던 수단이 사라지므로,
+AI 파트가 BE 없이 개발하는 방법은 `/internal/v1`을 구현하는 시점에 팀이 다시 정해야 한다 — 13절 참조.
+이 문서의 범위는 BE→AI 방향뿐이다.
+
 ## 2. 목적
 
 1. BE Worker가 실제 LLM 없이 식사 파이프라인 전 구간을 개발·테스트할 수 있게 한다.
@@ -31,7 +35,7 @@ BE가 AI 없이 개발하는 방법은 아직 정의돼 있지 않다. 이 문�
 - 라우터 3개와 요청·응답 스키마 확정
 - 의료 가드레일 (`guardrail/medical.py`) — 스텁·실제 공용
 - 시나리오 트리거 6종
-- pytest 테스트, `contracts/` OpenAPI export
+- pytest 테스트
 
 **제외**
 
@@ -52,6 +56,7 @@ BE가 AI 없이 개발하는 방법은 아직 정의돼 있지 않다. 이 문�
 | S4 | 응답은 결정적 픽스처 + 시나리오 트리거로 만든다 | 고정 응답은 정상 경로만 검증한다. 입력 해시 기반 랜덤은 재현은 되지만 테스트에서 assert를 쓸 수 없다 |
 | S5 | 시나리오는 `X-Stub-Scenario` **헤더**로 제어한다 | 본문에 매직 문자열을 심으면 프로덕션 데이터를 오염시킬 수 있고, 실제 구현으로 전환할 때 본문 스키마가 달라진다. 헤더는 실제 구현이 무시하면 그만이다 |
 | S6 | AI 응답에 집계 숫자를 두지 않는다 — `chartData`·일일 점수는 BE가 채운다 | `ai/README.md` 규칙 2의 연장. `long_term_feedbacks.chart_data`와 `daily_feedbacks`의 점수 3개는 `qqs_evaluations` 집계로 구할 수 있다. LLM이 만들면 숫자가 틀려도 검증할 방법이 없다 |
+| S7 | `contracts/`를 폐기한다. 계약의 단일 원본은 `agents/schemas.py`이고, OpenAPI는 **런타임에** FastAPI가 서빙한다 | 생성물을 커밋하면 원본(Pydantic)과 사본(JSON)이 갈라지고, 갱신 스크립트를 매번 돌려야 한다. 이 계약의 소비자는 BE Worker 하나뿐이고, 그쪽은 어차피 스텁을 띄워 놓고 개발한다 — `http://localhost:8001/docs`를 보면 된다 |
 
 ## 5. 컴포넌트 구조
 
@@ -294,14 +299,18 @@ AI는 그 숫자를 문장으로 옮기는 역할만 한다. `scope=DAILY`의 `q
 - 가드레일: 의료 키워드가 든 요청이 세 라우터 모두에서 `BLOCKED`을 받는지
 - `scope=DAILY` 응답의 `suggestions`·`reasoning`이 `null`인지
 
-### contracts export
+### 계약 문서
 
-FastAPI가 만든 OpenAPI를 `contracts/ai-service.openapi.json`으로 뽑아 커밋하는 스크립트를 둔다.
-`contracts/`는 현재 비어 있다(`.gitkeep`만). 이 파일이 생기면:
+별도 export 파일을 만들지 않는다(S7). FastAPI가 `/openapi.json`과 `/docs`를 자동으로 서빙하므로,
+스텁을 띄우면 그게 곧 계약 문서다.
 
-- BE와 AI가 같은 계약 파일을 본다
-- `ai/README.md`의 R7(Prism 목 서버)이 이 파일로 동작한다
-- 계약 변경이 PR diff에 드러난다
+```
+uvicorn app.main:app --reload --port 8001
+# http://localhost:8001/docs
+```
+
+계약 변경을 PR diff에서 보고 싶다면 `agents/schemas.py`의 diff를 보면 된다 — 그게 원본이다.
+생성된 JSON을 커밋하면 원본과 사본이 갈라지는 문제만 생긴다.
 
 ## 12. 환경변수
 
@@ -324,11 +333,16 @@ BE API가 8000을 쓰므로 스텁은 8001로 띄운다.
 이 브랜치 범위 밖이며, 순서대로 이어진다.
 
 1. BE `/internal/v1` 구현 (서비스 토큰 인증 + tool 3종)
-2. 스텁 `tools/` 채우기 — 역호출 경로 통합 검증 (S3 해제)
-3. BE Worker 식사 파이프라인 — 이 스텁을 상대로 개발
-4. AI 실제 LLM 연동 — `runner.py`의 `STUB_MODE=false` 분기만 채우면 된다
+2. **R7 대체 수단 결정** — `contracts/`가 사라지므로(S7), AI 파트가 BE 없이 개발할 때 쓸
+   `/internal/v1` 목을 어떻게 제공할지 1번과 함께 정해야 한다.
+   이 스텁과 대칭으로 BE 쪽에 `INTERNAL_STUB_MODE`를 두는 방법이 가장 일관적이다
+3. 스텁 `tools/` 채우기 — 역호출 경로 통합 검증 (S3 해제)
+4. BE Worker 식사 파이프라인 — 이 스텁을 상대로 개발
+5. AI 실제 LLM 연동 — `runner.py`의 `STUB_MODE=false` 분기만 채우면 된다
 
 ## 14. 열린 질문
 
 - 스텁 작업 디렉터리가 `ai/`인데 브랜치 접두사가 `be/`다. 팀에서 파트별 접두사를 엄격히 보는지 확인 필요.
 - `docs/architecture.md`와 `docs/decisions.md`가 `ai/README.md`·`backend/README.md`에서 참조되지만 아직 없다. D 번호(D2·D4·D5·D9·D13, R3·R7)의 원본이 어디인지 확인 필요.
+- `contracts/` 폐기에 따라 `ai/README.md`의 두 군데를 고쳐야 한다 — "실행" 절의 Prism 목 서버 안내와
+  `[../contracts/]` 링크. 이 브랜치에서 같이 고칠지, AI 파트에 넘길지 정할 것.
