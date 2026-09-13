@@ -3,8 +3,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 tests/
-.env
-.env.example
+pytest.ini
 README.md
 Dockerfile
 .dockerignore

@@ -1,8 +1,9 @@
-"""BE↔AI JSON 계약.
+"""BE ↔ AI 요청·응답 계약.
 
-이 파일이 계약의 단일 원본이다 (S7). 스텁 전용이 아니라 실제 LLM 구현도 같은 스키마를 쓴다.
+AI 레이어가 아직 없어서, BE 가 개발하는 동안 이 모양에 맞춰 코드를 쓴다.
+AI 팀이 실제 서비스를 만들 때 이 파일이 기준이 된다.
 
-JSON 은 camelCase, 파이썬은 snake_case 를 쓴다. `_Camel` 이 둘을 이어 준다.
+JSON 은 camelCase, 파이썬은 snake_case 다. `_Camel` 이 둘을 이어 준다.
 """
 
 from __future__ import annotations
@@ -15,12 +16,7 @@ from pydantic.alias_generators import to_camel
 
 
 class _Camel(BaseModel):
-    """camelCase 별칭을 자동으로 붙인다. 요청은 양쪽 표기를 모두 받는다."""
-
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
-
-
-# ─────────────────────────── 공통 enum ───────────────────────────
 
 
 class MealType(str, Enum):
@@ -51,7 +47,7 @@ class Scope(str, Enum):
 class PeriodType(str, Enum):
     WEEKLY = "WEEKLY"
     MONTHLY = "MONTHLY"
-    ALL = "ALL"  # 공개 API 의 ?period=all. DB ENUM 에는 아직 없다 — 스펙 14절
+    ALL = "ALL"  # 공개 API 의 ?period=all. DB ENUM 에는 아직 없다
 
 
 class QQS(_Camel):
@@ -68,12 +64,11 @@ class AnalyzeMealRequest(_Camel):
     meal_type: MealType
     eaten_at: dt.datetime
     stage: Stage
-    image_url: str | None = None
+    image_url: str | None = None  # presigned URL. AI 는 S3 권한이 없다
     raw_text: str | None = None
 
     @model_validator(mode="after")
     def _need_image_or_text(self) -> AnalyzeMealRequest:
-        # meals 의 CHECK (image_key IS NOT NULL OR raw_text IS NOT NULL) 과 같은 제약
         if not self.image_url and not self.raw_text:
             raise ValueError("imageUrl 과 rawText 중 최소 하나는 있어야 한다")
         return self
@@ -82,13 +77,13 @@ class AnalyzeMealRequest(_Camel):
 class RecognizedItem(_Camel):
     """meal_items 한 행에 대응한다.
 
-    성분(kcal·단백질 등) 필드는 일부러 두지 않는다. AI 는 음식을 지목만 하고
-    성분은 BE 가 food_refs 에서 채운다.
+    성분(kcal·단백질) 필드는 일부러 없다. AI 는 음식을 지목만 하고
+    성분은 BE 가 food_refs 에서 채운다. 양도 g 가 아니라 자연 단위로 준다.
     """
 
     original_food_name: str
     estimated_amount: float
-    unit: str  # g / 개 / ml / 공기 … g 환산은 BE 가 한다
+    unit: str  # g / 개 / ml … g 환산은 BE 가 한다
     confidence: float = Field(ge=0, le=1)
     candidate_food_ref_id: str | None = None
     clarify_question: str | None = None
@@ -105,7 +100,7 @@ class AnalyzeMealResponse(_Camel):
 
 
 class Nutrition(_Camel):
-    """BE → AI 방향의 컨텍스트 선주입. AI 가 생성하는 값이 아니다."""
+    """BE → AI 방향. AI 가 생성하는 값이 아니다."""
 
     kcal: float | None = None
     protein_g: float | None = None
@@ -145,14 +140,14 @@ class ShortFeedbackRequest(_Camel):
     scope: Scope
     user_id: str
     stage: Stage
-    qqs: QQS
+    qqs: QQS  # 채점은 BE Rule Engine 이 이미 끝냈다
 
-    # scope=MEAL 에서 쓴다
+    # scope=MEAL
     meal_id: str | None = None
     items: list[FeedbackItem] = Field(default_factory=list)
     satiety: SatietyContext | None = None
 
-    # scope=DAILY 에서 쓴다
+    # scope=DAILY
     date: dt.date | None = None
     meals: list[DailyMealSummary] = Field(default_factory=list)
 
@@ -166,7 +161,7 @@ class ShortFeedbackRequest(_Camel):
 
 
 class Suggestion(_Camel):
-    """nutrients 는 여기 없다 — BE 가 food_refs 에서 채워 공개 API 로 내보낸다."""
+    """nutrients 는 여기 없다 — BE 가 food_refs 에서 채운다."""
 
     food_name: str
     advice: str
@@ -202,6 +197,8 @@ class LongFeedbackRequest(_Camel):
 
 
 class LongFeedbackResponse(_Camel):
+    """chartData 는 없다 — BE 가 qqs_evaluations 를 집계해 채운다."""
+
     trend_summary: str
     recommendation: str
     model_version: str
