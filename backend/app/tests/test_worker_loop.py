@@ -11,7 +11,8 @@ from typing import Any
 import pytest
 
 from app.infra.queue import ReceivedTask
-from app.worker_main import handle, run
+from app.worker.dispatch import handle
+from app.worker.loop import run
 
 
 class FakeQueue:
@@ -29,9 +30,9 @@ class FakeQueue:
         if self._batches:
             return self._batches.pop(0)
 
-        import app.worker_main as worker_main
+        from app.worker import loop
 
-        worker_main._running = False
+        loop.request_stop()
         return []
 
     def delete(self, receipt: str) -> None:
@@ -59,11 +60,11 @@ class FakeAi:
 
 @pytest.fixture(autouse=True)
 def _reset_running():
-    import app.worker_main as worker_main
+    from app.worker import loop
 
-    worker_main._running = True
+    loop._running = True
     yield
-    worker_main._running = True
+    loop._running = True
 
 
 def _analyze_body(meal_id: str = "m1") -> dict[str, Any]:
@@ -90,7 +91,7 @@ def test_failed_task_is_not_deleted(monkeypatch):
     def boom(task, ai):
         raise RuntimeError("AI 가 500 을 냈다")
 
-    monkeypatch.setattr("app.worker_main.handle", boom)
+    monkeypatch.setattr("app.worker.loop.handle", boom)
     queue = FakeQueue([_task(_analyze_body())])
 
     run(queue, FakeAi())
@@ -99,7 +100,7 @@ def test_failed_task_is_not_deleted(monkeypatch):
 
 
 def test_successful_task_is_deleted(monkeypatch):
-    monkeypatch.setattr("app.worker_main.handle", lambda task, ai: None)
+    monkeypatch.setattr("app.worker.loop.handle", lambda task, ai: None)
     queue = FakeQueue([_task(_analyze_body(), receipt="abc")])
 
     run(queue, FakeAi())
@@ -114,7 +115,7 @@ def test_one_failure_does_not_stop_the_batch(monkeypatch):
         if task.receipt == "bad":
             raise RuntimeError("처리 실패")
 
-    monkeypatch.setattr("app.worker_main.handle", flaky)
+    monkeypatch.setattr("app.worker.loop.handle", flaky)
     queue = FakeQueue(
         [
             _task(_analyze_body(), receipt="bad"),

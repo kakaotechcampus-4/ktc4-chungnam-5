@@ -23,7 +23,7 @@ from app.models.enums import MealItemSource, MealStatus, MealType, MedicationSta
 from app.models.meal import Meal
 from app.models.medication import MedicationSnapshot
 from app.models.user import User
-from app.worker_main import analyze_meal
+from app.worker.jobs.analyze_meal import run as analyze_meal
 
 
 def _db_is_up() -> bool:
