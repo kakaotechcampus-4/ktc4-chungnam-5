@@ -50,6 +50,22 @@ npm-debug.log*
 yarn-error.log*
 .pnpm-store/
 
+# ── Dart / Flutter (frontend/) ───────────────────────
+# frontend/ 안에 `flutter create`가 만든 자체 .gitignore가 있지만,
+# 루트에서 실수로 부산물을 커밋하는 걸 막기 위해 여기도 추가.
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework/
+**/ios/Flutter/Flutter.podspec
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+
 # ── Python ──────────────────────────────────────────
 __pycache__/
 *.py[cod]
