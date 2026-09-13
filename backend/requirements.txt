@@ -1,2 +1,11 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
+
+# 설정
+pydantic-settings==2.15.0
+
+# 큐 — SQS. 로컬은 ElasticMQ(SQS API 호환)를 같은 코드로 쓴다
+boto3==1.43.93
+
+# 테스트
+pytest==9.1.1
