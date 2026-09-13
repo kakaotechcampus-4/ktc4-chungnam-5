@@ -31,12 +31,37 @@
       user_goal          진행 중 목표는 사용자당 하나 → close 먼저
       medication_record  effective_to IS NULL 인 행도 하나 → close 먼저
 
-## 커밋
+## 커밋은 부르는 쪽이 한다
 
-각 함수는 커밋하지 않는다. 한 작업이 여러 crud 를 묶어 쓰기 때문에, 함수마다 커밋하면
-중간에 실패했을 때 절반만 저장된 상태가 남는다.
+crud 함수 안에는 `commit()` 이 없다. 한 작업이 여러 crud 를 묶어 쓰기 때문에,
+함수마다 커밋하면 중간에 실패했을 때 절반만 저장된 상태가 남는다 —
+"옛 항목은 지워졌는데 새 항목은 절반만 들어간" 식사가 그런 예다.
 
-    from app.crud import meal as crud_meal
-    crud_meal.set_status(db, row, MealStatus.REVIEW_REQUIRED)
-    db.commit()
+세션을 얻는 방법은 부르는 쪽에 따라 다르다.
+
+**API** — 요청 하나당 세션 하나. `get_db` 가 세션을 주고 끝나면 닫는다(커밋은 안 한다).
+
+    @router.post("/meals", status_code=202)
+    def create_meal(body: MealCreate, db: Session = Depends(get_db)):
+        snapshot = crud_snapshot.add(db, user_id, stage=stage)
+        db.flush()                      # snapshot.id 가 필요하다
+        meal = crud_meal.create(db, medication_snapshot_id=snapshot.id, ...)
+        db.commit()                     # ← 큐에 넣기 전에 커밋한다
+        queue.send({"type": "meal.analyze", "mealId": str(meal.id)})
+        return {"mealId": meal.id, "status": "ANALYZING", "pollIntervalMs": 1500}
+
+순서가 중요하다. `queue.send()` 를 먼저 하면, 커밋이 실패했을 때 워커가 **DB 에 없는
+식사**를 처리하려다 3번 재시도 끝에 DLQ 로 보낸다.
+
+**Worker** — 요청 맥락이 없으니 세션을 직접 연다. 작업 하나가 트랜잭션 하나다.
+
+    with SessionLocal() as db:
+        crud_meal_item.delete_model_items(db, meal)
+        for item in items:
+            crud_meal_item.add(db, meal, ...)
+        crud_meal.set_status(db, meal, MealStatus.REVIEW_REQUIRED)
+        db.commit()                     # ← 전부 끝나고 한 번
+
+중간에 터지면 전부 롤백되고 식사는 `ANALYZING` 으로 남는다. 큐가 재배달하므로
+다시 시도된다 — 그래서 `analyze_meal` 은 상태를 먼저 보고 이미 처리된 건 건너뛴다.
 """
