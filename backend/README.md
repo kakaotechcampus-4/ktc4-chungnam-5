@@ -263,27 +263,21 @@ else:
 실패할 때마다 즉시 반환(visibility 0)하고 싶어지는데, 그러면 재시도가 밀리초 단위로 일어나
 `maxReceiveCount` 를 순식간에 태운다. **visibility timeout 이 곧 백오프다.**
 
-### DLQ
-
-3번 배달되고도 삭제되지 않은 메시지는 `glp1-tasks-dlq` 로 옮겨진다(`maxReceiveCount = 3`,
-`infra/elasticmq.conf`). 이동은 타이머가 아니라 **4번째 수신 시도**가 트리거한다 —
-Worker 가 폴링을 멈추면 메시지는 메인 큐에 남는다.
-
-DLQ 가 없으면 영원히 실패하는 작업이 무한히 재시도되면서 다른 작업을 방해하고,
-몇 개가 죽었는지 셀 방법도 없다. 원본 본문이 그대로 보존되므로 원인 조사와 재처리에 쓴다.
-
-```python
-dlq = build_task_queue(QueueSettings(), dlq=True)
-for task in dlq.receive(max_count=10, wait_seconds=2):
-    print(task.body)
-```
-
-DLQ 도착은 **"AI 가 이 식사를 끝내 분석하지 못했다"** 는 뜻이다. 여기서 `meals.status` 를
-`FAILED` 로 넘긴다. 점수(Rule Engine)는 이와 무관하게 남는다 — 부분 실패로 처리한다.
-
 ### 큐 상태 보기
 
-`http://localhost:9325` — ElasticMQ 웹 UI. 큐별 메시지 수와 DLQ 적재를 눈으로 확인한다.
+```bash
+python -m scripts.queue_status
+```
+
+```
+큐                          대기     처리중     지연
+---------------------------------------------
+glp1-tasks                  2       1      0
+glp1-tasks-dlq              0       0      0
+```
+
+ElasticMQ 에는 웹 UI 가 없다 — `elasticmq-native` 이미지에 `rest-stats` 서버가 들어 있지 않다.
+`GetQueueAttributes` 로 읽는다.
 
 > 🚨 Worker 컨테이너가 돌고 있으면 **메시지를 먼저 가져간다.** 손으로 `receive` 를 실험할 때는
 > `docker stop glp1-worker` 로 내렸다가 끝나면 `docker start glp1-worker` 로 되돌린다.

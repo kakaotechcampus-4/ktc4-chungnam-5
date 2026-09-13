@@ -6,7 +6,7 @@
 | 파일 | 서비스 | 컨테이너 | 호스트 포트 |
 |---|---|---|---|
 | `docker-compose.yml` | `db` | `glp1-db` | — |
-| `docker-compose.queue.yml` | `sqs` | `glp1-sqs` | 9324 (API) · 9325 (UI) |
+| `docker-compose.queue.yml` | `sqs` | `glp1-sqs` | 9324 |
 | `docker-compose.ai-stub.yml` | `ai-stub` | `glp1-ai-stub` | 8001 |
 | `docker-compose.be.yml` | `api` · `worker` | `glp1-api` · `glp1-worker` | 8000 (api) |
 
@@ -88,4 +88,23 @@ docker logs -f glp1-worker
 
 ## 큐 상태 보기
 
-`http://localhost:9325` — ElasticMQ 웹 UI. 메시지 수와 DLQ 적재를 눈으로 확인할 수 있다.
+**웹 UI 는 없다.** `elasticmq-native` 이미지에는 `rest-stats` 서버가 들어 있지 않아,
+설정에 넣어도 조용히 무시되고 9325 에는 아무것도 뜨지 않는다.
+
+대신 `GetQueueAttributes` 로 읽는다:
+
+```powershell
+cd ../backend
+.\.venv\Scripts\Activate.ps1
+python -m scripts.queue_status
+```
+
+```
+큐                          대기     처리중     지연
+---------------------------------------------
+glp1-tasks                  2       1      0
+glp1-tasks-dlq              0       0      0
+```
+
+`처리중` 은 누군가 꺼내갔고 아직 `delete` 하지 않은 것이다 —
+visibility timeout(60초) 안에 처리되지 않으면 `대기` 로 돌아온다.

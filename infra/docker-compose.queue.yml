@@ -2,7 +2,8 @@
 #
 #   docker compose -f docker-compose.queue.yml up -d
 #
-# 9324 — SQS API      9325 — 웹 UI (큐 상태를 눈으로 본다)
+# 9324 — SQS API. 웹 UI 는 없다 (elasticmq-native 에 rest-stats 서버가 없다).
+# 큐 상태는 backend/scripts/queue_status.py 로 본다.
 #
 # backend/.env 에 넣을 값:
 #   QUEUE_TYPE=sqs
@@ -22,7 +23,6 @@ services:
     container_name: glp1-sqs
     ports:
       - "9324:9324"
-      - "9325:9325"
     volumes:
       - ./elasticmq.conf:/opt/elasticmq.conf:ro
     restart: unless-stopped
