@@ -10,12 +10,36 @@ AI 레이어가 아직 없다. BE 를 개발하는 동안 **요청을 받아 고
 
 ## 실행
 
-```bash
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+**PowerShell (Windows)**
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 uvicorn main:app --reload --port 8001   # http://localhost:8001/docs
 pytest
+```
+
+`Activate.ps1` 이 실행 정책에 막히면 현재 세션에만 풀어 준다:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+```
+
+**macOS · Linux**
+
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8001
+```
+
+활성화 없이 쓰려면 venv 의 파이썬을 직접 부른다. 결과는 같다:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8001
+.\.venv\Scripts\python.exe -m pytest
 ```
 
 BE 쪽 `.env` 에 `AI_SERVICE_BASE_URL=http://localhost:8001` 을 넣는다.

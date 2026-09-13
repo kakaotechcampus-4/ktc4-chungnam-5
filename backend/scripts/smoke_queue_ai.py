@@ -1,8 +1,16 @@
-"""큐 ↔ ai-stub 왕복 확인.
+r"""큐 ↔ ai-stub 왕복 확인.
 
-    docker compose -f ../infra/docker-compose.queue.yml up -d   # ElasticMQ
-    cd ../ai-stub && uvicorn main:app --port 8001               # 스텁
-    cd ../backend && python -m scripts.smoke_queue_ai
+PowerShell 창 셋으로 띄운다:
+
+    docker compose -f infra\docker-compose.queue.yml up -d       # ElasticMQ
+
+    cd ai-stub
+    .\.venv\Scripts\Activate.ps1
+    uvicorn main:app --port 8001                                 # 스텁
+
+    cd backend
+    .\.venv\Scripts\Activate.ps1
+    python -m scripts.smoke_queue_ai
 
 정상 경로와 실패 경로를 한 번씩 돌린다. 실패 경로가 핵심이다 —
 AI 가 죽었을 때 메시지가 지워지지 않고, 재배달되고, 3회를 넘기면 DLQ 로 빠지는지.
