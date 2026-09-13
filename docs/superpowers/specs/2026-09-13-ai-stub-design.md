@@ -36,6 +36,7 @@ AI 파트가 BE 없이 개발하는 방법은 `/internal/v1`을 구현하는 시
 - 의료 가드레일 (`guardrail/medical.py`) — 스텁·실제 공용
 - 시나리오 트리거 6종
 - pytest 테스트
+- multi-stage Dockerfile (`stub` · `real` 두 타깃)과 `infra/docker-compose.ai.yml`
 
 **제외**
 
@@ -50,12 +51,13 @@ AI 파트가 BE 없이 개발하는 방법은 `/internal/v1`을 구현하는 시
 
 | # | 결정 | 근거 |
 |---|---|---|
-| S1 | 스텁을 별도 프로젝트가 아니라 `ai/` 안의 **모드**로 둔다 | 라우터·스키마·가드레일을 실제 구현과 공유한다. 버려지는 코드는 `agents/stub/`뿐이고, LLM을 붙일 때 계약이 그대로 남는다 |
+| S1 | 스텁을 별도 프로젝트가 아니라 `ai/` 안의 **모드**로 둔다 (소스 기준. 이미지는 S8 에서 나눈다) | 라우터·스키마·가드레일을 실제 구현과 공유한다. 버려지는 코드는 `agents/stub/`뿐이고, LLM을 붙일 때 계약이 그대로 남는다 |
 | S2 | 일일 피드백은 `/short-feedback`에 `scope: MEAL / DAILY`로 받는다 | 라우터 신설은 프롬프트·스키마·테스트를 3배로 늘린다(`ai/README.md`). `daily_feedbacks.summary`는 추이가 아니라 요약이라 short의 결과물 성격과 같다 |
 | S3 | 스텁은 BE `/internal/v1`을 역호출하지 않는다 | BE에 `/internal/v1`이 아직 없다(`app/internal/v1/`은 빈 패키지). 붙일 대상이 생기는 시점에 `tools/`를 채우는 것이 순서다. `candidateFoodRefId`는 픽스처 또는 `null`로 돌려준다 — `meal_items.food_ref_id`가 NULL을 허용한다 |
 | S4 | 응답은 결정적 픽스처 + 시나리오 트리거로 만든다 | 고정 응답은 정상 경로만 검증한다. 입력 해시 기반 랜덤은 재현은 되지만 테스트에서 assert를 쓸 수 없다 |
 | S5 | 시나리오는 `X-Stub-Scenario` **헤더**로 제어한다 | 본문에 매직 문자열을 심으면 프로덕션 데이터를 오염시킬 수 있고, 실제 구현으로 전환할 때 본문 스키마가 달라진다. 헤더는 실제 구현이 무시하면 그만이다 |
 | S6 | AI 응답에 집계 숫자를 두지 않는다 — `chartData`·일일 점수는 BE가 채운다 | `ai/README.md` 규칙 2의 연장. `long_term_feedbacks.chart_data`와 `daily_feedbacks`의 점수 3개는 `qqs_evaluations` 집계로 구할 수 있다. LLM이 만들면 숫자가 틀려도 검증할 방법이 없다 |
+| S8 | 스텁과 실사용을 **별개 이미지**로 빌드한다 — `glp1-ai-stub` · `glp1-ai`. 소스는 `ai/` 하나이고 Dockerfile 을 multi-stage 로 나눈다 | 컨테이너만 나누면 둘이 같은 이미지를 공유한다. 환경변수 하나 잘못 주면 스텁이 팀 공용 크레딧을 쓴다. 이미지를 나누면 스텁에는 LLM 의존성도 `agents/llm/` 도 **물리적으로 없다** — 설정 실수로 뚫리지 않는다. 소스는 나누지 않으므로 `schemas.py` 는 여전히 한 벌이다 (S7) |
 | S7 | `contracts/`를 폐기한다. 계약의 단일 원본은 `agents/schemas.py`이고, OpenAPI는 **런타임에** FastAPI가 서빙한다 | 생성물을 커밋하면 원본(Pydantic)과 사본(JSON)이 갈라지고, 갱신 스크립트를 매번 돌려야 한다. 이 계약의 소비자는 BE Worker 하나뿐이고, 그쪽은 어차피 스텁을 띄워 놓고 개발한다 — `http://localhost:8001/docs`를 보면 된다 |
 
 ## 5. 컴포넌트 구조
@@ -90,6 +92,34 @@ ai/
 그대로 따른다. 스텁 분기가 그 진입점 한 곳에만 존재하므로, 실제 LLM을 붙일 때 고치는 파일은 `runner.py` 하나다.
 
 `guardrail/`과 `agents/schemas.py`는 스텁 전용이 아니다. 실제 구현에서도 그대로 쓴다.
+
+### 이미지 두 개 (S8)
+
+한 소스에서 두 이미지를 빌드한다. 나뉘는 것은 `agents/` 아래 한 겹과 의존성뿐이다.
+
+| | `glp1-ai-stub` | `glp1-ai` |
+|---|---|---|
+| Dockerfile target | `stub` | `real` |
+| `app/` · `guardrail/` · `schemas.py` · `runner.py` | ✅ | ✅ |
+| `agents/stub/` | ✅ | ❌ |
+| `agents/llm/` | ❌ | ✅ |
+| `requirements-llm.txt` (LLM SDK) | ❌ | ✅ |
+| `STUB_MODE` 기본값 | `true` | `false` |
+| 포트 (호스트) | 8001 | 8002 |
+
+```bash
+docker build --target stub -t glp1-ai-stub ai/
+docker build --target real -t glp1-ai      ai/
+```
+
+`infra/docker-compose.ai.yml` 로 띄운다. **기본으로는 스텁만 뜬다** — 실사용은
+`--profile real` 을 명시해야 올라간다. 팀 공용 크레딧을 실수로 쓰지 않게 한 장치다.
+
+이 구성 때문에 `runner.py` 는 구현 묶음을 **지연 import** 한다.
+최상단에서 `from agents.stub import ...` 를 하면 실사용 이미지가 기동하자마자 ImportError 로 죽는다.
+
+`agents/llm/` 이 없는 실사용 이미지는 기동은 되고, 요청이 오면 `501 Not Implemented` 와
+무엇을 구현해야 하는지 적은 메시지를 돌려준다.
 
 ## 6. 계약 — `POST /analyze-meal`
 

@@ -5,7 +5,8 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers import analyze_meal, long_feedback, short_feedback
@@ -24,6 +25,15 @@ app = FastAPI(
 app.include_router(analyze_meal.router)
 app.include_router(short_feedback.router)
 app.include_router(long_feedback.router)
+
+
+@app.exception_handler(NotImplementedError)
+async def _not_implemented(request: Request, exc: NotImplementedError) -> JSONResponse:
+    """실사용 이미지에 agents/llm/ 이 아직 없을 때. 스택트레이스 대신 읽을 수 있는 응답을 준다."""
+    return JSONResponse(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        content={"detail": str(exc)},
+    )
 
 
 @app.get("/health", tags=["meta"])

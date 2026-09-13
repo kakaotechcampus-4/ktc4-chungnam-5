@@ -1,0 +1,63 @@
+# AI Service — 스텁과 실사용을 별개 이미지·별개 컨테이너로 띄운다 (S8).
+#
+#   docker compose -f docker-compose.ai.yml up -d              # 스텁만 (개발 기본)
+#   docker compose -f docker-compose.ai.yml --profile real up -d   # 실사용까지
+#
+# 기본으로 스텁만 뜬다. 실사용은 profile 을 명시해야 올라간다 —
+# 팀 공용 크레딧을 실수로 쓰는 일이 없게 한 장치다.
+#
+# Postgres 등 다른 서비스와 함께 쓰려면 -f 를 두 번 준다:
+#   docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+
+services:
+  ai-stub:
+    build:
+      context: ../ai
+      target: stub
+    image: glp1-ai-stub
+    container_name: glp1-ai-stub
+    ports:
+      - "8001:8000"
+    environment:
+      STUB_MODE: "true"
+      STUB_LATENCY_MS: "0"
+      STUB_DEFAULT_SCENARIO: "SUCCESS"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  ai:
+    profiles: ["real"]
+    build:
+      context: ../ai
+      target: real
+    image: glp1-ai
+    container_name: glp1-ai
+    ports:
+      - "8002:8000"
+    environment:
+      STUB_MODE: "false"
+      # 비어 있으면 app/config.py 가 부팅 시점에 컨테이너를 죽인다.
+      # 여기서 ${VAR:?} 를 쓰면 안 된다 — compose 는 프로필과 무관하게 파일 전체를
+      # 보간하므로, 스텁만 띄우려 할 때도 이 줄 때문에 막힌다.
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
