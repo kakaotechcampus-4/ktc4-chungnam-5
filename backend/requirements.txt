@@ -1,8 +1,16 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 
+# DB
+sqlalchemy==2.0.52
+alembic==1.19.2
+psycopg[binary]==3.3.5
+
 # 설정
 pydantic-settings==2.15.0
+
+# 공공 영양DB 엑셀 적재 (scripts/load_food_refs.py)
+openpyxl==3.1.5
 
 # 큐 — SQS. 로컬은 ElasticMQ(SQS API 호환)를 같은 코드로 쓴다
 boto3==1.43.93
