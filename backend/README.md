@@ -213,11 +213,29 @@ API ──send──▶ 큐 ──receive──▶ Worker ──HTTP──▶ AI
 | --- | --- | --- | --- |
 | `POST /meals` | `meal.analyze` | `/analyze-meal` | `meal_items` · `meals.status` |
 | 사용자가 `meal_items` 확인·수정한 뒤 | `meal.evaluate` | — (Rule Engine) | `qqs_evaluations` |
-| ↳ 이어서 | `feedback.generate` | `/short-feedback` `scope=MEAL` | `meal_feedbacks` |
-| `POST /insights/daily/refresh` | `feedback.generate` | `/short-feedback` `scope=DAILY` | `daily_feedbacks` |
-| `POST /insights/long-term/refresh` | `feedback.generate` | `/long-feedback` | `long_term_feedbacks` |
+| ↳ 이어서 | `feedback.meal` | `/short-feedback` `scope=MEAL` | `meal_feedbacks` |
+| `POST /insights/daily/refresh` | `feedback.daily` | `/short-feedback` `scope=DAILY` | `daily_feedbacks` · `daily_feedback_sources` |
+| `POST /insights/long-term/refresh` | `feedback.long` | `/long-feedback` | `long_term_feedbacks` · `long_term_feedback_sources` |
 
 전부 **`202` + `pollIntervalMs`** 를 돌려주고 끊는다. FE 는 아래 GET 을 폴링한다.
+
+#### 피드백 세 종류를 한 타입으로 묶지 않는다
+
+AI 쪽은 끼니와 하루를 같은 `/short-feedback` 으로 받는다 — AI 가 하는 일이
+"Q/Q/S 를 짧은 문장으로 옮긴다" 로 같기 때문이다(S2).
+
+**그렇다고 큐 작업 타입까지 같아지지는 않는다.** 데이터를 모으는 것도 결과를 저장하는 것도
+Worker 몫이고, 그게 셋 다 다르다.
+
+| | 모으는 데이터 | 쓰는 테이블 |
+| --- | --- | --- |
+| `feedback.meal` | `meal_items` + `satiety_logs` 1건 | `meal_feedbacks` |
+| `feedback.daily` | 그날 `meal_feedbacks` N건 집계 | `daily_feedbacks` + 근거 링크 |
+| `feedback.long` | `daily_feedbacks` 여러 날 + Q/Q/S 시계열 | `long_term_feedbacks` + 근거 링크 |
+
+한 타입으로 묶으면 `type` 이 정보를 거의 담지 못하고 진짜 구분자가 본문 안에 숨는다.
+DLQ 분류도 쓸모가 없어진다 — "`feedback.generate` 10건 실패" 보다
+"`feedback.long` 10건 실패" 가 원인 추적에 훨씬 낫다.
 
 #### 큐를 쓰지 않는다
 
@@ -231,7 +249,7 @@ DB 에 이미 저장된 결과를 읽을 뿐이다. AI 를 부르지 않으므�
 #### `meal.evaluate` 는 AI 가 필요 없다
 
 Q/Q/S 채점은 Rule Engine(순수 함수)이 한다. 그런데도 큐를 거치는 건, 바로 뒤에
-`feedback.generate`(AI)가 이어져 한 줄기로 묶이고, 재평가가 `qqs_evaluations` 를 덮어쓰는
+`feedback.meal`(AI)이 이어져 한 줄기로 묶이고, 재평가가 `qqs_evaluations` 를 덮어쓰는
 작업이라 실패 시 재시도가 필요하기 때문이다.
 
 **이게 "AI 가 죽어도 Q/Q/S 는 남는다" 가 성립하는 구조적 이유다.** 채점과 문장 생성이 별개
@@ -244,8 +262,8 @@ Q/Q/S 채점은 Rule Engine(순수 함수)이 한다. 그런데도 큐를 거치
 일도 없고, Worker 가 시간 트리거로 직접 시작한다. `worker/` 가 **큐 소비 + 스케줄 배치**
 두 갈래인 게 이것이다.
 
-> 현재 구현 상태: `meal.analyze` 만 AI 까지 왕복이 돈다. `meal.evaluate` · `feedback.generate`
-> 는 `NotImplementedError` 로 자리만 잡혀 있고, `analyze_meal()` 도 응답을 받아 로그만 찍고
+> 현재 구현 상태: `meal.analyze` 만 AI 까지 왕복이 돈다. 나머지 네 타입은
+> `NotImplementedError` 로 자리만 잡혀 있고, `analyze_meal()` 도 응답을 받아 로그만 찍고
 > DB 저장은 하지 않는다 — 모델이 아직 이 브랜치에 없다.
 
 ### API 3개

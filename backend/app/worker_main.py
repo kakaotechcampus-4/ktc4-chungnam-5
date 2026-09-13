@@ -62,15 +62,29 @@ def analyze_meal(task: ReceivedTask, ai: AiClient) -> None:
 
 
 def handle(task: ReceivedTask, ai: AiClient) -> None:
-    """작업 하나를 처리한다."""
+    """작업 하나를 처리한다.
+
+    피드백 세 종류를 한 타입으로 묶지 않는다. AI 쪽은 끼니와 하루를 같은
+    `/short-feedback` 으로 받지만(하는 일이 같다), Worker 쪽은 다르다 —
+    모으는 데이터도, 쓰는 테이블도 셋이 전부 다르다. 묶으면 진짜 구분자가
+    본문 안에 숨고 DLQ 에 쌓였을 때 어느 피드백이 죽었는지도 알 수 없다.
+    """
     task_type = task.body.get("type")
 
     if task_type == "meal.analyze":
         return analyze_meal(task, ai)
     if task_type == "meal.evaluate":
+        # Rule Engine(순수 함수) → qqs_evaluations. AI 를 부르지 않는다
         raise NotImplementedError("Q/Q/S 평가 파이프라인 미구현")
-    if task_type == "feedback.generate":
-        raise NotImplementedError("피드백 생성 파이프라인 미구현")
+    if task_type == "feedback.meal":
+        # /short-feedback scope=MEAL → meal_feedbacks
+        raise NotImplementedError("끼니 피드백 파이프라인 미구현")
+    if task_type == "feedback.daily":
+        # /short-feedback scope=DAILY → daily_feedbacks
+        raise NotImplementedError("일일 피드백 파이프라인 미구현")
+    if task_type == "feedback.long":
+        # /long-feedback → long_term_feedbacks
+        raise NotImplementedError("장기 피드백 파이프라인 미구현")
 
     raise ValueError(f"알 수 없는 작업 타입: {task_type!r}")
 
