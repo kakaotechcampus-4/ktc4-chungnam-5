@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+pytest.ini
+app/tests/
+
+# 로컬 설정이 이미지에 섞이지 않게 한다. 컨테이너 환경변수는 compose 가 준다.
+.env
+.env.example
+
+README.md
+image.png
+Dockerfile
+.dockerignore
