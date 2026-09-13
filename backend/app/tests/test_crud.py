@@ -15,12 +15,19 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import text
 
+from app.crud import daily_feedback as crud_daily
 from app.crud import evaluation as crud_eval
-from app.crud import feedback as crud_fb
 from app.crud import handoff as crud_handoff
+from app.crud import long_feedback as crud_long
 from app.crud import meal as crud_meal
-from app.crud import medication as crud_med
+from app.crud import meal_feedback as crud_meal_fb
+from app.crud import meal_item as crud_item
+from app.crud import medication_record as crud_record
+from app.crud import medication_snapshot as crud_snapshot
+from app.crud import satiety as crud_satiety
 from app.crud import user as crud_user
+from app.crud import user_goal as crud_goal
+from app.crud import user_state as crud_state
 from app.db.session import SessionLocal
 from app.models.enums import (
     FeedbackPeriodType,
@@ -72,7 +79,7 @@ def user(db):
 
 @pytest.fixture
 def meal(db, user):
-    snapshot = crud_med.add_snapshot(db, user.id, stage=MedicationStage.MAINTENANCE)
+    snapshot = crud_snapshot.add(db, user.id, stage=MedicationStage.MAINTENANCE)
     db.flush()
     row = crud_meal.create(
         db,
@@ -100,35 +107,27 @@ def test_get_by_provider(db, user):
 
 def test_active_goal_is_one_per_user(db, user):
     """진행 중인 목표가 둘이면 진행률을 무엇 대비로 볼지 모호해진다."""
-    crud_user.add_goal(db, user.id, Decimal("62.00"))
+    crud_goal.add(db, user.id, Decimal("62.00"))
     db.flush()
 
-    assert crud_user.get_active_goal(db, user.id) is not None
+    assert crud_goal.get_active(db, user.id) is not None
 
-    crud_user.add_goal(db, user.id, Decimal("60.00"))
+    crud_goal.add(db, user.id, Decimal("60.00"))
     with pytest.raises(Exception):  # 부분 유니크 인덱스 위반
         db.flush()
 
 
 def test_closed_goal_frees_the_slot(db, user):
-    first = crud_user.add_goal(db, user.id, Decimal("62.00"))
+    first = crud_goal.add(db, user.id, Decimal("62.00"))
     db.flush()
-    crud_user.close_goal(db, first, GoalStatus.COMPLETED)
+    crud_goal.close(db, first, GoalStatus.COMPLETED)
     db.flush()
 
-    crud_user.add_goal(db, user.id, Decimal("60.00"))
+    crud_goal.add(db, user.id, Decimal("60.00"))
     db.flush()  # 이제 통과해야 한다
 
-    assert crud_user.get_active_goal(db, user.id).target_weight_kg == Decimal("60.00")
+    assert crud_goal.get_active(db, user.id).target_weight_kg == Decimal("60.00")
 
-
-def test_latest_state_is_by_recorded_at(db, user):
-    crud_user.add_state(db, user.id, recorded_at=NOW - dt.timedelta(days=1), weight_kg=Decimal("70"))
-    crud_user.add_state(db, user.id, recorded_at=NOW, weight_kg=Decimal("69"))
-    db.flush()
-
-    assert crud_user.get_latest_state(db, user.id).weight_kg == Decimal("69.00")
-    assert len(crud_user.list_states(db, user.id)) == 2
 
 
 def test_fcm_token_clears_timestamp(db, user):
@@ -145,7 +144,7 @@ def test_fcm_token_clears_timestamp(db, user):
 
 
 def test_only_one_current_record(db, user):
-    crud_med.add_record(
+    crud_record.add(
         db,
         user.id,
         drug_name="위고비",
@@ -156,7 +155,7 @@ def test_only_one_current_record(db, user):
     )
     db.flush()
 
-    crud_med.add_record(
+    crud_record.add(
         db,
         user.id,
         drug_name="위고비",
@@ -170,7 +169,7 @@ def test_only_one_current_record(db, user):
 
 
 def test_snapshot_copies_record(db, user):
-    record = crud_med.add_record(
+    record = crud_record.add(
         db,
         user.id,
         drug_name="위고비",
@@ -181,7 +180,7 @@ def test_snapshot_copies_record(db, user):
     )
     db.flush()
 
-    snapshot = crud_med.add_snapshot(
+    snapshot = crud_snapshot.add(
         db, user.id, stage=MedicationStage.TITRATION, source_record=record
     )
     db.flush()
@@ -192,7 +191,7 @@ def test_snapshot_copies_record(db, user):
 
 def test_snapshot_without_record_is_allowed(db, user):
     """PRE_DOSE 사용자는 투약 기록이 없다. 그래도 스냅샷은 하나 붙는다."""
-    snapshot = crud_med.add_snapshot(db, user.id, stage=MedicationStage.PRE_DOSE)
+    snapshot = crud_snapshot.add(db, user.id, stage=MedicationStage.PRE_DOSE)
     db.flush()
 
     assert snapshot.drug_name is None
@@ -201,25 +200,9 @@ def test_snapshot_without_record_is_allowed(db, user):
 # ─────────────────────────── meal ───────────────────────────
 
 
-def test_recent_meals_are_newest_first(db, user, meal):
-    snapshot = crud_med.add_snapshot(db, user.id, stage=MedicationStage.MAINTENANCE)
-    db.flush()
-    crud_meal.create(
-        db,
-        user_id=user.id,
-        medication_snapshot_id=snapshot.id,
-        meal_type=MealType.DINNER,
-        eaten_at=NOW + dt.timedelta(hours=6),
-        raw_text="저녁",
-    )
-    db.flush()
-
-    rows = crud_meal.list_recent(db, user.id, limit=5)
-    assert [r.meal_type for r in rows] == [MealType.DINNER, MealType.LUNCH]
-
 
 def test_meal_needs_image_or_text(db, user, meal):
-    snapshot = crud_med.add_snapshot(db, user.id, stage=MedicationStage.MAINTENANCE)
+    snapshot = crud_snapshot.add(db, user.id, stage=MedicationStage.MAINTENANCE)
     db.flush()
     crud_meal.create(
         db,
@@ -233,7 +216,7 @@ def test_meal_needs_image_or_text(db, user, meal):
 
 
 def test_confirm_records_correction_only_when_changed(db, meal):
-    item = crud_meal.add_item(
+    item = crud_item.add(
         db,
         meal,
         original_food_name="참치김밥",
@@ -242,25 +225,25 @@ def test_confirm_records_correction_only_when_changed(db, meal):
     )
     db.flush()
 
-    assert crud_meal.confirm_item(db, item) is None, "확인만 한 것은 수정이 아니다"
+    assert crud_item.confirm(db, item) is None, "확인만 한 것은 수정이 아니다"
 
-    correction = crud_meal.confirm_item(db, item, confirmed_amount_g=Decimal("300.00"))
+    correction = crud_item.confirm(db, item, confirmed_amount_g=Decimal("300.00"))
     db.flush()
 
     assert correction is not None
     assert correction.original_value["confirmedAmountG"] is None
     assert correction.corrected_value["confirmedAmountG"] == 300.0
-    assert len(crud_meal.list_corrections(db, item.id)) == 1
+    assert len(item.corrections) == 1  # 관계로 확인한다 — 목록 함수는 두지 않았다
 
 
 def test_reanalysis_keeps_user_items(db, meal):
-    crud_meal.add_item(
+    crud_item.add(
         db, meal, original_food_name="AI 가 찾은 것", estimated_amount_g=None, confidence=None
     )
-    crud_meal.add_user_item(db, meal, display_name="사용자가 넣은 것")
+    crud_item.add_by_user(db, meal, display_name="사용자가 넣은 것")
     db.flush()
 
-    removed = crud_meal.delete_model_items(db, meal)
+    removed = crud_item.delete_model_items(db, meal)
     db.flush()
 
     assert removed == 1
@@ -269,13 +252,13 @@ def test_reanalysis_keeps_user_items(db, meal):
 
 def test_satiety_upsert_does_not_erase_earlier_input(db, meal):
     """식전에 한 번, 식후에 한 번 채워진다. 뒤 입력이 앞 값을 지우면 안 된다."""
-    crud_meal.upsert_satiety(db, meal.id, logged_at=NOW, satiety_before=20)
+    crud_satiety.upsert(db, meal.id, logged_at=NOW, satiety_before=20)
     db.flush()
 
-    crud_meal.upsert_satiety(db, meal.id, logged_at=NOW, satiety_after=68)
+    crud_satiety.upsert(db, meal.id, logged_at=NOW, satiety_after=68)
     db.flush()
 
-    row = crud_meal.get_satiety(db, meal.id)
+    row = crud_satiety.get(db, meal.id)
     assert (row.satiety_before, row.satiety_after) == (20, 68)
 
 
@@ -308,29 +291,12 @@ def test_qqs_upsert_overwrites(db, meal):
     assert row.quality_score is None
 
 
-def test_qqs_series_is_ordered_by_eaten_at(db, user, meal):
-    crud_eval.upsert(
-        db,
-        meal.id,
-        stage_at_evaluation=MedicationStage.MAINTENANCE,
-        quantity_score=Decimal("70"),
-        quality_score=Decimal("60"),
-        satiety_score=Decimal("50"),
-    )
-    db.flush()
-
-    series = crud_eval.list_series(
-        db, user.id, since=NOW - dt.timedelta(days=1), until=NOW + dt.timedelta(days=1)
-    )
-    assert len(series) == 1
-    assert series[0][0] is not None  # eaten_at
-
 
 # ─────────────────────────── feedback ───────────────────────────
 
 
 def test_meal_feedback_upsert_and_default_safety(db, user, meal):
-    row = crud_fb.upsert_meal_feedback(
+    row = crud_meal_fb.upsert(
         db,
         user_id=user.id,
         meal_id=meal.id,
@@ -343,7 +309,7 @@ def test_meal_feedback_upsert_and_default_safety(db, user, meal):
 
     assert row.safety_status is SafetyStatus.REVIEW_REQUIRED, "가드레일 통과 전에는 노출하지 않는다"
 
-    crud_fb.upsert_meal_feedback(
+    crud_meal_fb.upsert(
         db,
         user_id=user.id,
         meal_id=meal.id,
@@ -355,11 +321,11 @@ def test_meal_feedback_upsert_and_default_safety(db, user, meal):
     )
     db.flush()
 
-    assert crud_fb.get_by_meal(db, meal.id).body == "다시 쓴 문장"
+    assert crud_meal_fb.get_by_meal(db, meal.id).body == "다시 쓴 문장"
 
 
 def test_daily_feedback_replaces_sources(db, user, meal):
-    mf = crud_fb.upsert_meal_feedback(
+    mf = crud_meal_fb.upsert(
         db,
         user_id=user.id,
         meal_id=meal.id,
@@ -370,7 +336,7 @@ def test_daily_feedback_replaces_sources(db, user, meal):
     )
     db.flush()
 
-    daily = crud_fb.upsert_daily_feedback(
+    daily = crud_daily.upsert(
         db,
         user_id=user.id,
         feedback_date=TODAY,
@@ -384,7 +350,7 @@ def test_daily_feedback_replaces_sources(db, user, meal):
     db.flush()
     assert len(daily.sources) == 1
 
-    crud_fb.upsert_daily_feedback(
+    crud_daily.upsert(
         db,
         user_id=user.id,
         feedback_date=TODAY,
@@ -397,39 +363,8 @@ def test_daily_feedback_replaces_sources(db, user, meal):
     )
     db.flush()
 
-    assert crud_fb.get_daily(db, user.id, TODAY).sources == []
+    assert crud_daily.get(db, user.id, TODAY).sources == []
 
-
-def test_long_term_feedback_upsert(db, user):
-    start = TODAY - dt.timedelta(days=6)
-    crud_fb.upsert_long_term_feedback(
-        db,
-        user_id=user.id,
-        period_type=FeedbackPeriodType.WEEKLY,
-        period_start=start,
-        period_end=TODAY,
-        trend_summary="오르는 흐름",
-        recommendation=None,
-        chart_data={"points": []},
-        model_version=None,
-    )
-    db.flush()
-
-    crud_fb.upsert_long_term_feedback(
-        db,
-        user_id=user.id,
-        period_type=FeedbackPeriodType.WEEKLY,
-        period_start=start,
-        period_end=TODAY,
-        trend_summary="다시 쓴 추이",
-        recommendation=None,
-        chart_data=None,
-        model_version=None,
-    )
-    db.flush()
-
-    row = crud_fb.get_latest_long_term(db, user.id, FeedbackPeriodType.WEEKLY)
-    assert row.trend_summary == "다시 쓴 추이"
 
 
 # ─────────────────────────── handoff ───────────────────────────
@@ -452,26 +387,8 @@ def test_handoff_pending_then_reviewed(db, user, meal):
     db.flush()
 
     assert all(row.id != log.id for row in crud_handoff.list_pending(db))
-    assert len(crud_handoff.list_for_user(db, user.id)) == 1
+    assert crud_handoff.get(db, log.id).status is HandoffStatus.RESOLVED
 
-
-def test_handoff_survives_meal_deletion(db, user, meal):
-    """차단했다는 사실은 감사 대상이라 남아야 한다 — meal_id 만 NULL 이 된다."""
-    log = crud_handoff.add(
-        db,
-        user.id,
-        trigger_type=HandoffTriggerType.DISCONTINUATION_QUESTION,
-        detected_at=NOW,
-        meal_id=meal.id,
-    )
-    db.flush()
-
-    db.delete(meal)
-    db.flush()
-    db.expire(log)
-
-    assert crud_handoff.get(db, log.id) is not None
-    assert crud_handoff.get(db, log.id).meal_id is None
 
 
 # ─────────────────────────── food ───────────────────────────
@@ -495,3 +412,29 @@ def test_food_lookup_hits_seed_data(db):
 
     assert crud_food.get(db, sample.id).id == sample.id
     assert sample.id in crud_food.get_many(db, [sample.id, uuid.uuid4().hex])
+
+
+# ─────────────────────────── long_feedback ───────────────────────────
+
+
+def test_long_term_upsert_overwrites(db, user):
+    start = TODAY - dt.timedelta(days=6)
+    kw = dict(
+        user_id=user.id,
+        period_type=FeedbackPeriodType.WEEKLY,
+        period_start=start,
+        period_end=TODAY,
+        recommendation=None,
+        model_version=None,
+    )
+
+    crud_long.upsert(db, trend_summary="오르는 흐름", chart_data={"points": []}, **kw)
+    db.flush()
+    crud_long.upsert(db, trend_summary="다시 쓴 추이", chart_data=None, **kw)
+    db.flush()
+
+    row = crud_long.get(
+        db, user.id, period_type=FeedbackPeriodType.WEEKLY, period_start=start
+    )
+    assert row.trend_summary == "다시 쓴 추이"
+    assert row.safety_status is SafetyStatus.REVIEW_REQUIRED

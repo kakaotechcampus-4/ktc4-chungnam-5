@@ -1,7 +1,8 @@
 """`medical_handoff_logs` 접근.
 
 가드레일이 의료 질문을 감지하면 여기 남긴다(규칙 1). 기록은 지우지 않는다 —
-"차단했다" 는 사실 자체가 감사 대상이다.
+"차단했다" 는 사실 자체가 감사 대상이다. 식사가 지워져도 `meal_id` 만 NULL 이 되고
+로그는 남는다(`ondelete=SET NULL`).
 
 `original_input` 에 사용자의 원본 질문이 들어간다. **로그로 흘리지 않는다** —
 약제·용량이 섞여 있을 수 있다(규칙 6).
@@ -55,16 +56,6 @@ def list_pending(db: Session, *, limit: int = 100) -> list[MedicalHandoffLog]:
             .where(MedicalHandoffLog.status == HandoffStatus.PENDING)
             .order_by(MedicalHandoffLog.detected_at)
             .limit(limit)
-        ).all()
-    )
-
-
-def list_for_user(db: Session, user_id: uuid.UUID | str) -> list[MedicalHandoffLog]:
-    return list(
-        db.scalars(
-            select(MedicalHandoffLog)
-            .where(MedicalHandoffLog.user_id == user_id)
-            .order_by(MedicalHandoffLog.detected_at.desc())
         ).all()
     )
 

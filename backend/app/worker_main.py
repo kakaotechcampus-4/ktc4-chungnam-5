@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import food as crud_food
 from app.crud import meal as crud_meal
+from app.crud import meal_item as crud_meal_item
 from app.db.session import SessionLocal
 from app.infra.ai import AiClient, build_ai_client
 from app.infra.queue import ReceivedTask, TaskQueue, build_task_queue
@@ -78,7 +79,7 @@ def analyze_meal(task: ReceivedTask, ai: AiClient) -> None:
         # 존재하지 않는 food_ref_id 를 그대로 넣으면 FK 위반으로 커밋이 통째로 깨진다.
         known = crud_food.get_many(db, (item.get("candidateFoodRefId") for item in items))
 
-        crud_meal.delete_model_items(db, meal)
+        crud_meal_item.delete_model_items(db, meal)
 
         unconverted = 0
         for item in items:
@@ -87,7 +88,7 @@ def analyze_meal(task: ReceivedTask, ai: AiClient) -> None:
                 unconverted += 1
 
             confidence = item.get("confidence")
-            crud_meal.add_item(
+            crud_meal_item.add(
                 db,
                 meal,
                 original_food_name=item["originalFoodName"],
