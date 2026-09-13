@@ -203,6 +203,51 @@ API ──send──▶ 큐 ──receive──▶ Worker ──HTTP──▶ AI
 재시도 · DLQ 를 흉내 낸 구현은 결국 진짜와 어긋나기 때문이다 — 로컬에서 통과한 재시도 로직이
 배포 후에 다르게 돌면 곤란하다. 프로덕션에서는 `SQS_ENDPOINT_URL` 을 비워 실제 AWS 로 붙는다.
 
+### 언제 큐를 쓰나
+
+경계는 하나다 — **변경 요청은 큐로, 조회는 직접.**
+
+#### 큐에 넣는다
+
+| 공개 API | 작업 타입 | 부르는 AI | 결과가 들어가는 곳 |
+| --- | --- | --- | --- |
+| `POST /meals` | `meal.analyze` | `/analyze-meal` | `meal_items` · `meals.status` |
+| 사용자가 `meal_items` 확인·수정한 뒤 | `meal.evaluate` | — (Rule Engine) | `qqs_evaluations` |
+| ↳ 이어서 | `feedback.generate` | `/short-feedback` `scope=MEAL` | `meal_feedbacks` |
+| `POST /insights/daily/refresh` | `feedback.generate` | `/short-feedback` `scope=DAILY` | `daily_feedbacks` |
+| `POST /insights/long-term/refresh` | `feedback.generate` | `/long-feedback` | `long_term_feedbacks` |
+
+전부 **`202` + `pollIntervalMs`** 를 돌려주고 끊는다. FE 는 아래 GET 을 폴링한다.
+
+#### 큐를 쓰지 않는다
+
+```
+GET /meals/{mealId}              GET /meals/{mealId}/feedback
+GET /insights/daily              GET /insights/long-term
+```
+
+DB 에 이미 저장된 결과를 읽을 뿐이다. AI 를 부르지 않으므로 기다릴 이유가 없다.
+
+#### `meal.evaluate` 는 AI 가 필요 없다
+
+Q/Q/S 채점은 Rule Engine(순수 함수)이 한다. 그런데도 큐를 거치는 건, 바로 뒤에
+`feedback.generate`(AI)가 이어져 한 줄기로 묶이고, 재평가가 `qqs_evaluations` 를 덮어쓰는
+작업이라 실패 시 재시도가 필요하기 때문이다.
+
+**이게 "AI 가 죽어도 Q/Q/S 는 남는다" 가 성립하는 구조적 이유다.** 채점과 문장 생성이 별개
+작업이라, 뒤쪽이 DLQ 로 빠져도 앞쪽 결과는 이미 DB 에 있다.
+
+#### 큐를 거치지 않는 비동기도 있다
+
+일일·장기 피드백은 `refresh` API 말고 **스케줄 배치**로도 돈다. Worker 가 매일 그날
+`meal_feedbacks` 를 모아 `daily_feedbacks` 를 만드는 식이다. API 요청이 없으니 큐에 들어올
+일도 없고, Worker 가 시간 트리거로 직접 시작한다. `worker/` 가 **큐 소비 + 스케줄 배치**
+두 갈래인 게 이것이다.
+
+> 현재 구현 상태: `meal.analyze` 만 AI 까지 왕복이 돈다. `meal.evaluate` · `feedback.generate`
+> 는 `NotImplementedError` 로 자리만 잡혀 있고, `analyze_meal()` 도 응답을 받아 로그만 찍고
+> DB 저장은 하지 않는다 — 모델이 아직 이 브랜치에 없다.
+
 ### API 3개
 
 ```python
