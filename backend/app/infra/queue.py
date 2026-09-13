@@ -59,6 +59,12 @@ class QueueSettings(BaseSettings):
     SQS_ENDPOINT_URL: str = ""
     AWS_DEFAULT_REGION: str = "ap-northeast-2"
 
+    # ElasticMQ 는 값을 검사하지 않지만 boto3 가 서명을 만들려면 뭔가는 있어야 한다.
+    # boto3 는 .env 를 읽지 않으므로(실제 환경변수만 본다) 여기서 받아 명시적으로 넘긴다.
+    # 프로덕션에서는 비운다 — 그러면 boto3 가 인스턴스 역할로 떨어진다.
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+
 
 class SqsQueue:
     """SQS(및 API 호환 서버) 구현."""
@@ -69,13 +75,18 @@ class SqsQueue:
         *,
         endpoint_url: str | None = None,
         region_name: str = "ap-northeast-2",
+        access_key_id: str | None = None,
+        secret_access_key: str | None = None,
     ) -> None:
         self._url = queue_url
+        # 빈 문자열은 전부 None 으로 넘긴다 — 그래야 boto3 가 기본 동작으로 떨어진다.
+        # 엔드포인트는 실제 AWS 로, 자격증명은 인스턴스 역할로.
         self._client = boto3.client(
             "sqs",
-            # 빈 문자열이면 None 으로 넘겨야 boto3 가 실제 AWS 엔드포인트를 쓴다
             endpoint_url=endpoint_url or None,
             region_name=region_name,
+            aws_access_key_id=access_key_id or None,
+            aws_secret_access_key=secret_access_key or None,
         )
 
     def send(self, body: dict[str, Any]) -> None:
@@ -128,4 +139,6 @@ def build_task_queue(settings: QueueSettings | None = None, *, dlq: bool = False
         url,
         endpoint_url=settings.SQS_ENDPOINT_URL,
         region_name=settings.AWS_DEFAULT_REGION,
+        access_key_id=settings.AWS_ACCESS_KEY_ID,
+        secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
     )
