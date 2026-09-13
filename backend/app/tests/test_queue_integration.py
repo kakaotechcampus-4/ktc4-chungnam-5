@@ -39,12 +39,18 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def settings() -> QueueSettings:
+    """개발용 큐(glp1-tasks)가 아니라 **전용 테스트 큐**를 쓴다.
+
+    Worker 컨테이너가 돌고 있으면 개발용 큐의 메시지를 먼저 채가서 테스트가 깨진다.
+    테스트가 컨테이너 상태에 따라 통과했다 말았다 하면 안 되므로 큐를 분리한다.
+    설정(visibility timeout · maxReceiveCount)은 개발용과 같게 맞춰 둔다.
+    """
     base = f"http://{ENDPOINT_HOST}:{ENDPOINT_PORT}"
     return QueueSettings(
         QUEUE_TYPE="sqs",
         SQS_ENDPOINT_URL=base,
-        SQS_QUEUE_URL=f"{base}/queue/glp1-tasks",
-        SQS_DLQ_URL=f"{base}/queue/glp1-tasks-dlq",
+        SQS_QUEUE_URL=f"{base}/queue/glp1-tasks-test",
+        SQS_DLQ_URL=f"{base}/queue/glp1-tasks-test-dlq",
     )
 
 
