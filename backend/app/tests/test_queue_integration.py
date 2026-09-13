@@ -58,6 +58,24 @@ def dlq(settings):
     return build_task_queue(settings, dlq=True)
 
 
+def _raw_client(settings: QueueSettings):
+    """점유를 즉시 푸는 데만 쓰는 저수준 클라이언트.
+
+    `release` 를 TaskQueue 에 두지 않은 건 의도적이다. 실패할 때마다 즉시 반환하면
+    재시도가 밀리초 단위로 일어나 maxReceiveCount 를 순식간에 태운다 —
+    visibility timeout 이 곧 백오프다. 테스트에서만 앞당긴다.
+    """
+    import boto3
+
+    return boto3.client(
+        "sqs",
+        endpoint_url=settings.SQS_ENDPOINT_URL or None,
+        region_name=settings.AWS_DEFAULT_REGION,
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
+    )
+
+
 def _drain(q) -> None:
     while batch := q.receive(max_count=10, wait_seconds=0):
         for task in batch:
@@ -101,9 +119,7 @@ def test_receive_count_climbs_when_not_deleted(queue, settings):
     conf 의 defaultVisibilityTimeout 이 60초라 그대로 기다릴 수 없어,
     점유를 즉시 풀어(visibility 0) 재배달을 앞당긴다.
     """
-    import boto3
-
-    client = boto3.client("sqs", endpoint_url=settings.SQS_ENDPOINT_URL, region_name="ap-northeast-2")
+    client = _raw_client(settings)
     queue.send({"type": "meal.analyze", "mealId": str(uuid.uuid4())})
 
     counts = []
@@ -121,25 +137,32 @@ def test_receive_count_climbs_when_not_deleted(queue, settings):
 
 
 def test_message_lands_in_dlq_after_max_receive_count(queue, dlq, settings):
-    """maxReceiveCount = 3 — 3번 배달되고도 안 지우면 DLQ 로 간다."""
-    import boto3
+    """maxReceiveCount = 3 — 3번 배달되고도 안 지우면 DLQ 로 간다.
 
-    client = boto3.client("sqs", endpoint_url=settings.SQS_ENDPOINT_URL, region_name="ap-northeast-2")
+    이동은 **다음 수신 시도**가 트리거한다. 3번 배달된 뒤 4번째로 꺼내려 할 때
+    큐가 옮기고 메인 큐는 빈 결과를 준다. 타이머가 아니므로, 워커가 폴링을 멈추면
+    메시지는 메인 큐에 그대로 남는다.
+    """
+    client = _raw_client(settings)
     marker = str(uuid.uuid4())
     queue.send({"type": "meal.analyze", "mealId": marker})
 
-    for _ in range(3):
-        batch = queue.receive(wait_seconds=5)
+    deliveries = []
+    for _ in range(5):  # 3회 배달 + 이동을 트리거할 1회. 넉넉히 잡는다
+        batch = queue.receive(wait_seconds=2)
         if not batch:
             break
+        deliveries.append(batch[0].receive_count)
         client.change_message_visibility(
             QueueUrl=settings.SQS_QUEUE_URL,
             ReceiptHandle=batch[0].receipt,
             VisibilityTimeout=0,
         )
 
+    assert deliveries == [1, 2, 3], "maxReceiveCount 만큼만 배달돼야 한다"
+
     deadline = time.time() + 10
-    dead = []
+    dead: list = []
     while time.time() < deadline and not dead:
         dead = dlq.receive(max_count=10, wait_seconds=1)
 
