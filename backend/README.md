@@ -187,84 +187,10 @@ alembic check                               # 모델과 DB 가 어긋났는지 �
 > ENUM 을 여러 테이블이 쓰면 `CREATE TYPE` 을 중복 실행하고, downgrade 에서는 타입을
 > 지우지 않아 재적용이 깨진다. 초기 마이그레이션의 `ENUM_TYPES` 처리 방식을 따른다.
 
-## 큐
+## 큐 사용법
 
-비동기 작업은 SQS 를 거친다. **API 는 큐에 넣고 `202` 를 돌려줄 뿐, AI 를 직접 부르지 않는다** —
-분석이 10~30초 걸리기 때문이다. 꺼내서 처리하는 건 Worker 다.
-
-```
-API ──send──▶ 큐 ──receive──▶ Worker ──HTTP──▶ AI
-                 │                  │
-                 └── DLQ ◀──────────┘  3회 실패하면
-```
-
-로컬에서도 **`SqsQueue` 구현을 그대로 쓴다.** SQS API 호환 서버(ElasticMQ)를 컨테이너로 띄우고
-`SQS_ENDPOINT_URL` 로 가리킨다. 별도의 `LocalQueue` 를 두지 않는 이유는, visibility timeout ·
-재시도 · DLQ 를 흉내 낸 구현은 결국 진짜와 어긋나기 때문이다 — 로컬에서 통과한 재시도 로직이
-배포 후에 다르게 돌면 곤란하다. 프로덕션에서는 `SQS_ENDPOINT_URL` 을 비워 실제 AWS 로 붙는다.
-
-### 언제 큐를 쓰나
-
-경계는 하나다 — **변경 요청은 큐로, 조회는 직접.**
-
-#### 큐에 넣는다
-
-| 공개 API | 작업 타입 | 부르는 AI | 결과가 들어가는 곳 |
-| --- | --- | --- | --- |
-| `POST /meals` | `meal.analyze` | `/analyze-meal` | `meal_items` · `meals.status` |
-| 사용자가 `meal_items` 확인·수정한 뒤 | `meal.evaluate` | — (Rule Engine) | `qqs_evaluations` |
-| ↳ 이어서 | `feedback.meal` | `/short-feedback` `scope=MEAL` | `meal_feedbacks` |
-| `POST /insights/daily/refresh` | `feedback.daily` | `/short-feedback` `scope=DAILY` | `daily_feedbacks` · `daily_feedback_sources` |
-| `POST /insights/long-term/refresh` | `feedback.long` | `/long-feedback` | `long_term_feedbacks` · `long_term_feedback_sources` |
-
-전부 **`202` + `pollIntervalMs`** 를 돌려주고 끊는다. FE 는 아래 GET 을 폴링한다.
-
-#### 피드백 세 종류를 한 타입으로 묶지 않는다
-
-AI 쪽은 끼니와 하루를 같은 `/short-feedback` 으로 받는다 — AI 가 하는 일이
-"Q/Q/S 를 짧은 문장으로 옮긴다" 로 같기 때문이다(S2).
-
-**그렇다고 큐 작업 타입까지 같아지지는 않는다.** 데이터를 모으는 것도 결과를 저장하는 것도
-Worker 몫이고, 그게 셋 다 다르다.
-
-| | 모으는 데이터 | 쓰는 테이블 |
-| --- | --- | --- |
-| `feedback.meal` | `meal_items` + `satiety_logs` 1건 | `meal_feedbacks` |
-| `feedback.daily` | 그날 `meal_feedbacks` N건 집계 | `daily_feedbacks` + 근거 링크 |
-| `feedback.long` | `daily_feedbacks` 여러 날 + Q/Q/S 시계열 | `long_term_feedbacks` + 근거 링크 |
-
-한 타입으로 묶으면 `type` 이 정보를 거의 담지 못하고 진짜 구분자가 본문 안에 숨는다.
-DLQ 분류도 쓸모가 없어진다 — "`feedback.generate` 10건 실패" 보다
-"`feedback.long` 10건 실패" 가 원인 추적에 훨씬 낫다.
-
-#### 큐를 쓰지 않는다
-
-```
-GET /meals/{mealId}              GET /meals/{mealId}/feedback
-GET /insights/daily              GET /insights/long-term
-```
-
-DB 에 이미 저장된 결과를 읽을 뿐이다. AI 를 부르지 않으므로 기다릴 이유가 없다.
-
-#### `meal.evaluate` 는 AI 가 필요 없다
-
-Q/Q/S 채점은 Rule Engine(순수 함수)이 한다. 그런데도 큐를 거치는 건, 바로 뒤에
-`feedback.meal`(AI)이 이어져 한 줄기로 묶이고, 재평가가 `qqs_evaluations` 를 덮어쓰는
-작업이라 실패 시 재시도가 필요하기 때문이다.
-
-**이게 "AI 가 죽어도 Q/Q/S 는 남는다" 가 성립하는 구조적 이유다.** 채점과 문장 생성이 별개
-작업이라, 뒤쪽이 DLQ 로 빠져도 앞쪽 결과는 이미 DB 에 있다.
-
-#### 큐를 거치지 않는 비동기도 있다
-
-일일·장기 피드백은 `refresh` API 말고 **스케줄 배치**로도 돈다. Worker 가 매일 그날
-`meal_feedbacks` 를 모아 `daily_feedbacks` 를 만드는 식이다. API 요청이 없으니 큐에 들어올
-일도 없고, Worker 가 시간 트리거로 직접 시작한다. `worker/` 가 **큐 소비 + 스케줄 배치**
-두 갈래인 게 이것이다.
-
-> 현재 구현 상태: `meal.analyze` 만 AI 까지 왕복이 돈다. 나머지 네 타입은
-> `NotImplementedError` 로 자리만 잡혀 있다. `meal.analyze` 는 AI 응답을 `meal_items` 에
-> 저장하고 `status` 를 `REVIEW_REQUIRED` 로 넘기는 것까지 동작한다.
+비동기 작업은 SQS 를 거친다. 로컬에서도 같은 `SqsQueue` 구현을 쓴다 —
+SQS API 호환 서버(ElasticMQ)를 컨테이너로 띄우고 `SQS_ENDPOINT_URL` 로 가리킨다.
 
 ### API 3개
 
@@ -295,6 +221,8 @@ queue.send({
 ```
 
 dict 를 주면 JSON 으로 직렬화된다. `POST /meals` 가 `202` 를 돌려주기 직전에 하는 일이 이것이다.
+**커밋이 먼저다** — `queue.send()` 를 앞에 두면 커밋이 실패했을 때 Worker 가 DB 에 없는
+식사를 처리하려다 DLQ 로 간다.
 
 ### 꺼내기
 
@@ -312,7 +240,7 @@ for task in queue.receive(max_count=1, wait_seconds=5):
 
 ```python
 try:
-    handle(task)
+    handle(task, ai)
 except Exception:
     logger.exception(...)        # 지우지 않는다 → 재배달 → 3회 넘으면 DLQ
 else:
@@ -320,33 +248,20 @@ else:
 ```
 
 **실패했는데 지우면 재시도도 DLQ 도 일어나지 않고 작업이 조용히 사라진다.**
-반대로 성공했는데 안 지우면 같은 작업을 3번 더 한다. `app/worker_main.py` 의 `run()` 이
+반대로 성공했는데 안 지우면 같은 작업을 3번 더 한다. `app/worker/loop.py` 의 `run()` 이
 이 구조이고, `app/tests/test_worker_loop.py` 가 이것만 검증한다.
 
 실패할 때마다 즉시 반환(visibility 0)하고 싶어지는데, 그러면 재시도가 밀리초 단위로 일어나
 `maxReceiveCount` 를 순식간에 태운다. **visibility timeout 이 곧 백오프다.**
 
-### 큐 상태 보기
+### 작업을 하나 붙이려면
 
-```bash
-python -m scripts.queue_status
-```
+1. `app/worker/jobs/` 에 파일을 만들고 `run(task, ai)` 를 둔다
+2. `app/worker/dispatch.py` 의 `_HANDLERS` 에 한 줄 더한다
+3. `_NOT_IMPLEMENTED` 에서 그 타입을 지운다
 
-```
-큐                          대기     처리중     지연
----------------------------------------------
-glp1-tasks                  2       1      0
-glp1-tasks-dlq              0       0      0
-```
-
-ElasticMQ 에는 웹 UI 가 없다 — `elasticmq-native` 이미지에 `rest-stats` 서버가 들어 있지 않다.
-`GetQueueAttributes` 로 읽는다.
-
-> 🚨 Worker 컨테이너가 돌고 있으면 **메시지를 먼저 가져간다.** 손으로 `receive` 를 실험할 때는
-> `docker stop glp1-worker` 로 내렸다가 끝나면 `docker start glp1-worker` 로 되돌린다.
->
-> 테스트는 이 영향을 받지 않는다. `glp1-tasks-test` 라는 별도 큐를 쓰고 Worker 는 그쪽을
-> 폴링하지 않는다 — 테스트가 컨테이너 상태에 따라 통과했다 말았다 하면 안 되기 때문이다.
+스켈레톤 마지막 줄의 `raise NotImplementedError` 를 **가장 마지막에** 지운다.
+먼저 지우면 `loop.py` 가 성공으로 보고 메시지를 큐에서 지운다.
 
 ## 환경변수
 
@@ -393,12 +308,7 @@ ElasticMQ 에는 웹 UI 가 없다 — `elasticmq-native` 이미지에 `rest-sta
 | 레이어 경계  | import-linter — `services/*` 상호 참조 금지 · `services` → `crud` 단방향을 CI에서 강제                                          |
 | API          | `httpx.ASGITransport` + Testcontainers(Postgres)                                                                                |
 | Worker 루프  | 가짜 큐·가짜 AI 로 **삭제 시점**만 검증 — 실패한 작업을 지우지 않는지(`test_worker_loop.py`). 외부 의존 0                        |
-| 큐 설정      | ElasticMQ 를 상대로 재시도·DLQ 이동을 확인(`test_queue_integration.py`). 컨테이너가 없으면 **통째로 skip**                       |
 | infra 추상화 | 로컬 구현으로 테스트, 외부 의존 0                                                                                               |
-
-> 큐 통합 테스트만 컨테이너를 요구한다. 재시도와 DLQ 이동은 우리 코드가 아니라 큐가 하는 일이라,
-> 검증 대상이 **`elasticmq.conf` 의 설정값이 의도대로 먹는지**다. `maxReceiveCount` 를 잘못 적으면
-> 배포 후에야 드러난다. 컨테이너가 안 떠 있으면 skip 되므로 CI 가 깨지지는 않는다.
 
 ---
 
@@ -731,6 +641,3 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 | daily_feedback_id | UUID FK, PK | 사용된 일일 피드백 |
 
 ---
-
-## 시스템 아키텍처
-![alt text](image.png)
