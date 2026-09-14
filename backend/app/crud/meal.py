@@ -3,10 +3,12 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import Row, and_, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.meal import Meal
+from app.models.evaluation import QQSEvaluation
+from app.models.meal import Meal, MealItem
+from app.models.medication import MedicationSnapshot
 
 
 def list_meals(
@@ -16,13 +18,24 @@ def list_meals(
     limit: int,
     before_eaten_at: datetime | None = None,
     before_id: uuid.UUID | None = None,
-) -> list[Meal]:
+) -> list[Row]:
     """user_id 의 식사를 eaten_at 최신순으로 최대 limit 개 조회한다.
 
+    각 행은 (Meal, stage, quantity_score, quality_score, satiety_score) 튜플이다.
     (before_eaten_at, before_id) 보다 "이전" 항목만 대상으로 한다 — 커서 페이지네이션.
-    eaten_at 이 동일한 두 건을 구분하려고 id 를 2차 정렬 기준으로 쓴다.
     """
-    stmt = select(Meal).where(Meal.user_id == user_id)
+    stmt = (
+        select(
+            Meal,
+            MedicationSnapshot.stage,
+            QQSEvaluation.quantity_score,
+            QQSEvaluation.quality_score,
+            QQSEvaluation.satiety_score,
+        )
+        .join(MedicationSnapshot, Meal.medication_snapshot_id == MedicationSnapshot.id)
+        .outerjoin(QQSEvaluation, QQSEvaluation.meal_id == Meal.id)
+        .where(Meal.user_id == user_id)
+    )
 
     if before_eaten_at is not None:
         stmt = stmt.where(
@@ -34,4 +47,22 @@ def list_meals(
 
     stmt = stmt.order_by(Meal.eaten_at.desc(), Meal.id.desc()).limit(limit)
 
-    return list(db.execute(stmt).scalars().all())
+    return list(db.execute(stmt).all())
+
+
+def get_display_names(db: Session, meal_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """meal_id 별로 meal_items.display_name 을 쉼표로 이어붙인 값을 돌려준다."""
+    if not meal_ids:
+        return {}
+
+    stmt = (
+        select(MealItem.meal_id, MealItem.display_name)
+        .where(MealItem.meal_id.in_(meal_ids))
+        .order_by(MealItem.meal_id, MealItem.id)
+    )
+
+    names_by_meal: dict[uuid.UUID, list[str]] = {}
+    for meal_id, display_name in db.execute(stmt).all():
+        names_by_meal.setdefault(meal_id, []).append(display_name)
+
+    return {meal_id: ", ".join(names) for meal_id, names in names_by_meal.items()}

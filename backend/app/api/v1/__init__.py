@@ -4,5 +4,5 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import meals
 
-api_router = APIRouter()
+api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(meals.router, tags=["meals"])

@@ -3,13 +3,39 @@
 import base64
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from app.crud import meal as meal_crud
-from app.schemas.meal import MealListItem, MealListResponse
+from app.schemas.meal import MealListItem, MealListResponse, MealScores
 
 _CURSOR_SEPARATOR = "|"
+
+
+def _build_scores(
+    quantity: Decimal | None,
+    quality: Decimal | None,
+    satiety: Decimal | None,
+) -> MealScores | None:
+    """세 점수가 전부 없으면(아직 미평가) None, 하나라도 있으면 객체로 감싼다."""
+    if quantity is None and quality is None and satiety is None:
+        return None
+    return MealScores(
+        quantity=round(quantity) if quantity is not None else None,
+        quality=round(quality) if quality is not None else None,
+        satiety=round(satiety) if satiety is not None else None,
+    )
+
+
+def _build_thumbnail_url(image_key: str | None) -> str | None:
+    """image_key 를 실제 접근 가능한 URL 로 바꾼다.
+
+    TODO: 6번(POST /meals)에서 infra/ FileStorage 붙이면 presigned URL 로 교체.
+    """
+    if image_key is None:
+        return None
+    return f"/media/{image_key}"
 
 
 def encode_cursor(eaten_at: datetime, meal_id: uuid.UUID) -> str:
@@ -43,7 +69,7 @@ def list_meals(
     if cursor is not None:
         before_eaten_at, before_id = decode_cursor(cursor)
 
-    meals = meal_crud.list_meals(
+    rows = meal_crud.list_meals(
         db,
         user_id=user_id,
         limit=limit + 1,  # 1개 더 가져와서 "다음 페이지 있음"을 판단한다
@@ -51,13 +77,28 @@ def list_meals(
         before_id=before_id,
     )
 
-    has_more = len(meals) > limit
-    meals = meals[:limit]  # 판단용으로 더 가져온 1개는 응답에서 잘라낸다
+    has_more = len(rows) > limit
+    rows = rows[:limit]  # 판단용으로 더 가져온 1개는 응답에서 잘라낸다
+
+    meal_ids = [meal.id for meal, *_ in rows]
+    display_names = meal_crud.get_display_names(db, meal_ids)
+
+    items = [
+        MealListItem(
+            meal_id=meal.id,
+            meal_type=meal.meal_type,
+            eaten_at=meal.eaten_at,
+            stage=stage,
+            display_name=display_names.get(meal.id, ""),
+            thumbnail_url=_build_thumbnail_url(meal.image_key),
+            scores=_build_scores(quantity, quality, satiety),
+        )
+        for meal, stage, quantity, quality, satiety in rows
+    ]
 
     next_cursor = None
-    if has_more and meals:
-        last = meals[-1]
-        next_cursor = encode_cursor(last.eaten_at, last.id)
+    if has_more and rows:
+        last_meal = rows[-1][0]
+        next_cursor = encode_cursor(last_meal.eaten_at, last_meal.id)
 
-    items = [MealListItem.model_validate(meal) for meal in meals]
     return MealListResponse(items=items, next_cursor=next_cursor, has_more=has_more)
