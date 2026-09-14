@@ -1,0 +1,26 @@
+# AI 레이어 더미 서버.
+#
+#   docker compose -f docker-compose.ai-stub.yml up -d
+#
+# BE API 가 8000 을 쓰므로 8001 로 띄운다.
+# BE 쪽 .env: AI_SERVICE_BASE_URL=http://localhost:8001
+
+services:
+  ai-stub:
+    build:
+      context: ../ai-stub
+    image: glp1-ai-stub
+    container_name: glp1-ai-stub
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
