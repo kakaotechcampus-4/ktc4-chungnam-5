@@ -88,28 +88,4 @@ curl -X POST localhost:8001/analyze-meal \
 본문이 아니라 헤더로 고르는 이유는, 실제 AI 가 붙으면 이 헤더를 그냥 무시하면 되기 때문이다.
 요청 본문에 매직 문자열을 심으면 그게 실제 데이터에 섞여 들어간다.
 
----
 
-## 더미지만 계약은 진짜다
-
-응답 내용은 고정값이지만 **모양은 실제 계약과 같다.** BE 가 이 모양에 맞춰 매핑 코드를 쓰면
-나중에 진짜 AI 로 바꿔도 안 깨진다. 요청도 검증한다 — 잘못 보내면 지금 422 로 알려준다.
-
-계약에서 헷갈리기 쉬운 세 가지:
-
-- **양은 g 가 아니다.** `{"estimatedAmount": 2, "unit": "개"}` 로 온다.
-  비전 모델은 "계란 100g" 이 아니라 "계란 2개" 로 본다. g 환산은 `food_refs` 가 필요하므로 BE 몫이다.
-- **성분값이 없다.** `kcal` · `proteinG` 같은 필드는 응답에 아예 없다.
-  AI 는 `candidateFoodRefId` 로 음식을 지목만 하고, 성분은 BE 가 `food_refs` 에서 채운다.
-  `candidateFoodRefId` 가 `null` 이면 매칭 실패다 — 공개 API 의 `matched: false` 에 해당한다.
-- **점수를 만들지 않는다.** Q/Q/S 는 요청에 실어 보낸다. 채점은 BE Rule Engine 이 이미 끝냈고
-  AI 는 그 숫자를 문장으로 옮길 뿐이다. `long_term_feedbacks.chart_data` 와
-  `daily_feedbacks` 의 점수 3개도 같은 이유로 응답에 없다.
-
----
-
-## 설계 문서
-
-[`../docs/superpowers/specs/2026-09-13-ai-stub-design.md`](../docs/superpowers/specs/2026-09-13-ai-stub-design.md)
-
-계약 전문, 공개 API 명세, 그리고 **명세와 DB 스키마가 어긋나는 5건**이 정리돼 있다.
