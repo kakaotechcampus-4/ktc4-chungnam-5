@@ -86,12 +86,16 @@ alembic upgrade head
 # 공공 영양DB 시드 복원 (336,351건)
 docker exec -i glp1-db pg_restore -U glp1 -d glp1_dev --data-only --no-owner < ../infra/seed/food_refs_20260828.dump
 
+# 큐(ElasticMQ) · AI 스텁 — Worker 가 쓴다. 자세한 건 ../infra/README.md
+cd ../infra && docker compose -f docker-compose.queue.yml -f docker-compose.ai-stub.yml up -d && cd ../backend
+
 # API — http://127.0.0.1:8000/docs
 uvicorn app.main:app --reload
 
-# ── 아래는 아직 없다 (구현되면 주석을 푼다) ──────────────────
-# python -m app.worker_main        # worker_main.py 미작성
-# pytest                           # pytest 미설치 · 테스트 미작성
+# Worker — 별도 프로세스다. 창을 하나 더 연다
+python -m app.worker_main
+
+pytest
 ```
 
 ### 세팅 확인
@@ -183,6 +187,82 @@ alembic check                               # 모델과 DB 가 어긋났는지 �
 > ENUM 을 여러 테이블이 쓰면 `CREATE TYPE` 을 중복 실행하고, downgrade 에서는 타입을
 > 지우지 않아 재적용이 깨진다. 초기 마이그레이션의 `ENUM_TYPES` 처리 방식을 따른다.
 
+## 큐 사용법
+
+비동기 작업은 SQS 를 거친다. 로컬에서도 같은 `SqsQueue` 구현을 쓴다 —
+SQS API 호환 서버(ElasticMQ)를 컨테이너로 띄우고 `SQS_ENDPOINT_URL` 로 가리킨다.
+
+### API 3개
+
+```python
+from app.infra.queue import QueueSettings, build_task_queue
+
+queue = build_task_queue(QueueSettings())              # .env 에서 설정을 읽는다
+
+queue.send({...})                                      # 넣기
+tasks = queue.receive(max_count=1, wait_seconds=5)     # 꺼내기 (롱 폴링)
+queue.delete(task.receipt)                             # 처리 완료를 알리기
+```
+
+`receive` 는 **지우지 않는다.** 60초 동안 다른 소비자에게 안 보이게 할 뿐이고,
+그 안에 `delete` 하지 않으면 다시 나타난다.
+
+### 넣기
+
+```python
+queue.send({
+    "type": "meal.analyze",       # Worker 가 이걸 보고 분기한다
+    "mealId": "meal_456",
+    "mealType": "LUNCH",
+    "eatenAt": "2026-08-21T12:40:00+09:00",
+    "stage": "MAINTENANCE",
+    "rawText": "김밥 한 줄",
+})
+```
+
+dict 를 주면 JSON 으로 직렬화된다. `POST /meals` 가 `202` 를 돌려주기 직전에 하는 일이 이것이다.
+**커밋이 먼저다** — `queue.send()` 를 앞에 두면 커밋이 실패했을 때 Worker 가 DB 에 없는
+식사를 처리하려다 DLQ 로 간다.
+
+### 꺼내기
+
+```python
+for task in queue.receive(max_count=1, wait_seconds=5):
+    task.body           # dict 로 파싱돼 있다
+    task.receipt        # delete 에 쓰는 손잡이
+    task.receive_count  # 이 메시지가 몇 번째로 배달됐는지
+```
+
+`wait_seconds` 는 롱 폴링이다. 큐가 비어 있으면 그만큼 기다렸다 빈 리스트를 준다.
+`0` 으로 두면 즉시 반환하는데, 루프에서 쓰면 빈 큐를 쉬지 않고 때리게 된다.
+
+### 지우기 — 여기가 전부다
+
+```python
+try:
+    handle(task, ai)
+except Exception:
+    logger.exception(...)        # 지우지 않는다 → 재배달 → 3회 넘으면 DLQ
+else:
+    queue.delete(task.receipt)   # 성공했을 때만
+```
+
+**실패했는데 지우면 재시도도 DLQ 도 일어나지 않고 작업이 조용히 사라진다.**
+반대로 성공했는데 안 지우면 같은 작업을 3번 더 한다. `app/worker/loop.py` 의 `run()` 이
+이 구조이고, `app/tests/test_worker_loop.py` 가 이것만 검증한다.
+
+실패할 때마다 즉시 반환(visibility 0)하고 싶어지는데, 그러면 재시도가 밀리초 단위로 일어나
+`maxReceiveCount` 를 순식간에 태운다. **visibility timeout 이 곧 백오프다.**
+
+### 작업을 하나 붙이려면
+
+1. `app/worker/jobs/` 에 파일을 만들고 `run(task, ai)` 를 둔다
+2. `app/worker/dispatch.py` 의 `_HANDLERS` 에 한 줄 더한다
+3. `_NOT_IMPLEMENTED` 에서 그 타입을 지운다
+
+스켈레톤 마지막 줄의 `raise NotImplementedError` 를 **가장 마지막에** 지운다.
+먼저 지우면 `loop.py` 가 성공으로 보고 메시지를 큐에서 지운다.
+
 ## 환경변수
 
 `.env.example` 참고. `core/`의 Pydantic `BaseSettings`로 로드해, 없거나 형식이 틀리면
@@ -194,14 +274,29 @@ alembic check                               # 모델과 DB 가 어긋났는지 �
 | `JWT_SECRET`                              | 액세스 토큰 서명 키                                                    |
 | `KAKAO_CLIENT_ID` · `KAKAO_CLIENT_SECRET` | 카카오 OAuth (D3)                                                      |
 | `INTERNAL_SERVICE_TOKEN`                  | `/internal/v1` 호출용. AI Service와 공유                               |
-| `AI_SERVICE_BASE_URL`                     | AI 컨테이너 주소                                                       |
+| `AI_SERVICE_BASE_URL`                     | AI 컨테이너 주소. 로컬은 `http://localhost:8001`                       |
+| `AI_TIMEOUT_SEC`                          | 기본 45. 분석이 10~30초 걸린다                                         |
+| `AI_STUB_SCENARIO`                        | ai-stub 의 실패 경로를 부르는 손잡이. **로컬 전용, 평소엔 비움**       |
 | `STORAGE_TYPE`                            | `s3` \| `local`                                                        |
 | `S3_BUCKET`                               | **`glp1-team-*` 패턴이어야 함.** 인스턴스 역할 권한이 이 패턴으로 한정 |
-| `QUEUE_TYPE`                              | `sqs` \| `local`                                                       |
+| `QUEUE_TYPE`                              | `sqs`. 로컬에서도 `sqs` 를 쓴다 (ElasticMQ)                            |
+| `SQS_ENDPOINT_URL`                        | 로컬 ElasticMQ 주소. **프로덕션에서는 비운다** → 실제 AWS 로 붙는다    |
 | `SQS_QUEUE_URL` · `SQS_DLQ_URL`           | 비동기 파이프라인                                                      |
+| `AWS_DEFAULT_REGION`                      | 기본 `ap-northeast-2`                                                  |
+| `AWS_ACCESS_KEY_ID` · `AWS_SECRET_ACCESS_KEY` | **로컬 전용.** ElasticMQ 는 값을 검사하지 않는다 (`test` 로 둔다)  |
 | `FCM_*`                                   | 푸시 발송                                                              |
 
 > 🚨 AWS 액세스 키는 두지 않는다. 서버는 **인스턴스 역할**로 S3·SQS에 접근한다.
+>
+> 로컬의 `AWS_ACCESS_KEY_ID=test` 는 인증용이 아니라 **boto3 가 요청에 서명을 붙이려면
+> 뭔가 값이 있어야 해서**다. 프로덕션 `.env` 에는 `SQS_ENDPOINT_URL` 과 함께 이 둘도 비운다 —
+> 비어 있으면 boto3 가 EC2 메타데이터에서 임시 자격증명을 가져온다.
+>
+> boto3 는 `.env` 를 읽지 않는다(실제 환경변수만 본다). 그래서 `QueueSettings` 가 받아
+> `boto3.client()` 에 명시적으로 넘긴다.
+
+---
+
 
 ---
 
@@ -212,6 +307,7 @@ alembic check                               # 모델과 DB 가 어긋났는지 �
 | Rule Engine  | **순수 함수 단위 테스트.** 입력→기대 점수 표로 고정(`pytest.mark.parametrize`). 단계를 바꾸면 점수가 실제로 달라지는지 검증(R1) |
 | 레이어 경계  | import-linter — `services/*` 상호 참조 금지 · `services` → `crud` 단방향을 CI에서 강제                                          |
 | API          | `httpx.ASGITransport` + Testcontainers(Postgres)                                                                                |
+| Worker 루프  | 가짜 큐·가짜 AI 로 **삭제 시점**만 검증 — 실패한 작업을 지우지 않는지(`test_worker_loop.py`). 외부 의존 0                        |
 | infra 추상화 | 로컬 구현으로 테스트, 외부 의존 0                                                                                               |
 
 ---
@@ -543,3 +639,5 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 | --- | --- | --- |
 | long_term_feedback_id | UUID FK, PK | 장기 피드백 |
 | daily_feedback_id | UUID FK, PK | 사용된 일일 피드백 |
+
+---
