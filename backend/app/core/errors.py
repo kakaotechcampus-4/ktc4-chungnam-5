@@ -19,6 +19,7 @@ class ErrorCode(str, enum.Enum):
     # 이번 작업에서 새로 정의한 것
     UNAUTHORIZED = "UNAUTHORIZED"
     USER_NOT_FOUND = "USER_NOT_FOUND"
+    NOT_FOUND = "NOT_FOUND"
     VALIDATION_ERROR = "VALIDATION_ERROR"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
