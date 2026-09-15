@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import os
+import platform
 from collections.abc import Generator
 
 # app.* 를 import 하기 전에 심어야 한다. Settings 가 없는 값에 죽는다.
@@ -23,10 +24,14 @@ os.environ.setdefault("DB_PASSWORD", "placeholder")
 # 포트 매핑을 곧바로 조회한다. Windows + Docker Desktop 조합에서는 이 조회가 Docker 데몬이
 # NetworkSettings 를 채우기 전에 일어나는 경우가 있어 `ConnectionError: Port mapping ...
 # is not available` 로 매번 죽는다 (컨테이너 자체는 정상적으로 뜬다 — 타이밍 문제다).
-# Ryuk 를 꺼도 안전한 이유: 아래 `db` 픽스처가 트랜잭션을 매번 롤백하고, `test_engine` 은
-# 세션이 끝나면 `with PostgresContainer(...)` 컨텍스트 매니저가 컨테이너를 직접 정리한다 —
-# 정상 종료 경로에서는 Ryuk 없이도 남는 컨테이너가 없다.
-os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
+# 이 우회는 Windows 로만 좁힌다 — Ryuk 의 존재 이유는 원래 *비정상* 종료 경로(테스트
+# 프로세스가 죽거나, 디버거 인터럽트, CI 잡 타임아웃/OOM)에서 남은 컨테이너를 정리하는
+# 것이다. CI(보통 Linux 러너)에는 이 포트 매핑 레이스가 없으니 Ryuk 를 그대로 켜둬서
+# 비정상 종료 시의 실제 leak 보호를 유지한다. 정상 종료 경로는 어느 플랫폼에서든
+# `with PostgresContainer(...)` 컨텍스트 매니저가 직접 컨테이너를 정리하므로 Ryuk 유무와
+# 무관하다.
+if platform.system() == "Windows":
+    os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
