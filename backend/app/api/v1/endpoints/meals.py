@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.meal import MealListResponse
+from app.schemas.meal import MealDeleteResponse, MealListResponse
 from app.services import meal as meal_service
 
 router = APIRouter()
@@ -23,3 +23,15 @@ def list_meals(
         return meal_service.list_meals(db, user_id=user_id, cursor=cursor, limit=limit)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/meals/{meal_id}", response_model=MealDeleteResponse)
+def delete_meal(
+    meal_id: uuid.UUID,
+    user_id: uuid.UUID,  # TODO: JWT 인증 붙으면 Depends(get_current_user_id) 로 교체
+    db: Session = Depends(get_db),
+) -> MealDeleteResponse:
+    try:
+        return meal_service.delete_meal(db, user_id=user_id, meal_id=meal_id)
+    except meal_service.MealNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
