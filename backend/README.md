@@ -21,6 +21,15 @@ GLP-1 포즈 단계별 식사 코치의 **백엔드**. 공개 API·내부 API·�
 6. **포즈 정보는 민감 건강정보.** 로그에 약제·용량·이미지 키를 남기지 않는다.
    모든 공개 API는 JWT + 본인 데이터만 조회.
 
+> 🚨 **현재 `/users/*` 는 규칙 6을 지키지 않는다.** `GET`/`PATCH /users/me` 는
+> `X-User-Id` 헤더에 담긴 UUID 를 그대로 사용자 식별자로 신뢰한다 — **이건 인증이
+> 아니라 인증 이음새(seam)다.** 헤더에 아무 UUID나 넣으면 그 사용자의 키·체중(민감
+> 건강정보)을 읽고 쓸 수 있다. JWT 가 `app/core/deps.py` 에 병합되기 전까지
+> **`/users/*` 를 어떤 공개 환경에도 배포하지 않는다.** (`APP_ENV=production` 이면
+> `get_current_user_id` 가 기동 자체를 막는다 — `app/core/config.py` ·
+> `app/core/deps.py` 참고.) FE 는 그동안 `GET`/`PATCH /users/me` 호출마다 이
+> `X-User-Id` 헤더를 붙여야 한다.
+
 ---
 
 ## 디렉터리 구조
