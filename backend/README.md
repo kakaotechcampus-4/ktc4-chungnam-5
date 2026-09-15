@@ -1,10 +1,9 @@
-# be — Backend
+# backend — Backend
 
 GLP-1 포즈 단계별 식사 코치의 **백엔드**. 공개 API·내부 API·비동기 워커·도메인 로직을 담당한다.
 
 - 스택: **Python 3.12 / FastAPI / SQLAlchemy / PostgreSQL** (D2)
 - 컨테이너 2개로 뜬다: `api`, `worker` (D4)
-- 상세 설계: [`../docs/architecture.md`](../docs/architecture.md) · 결정 근거: [`../docs/decisions.md`](../docs/decisions.md)
 
 ---
 
@@ -27,7 +26,7 @@ GLP-1 포즈 단계별 식사 코치의 **백엔드**. 공개 API·내부 API·�
 ## 디렉터리 구조
 
 ```
-be/app/
+backend/app/
 ├── main.py                엔트리포인트
 ├── worker_main.py         Worker 엔트리포인트
 ├── core/                  설정 · JWT · 응답 래퍼 · 에러 코드
@@ -311,11 +310,6 @@ else:
 | infra 추상화 | 로컬 구현으로 테스트, 외부 의존 0                                                                                               |
 
 ---
-
-## 참고
-
-- API 명세 · 스키마 · 단계 프로파일은 [`../contracts/`](../contracts/)가 **코드보다 먼저**다.
-- 개발 규칙: [`../CLAUDE.md`](../CLAUDE.md)
 
 ## 테이블 명세
 
