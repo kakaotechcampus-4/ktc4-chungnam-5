@@ -1,4 +1,9 @@
-"""응답 래퍼와 예외 핸들러. DB 의존 0 — 테스트 안에서 작은 앱을 만들어 검사한다."""
+"""응답 래퍼와 예외 핸들러.
+
+대부분은 DB 의존 0 — 테스트 안에서 작은 앱을 만들어 검사한다. 다만 마지막
+두 개(`/meals` 400·405 회귀 테스트)는 실제 라우터를 타므로 `client` 픽스처 →
+Postgres 컨테이너를 쓴다.
+"""
 
 import uuid
 
@@ -114,24 +119,39 @@ def test_unhandled_exception_is_wrapped_and_sanitized():
     assert body["error"]["message"] == "서버 오류가 발생했습니다."
 
 
-def test_http_exception_400_from_real_endpoint_is_wrapped_as_validation_error(client):
-    """회귀 테스트: /meals 엔드포인트의 400 오류가 VALIDATION_ERROR 로 래핑된다.
+def test_http_exception_400_from_real_endpoint_is_wrapped_as_bad_request(client):
+    """회귀 테스트: /meals 엔드포인트의 400 오류가 BAD_REQUEST 로 래핑된다.
 
     식사 목록 조회 시 잘못된 cursor 를 전달하면 ValueError 가 발생하고,
     이것이 HTTPException(status_code=400) 으로 변환된다.
-    이 400 은 4xx 일반 규칙에 따라 VALIDATION_ERROR 로 매핑되어야 한다.
+    이 400 은 명시 매핑에 없는 4xx 이므로 BAD_REQUEST 로 흡수되어야 한다
+    (이 테스트가 지키는 것: 클라이언트 입력 오류가 서버 오류로 둔갑하지 않는다).
     """
     # 적절한 user_id (UUID 형식)
     user_id = uuid.uuid4()
 
     # 잘못된 cursor 로 요청
-    response = client.get(f"/api/v1/meals", params={"user_id": str(user_id), "cursor": "garbage"})
+    response = client.get("/api/v1/meals", params={"user_id": str(user_id), "cursor": "garbage"})
 
-    # 400 으로 응답, VALIDATION_ERROR 로 래핑되어야 함
+    # 400 으로 응답, BAD_REQUEST 로 래핑되어야 함
     assert response.status_code == 400
     body = response.json()
     assert body["success"] is False
     assert body["data"] is None
-    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["code"] == "BAD_REQUEST"
     # 상세 메시지는 에러마다 다를 수 있으니 존재만 확인
     assert isinstance(body["error"]["message"], str)
+
+
+def test_method_not_allowed_from_real_endpoint_is_wrapped_as_bad_request(client):
+    """회귀 테스트: 존재하지 않는 메서드(405)가 VALIDATION_ERROR 가 아닌 BAD_REQUEST 로 래핑된다.
+
+    /api/v1/users/me 는 GET/PATCH 만 있다. DELETE 는 405 이고, 이건 "필드가
+    틀렸다" 는 뜻이 아니므로 VALIDATION_ERROR 로 흡수되면 안 된다.
+    """
+    response = client.delete("/api/v1/users/me")
+    assert response.status_code == 405
+    body = response.json()
+    assert body["success"] is False
+    assert body["data"] is None
+    assert body["error"]["code"] == "BAD_REQUEST"
