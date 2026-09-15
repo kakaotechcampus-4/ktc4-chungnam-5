@@ -1,5 +1,7 @@
 """응답 래퍼와 예외 핸들러. DB 의존 0 — 테스트 안에서 작은 앱을 만들어 검사한다."""
 
+import uuid
+
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
@@ -110,3 +112,26 @@ def test_unhandled_exception_is_wrapped_and_sanitized():
     # 예외 메시지("버그가 발생했습니다.")가 응답에 없어야 한다.
     assert "버그가 발생했습니다." not in body["error"]["message"]
     assert body["error"]["message"] == "서버 오류가 발생했습니다."
+
+
+def test_http_exception_400_from_real_endpoint_is_wrapped_as_validation_error(client):
+    """회귀 테스트: /meals 엔드포인트의 400 오류가 VALIDATION_ERROR 로 래핑된다.
+
+    식사 목록 조회 시 잘못된 cursor 를 전달하면 ValueError 가 발생하고,
+    이것이 HTTPException(status_code=400) 으로 변환된다.
+    이 400 은 4xx 일반 규칙에 따라 VALIDATION_ERROR 로 매핑되어야 한다.
+    """
+    # 적절한 user_id (UUID 형식)
+    user_id = uuid.uuid4()
+
+    # 잘못된 cursor 로 요청
+    response = client.get(f"/api/v1/meals", params={"user_id": str(user_id), "cursor": "garbage"})
+
+    # 400 으로 응답, VALIDATION_ERROR 로 래핑되어야 함
+    assert response.status_code == 400
+    body = response.json()
+    assert body["success"] is False
+    assert body["data"] is None
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    # 상세 메시지는 에러마다 다를 수 있으니 존재만 확인
+    assert isinstance(body["error"]["message"], str)

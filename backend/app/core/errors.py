@@ -3,8 +3,8 @@
 FE 는 HTTP status 가 아니라 `error.code` 로 분기한다 (contracts/API.md 규약).
 그래서 status 는 예외가 함께 들고 다니고, 분기의 진실은 code 다.
 
-`UNAUTHORIZED` · `USER_NOT_FOUND` · `VALIDATION_ERROR` · `INTERNAL_ERROR` 는
-contracts/API.md 의 에러 코드 표에 없다. 세 엔드포인트를 구현하는 데 필요해서
+`UNAUTHORIZED` · `USER_NOT_FOUND` · `NOT_FOUND` · `VALIDATION_ERROR` · `INTERNAL_ERROR` 는
+contracts/API.md 의 에러 코드 표에 없다. 엔드포인트를 구현하는 데 필요해서
 여기서 정의했고, 명세에 역반영이 필요하다.
 """
 
