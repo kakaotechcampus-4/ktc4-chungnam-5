@@ -4,7 +4,6 @@
 
 - 스택: **Python / FastAPI** (D2)
 - 컨테이너 1개. BE와는 HTTP로만 대화한다 (D4)
-- 상세 설계: [`../docs/architecture.md`](../docs/architecture.md) · 결정 근거: [`../docs/decisions.md`](../docs/decisions.md)
 
 ---
 
@@ -36,11 +35,11 @@ ai/
 
 ### 라우터 3개
 
-| 엔드포인트 | 하는 일 | 모델 성격 | 지연 |
-|---|---|---|---|
-| `POST /analyze-meal` | 사진·텍스트 → 음식 후보 목록 | 저비용 비전 | 10~30초 |
-| `POST /short-feedback` | 한 끼 Q/Q/S → 짧은 코멘트 | 소형 추론 | 5~15초 |
-| `POST /long-feedback` | 주간 추이 → 장기 피드백 | 추론 | 5~15초 |
+| 엔드포인트             | 하는 일                      | 모델 성격   | 지연    |
+| ---------------------- | ---------------------------- | ----------- | ------- |
+| `POST /analyze-meal`   | 사진·텍스트 → 음식 후보 목록 | 저비용 비전 | 10~30초 |
+| `POST /short-feedback` | 한 끼 Q/Q/S → 짧은 코멘트    | 소형 추론   | 5~15초  |
+| `POST /long-feedback`  | 주간 추이 → 장기 피드백      | 추론        | 5~15초  |
 
 > 라우터를 **늘리기 전에 통합을 먼저 검토**한다. 엔드포인트가 늘면 프롬프트·스키마·테스트가 3배로 는다.
 
@@ -75,15 +74,15 @@ ai/
 
 `.env.example` 참고.
 
-| 키 | 설명 |
-|---|---|
-| `LLM_API_KEY` | 모델 API 키 |
-| `LLM_BASE_URL` | https 필수 |
-| `LLM_MODEL_VISION` · `LLM_MODEL_REASONING` | 화이트리스트 내 값만 |
-| `LLM_TIMEOUT_SEC` · `LLM_MAX_RETRIES` | 기본 45초 / 1회 |
-| `BE_INTERNAL_BASE_URL` | BE `/internal/v1` 주소 |
-| `INTERNAL_SERVICE_TOKEN` | BE와 공유하는 서비스 토큰 |
-| `TOOL_CALL_LIMIT` | 기본 3 |
+| 키                                         | 설명                      |
+| ------------------------------------------ | ------------------------- |
+| `LLM_API_KEY`                              | 모델 API 키               |
+| `LLM_BASE_URL`                             | https 필수                |
+| `LLM_MODEL_VISION` · `LLM_MODEL_REASONING` | 화이트리스트 내 값만      |
+| `LLM_TIMEOUT_SEC` · `LLM_MAX_RETRIES`      | 기본 45초 / 1회           |
+| `BE_INTERNAL_BASE_URL`                     | BE `/internal/v1` 주소    |
+| `INTERNAL_SERVICE_TOKEN`                   | BE와 공유하는 서비스 토큰 |
+| `TOOL_CALL_LIMIT`                          | 기본 3                    |
 
 ---
 
@@ -97,8 +96,6 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 pytest
 ```
-
-BE 없이 단독 개발하려면 [`../contracts/`](../contracts/)의 OpenAPI로 Prism 목 서버를 띄운다(R7).
 
 ---
 
