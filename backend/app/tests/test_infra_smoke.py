@@ -24,3 +24,9 @@ def test_health_endpoint_is_reachable(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_users_has_height_cm_column(db):
+    columns = {c["name"]: c for c in inspect(db.get_bind()).get_columns("users")}
+    assert "height_cm" in columns
+    assert columns["height_cm"]["nullable"] is True

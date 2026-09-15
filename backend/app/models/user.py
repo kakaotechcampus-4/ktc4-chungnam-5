@@ -37,6 +37,9 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     nickname: Mapped[str] = mapped_column(String(64), nullable=False)
 
+    height_cm: Mapped[Decimal | None] = mapped_column(Numeric(4, 1), nullable=True)
+    """키(cm). 프로필 미입력 상태를 표현하려고 nullable 로 둔다."""
+
     restrictions: Mapped[dict | list] = mapped_column(
         JSONB, nullable=False, server_default=text("'[]'::jsonb")
     )
