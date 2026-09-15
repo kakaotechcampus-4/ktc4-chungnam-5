@@ -4,7 +4,6 @@
 
 - 스택: **Python / FastAPI** (D2)
 - 컨테이너 1개. BE와는 HTTP로만 대화한다 (D4)
-- 상세 설계: [`../docs/architecture.md`](../docs/architecture.md) · 결정 근거: [`../docs/decisions.md`](../docs/decisions.md)
 
 ---
 
@@ -97,8 +96,6 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 pytest
 ```
-
-BE 없이 단독 개발하려면 [`../contracts/`](../contracts/)의 OpenAPI로 Prism 목 서버를 띄운다(R7).
 
 ---
 
