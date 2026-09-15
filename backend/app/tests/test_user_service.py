@@ -5,11 +5,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import func, select
 
 from app.core.errors import ApiError, ErrorCode
 from app.crud import user as user_crud
 from app.models.enums import MedicationStage
 from app.models.medication import MedicationRecord
+from app.models.user import UserState
 from app.schemas.user import (
     OnboardingStatus,
     ProfileCreateRequest,
@@ -98,7 +100,12 @@ def test_update_me_changes_only_given_fields(db):
 
 
 def test_update_me_weight_creates_new_state_record(db):
-    """체중 수정은 users 를 고치지 않고 user_states 에 기록을 남긴다."""
+    """체중 수정은 users 를 고치지 않고 user_states 에 '새' 기록을 남긴다.
+
+    최신 체중 값만 보면 users 컬럼을 덮어써도 통과해버린다(그 값도 78.4로 보이므로).
+    그래서 user_states 행 수를 직접 세어 실제로 새 행이 추가됐는지 확인한다 —
+    프로필 생성 시 첫 체중 기록 1건 + 이번 수정으로 1건, 총 2건이어야 한다.
+    """
     created = user_service.create_profile(db, request=_create_request())
     updated = user_service.update_me(
         db,
@@ -107,6 +114,13 @@ def test_update_me_weight_creates_new_state_record(db):
     )
     assert updated.weight_kg == 78.4
     assert user_service.get_me(db, user_id=created.user_id).weight_kg == 78.4
+
+    state_count = db.execute(
+        select(func.count())
+        .select_from(UserState)
+        .where(UserState.user_id == created.user_id)
+    ).scalar_one()
+    assert state_count == 2
 
 
 def test_update_me_raises_for_unknown_user(db):

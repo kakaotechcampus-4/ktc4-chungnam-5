@@ -39,6 +39,19 @@ def _resolve_onboarding_status(db: Session, user: User) -> OnboardingStatus:
     height_cm 이 비어 있으면 프로필이 아직 안 채워진 것으로 본다. 인증이 붙기
     전에는 프로필 생성이 곧 유저 생성이라 이 분기가 나오지 않지만, 카카오 로그인이
     붙으면 바로 쓰인다.
+
+    **함정:** height_cm is None 을 "프로필 미입력" 의 유일한 신호로 쓴다. 그런데
+    카카오 로그인 콜백은 최초 로그인 시 유저 행을 먼저 만들어야 하고, 그 시점엔
+    아직 프로필 입력을 받지 않았다. `users.baseline_meal_kcal` 이 NOT NULL 이라
+    콜백이 아무도 입력하지 않은 숫자를 발명해 넣어야 하는데, 그러면
+    `GET /users/me` 가 `onboardingStatus: "PROFILE_REQUIRED"` 와 그 가짜
+    `baselineIntake` 를 동시에 내보낸다. FE 가 PROFILE_REQUIRED 를 무시하고 그
+    값을 신뢰하면 Quantity 채점의 분모(D7, README 규칙 4)가 조용히 틀린다.
+
+    **선행 조건:** 이 함정 때문에, 인증(카카오 콜백) 작업은 `users.nickname` 과
+    `users.baseline_meal_kcal` 을 nullable 로 만들기 전에는 콜백에서 유저 행을
+    만들 수 없다. (이번 범위에서는 두 컬럼을 nullable 로 바꾸지 않는다 — 별도
+    작업.)
     """
     if user.height_cm is None:
         return OnboardingStatus.PROFILE_REQUIRED
