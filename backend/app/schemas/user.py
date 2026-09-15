@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from app.schemas.base import CamelModel
 
@@ -24,7 +24,15 @@ class OnboardingStatus(str, enum.Enum):
 
 
 class ProfileCreateRequest(CamelModel):
-    """POST /users/profile 요청."""
+    """POST /users/profile 요청.
+
+    extra="forbid": 오타난 필드(예: weigthKg)를 조용히 무시하지 않는다. 무시하면
+    클라이언트는 200/201을 받고 "저장됐다"고 믿지만 실제로는 그 필드가 반영되지
+    않는다. model_config 는 CamelModel 의 값과 병합된다(별도로 확인됨) — alias_generator
+    등은 그대로 유지되고 extra 만 덮어써진다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     nickname: str = Field(min_length=1, max_length=64)
     height_cm: Decimal = Field(gt=0, le=300)
@@ -34,7 +42,13 @@ class ProfileCreateRequest(CamelModel):
 
 
 class ProfileUpdateRequest(CamelModel):
-    """PATCH /users/me 요청. 준 필드만 바꾼다."""
+    """PATCH /users/me 요청. 준 필드만 바꾼다.
+
+    extra="forbid": 오타난 필드(예: weigthKg)를 조용히 무시하지 않는다 — 그러면
+    200과 함께 예전 값이 담긴 응답이 나가 "저장됐다"는 착각을 준다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     nickname: str | None = Field(default=None, min_length=1, max_length=64)
     height_cm: Decimal | None = Field(default=None, gt=0, le=300)

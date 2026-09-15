@@ -85,10 +85,22 @@ def db(test_engine: Engine) -> Generator[Session, None, None]:
     `join_transaction_mode="create_savepoint"` 가 핵심이다. services/ 가 부르는
     session.commit() 이 바깥 트랜잭션을 실제로 커밋하지 않고 SAVEPOINT 만 놓는다.
     이게 없으면 테스트가 서로의 데이터를 본다.
+
+    `autoflush=False, expire_on_commit=False` 는 프로덕션(app/db/session.py 의
+    SessionLocal)과 반드시 맞춘다. SQLAlchemy 기본값(autoflush=True)을 그대로
+    두면 `crud/` 에서 빠뜨린 `db.flush()` 를 테스트 세션이 가려준다 — 쿼리 시점에
+    자동으로 flush 가 일어나 테스트는 초록색인데, autoflush=False 인 프로덕션에서는
+    flush 가 안 돼 조용히 틀린 결과가 나간다. 세션 설정이 다르면 이 테스트 스위트가
+    검증하는 게 프로덕션과 다른 코드 경로가 된다.
     """
     connection = test_engine.connect()
     transaction = connection.begin()
-    session = Session(bind=connection, join_transaction_mode="create_savepoint")
+    session = Session(
+        bind=connection,
+        autoflush=False,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
     try:
         yield session
     finally:

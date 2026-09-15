@@ -112,3 +112,32 @@ def test_create_profile_rejects_missing_field(client):
     response = client.post("/api/v1/users/profile", json={"nickname": "종호"})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_patch_me_rejects_typo_field(client):
+    """오타난 필드(weigthKg)를 조용히 무시하지 않고 422 를 낸다.
+
+    무시하면 200 + 예전 값이 담긴 응답이 나가 "저장됐다"는 착각을 준다
+    (ProfileUpdateRequest 의 extra="forbid").
+    """
+    created = _create(client)
+    response = client.patch(
+        "/api/v1/users/me",
+        json={"weigthKg": 78.4},  # 오타: weightKg
+        headers={"X-User-Id": created["userId"]},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_create_profile_rejects_typo_field(client):
+    """ProfileCreateRequest 도 동일하게 오타난 필드를 거부한다.
+
+    필수 필드는 모두 정상적으로 채우고, 오타난 필드 하나를 추가로 보낸다 —
+    "필수값 누락" 이 아니라 "extra=forbid" 자체를 검증하기 위해서다.
+    """
+    body = dict(CREATE_BODY)
+    body["weigthKg"] = 79.0  # 오타: weightKg 는 그대로 두고 오타 필드를 추가
+    response = client.post("/api/v1/users/profile", json=body)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
