@@ -6,18 +6,133 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'shared_meal_widgets.dart';
 
+// ── 모델 ────────────────────────────────────────────────────
+
+/// `POST /medications` · `GET /medications/current` 응답.
+class MedicationCurrent {
+  const MedicationCurrent({
+    required this.medicationId,
+    required this.drugName,
+    required this.doseMg,
+    required this.startedAt,
+    required this.doseCount,
+    required this.nextDoseDate,
+    required this.daysUntilNextDose,
+    required this.stage,
+    this.stageReason,
+  });
+
+  final String medicationId;
+  final String drugName;
+  final double doseMg;
+  final DateTime startedAt;
+
+  /// 서버 계산: `floor((today − startedAt) / 7) + 1`.
+  final int doseCount;
+
+  final DateTime nextDoseDate;
+  final int daysUntilNextDose;
+
+  /// `INITIAL` · `TITRATION` · `MAINTENANCE`.
+  final String stage;
+
+  /// `약효가 줄고 식욕이 돌아오는 구간` 같은 한 줄 설명.
+  final String? stageReason;
+
+  factory MedicationCurrent.fromJson(Map<String, dynamic> json) =>
+      MedicationCurrent(
+        medicationId: json['medicationId'] as String,
+        drugName: json['drugName'] as String,
+        doseMg: (json['doseMg'] as num).toDouble(),
+        startedAt: DateTime.parse(json['startedAt'] as String),
+        doseCount: json['doseCount'] as int,
+        nextDoseDate: DateTime.parse(json['nextDoseDate'] as String),
+        daysUntilNextDose: json['daysUntilNextDose'] as int,
+        stage: json['stage'] as String,
+        stageReason: json['stageReason'] as String?,
+      );
+}
+
+String stageLabel(String stage) => switch (stage) {
+  'INITIAL' => '도입기',
+  'TITRATION' => '증량기',
+  'MAINTENANCE' => '유지기',
+  _ => stage,
+};
+
+/// `2026-06-14` 형식. 요청 body 에 쓴다.
+String formatApiDate(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-'
+    '${d.day.toString().padLeft(2, '0')}';
+
+// ── API ─────────────────────────────────────────────────────
+
+/// 투약 화면이 쓰는 엔드포인트.
+///
+/// 지금은 명세 예시를 그대로 돌려준다. 통신 라이브러리가 정해지면
+/// 메서드 본문만 교체하면 되고 화면은 건드리지 않는다.
+class MedicationApiService {
+  /// `GET /medications/current`
+  ///
+  /// 미등록이면 `error.code = STAGE_NOT_SET` 이 온다. 이건 실패가 아니라
+  /// "아직 입력 안 함" 이므로 null 로 바꿔 돌려주고 화면은 빈 폼을 보여 준다.
+  Future<MedicationCurrent?> fetchCurrent() async {
+    // TODO(http|dio 결정 후): 실제 GET 요청으로 교체.
+    //   error.code == 'STAGE_NOT_SET' 이면 null 을 반환하고,
+    //   그 밖의 에러만 throw 한다.
+    await Future.delayed(const Duration(milliseconds: 250));
+    return MedicationCurrent.fromJson(_sample);
+  }
+
+  /// `POST /medications` — 등록·수정 겸용.
+  ///
+  /// `doseMg` 가 현재 값과 다르면 서버가 `dose_events` 를 자동 기록한다.
+  /// 그래서 미리보기 용도로는 절대 부르면 안 된다.
+  Future<MedicationCurrent> save({
+    required String drugName,
+    required double doseMg,
+    required DateTime startedAt,
+  }) async {
+    // TODO(http|dio 결정 후): 실제 POST 요청으로 교체.
+    //   body: { drugName, doseMg, startedAt: "YYYY-MM-DD" }
+    await Future.delayed(const Duration(milliseconds: 300));
+    return MedicationCurrent.fromJson({
+      ..._sample,
+      'drugName': drugName,
+      'doseMg': doseMg,
+      'startedAt': formatApiDate(startedAt),
+    });
+  }
+
+  /// 명세의 `POST /medications` 예시 응답(`data` 안쪽).
+  static const Map<String, dynamic> _sample = {
+    'medicationId': 'med_01H8',
+    'drugName': '위고비',
+    'doseMg': 1.0,
+    'startedAt': '2026-06-14',
+    'doseCount': 10,
+    'nextDoseDate': '2026-08-23',
+    'daysUntilNextDose': 2,
+    'stage': 'MAINTENANCE',
+    'stageReason': '약효가 줄고 식욕이 돌아오는 구간',
+    'ruleVersion': 'v1',
+    'doseChanged': false,
+    'doseEvent': null,
+    'stageChanged': false,
+    'decidedAt': '2026-08-21T09:12:00+09:00',
+  };
+}
+
+// ── 화면 ────────────────────────────────────────────────────
+
 /// 투약 정보 입력 — 온보딩 1/2 단계.
 ///
-/// Figma `hOxrHBitBpjwIBBg2GO49y` node `60:11`.
-///
-/// **지금은 레이아웃 뼈대다.** 선택 상태만 로컬 `setState` 로 돌고 저장은 하지 않는다.
-/// 연동하면 `POST /medications`(등록·수정 겸용) 으로 보낸다.
+/// Figma `hOxrHBitBpjwIBBg2GO49y` node `60:11`. 탭바 밖 화면이라
+/// `Navigator.push` 로 띄운다.
 ///
 /// 프리필(`GET /medications/current`)은 스켈레톤을 쓰지 않는다. 폼을 기본값으로
-/// 즉시 렌더하고 응답이 오면 채운다. 단, **응답이 늦게 와도 사용자가 이미 손댄
-/// 입력은 덮어쓰지 않는다** — 그 시점에 "사용자가 만졌는지" 플래그가 필요해진다.
-///
-/// 탭바 밖 화면이라 `Navigator.push` 로 띄운다.
+/// 즉시 렌더하고 응답이 오면 채운다. 단 **사용자가 이미 손댄 입력은 덮어쓰지
+/// 않는다**.
 class MedicationInfoScreen extends StatefulWidget {
   const MedicationInfoScreen({super.key});
 
@@ -26,38 +141,103 @@ class MedicationInfoScreen extends StatefulWidget {
 }
 
 class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
+  final MedicationApiService _api = MedicationApiService();
+
   /// 약별 1회 용량 스텝(mg, 주 1회). 약을 바꾸면 값도 개수도 달라진다.
   /// Figma 에는 위고비 5칸만 그려져 있어 마운자로는 가로 스크롤로 받는다.
-  static const Map<String, List<String>> _dosesByDrug = {
-    '위고비': ['0.25', '0.5', '1.0', '1.7', '2.4'],
-    '마운자로': ['2.5', '5', '7.5', '10', '12.5', '15'],
+  ///
+  /// 표기를 값과 같이 들고 있는 이유: 위고비는 `1.0`, 마운자로는 `5` 로 적는다.
+  /// 숫자에서 규칙으로 만들어 내려 하면 한쪽이 반드시 틀어진다.
+  static const Map<String, List<(String, double)>> _dosesByDrug = {
+    '위고비': [
+      ('0.25', 0.25),
+      ('0.5', 0.5),
+      ('1.0', 1.0),
+      ('1.7', 1.7),
+      ('2.4', 2.4),
+    ],
+    '마운자로': [
+      ('2.5', 2.5),
+      ('5', 5.0),
+      ('7.5', 7.5),
+      ('10', 10.0),
+      ('12.5', 12.5),
+      ('15', 15.0),
+    ],
   };
 
   String _drug = '위고비';
-  String _dose = '1.0';
+  double _dose = 1.0;
   DateTime _startedAt = DateTime(2026, 6, 14);
-  int _doseCount = 12;
 
-  /// 저장(`POST /medications`) 진행 중. 버튼을 잠가 중복 전송을 막는다.
+  /// 서버가 판정한 현재 투약. 단계 블록을 채우는 데만 쓴다.
+  MedicationCurrent? _current;
+
+  /// 사용자가 폼을 건드렸는지. 늦게 도착한 프리필이 입력을 덮지 않게 한다.
+  bool _touchedByUser = false;
+
   bool _saving = false;
+  String? _saveError;
 
-  /// 저장 실패. 입력값은 그대로 두고 버튼 위에 재시도만 띄운다.
-  bool _saveFailed = false;
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrent();
+  }
 
-  void _submit() {
-    setState(() {
-      _saving = true;
-      _saveFailed = false;
+  Future<void> _loadCurrent() async {
+    try {
+      final current = await _api.fetchCurrent();
+      if (!mounted || current == null) return;
+      setState(() {
+        _current = current;
+        // 사용자가 이미 손댔으면 입력값은 건드리지 않는다.
+        if (!_touchedByUser) {
+          _drug = current.drugName;
+          _dose = current.doseMg;
+          _startedAt = current.startedAt;
+        }
+      });
+    } catch (_) {
+      // 프리필 실패는 조용히 넘긴다. 빈 폼으로도 입력할 수 있고,
+      // 여기서 재시도 블록을 띄우면 처음 쓰는 사람에게 실패처럼 보인다.
+    }
+  }
+
+  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// 오늘 기준 투약 회차. 서버 공식과 같다.
+  int get _doseCount =>
+      _dateOnly(DateTime.now()).difference(_startedAt).inDays ~/ 7 + 1;
+
+  /// 회차를 바꾸면 시작일을 역산한다.
+  ///
+  /// 명세상 `doseCount` 는 서버가 `startedAt` 으로 계산하고 `POST /medications`
+  /// body 에도 회차 자리가 없다. 그래서 Figma 의 회차 스테퍼는 그대로는 보낼
+  /// 곳이 없다. 시작일을 거꾸로 맞추면 스테퍼를 살리면서 유효한 body 가 되고,
+  /// 바로 옆 `투약 시작일` 필드가 같이 바뀌어서 동작이 눈에 드러난다.
+  void _changeDoseCount(int delta) {
+    final next = _doseCount + delta;
+    if (next < 1) return;
+    _edit(() {
+      _startedAt = _dateOnly(
+        DateTime.now(),
+      ).subtract(Duration(days: (next - 1) * 7));
     });
-    // TODO: POST /medications → 성공 시 2/2(프로필) 단계로 이동.
-    //       실패하면 _saving=false, _saveFailed=true 로 되돌린다.
+  }
+
+  void _edit(VoidCallback change) {
+    setState(() {
+      _touchedByUser = true;
+      change();
+    });
   }
 
   void _selectDrug(String drug) {
-    setState(() {
+    _edit(() {
       _drug = drug;
-      // 약이 바뀌면 이전 용량이 존재하지 않을 수 있다.
-      _dose = _dosesByDrug[drug]!.first;
+      // 약이 바뀌면 이전 용량이 목록에 없을 수 있다.
+      _dose = _dosesByDrug[drug]!.first.$2;
     });
   }
 
@@ -68,7 +248,29 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (picked != null) setState(() => _startedAt = picked);
+    if (picked != null) _edit(() => _startedAt = picked);
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    try {
+      final saved = await _api.save(
+        drugName: _drug,
+        doseMg: _dose,
+        startedAt: _startedAt,
+      );
+      if (!mounted) return;
+      setState(() => _current = saved);
+      // TODO: 2/2(프로필 입력) 단계로 이동.
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saveError = '저장하지 못했어요: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   String get _formattedStartDate =>
@@ -84,7 +286,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _Header(step: 1, totalSteps: 2),
+            const _Header(step: 1, totalSteps: 2),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(
@@ -96,10 +298,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '투약 정보를 알려주세요',
-                      style: AppTypography.screenTitle,
-                    ),
+                    Text('투약 정보를 알려주세요', style: AppTypography.screenTitle),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       '같은 식사도 투약 단계에 따라 다르게 평가해요',
@@ -110,7 +309,6 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                     const _SectionLabel('복용 중인 약'),
                     const SizedBox(height: AppSpacing.md),
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Figma 는 주사기 일러스트다. 에셋이 들어오면 교체한다.
                         const Expanded(
@@ -154,9 +352,9 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                         children: [
                           for (final dose in doses) ...[
                             _DoseChip(
-                              label: dose,
-                              selected: _dose == dose,
-                              onTap: () => setState(() => _dose = dose),
+                              label: dose.$1,
+                              selected: _dose == dose.$2,
+                              onTap: () => _edit(() => _dose = dose.$2),
                             ),
                             if (dose != doses.last)
                               const SizedBox(width: AppSpacing.sm),
@@ -209,7 +407,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                                     _StepperButton(
                                       icon: Icons.remove,
                                       onTap: _doseCount > 1
-                                          ? () => setState(() => _doseCount--)
+                                          ? () => _changeDoseCount(-1)
                                           : null,
                                     ),
                                     Expanded(
@@ -221,7 +419,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                                     ),
                                     _StepperButton(
                                       icon: Icons.add,
-                                      onTap: () => setState(() => _doseCount++),
+                                      onTap: () => _changeDoseCount(1),
                                     ),
                                   ],
                                 ),
@@ -233,7 +431,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                     ),
                     const SizedBox(height: AppSpacing.xl),
 
-                    const _StageResultBlock(),
+                    _StageResultBlock(current: _current),
                   ],
                 ),
               ),
@@ -244,11 +442,8 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (_saveFailed) ...[
-                    RetryBlock(
-                      message: '저장하지 못했어요. 잠시 후 다시 시도해 주세요',
-                      onRetry: _submit,
-                    ),
+                  if (_saveError != null) ...[
+                    RetryBlock(message: _saveError!, onRetry: _submit),
                     const SizedBox(height: AppSpacing.md),
                   ],
                   FilledButton(
@@ -340,10 +535,7 @@ class _SelectableCard extends StatelessWidget {
       borderRadius: AppRadius.lgRadius,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.lg,
-        ),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
           color: selected ? AppColors.primaryTint : AppColors.surface,
           borderRadius: AppRadius.lgRadius,
@@ -463,15 +655,19 @@ class _StepperButton extends StatelessWidget {
 
 /// 입력 기준 현재 단계.
 ///
-/// **아직 값을 채우지 않는다.** 단계 판정은 서버(`POST /medications`)가 하고
-/// 경계값도 미확정이라 FE 가 예측할 수 없다. 입력할 때마다 POST 를 부르면
-/// "용량 변경 자동 기록"이 실제 이력이 아닌 값으로 오염된다.
-/// BE 에 판정 전용 dry-run 이 생기면 그걸 붙이고, 그전까지는 안내만 둔다.
+/// 서버가 판정한 값이 있을 때만 채운다. **입력을 바꿀 때마다 미리 보여 주지는
+/// 않는다.** 판정은 `POST /medications` 가 하는데 그 호출은 용량이 바뀌면
+/// `dose_events` 를 자동 기록해서, 미리보기로 부르면 실제 이력이 아닌 값이
+/// 쌓인다. 판정 전용 dry-run 이 생기면 그때 붙인다.
 class _StageResultBlock extends StatelessWidget {
-  const _StageResultBlock();
+  const _StageResultBlock({required this.current});
+
+  final MedicationCurrent? current;
 
   @override
   Widget build(BuildContext context) {
+    final stage = current;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -485,14 +681,14 @@ class _StageResultBlock extends StatelessWidget {
           Text('입력 기준 현재 단계', style: AppTypography.caption),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            '다음을 누르면 알려드려요',
+            stage == null ? '다음을 누르면 알려드려요' : stageLabel(stage.stage),
             style: AppTypography.screenTitle.copyWith(
-              color: AppColors.textSecondary,
+              color: stage == null ? AppColors.textSecondary : null,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            '투약 단계에 따라 같은 식사도 다르게 평가돼요',
+            stage?.stageReason ?? '투약 단계에 따라 같은 식사도 다르게 평가돼요',
             style: AppTypography.bodySecondary,
           ),
         ],
