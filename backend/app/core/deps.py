@@ -6,14 +6,12 @@ production 이면 아래 get_current_user_id 가 기동 자체를 막는다 (REA
 규칙 6" 예외 블록 참고).
 
 JWT 가 붙으면 이 파일의 get_current_user_id 본문이 바뀌고, **이 의존성을 쓰는**
-`GET`/`PATCH /users/me` 는 바뀌지 않는다. 하지만 `POST /users/profile` 은 이
-의존성을 **쓰지 않는다** — 프로필 생성이 곧 유저 생성이라 식별할 기존 사용자가
-없기 때문이다. JWT 가 붙으면 "프로필 생성" 의 의미 자체가 바뀐다(카카오 콜백이
+`GET`/`PATCH /users/me` 와 `GET`/`DELETE /meals` 는 바뀌지 않는다. 하지만
+`POST /users/profile` 은 이 의존성을 **쓰지 않는다** — 프로필 생성이 곧 유저
+생성이라 식별할 기존 사용자가 없기 때문이다. JWT 가 붙으면 "프로필 생성" 의 의미 자체가 바뀐다(카카오 콜백이
 먼저 유저 행을 만들고, 이 엔드포인트는 그 행을 채우는 걸로 바뀐다) — 그래서 이
 엔드포인트·`services/user.py::create_profile`·crud·테스트가 함께 바뀐다. 다음
 사람이 JWT 작업량을 "이 파일만 고치면 된다" 로 과소산정하지 않도록 남겨둔다.
-
-api/v1/endpoints/meals.py 의 user_id 쿼리 파라미터도 나중에 여기로 옮긴다.
 """
 
 import uuid

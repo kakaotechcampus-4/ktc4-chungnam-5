@@ -127,11 +127,12 @@ def test_http_exception_400_from_real_endpoint_is_wrapped_as_bad_request(client)
     이 400 은 명시 매핑에 없는 4xx 이므로 BAD_REQUEST 로 흡수되어야 한다
     (이 테스트가 지키는 것: 클라이언트 입력 오류가 서버 오류로 둔갑하지 않는다).
     """
-    # 적절한 user_id (UUID 형식)
-    user_id = uuid.uuid4()
-
     # 잘못된 cursor 로 요청
-    response = client.get("/api/v1/meals", params={"user_id": str(user_id), "cursor": "garbage"})
+    response = client.get(
+        "/api/v1/meals",
+        params={"cursor": "garbage"},
+        headers={"X-User-Id": str(uuid.uuid4())},
+    )
 
     # 400 으로 응답, BAD_REQUEST 로 래핑되어야 함
     assert response.status_code == 400

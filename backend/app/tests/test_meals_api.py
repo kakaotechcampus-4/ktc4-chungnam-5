@@ -1,4 +1,4 @@
-"""DELETE /meals/{mealId} 의 HTTP 계약.
+"""/meals 엔드포인트의 HTTP 계약.
 
 응답 래퍼 · camelCase · 인증 이음새 · 404 단일화까지, FE 가 실제로 보는 모양을 검증한다.
 """
@@ -73,10 +73,36 @@ def test_deleted_meal_is_gone_from_list_endpoint(client, db):
     user = make_user(db)
     meal = make_meal(db, user_id=user.id)
 
-    before = client.get("/api/v1/meals", params={"user_id": str(user.id)})
-    assert [item["mealId"] for item in before.json()["items"]] == [str(meal.id)]
+    headers = {"X-User-Id": str(user.id)}
 
-    client.delete(f"/api/v1/meals/{meal.id}", headers={"X-User-Id": str(user.id)})
+    before = client.get("/api/v1/meals", headers=headers)
+    assert [item["mealId"] for item in before.json()["data"]["items"]] == [str(meal.id)]
 
-    after = client.get("/api/v1/meals", params={"user_id": str(user.id)})
-    assert after.json()["items"] == []
+    client.delete(f"/api/v1/meals/{meal.id}", headers=headers)
+
+    after = client.get("/api/v1/meals", headers=headers)
+    assert after.json()["data"]["items"] == []
+
+
+def test_list_without_user_header_is_401(client, db):
+    """식사 기록은 민감 건강정보다. 조회도 인증 이음새를 타야 한다."""
+    user = make_user(db)
+    make_meal(db, user_id=user.id)
+
+    response = client.get("/api/v1/meals")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHORIZED"
+
+
+def test_list_only_returns_the_callers_meals(client, db):
+    """헤더의 사용자 것만 나온다 — 남의 기록이 섞이지 않는다."""
+    owner = make_user(db, "종호")
+    stranger = make_user(db, "남의사람")
+    mine = make_meal(db, user_id=owner.id)
+    make_meal(db, user_id=stranger.id)
+
+    response = client.get("/api/v1/meals", headers={"X-User-Id": str(owner.id)})
+
+    items = response.json()["data"]["items"]
+    assert [item["mealId"] for item in items] == [str(mine.id)]
