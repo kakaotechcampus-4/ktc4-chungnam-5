@@ -148,6 +148,10 @@ def delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> MealD
     if meal is None:
         raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
 
+    # 응답을 만들어 돌려주기 전에 커밋 — 클라이언트가 200을 받는 시점엔
+    # 이미 DB에 반영된 상태여야 한다 (get_db 는 더 이상 commit 하지 않는다).
+    db.commit()
+
     return MealDeleteResponse(
         meal_id=meal.id,
         deleted_at=meal.deleted_at,

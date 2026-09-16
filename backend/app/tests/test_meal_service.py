@@ -6,6 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -110,8 +111,11 @@ def test_delete_meal_builds_response_when_found(monkeypatch):
     fake_meal = SimpleNamespace(id=meal_id, deleted_at=deleted_at)
 
     monkeypatch.setattr(meal_crud, "soft_delete_meal", lambda db, *, user_id, meal_id: fake_meal)
+    fake_db = MagicMock()
 
-    response = delete_meal(db=None, user_id=uuid.uuid4(), meal_id=meal_id)
+    response = delete_meal(db=fake_db, user_id=uuid.uuid4(), meal_id=meal_id)
+
+    fake_db.commit.assert_called_once()
 
     assert response.meal_id == meal_id
     assert response.deleted_at == deleted_at
