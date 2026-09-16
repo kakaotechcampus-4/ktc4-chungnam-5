@@ -1,10 +1,9 @@
-# be — Backend
+# backend — Backend
 
 GLP-1 포즈 단계별 식사 코치의 **백엔드**. 공개 API·내부 API·비동기 워커·도메인 로직을 담당한다.
 
 - 스택: **Python 3.12 / FastAPI / SQLAlchemy / PostgreSQL** (D2)
 - 컨테이너 2개로 뜬다: `api`, `worker` (D4)
-- 상세 설계: [`../docs/architecture.md`](../docs/architecture.md) · 결정 근거: [`../docs/decisions.md`](../docs/decisions.md)
 
 ---
 
@@ -18,16 +17,28 @@ GLP-1 포즈 단계별 식사 코치의 **백엔드**. 공개 API·내부 API·�
    **단계별 기준선(목표 범위)의 엄격함**으로 구현한다 (D9).
 4. **Quantity는 절대 섭취량·BMR 목표 kcal 대비가 아니다.** 개인 baseline(평소 한 끼) 대비 **감소폭** (D7).
 5. **`services/` 하위 모듈은 서로 직접 참조하지 않는다.** 조합은 `api/` · `internal/` · `worker/` 레이어에서만.
-   DB 접근은 `crud/`를 통해서만 한다 — `services/`가 세션을 직접 다루지 않는다.
+   DB 접근은 `crud/`를 통해서만 한다. **트랜잭션 경계(`commit`/`rollback`)는 `services/`가 정한다 —
+   그 외의 세션 조작(쿼리·직접 add 등)은 하지 않는다.** `crud/`는 `add`/`flush`까지만 하고 커밋하지 않는다
+   (예: `services/user.py`의 `create_profile`이 "유저 생성 + 첫 체중 기록"을 한 트랜잭션으로 묶으려고
+   `db.commit()`을 부른다).
 6. **포즈 정보는 민감 건강정보.** 로그에 약제·용량·이미지 키를 남기지 않는다.
    모든 공개 API는 JWT + 본인 데이터만 조회.
+
+> 🚨 **현재 `/users/*` 는 규칙 6을 지키지 않는다.** `GET`/`PATCH /users/me` 는
+> `X-User-Id` 헤더에 담긴 UUID 를 그대로 사용자 식별자로 신뢰한다 — **이건 인증이
+> 아니라 인증 이음새(seam)다.** 헤더에 아무 UUID나 넣으면 그 사용자의 키·체중(민감
+> 건강정보)을 읽고 쓸 수 있다. JWT 가 `app/core/deps.py` 에 병합되기 전까지
+> **`/users/*` 를 어떤 공개 환경에도 배포하지 않는다.** (`APP_ENV=production` 이면
+> `get_current_user_id` 가 기동 자체를 막는다 — `app/core/config.py` ·
+> `app/core/deps.py` 참고.) FE 는 그동안 `GET`/`PATCH /users/me` 호출마다 이
+> `X-User-Id` 헤더를 붙여야 한다.
 
 ---
 
 ## 디렉터리 구조
 
 ```
-be/app/
+backend/app/
 ├── main.py                엔트리포인트
 ├── worker_main.py         Worker 엔트리포인트
 ├── core/                  설정 · JWT · 응답 래퍼 · 에러 코드
@@ -311,11 +322,6 @@ else:
 | infra 추상화 | 로컬 구현으로 테스트, 외부 의존 0                                                                                               |
 
 ---
-
-## 참고
-
-- API 명세 · 스키마 · 단계 프로파일은 [`../contracts/`](../contracts/)가 **코드보다 먼저**다.
-- 개발 규칙: [`../CLAUDE.md`](../CLAUDE.md)
 
 ## 테이블 명세
 

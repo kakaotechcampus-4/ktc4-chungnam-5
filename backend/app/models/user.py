@@ -31,11 +31,14 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
 
-    auth_provider: Mapped[str] = mapped_column(String(32), nullable=True)
+    auth_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # 카카오는 이메일이 선택 동의라 없을 수 있다. 계정 식별은 provider_user_id 로 한다.
-    provider_user_id: Mapped[str] = mapped_column(String(128), nullable=True)
+    provider_user_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     nickname: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    height_cm: Mapped[Decimal | None] = mapped_column(Numeric(4, 1), nullable=True)
+    """키(cm). 프로필 미입력 상태를 표현하려고 nullable 로 둔다."""
 
     restrictions: Mapped[dict | list] = mapped_column(
         JSONB, nullable=False, server_default=text("'[]'::jsonb")
