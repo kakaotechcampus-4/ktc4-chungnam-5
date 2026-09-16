@@ -83,6 +83,4 @@ def soft_delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> 
         return None
 
     meal.deleted_at = datetime.now(UTC)
-    db.commit()
-    db.refresh(meal)
     return meal

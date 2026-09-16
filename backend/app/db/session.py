@@ -25,9 +25,18 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def get_db() -> Generator[Session, None, None]:
-    """FastAPI 의존성. 요청 하나당 세션 하나."""
+    """FastAPI 의존성. 요청 하나당 세션 하나 = 트랜잭션 하나.
+
+    요청 안에서 crud 함수를 몇 번 부르든 commit 은 여기서 딱 한 번만 일어난다.
+    crud 는 절대 commit/rollback 하지 않는다 — 그러면 일부만 반영되는 반쪽짜리
+    상태가 생길 수 있다.
+    """
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

@@ -2,11 +2,24 @@
 
 from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
-from app.services.meal import to_grams
+from app.crud import meal as meal_crud
+from app.schemas.meal import MealScores
+from app.services.meal import (
+    MealNotFoundError,
+    _build_scores,
+    _build_thumbnail_url,
+    decode_cursor,
+    delete_meal,
+    encode_cursor,
+    to_grams,
+)
 
 
 @pytest.mark.parametrize(
@@ -43,3 +56,63 @@ def test_negative_amount_is_rejected():
 
 def test_whitespace_in_unit_is_tolerated():
     assert to_grams(100, " g ") == Decimal("100.00")
+
+
+def test_cursor_round_trip():
+    """encode 한 걸 decode 하면 원래 값이 그대로 나와야 한다."""
+    eaten_at = datetime(2026, 8, 21, 12, 40, 0, tzinfo=UTC)
+    meal_id = uuid.uuid4()
+
+    cursor = encode_cursor(eaten_at, meal_id)
+    decoded_eaten_at, decoded_meal_id = decode_cursor(cursor)
+
+    assert decoded_eaten_at == eaten_at
+    assert decoded_meal_id == meal_id
+
+
+@pytest.mark.parametrize("garbage", ["not-a-valid-cursor", "", "abc", "12345"])
+def test_decode_cursor_rejects_garbage(garbage):
+    """조작되거나 형식이 다른 cursor 는 ValueError 여야 한다 (400 으로 이어짐)."""
+    with pytest.raises(ValueError):
+        decode_cursor(garbage)
+
+
+def test_build_scores_all_none_returns_none():
+    """세 점수가 전부 없으면(미평가) 객체 자체가 None 이어야 한다."""
+    assert _build_scores(None, None, None) is None
+
+
+def test_build_scores_rounds_decimal_to_int():
+    scores = _build_scores(Decimal("74.6"), Decimal("81.2"), None)
+    assert scores == MealScores(quantity=75, quality=81, satiety=None)
+
+
+def test_build_thumbnail_url_none_when_no_image():
+    assert _build_thumbnail_url(None) is None
+
+
+def test_build_thumbnail_url_wraps_image_key():
+    assert _build_thumbnail_url("abc123.jpg") == "/media/abc123.jpg"
+
+
+def test_delete_meal_raises_when_not_found(monkeypatch):
+    """crud 가 None 을 돌려주면(없음 / 남의 것 / 이미 삭제됨) MealNotFoundError 로 바뀌어야 한다."""
+    monkeypatch.setattr(meal_crud, "soft_delete_meal", lambda db, *, user_id, meal_id: None)
+
+    with pytest.raises(MealNotFoundError):
+        delete_meal(db=None, user_id=uuid.uuid4(), meal_id=uuid.uuid4())
+
+
+def test_delete_meal_builds_response_when_found(monkeypatch):
+    """crud 가 Meal 을 돌려주면 그 값 그대로 MealDeleteResponse 로 조립돼야 한다."""
+    meal_id = uuid.uuid4()
+    deleted_at = datetime(2026, 8, 22, 10, 4, 0, tzinfo=UTC)
+    fake_meal = SimpleNamespace(id=meal_id, deleted_at=deleted_at)
+
+    monkeypatch.setattr(meal_crud, "soft_delete_meal", lambda db, *, user_id, meal_id: fake_meal)
+
+    response = delete_meal(db=None, user_id=uuid.uuid4(), meal_id=meal_id)
+
+    assert response.meal_id == meal_id
+    assert response.deleted_at == deleted_at
+    assert response.affected_insights == []
