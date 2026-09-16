@@ -21,7 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorBody(BaseModel):
-    code: str
+    # str 이 아니라 ErrorCode 다 — 그래야 가능한 코드 목록이 /openapi.json 과
+    # /docs 스키마에 전부 열거된다. 별도 명세 파일이 없으므로 FE 는 여기서
+    # 분기 대상을 확인한다. 직렬화 결과는 동일하다 (ErrorCode 가 str enum).
+    code: ErrorCode
     message: str
 
 
