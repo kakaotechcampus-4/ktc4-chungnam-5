@@ -31,6 +31,18 @@
       user_goal          진행 중 목표는 사용자당 하나 → close 먼저
       medication_record  effective_to IS NULL 인 행도 하나 → close 먼저
 
+## meals 는 soft delete 다
+
+`DELETE /meals/{mealId}` 는 행을 지우지 않고 `meals.deleted_at` 에 값을 넣는다. 행도,
+자식 행(`meal_items` · `qqs_evaluations` · `meal_feedbacks` · `satiety_logs`)도 전부
+그대로 남는다. FK 가 `ON DELETE CASCADE` 라 hard delete 였다면 평가 이력이 같이
+날아갔을 것이고, 그걸 피하려고 고른 방식이다. 대가는 **필터를 각자 기억해야 한다**는 것:
+
+  - `meals` 를 읽는 모든 쿼리에 `deleted_at IS NULL` 을 붙인다. 부분 인덱스
+    `ix_meals_user_id_eaten_at` 도 이 조건이 있어야 탄다.
+  - 자식 테이블을 집계할 때는 `meals` 를 join 해서 거른다. join 없이
+    `qqs_evaluations` 를 그대로 합치면 **삭제된 식사가 점수에 계속 반영된다.**
+
 ## 커밋은 부르는 쪽이 한다
 
 crud 함수 안에는 `commit()` 이 없다. 한 작업이 여러 crud 를 묶어 쓰기 때문에,
@@ -40,18 +52,30 @@ crud 함수 안에는 `commit()` 이 없다. 한 작업이 여러 crud 를 묶�
 세션을 얻는 방법은 부르는 쪽에 따라 다르다.
 
 **API** — 요청 하나당 세션 하나. `get_db` 가 세션을 주고 끝나면 닫는다(커밋은 안 한다).
+커밋은 **`services/` 함수가 응답을 만들어 return 하기 직전에** 한다(규칙 5). 엔드포인트
+안에서 커밋하지 않는다.
 
+    # api/v1/endpoints/meals.py
     @router.post("/meals", status_code=202)
     def create_meal(body: MealCreate, db: Session = Depends(get_db)):
+        return ok(meal_service.create_meal(db, user_id=user_id, request=body))
+
+    # services/meal.py
+    def create_meal(db, *, user_id, request):
         snapshot = crud_snapshot.add(db, user_id, stage=stage)
         db.flush()                      # snapshot.id 가 필요하다
         meal = crud_meal.create(db, medication_snapshot_id=snapshot.id, ...)
         db.commit()                     # ← 큐에 넣기 전에 커밋한다
         queue.send({"type": "meal.analyze", "mealId": str(meal.id)})
-        return {"mealId": meal.id, "status": "ANALYZING", "pollIntervalMs": 1500}
+        return MealCreatedResponse(meal_id=meal.id, ...)
 
 순서가 중요하다. `queue.send()` 를 먼저 하면, 커밋이 실패했을 때 워커가 **DB 에 없는
 식사**를 처리하려다 3번 재시도 끝에 DLQ 로 보낸다.
+
+커밋을 `get_db` 에 맡기지 않는 이유도 같은 종류다. FastAPI 0.106+ 에서 yield 의존성의
+종료 코드는 응답을 클라이언트에 **이미 보낸 뒤** 실행되므로, 거기서 커밋하면 "201 을
+받았는데 저장은 안 된" 상태가 생긴다(`db/session.py` 참고). 대신 **`services/` 가
+커밋을 빠뜨리면 에러 없이 조용히 버려진다** — 쓰기 경로를 짤 때 이걸 먼저 확인한다.
 
 **Worker** — 요청 맥락이 없으니 세션을 직접 연다. 작업 하나가 트랜잭션 하나다.
 

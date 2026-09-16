@@ -23,21 +23,25 @@ def run(task: ReceivedTask, ai: AiClient) -> None:
     재배달마다 `meal_items` 가 중복으로 쌓인다.
 
     구현 순서:
-      1. `meals` 를 읽는다. 없으면 raise — 재시도해도 생기지 않는다(삭제된 식사)
-      2. `status` 가 ANALYZING 이 아니면 return
-      3. AI 호출
-      4. `candidateFoodRefId` 가 `food_refs` 에 실재하는지 확인한다.
+      1. `meals` 를 읽는다. 행이 없으면 raise — 재시도해도 생기지 않는다
+      2. `deleted_at` 이 NULL 이 아니면 return. **meals 는 soft delete 라 삭제된
+         식사도 행은 그대로 있다** — 이걸 빠뜨리면 사용자가 지운 식사를 분석해서
+         `meal_items` 를 채운다 (`crud/__init__.py` 의 soft delete 절 참고)
+      3. `status` 가 ANALYZING 이 아니면 return
+      4. AI 호출
+      5. `candidateFoodRefId` 가 `food_refs` 에 실재하는지 확인한다.
          없는 FK 를 그대로 넣으면 커밋이 통째로 깨진다
-      5. 이 식사의 기존 모델 생성 항목을 지우고 새로 넣는다(재배달 대비)
-      6. `unit` 을 g 으로 환산한다 — `app.services.meal.to_grams`.
+      6. 이 식사의 기존 모델 생성 항목을 지우고 새로 넣는다(재배달 대비)
+      7. `unit` 을 g 으로 환산한다 — `app.services.meal.to_grams`.
          환산이 안 되면 None 을 넣고 원본 단위는 `raw_ai_result` 에 남긴다
-      7. `status` 를 REVIEW_REQUIRED 로 옮긴다
+      8. `status` 를 REVIEW_REQUIRED 로 옮긴다
     """
     body = task.body
     meal_id = body["mealId"]
 
     with SessionLocal() as db:
         # TODO: meals 조회. 없으면 raise ValueError(f"식사를 찾을 수 없다: {meal_id}")
+        # TODO: deleted_at 이 NULL 이 아니면 return  ← soft delete 된 식사는 분석하지 않는다
         # TODO: status 가 ANALYZING 이 아니면 return  ← 멱등성. 지우지 말 것
 
         result = ai.analyze_meal(
