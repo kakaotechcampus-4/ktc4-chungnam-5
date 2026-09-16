@@ -63,7 +63,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     """앱에 예외 → 응답 래퍼 변환을 붙인다. main.py 에서 한 번 부른다.
 
     모든 응답이 { success, data, error } 래퍼를 갖도록 보장한다. HTTP status 는
-    error.code 의 맥락이고, 분기의 진실은 code 다 (contracts/API.md 규약).
+    error.code 의 맥락이고, 분기의 진실은 code 다.
 
     Status code → ErrorCode 매핑 규칙 (명시 dict, `app/core/response.py` 의
     `_HTTP_STATUS_TO_ERROR_CODE` 가 실제 정의다):

@@ -1,23 +1,21 @@
 """API 에러 코드와 예외.
 
-FE 는 HTTP status 가 아니라 `error.code` 로 분기한다 (contracts/API.md 규약).
-그래서 status 는 예외가 함께 들고 다니고, 분기의 진실은 code 다.
+FE 는 HTTP status 가 아니라 `error.code` 로 분기한다. 그래서 status 는 예외가
+함께 들고 다니고, 분기의 진실은 code 다.
 
-`UNAUTHORIZED` · `FORBIDDEN` · `USER_NOT_FOUND` · `NOT_FOUND` · `CONFLICT` ·
-`BAD_REQUEST` · `VALIDATION_ERROR` · `INTERNAL_ERROR` 는 contracts/API.md 의
-에러 코드 표에 없다. 엔드포인트를 구현하는 데 필요해서 여기서 정의했고, 명세에
-역반영이 필요하다.
+별도의 API 명세 파일이 없으므로 **이 enum 이 에러 코드의 진실의 출처**다.
+코드를 추가·변경하면 FE 가 분기를 고쳐야 하므로 합의 없이 건드리지 않는다.
 """
 
 import enum
 
 
 class ErrorCode(str, enum.Enum):
-    # contracts/API.md 에 있는 것
+    # 온보딩 선행조건 미충족 — 도메인 코드
     PROFILE_REQUIRED = "PROFILE_REQUIRED"
     STAGE_NOT_SET = "STAGE_NOT_SET"
 
-    # 이번 작업에서 새로 정의한 것
+    # 인증 · 검증 · 서버 오류 — 전 엔드포인트 공통
     UNAUTHORIZED = "UNAUTHORIZED"
     FORBIDDEN = "FORBIDDEN"
     USER_NOT_FOUND = "USER_NOT_FOUND"
