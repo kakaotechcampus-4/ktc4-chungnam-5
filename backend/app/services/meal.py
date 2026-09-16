@@ -14,7 +14,11 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.crud import meal as meal_crud
-from app.schemas.meal import MealListItem, MealListResponse, MealScores
+from app.schemas.meal import MealDeleteResponse, MealListItem, MealListResponse, MealScores
+
+
+class MealNotFoundError(Exception):
+    """존재하지 않거나, 남의 것이거나, 이미 삭제된 식사를 가리킬 때."""
 
 # 그대로 g 으로 볼 수 있는 단위.
 # ml 은 물 기준 1ml ≈ 1g 로 근사한다. 국·음료가 대부분이라 오차를 감수할 만하다.
@@ -136,3 +140,21 @@ def list_meals(
         next_cursor = encode_cursor(last_meal.eaten_at, last_meal.id)
 
     return MealListResponse(items=items, next_cursor=next_cursor, has_more=has_more)
+
+
+def delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> MealDeleteResponse:
+    """식사를 soft delete 하고 응답을 조립한다."""
+    meal = meal_crud.soft_delete_meal(db, user_id=user_id, meal_id=meal_id)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+
+    # 응답을 만들어 돌려주기 전에 커밋 — 클라이언트가 200을 받는 시점엔
+    # 이미 DB에 반영된 상태여야 한다 (get_db 는 더 이상 commit 하지 않는다).
+    db.commit()
+
+    return MealDeleteResponse(
+        meal_id=meal.id,
+        deleted_at=meal.deleted_at,
+        # TODO: 7·8번(insights/long-term) 구현 후 실제 stale 판정 로직으로 교체.
+        affected_insights=[],
+    )

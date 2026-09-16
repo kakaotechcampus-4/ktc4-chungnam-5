@@ -33,3 +33,19 @@ class MealListResponse(CamelModel):
     items: list[MealListItem]
     next_cursor: str | None
     has_more: bool
+
+
+class AffectedInsight(CamelModel):
+    """식사 삭제로 낡은 정보가 된 장기 피드백 하나. (7·8번 insights 구현 전까지는 항상 빈 배열)"""
+
+    period: str
+    stale: bool
+    stale_reason: str
+
+
+class MealDeleteResponse(CamelModel):
+    """DELETE /meals/{mealId} 응답."""
+
+    meal_id: uuid.UUID
+    deleted_at: datetime
+    affected_insights: list[AffectedInsight]

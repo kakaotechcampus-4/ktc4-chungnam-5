@@ -49,6 +49,8 @@ class Meal(Base):
         server_default=MealStatus.ANALYZING.value,
     )
     created_at: Mapped[datetime] = created_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    """NULL 이면 살아있는 식사. soft delete — 값이 채워지면 삭제된 것으로 취급한다."""
 
     items: Mapped[list["MealItem"]] = relationship(
         back_populates="meal", cascade="all, delete-orphan"
@@ -63,7 +65,13 @@ class Meal(Base):
             name="input_present",
         ),
         # 홈 화면(오늘 끼니)과 기간별 조회가 같은 인덱스를 탄다.
-        Index("ix_meals_user_id_eaten_at", "user_id", text("eaten_at DESC")),
+        # 삭제된 식사는 거의 모든 조회에서 제외되므로 partial index 로 좁힌다.
+        Index(
+            "ix_meals_user_id_eaten_at",
+            "user_id",
+            text("eaten_at DESC"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
 

@@ -1,7 +1,7 @@
 """meals 테이블 접근. 여기 말고는 아무도 Meal 을 직접 쿼리하지 않는다."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Row, and_, or_, select
 from sqlalchemy.orm import Session
@@ -34,7 +34,7 @@ def list_meals(
         )
         .join(MedicationSnapshot, Meal.medication_snapshot_id == MedicationSnapshot.id)
         .outerjoin(QQSEvaluation, QQSEvaluation.meal_id == Meal.id)
-        .where(Meal.user_id == user_id)
+        .where(Meal.user_id == user_id, Meal.deleted_at.is_(None))
     )
 
     if before_eaten_at is not None:
@@ -66,3 +66,21 @@ def get_display_names(db: Session, meal_ids: list[uuid.UUID]) -> dict[uuid.UUID,
         names_by_meal.setdefault(meal_id, []).append(display_name)
 
     return {meal_id: ", ".join(names) for meal_id, names in names_by_meal.items()}
+
+
+def soft_delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal | None:
+    """user_id 소유의 meal_id 를 soft delete 한다.
+
+    없거나, 남의 것이거나, 이미 삭제됐으면 None (셋 다 "지울 수 있는 게 없다"로 동일 취급).
+    """
+    stmt = select(Meal).where(
+        Meal.id == meal_id,
+        Meal.user_id == user_id,
+        Meal.deleted_at.is_(None),
+    )
+    meal = db.execute(stmt).scalar_one_or_none()
+    if meal is None:
+        return None
+
+    meal.deleted_at = datetime.now(UTC)
+    return meal
