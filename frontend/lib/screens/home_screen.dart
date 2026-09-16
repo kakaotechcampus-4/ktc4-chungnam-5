@@ -6,19 +6,276 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'shared_meal_widgets.dart';
 
+// ── 모델 ────────────────────────────────────────────────────
+
+/// Q·Q·S 점수. 셋 다 0~100 정수다.
+class MealScores {
+  const MealScores({
+    required this.quantity,
+    required this.quality,
+    required this.satiety,
+    this.quantityLabel,
+  });
+
+  final int quantity;
+  final int quality;
+  final int satiety;
+
+  /// 양 라벨(`부족` · `적정` · `과다`).
+  ///
+  /// **명세 초안에 아직 없는 필드다.** Figma 는 양만 숫자가 아니라 라벨로 보여 주고
+  /// 라벨 계산은 BE 가 하기로 했는데, `scores` 에 자리가 없어 지금은 null 로 온다.
+  /// null 이면 [quantityDisplay] 가 숫자를 그대로 내보낸다.
+  final String? quantityLabel;
+
+  factory MealScores.fromJson(Map<String, dynamic> json) => MealScores(
+    quantity: json['quantity'] as int,
+    quality: json['quality'] as int,
+    satiety: json['satiety'] as int,
+    quantityLabel: json['quantityLabel'] as String?,
+  );
+
+  String get quantityDisplay => quantityLabel ?? '$quantity';
+}
+
+/// `GET /home` 의 `medication`.
+class HomeMedication {
+  const HomeMedication({
+    required this.drugName,
+    required this.doseMg,
+    required this.doseCount,
+    required this.stage,
+    required this.nextDoseDate,
+    required this.daysUntilNextDose,
+    required this.doseChangeScheduled,
+  });
+
+  final String drugName;
+  final double doseMg;
+  final int doseCount;
+  final String stage;
+  final DateTime nextDoseDate;
+  final int daysUntilNextDose;
+  final bool doseChangeScheduled;
+
+  factory HomeMedication.fromJson(Map<String, dynamic> json) => HomeMedication(
+    drugName: json['drugName'] as String,
+    doseMg: (json['doseMg'] as num).toDouble(),
+    doseCount: json['doseCount'] as int,
+    stage: json['stage'] as String,
+    nextDoseDate: parseApiDate(json['nextDoseDate'] as String),
+    daysUntilNextDose: json['daysUntilNextDose'] as int,
+    doseChangeScheduled: json['doseChangeScheduled'] as bool,
+  );
+}
+
+/// `GET /home` 의 `stomach`. 기록된 식단 중 가장 최근 것 기준이다.
+class HomeStomach {
+  const HomeStomach({
+    required this.satietyPct,
+    required this.minutesSinceMeal,
+    this.feedbackSummary,
+  });
+
+  final int satietyPct;
+  final int minutesSinceMeal;
+
+  /// 나중에 도착하는 문구. 비어 있어도 게이지·목록은 정상이어야 한다
+  /// (`design-system.md` §7 규칙 3).
+  final String? feedbackSummary;
+
+  factory HomeStomach.fromJson(Map<String, dynamic> json) => HomeStomach(
+    satietyPct: json['satietyPct'] as int,
+    minutesSinceMeal: json['minutesSinceMeal'] as int,
+    feedbackSummary: json['feedbackSummary'] as String?,
+  );
+}
+
+/// `GET /home` 의 `today.meals[]` 한 끼.
+class HomeMeal {
+  const HomeMeal({
+    required this.mealId,
+    required this.mealType,
+    required this.eatenAt,
+    required this.displayName,
+    required this.scores,
+    this.thumbnailUrl,
+  });
+
+  final String mealId;
+  final String mealType;
+  final DateTime eatenAt;
+  final String displayName;
+  final MealScores scores;
+  final String? thumbnailUrl;
+
+  factory HomeMeal.fromJson(Map<String, dynamic> json) => HomeMeal(
+    mealId: json['mealId'] as String,
+    mealType: json['mealType'] as String,
+    eatenAt: parseApiDateTime(json['eatenAt'] as String),
+    displayName: json['displayName'] as String,
+    thumbnailUrl: json['thumbnailUrl'] as String?,
+    scores: MealScores.fromJson(json['scores'] as Map<String, dynamic>),
+  );
+}
+
+/// `GET /home` 전체.
+class HomeSummary {
+  const HomeSummary({
+    required this.date,
+    required this.medication,
+    required this.stomach,
+    required this.recordedCount,
+    required this.meals,
+    required this.missingMealTypes,
+  });
+
+  final DateTime date;
+  final HomeMedication medication;
+  final HomeStomach stomach;
+  final int recordedCount;
+  final List<HomeMeal> meals;
+  final List<String> missingMealTypes;
+
+  factory HomeSummary.fromJson(Map<String, dynamic> json) {
+    final today = json['today'] as Map<String, dynamic>;
+    return HomeSummary(
+      date: parseApiDate(json['date'] as String),
+      medication: HomeMedication.fromJson(
+        json['medication'] as Map<String, dynamic>,
+      ),
+      stomach: HomeStomach.fromJson(json['stomach'] as Map<String, dynamic>),
+      recordedCount: today['recordedCount'] as int,
+      meals: (today['meals'] as List<dynamic>)
+          .map((e) => HomeMeal.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      missingMealTypes: (today['missingMealTypes'] as List<dynamic>)
+          .cast<String>(),
+    );
+  }
+}
+
+// ── 표시 문구 ────────────────────────────────────────────────
+// 열거형 → 한글 변환. 지금은 화면마다 갖고 있는데, 공용 모델 폴더가 생기면
+// 한곳으로 모아야 한다. 화면마다 다른 말이 되면 바로 티가 난다.
+
+String stageLabel(String stage) => switch (stage) {
+  'INITIAL' => '도입기',
+  'TITRATION' => '증량기',
+  'MAINTENANCE' => '유지기',
+  _ => stage,
+};
+
+String mealTypeLabel(String mealType) => switch (mealType) {
+  'BREAKFAST' => '아침',
+  'LUNCH' => '점심',
+  'DINNER' => '저녁',
+  'SNACK' => '간식',
+  _ => mealType,
+};
+
+/// 날짜만 있는 값(`2026-08-21`). 시간대 변환 없이 그대로 읽는다.
+DateTime parseApiDate(String value) => DateTime.parse(value);
+
+/// 시각이 붙은 값(`2026-08-21T08:20:00+09:00`).
+///
+/// `DateTime.parse` 는 오프셋을 UTC 로 접어 버려서 `.hour` 가 9시간 어긋난다.
+/// 명세상 모든 시각이 +09:00 이므로, 기기 시간대와 무관하게 그 벽시계 값을
+/// 그대로 보여 주려고 UTC 로 바꾼 뒤 9시간을 더한다.
+/// `toLocal()` 은 기기 설정에 휘둘려서 쓰지 않는다.
+DateTime parseApiDateTime(String value) =>
+    DateTime.parse(value).toUtc().add(const Duration(hours: 9));
+
+const List<String> _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
+
+String _formatFullDate(DateTime d) =>
+    '${d.month}월 ${d.day}일 ${_weekdayNames[d.weekday - 1]}요일';
+
+String _formatShortDate(DateTime d) =>
+    '${d.month}/${d.day} (${_weekdayNames[d.weekday - 1]})';
+
+String _formatTime(DateTime d) =>
+    '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+String _formatElapsed(int minutes) {
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h == 0) return '마지막 식사 후 $m분';
+  if (m == 0) return '마지막 식사 후 $h시간';
+  return '마지막 식사 후 $h시간 $m분';
+}
+
+/// `1.0` → `1.0mg`, `2.4` → `2.4mg`. Figma 도 소수점 한 자리로 적는다.
+String _formatDose(double mg) => '${mg}mg';
+
+// ── API ─────────────────────────────────────────────────────
+
+/// 홈 화면이 쓰는 엔드포인트.
+///
+/// 지금은 명세 예시를 그대로 돌려준다. 통신 라이브러리가 정해지면
+/// 메서드 본문만 교체하면 되고 화면은 건드리지 않는다.
+class HomeApiService {
+  /// `GET /home`
+  Future<HomeSummary> fetchHome() async {
+    // TODO(http|dio 결정 후): 실제 GET 요청으로 교체.
+    //   응답 래퍼 { success, data, error } 를 벗기고 data 를 넘긴다.
+    //   error.code 분기: PROFILE_REQUIRED -> 프로필 입력,
+    //                    STAGE_NOT_SET   -> 투약 정보 입력.
+    //   둘 다 실패가 아니라 이동이라 재시도 블록을 띄우지 않는다.
+    await Future.delayed(const Duration(milliseconds: 300));
+    return HomeSummary.fromJson(_sample);
+  }
+
+  /// 명세의 `GET /home` 예시 응답(`data` 안쪽).
+  static const Map<String, dynamic> _sample = {
+    'date': '2026-08-21',
+    'medication': {
+      'drugName': '위고비',
+      'doseMg': 1.0,
+      'doseCount': 10,
+      'stage': 'MAINTENANCE',
+      'nextDoseDate': '2026-08-23',
+      'daysUntilNextDose': 2,
+      'doseChangeScheduled': false,
+    },
+    'stomach': {
+      'satietyPct': 68,
+      'sourceMealId': 'meal_456',
+      'sourceMealAt': '2026-08-21T12:40:00+09:00',
+      'minutesSinceMeal': 320,
+      'feedbackSummary': '유지기 기준 포만감이 부족한 식사였어요.',
+    },
+    'today': {
+      'recordedCount': 2,
+      'meals': [
+        {
+          'mealId': 'meal_450',
+          'mealType': 'BREAKFAST',
+          'eatenAt': '2026-08-21T08:20:00+09:00',
+          'displayName': '토스트, 그릭요거트',
+          'thumbnailUrl': null,
+          'scores': {'quantity': 74, 'quality': 90, 'satiety': 80},
+        },
+        {
+          'mealId': 'meal_456',
+          'mealType': 'LUNCH',
+          'eatenAt': '2026-08-21T12:40:00+09:00',
+          'displayName': '현미밥, 된장국, 두부조림',
+          'thumbnailUrl': null,
+          'scores': {'quantity': 76, 'quality': 80, 'satiety': 68},
+        },
+      ],
+      'missingMealTypes': ['DINNER'],
+    },
+  };
+}
+
+// ── 화면 ────────────────────────────────────────────────────
+
 /// 홈 — 투약 상태 · 위 게이지 · 오늘의 식사.
 ///
 /// Figma `hOxrHBitBpjwIBBg2GO49y` node `60:189`.
-///
-/// **지금은 레이아웃 뼈대다.** 보이는 값은 전부 아래 `_dummy*` 이고,
-/// 실제로는 `GET /home` 한 번으로 전부 채워진다.
-///
-/// 상태는 `GET /home` 이 단일 호출이라 화면 전체가 하나로 움직인다.
-/// 연동할 때 [_state] 를 응답에 따라 바꾸고, `error.code` 로 다음을 분기한다.
-/// - `PROFILE_REQUIRED` → 프로필 입력 화면
-/// - `STAGE_NOT_SET`    → 투약 정보 입력 화면 (`MedicationInfoScreen`)
-///
-/// 두 경우는 실패가 아니라 이동이므로 [LoadState.failed] 로 두지 않는다.
+/// `GET /home` 단일 호출이라 화면 전체가 하나의 [LoadState] 로 움직인다.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -27,33 +284,37 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  /// 연동 전까지는 정상 화면을 보여 준다.
-  /// 나머지 분기도 아래에 다 구현돼 있으니 값만 바꿔 확인할 수 있다.
-  LoadState _state = LoadState.ready;
+  final HomeApiService _api = HomeApiService();
 
-  // ── 더미 데이터 (GET /home 응답 자리) ──────────────────────────
-  static const String _dummyDate = '8월 21일 금요일';
-  static const String _dummyStage = '유지기';
-  static const String _dummyMedication = '위고비 1.0mg';
-  static const String _dummyDoseInfo = '12회차 · 투약 10주차';
-  static const String _dummyDDay = 'D-3';
-  static const String _dummyNextDoseDate = '8/24 (일)';
-  static const String _dummyDoseChange = '증량 예정 없음';
-  static const int _dummySatiety = 68;
-  static const String _dummyLastMeal = '마지막 식사 후 2시간 20분';
-  static const String _dummyTip = '“단백질을 조금 더 먹어야 해요!!”';
+  HomeSummary? _home;
+  LoadState _state = LoadState.loading;
+  String? _errorMessage;
 
-  /// `safetyStatus: BLOCKED` 여부. true 면 팁 문장 자리에 상담 안내가 들어간다.
-  static const bool _dummyBlocked = false;
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
-  static const List<_HomeMeal> _dummyMeals = [
-    _HomeMeal('아침', '08:20', '토스트, 그릭요거트', '적정', 90, 80),
-    _HomeMeal('점심', '12:40', '현미밥, 된장국, 두부조림', '적정', 80, 68),
-  ];
-
-  void _reload() {
-    // TODO: GET /home 재요청.
-    setState(() => _state = LoadState.ready);
+  Future<void> _load() async {
+    setState(() {
+      _state = LoadState.loading;
+      _errorMessage = null;
+    });
+    try {
+      final result = await _api.fetchHome();
+      if (!mounted) return;
+      setState(() {
+        _home = result;
+        _state = LoadState.ready;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = '불러오는 데 실패했어요: $e';
+        _state = LoadState.failed;
+      });
+    }
   }
 
   void _openMealInput() {
@@ -66,129 +327,131 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final home = _home;
+
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.screenHorizontal,
-          AppSpacing.titleTop,
-          AppSpacing.screenHorizontal,
-          AppLayout.scrollBottomPadding,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 날짜는 로컬 값이라 어떤 상태에서도 바로 보여 준다.
-            Text(_dummyDate, style: AppTypography.bodySecondary),
-            const SizedBox(height: AppSpacing.md),
-            ...switch (_state) {
-              LoadState.loading => _buildLoading(),
-              LoadState.failed => _buildFailed(),
-              LoadState.ready => _buildReady(),
-            },
-          ],
+      child: RefreshIndicator(
+        onRefresh: _load,
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenHorizontal,
+            AppSpacing.titleTop,
+            AppSpacing.screenHorizontal,
+            AppLayout.scrollBottomPadding,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 날짜는 응답이 오기 전엔 비워 둔다. 자리는 유지한다.
+              SizedBox(
+                height: 18,
+                child: home == null
+                    ? null
+                    : Text(
+                        _formatFullDate(home.date),
+                        style: AppTypography.bodySecondary,
+                      ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ...switch (_state) {
+                LoadState.loading => _buildLoading(),
+                LoadState.failed => _buildFailed(),
+                LoadState.ready => _buildReady(home!),
+              },
+            ],
+          ),
         ),
       ),
     );
   }
 
-  List<Widget> _buildLoading() {
-    return [
-      const SkeletonBox(width: double.infinity, height: 75),
-      const SizedBox(height: AppSpacing.xl),
-      // 게이지는 실루엣을 그대로 그리고 채움만 0 으로 둔다.
-      // 자리를 비우면 완료 시점에 아래 내용이 통째로 밀린다.
-      const Center(child: StomachGauge(satiety: 0, showValue: false)),
-      const SizedBox(height: AppSpacing.xl),
-      const _SectionHeader(trailing: null),
-      const SizedBox(height: AppSpacing.md),
-      const MealCardSkeleton(),
-      const SizedBox(height: AppSpacing.cardGap),
-      const MealCardSkeleton(),
-    ];
-  }
+  List<Widget> _buildLoading() => [
+    const SkeletonBox(width: double.infinity, height: 75),
+    const SizedBox(height: AppSpacing.xl),
+    // 게이지는 실루엣을 그대로 그리고 채움만 0 으로 둔다.
+    // 자리를 비우면 완료 시점에 아래 내용이 통째로 밀린다.
+    const Center(child: StomachGauge(satiety: 0, showValue: false)),
+    const SizedBox(height: AppSpacing.xl),
+    const _SectionHeader(trailing: null),
+    const SizedBox(height: AppSpacing.md),
+    const MealCardSkeleton(),
+    const SizedBox(height: AppSpacing.cardGap),
+    const MealCardSkeleton(),
+  ];
 
-  List<Widget> _buildFailed() {
-    return [
-      const SizedBox(height: AppSpacing.xxl),
-      RetryBlock(onRetry: _reload),
-    ];
-  }
+  List<Widget> _buildFailed() => [
+    const SizedBox(height: AppSpacing.xxl),
+    RetryBlock(
+      message: _errorMessage ?? '잠시 후 다시 시도해 주세요',
+      onRetry: _load,
+    ),
+  ];
 
-  List<Widget> _buildReady() {
-    final hasMeals = _dummyMeals.isNotEmpty;
+  List<Widget> _buildReady(HomeSummary home) {
+    final hasMeals = home.meals.isNotEmpty;
+    final nextMealType = home.missingMealTypes.isEmpty
+        ? null
+        : mealTypeLabel(home.missingMealTypes.first);
 
     return [
       _MedicationStatusCard(
-        stage: _dummyStage,
-        medication: _dummyMedication,
-        doseInfo: _dummyDoseInfo,
-        dDay: _dummyDDay,
-        nextDoseDate: _dummyNextDoseDate,
-        doseChange: _dummyDoseChange,
+        medication: home.medication,
         onTap: _openMedicationInfo,
       ),
       const SizedBox(height: AppSpacing.xl),
 
-      // 오늘 기록이 없으면 게이지는 0% 로 둔다.
-      Center(child: StomachGauge(satiety: hasMeals ? _dummySatiety : 0)),
+      Center(
+        child: StomachGauge(satiety: hasMeals ? home.stomach.satietyPct : 0),
+      ),
       const SizedBox(height: AppSpacing.lg),
 
       if (!hasMeals)
         const EmptyBlock(message: '아직 기록된 식사가 없어요')
-      else if (_dummyBlocked)
-        // 안전 차단이어도 게이지·식사 목록은 그대로 둔다.
-        // 판단을 덧붙이지 않고 상담 안내만 한다(§7).
-        const NoticeBlock()
       else
         Center(
           child: Column(
             children: [
-              Text(_dummyLastMeal, style: AppTypography.bodySecondary),
-              // 문구 생성이 실패하면 이 줄만 빠지고 나머지는 정상이다(§7 규칙 3).
-              Text(_dummyTip, style: AppTypography.bodySecondary),
+              Text(
+                _formatElapsed(home.stomach.minutesSinceMeal),
+                style: AppTypography.bodySecondary,
+              ),
+              // 문구 생성이 실패하면 이 줄만 빠지고 나머지는 정상이다.
+              if (home.stomach.feedbackSummary != null)
+                Text(
+                  home.stomach.feedbackSummary!,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.bodySecondary,
+                ),
             ],
           ),
         ),
       const SizedBox(height: AppSpacing.xl),
 
-      _SectionHeader(trailing: '${_dummyMeals.length}끼 기록됨'),
+      _SectionHeader(trailing: '${home.recordedCount}끼 기록됨'),
       const SizedBox(height: AppSpacing.md),
 
-      for (final meal in _dummyMeals) ...[
+      for (final meal in home.meals) ...[
         MealCard(
-          mealTypeLabel: meal.mealTypeLabel,
-          time: meal.time,
-          foodNames: meal.foodNames,
-          quantityLabel: meal.quantityLabel,
-          quality: meal.quality,
-          satiety: meal.satiety,
+          mealTypeLabel: mealTypeLabel(meal.mealType),
+          time: _formatTime(meal.eatenAt),
+          foodNames: meal.displayName,
+          quantityLabel: meal.scores.quantityDisplay,
+          quality: meal.scores.quality,
+          satiety: meal.scores.satiety,
         ),
         const SizedBox(height: AppSpacing.cardGap),
       ],
 
       // 부제(`아래 카메라 버튼으로...`)는 중앙 카메라 버튼이 미확정이라 넣지 않는다.
-      AddMealCard(label: '＋ 저녁 식사 기록하기', onTap: _openMealInput),
+      if (nextMealType != null)
+        AddMealCard(
+          label: '＋ $nextMealType 식사 기록하기',
+          onTap: _openMealInput,
+        ),
     ];
   }
-}
-
-/// 오늘의 식사 목록 한 끼. 연동 시 모델로 대체된다.
-class _HomeMeal {
-  const _HomeMeal(
-    this.mealTypeLabel,
-    this.time,
-    this.foodNames,
-    this.quantityLabel,
-    this.quality,
-    this.satiety,
-  );
-
-  final String mealTypeLabel;
-  final String time;
-  final String foodNames;
-  final String quantityLabel;
-  final int quality;
-  final int satiety;
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -211,22 +474,9 @@ class _SectionHeader extends StatelessWidget {
 
 /// 투약 상태 카드 — 좌측 현재 투약, 우측 다음 투약.
 class _MedicationStatusCard extends StatelessWidget {
-  const _MedicationStatusCard({
-    required this.stage,
-    required this.medication,
-    required this.doseInfo,
-    required this.dDay,
-    required this.nextDoseDate,
-    required this.doseChange,
-    this.onTap,
-  });
+  const _MedicationStatusCard({required this.medication, this.onTap});
 
-  final String stage;
-  final String medication;
-  final String doseInfo;
-  final String dDay;
-  final String nextDoseDate;
-  final String doseChange;
+  final HomeMedication medication;
   final VoidCallback? onTap;
 
   @override
@@ -255,13 +505,21 @@ class _MedicationStatusCard extends StatelessWidget {
                             color: AppColors.primary,
                           ),
                           const SizedBox(width: AppSpacing.sm),
-                          StageBadge(label: stage),
+                          StageBadge(label: stageLabel(medication.stage)),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      Text(medication, style: AppTypography.sectionHead),
+                      Text(
+                        '${medication.drugName} ${_formatDose(medication.doseMg)}',
+                        style: AppTypography.sectionHead,
+                      ),
                       const SizedBox(height: 2),
-                      Text(doseInfo, style: AppTypography.caption),
+                      // Figma 는 `12회차 · 투약 10주차` 인데 명세에는 doseCount 뿐이라
+                      // 주차를 만들 수 없다. startedAt 이 /home 에 없다.
+                      Text(
+                        '${medication.doseCount}회차',
+                        style: AppTypography.caption,
+                      ),
                     ],
                   ),
                 ),
@@ -277,17 +535,25 @@ class _MedicationStatusCard extends StatelessWidget {
                       textBaseline: TextBaseline.alphabetic,
                       children: [
                         Text(
-                          dDay,
+                          'D-${medication.daysUntilNextDose}',
                           style: AppTypography.sectionHead.copyWith(
                             color: AppColors.primary,
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
-                        Text(nextDoseDate, style: AppTypography.caption),
+                        Text(
+                          _formatShortDate(medication.nextDoseDate),
+                          style: AppTypography.caption,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(doseChange, style: AppTypography.caption),
+                    Text(
+                      medication.doseChangeScheduled
+                          ? '증량 예정 있음'
+                          : '증량 예정 없음',
+                      style: AppTypography.caption,
+                    ),
                   ],
                 ),
               ],
@@ -322,6 +588,9 @@ class StomachGauge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 채움이 낮으면 수치가 회색 면 위에 얹혀 대비가 죽는다.
+    final onFill = satiety >= 35;
+
     return SizedBox(
       width: _width,
       height: _height,
@@ -342,8 +611,7 @@ class StomachGauge extends StatelessWidget {
                 Text(
                   '$satiety%',
                   style: AppTypography.gaugeValue.copyWith(
-                    // 채움이 낮으면 수치가 회색 면 위에 얹혀 대비가 죽는다.
-                    color: satiety >= 35
+                    color: onFill
                         ? AppColors.textInverse
                         : AppColors.textPrimary,
                   ),
@@ -351,7 +619,7 @@ class StomachGauge extends StatelessWidget {
                 Text(
                   '지금 포만감',
                   style: AppTypography.body.copyWith(
-                    color: satiety >= 35
+                    color: onFill
                         ? AppColors.textInverse
                         : AppColors.textSecondary,
                   ),
