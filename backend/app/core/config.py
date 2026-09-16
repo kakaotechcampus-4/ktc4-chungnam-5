@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 5
     DB_MAX_OVERFLOW: int = 10
 
+    APP_ENV: str = Field(
+        default="local",
+        description=(
+            "local | production. get_current_user_id 가 X-User-Id 를 신뢰하는 "
+            "임시 인증 이음새를 production 에서 강제로 죽이는 가드에 쓰인다 "
+            "(app/core/deps.py)."
+        ),
+    )
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def sqlalchemy_dsn(self) -> str:
