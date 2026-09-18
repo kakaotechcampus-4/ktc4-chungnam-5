@@ -1,7 +1,9 @@
-"""공통 응답 래퍼 `{ success, data, error }` 와 예외 핸들러.
+"""공통 응답 래퍼 { success, data, error } 와 예외 핸들러.
 
-성공 응답은 각 엔드포인트가 `response_model=ApiResponse[X]` 를 선언하고 `ok()` 로
-감싼다. 미들웨어로 자동 래핑하지 않는다 — OpenAPI 문서가 실제 응답과 어긋나기 때문이다.
+성공 응답은 각 엔드포인트가 response_model=ApiResponse[X] 를 선언하고 ok() 로
+감싼다. 명세서에서 HTTP 200 인 도메인 code(LOW_CONFIDENCE 등)는 ok_with_code() 로
+감싸 success=true 와 error 가 함께 나간다 — error 가 있다고 실패가 아니다.
+미들웨어로 자동 래핑하지 않는다 — OpenAPI 문서가 실제 응답과 어긋나기 때문이다.
 """
 
 import logging
@@ -126,17 +128,19 @@ def register_exception_handlers(app: FastAPI) -> None:
     모든 응답이 { success, data, error } 래퍼를 갖도록 보장한다. HTTP status 는
     error.code 의 맥락이고, 분기의 진실은 code 다.
 
-    Status code → ErrorCode 매핑 규칙 (명시 dict, `app/core/response.py` 의
-    `_HTTP_STATUS_TO_ERROR_CODE` 가 실제 정의다):
-    - 401 (Unauthorized) → ErrorCode.UNAUTHORIZED
-    - 403 (Forbidden) → ErrorCode.FORBIDDEN
-    - 404 (Not Found) → ErrorCode.NOT_FOUND
-    - 409 (Conflict) → ErrorCode.CONFLICT (예: PROFILE_REQUIRED·STAGE_NOT_SET 처럼
-      이미 구체적인 code 로 ApiError 를 던지지 않고 HTTPException(409) 를 던진 경우)
-    - 422 (Unprocessable Entity) → ErrorCode.VALIDATION_ERROR (요청 본문 필드 오류)
-    - 그 외 4xx (401/403/404/409/422 가 아닌 모든 < 500, 405 method mismatch 포함)
-      → ErrorCode.BAD_REQUEST
-    - 5xx (status_code >= 500) → ErrorCode.INTERNAL_ERROR (서버 에러 전용)
+    Status code → ErrorCode 매핑은 `_HTTP_STATUS_TO_ERROR_CODE` 가 실제 정의다
+    (거기 없는 4xx 는 BAD_REQUEST, 5xx 는 INTERNAL_ERROR). 여기 다시 적지
+    않는다 — 코드가 늘면 두 곳이 어긋난다.
+
+    **주의: `_ERROR_DESCRIPTIONS` 와 헷갈리지 말 것.** 이 dict 는 code 가 없는
+    HTTPException 에 code 를 채워주는 표다 — 런타임 동작이다. 저쪽은 /docs 에
+    띄울 설명 문자열이라 응답 생성에 관여하지 않는다.
+
+        HTTPException(504)              → INTERNAL_ERROR   (이 표 + 5xx 규칙)
+        ApiError(ANALYSIS_TIMEOUT, 504) → ANALYSIS_TIMEOUT (code 를 들고 온다)
+
+    같은 504 라도 던지는 방법에 따라 다르다. 그래서 두 dict 를 합치거나 한쪽이
+    다른 쪽을 가리키게 하면 안 된다.
 
     **중요 규칙: INTERNAL_ERROR 는 5xx 전용이다.** 4xx 는 클라이언트 책임이므로
     BAD_REQUEST/VALIDATION_ERROR/CONFLICT/FORBIDDEN 중 하나로 처리한다. 이를 어기면
