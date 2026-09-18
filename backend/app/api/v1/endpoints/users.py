@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
-from app.core.response import ApiResponse, ok
+from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
 from app.schemas.user import (
     ProfileCreatedResponse,
@@ -26,6 +26,7 @@ router = APIRouter()
     "/users/profile",
     response_model=ApiResponse[ProfileCreatedResponse],
     status_code=201,
+    responses=error_responses(422),
 )
 def create_profile(
     payload: ProfileCreateRequest,
@@ -35,7 +36,11 @@ def create_profile(
     return ok(user_service.create_profile(db, request=payload))
 
 
-@router.get("/users/me", response_model=ApiResponse[UserProfileResponse])
+@router.get(
+    "/users/me",
+    response_model=ApiResponse[UserProfileResponse],
+    responses=error_responses(401, 404, 422),
+)
 def get_me(
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
@@ -43,7 +48,11 @@ def get_me(
     return ok(user_service.get_me(db, user_id=user_id))
 
 
-@router.patch("/users/me", response_model=ApiResponse[UserProfileResponse])
+@router.patch(
+    "/users/me",
+    response_model=ApiResponse[UserProfileResponse],
+    responses=error_responses(401, 404, 422),
+)
 def update_me(
     payload: ProfileUpdateRequest,
     user_id: uuid.UUID = Depends(get_current_user_id),

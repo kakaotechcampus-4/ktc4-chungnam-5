@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
-from app.core.response import ApiResponse, ok
+from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
 from app.schemas.meal import MealDeleteResponse, MealListResponse
 from app.services import meal as meal_service
@@ -14,7 +14,11 @@ from app.services import meal as meal_service
 router = APIRouter()
 
 
-@router.get("/meals", response_model=ApiResponse[MealListResponse])
+@router.get(
+    "/meals",
+    response_model=ApiResponse[MealListResponse],
+    responses=error_responses(400, 401, 422),
+)
 def list_meals(
     cursor: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
@@ -29,7 +33,11 @@ def list_meals(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.delete("/meals/{meal_id}", response_model=ApiResponse[MealDeleteResponse])
+@router.delete(
+    "/meals/{meal_id}",
+    response_model=ApiResponse[MealDeleteResponse],
+    responses=error_responses(401, 404, 422),
+)
 def delete_meal(
     meal_id: uuid.UUID,
     user_id: uuid.UUID = Depends(get_current_user_id),
