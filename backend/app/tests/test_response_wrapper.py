@@ -12,7 +12,12 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from app.core.errors import ApiError, ErrorCode
-from app.core.response import ApiResponse, ok, register_exception_handlers
+from app.core.response import (
+    ApiResponse,
+    ok,
+    ok_with_code,
+    register_exception_handlers,
+)
 
 
 class Payload(BaseModel):
@@ -26,6 +31,14 @@ def build_app() -> FastAPI:
     @app.get("/fine", response_model=ApiResponse[Payload])
     def fine() -> ApiResponse[Payload]:
         return ok(Payload(value=7))
+
+    @app.get("/warned", response_model=ApiResponse[Payload])
+    def warned() -> ApiResponse[Payload]:
+        return ok_with_code(
+            Payload(value=3),
+            ErrorCode.LOW_CONFIDENCE,
+            "인식 확신도가 낮습니다.",
+        )
 
     @app.get("/missing")
     def missing() -> None:
@@ -53,6 +66,21 @@ def test_success_is_wrapped_with_null_error():
     response = client.get("/fine")
     assert response.status_code == 200
     assert response.json() == {"success": True, "data": {"value": 7}, "error": None}
+
+
+def test_success_can_carry_a_domain_code_at_200():
+    """명세서의 200 코드 — 결과와 단서가 한 응답에 같이 실린다.
+
+    FE 는 분기점을 하나로 유지한다(`error.code`). 실패가 아니므로 success 는
+    참이고 data 도 그대로 있다 — 이게 `_error_response` 경로와 다른 점이다.
+    """
+    response = client.get("/warned")
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": True,
+        "data": {"value": 3},
+        "error": {"code": "LOW_CONFIDENCE", "message": "인식 확신도가 낮습니다."},
+    }
 
 
 def test_api_error_is_wrapped_with_null_data():
