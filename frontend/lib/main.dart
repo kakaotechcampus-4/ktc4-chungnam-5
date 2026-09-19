@@ -23,6 +23,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => TabState()),
       ],
       child: MaterialApp(
+        // TODO: 알림 기능 착수 시 navigatorKey(GlobalKey<NavigatorState>) 추가.
+        // cold-start 알림 딥링크에서 BuildContext 없이 Navigator/TabState에
+        // 접근해야 할 때 필요 (멘토 리뷰 PR #9 논의, 지금은 쓰는 곳이 없어 보류).
         title: 'GLP-1 식사 코치',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
