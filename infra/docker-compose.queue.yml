@@ -1,0 +1,28 @@
+# 로컬 개발용 SQS (ElasticMQ).
+#
+#   docker compose -f docker-compose.queue.yml up -d
+#
+# 9324 — SQS API. 웹 UI 는 없다 (elasticmq-native 에 rest-stats 서버가 없다).
+# 큐 상태는 backend/scripts/queue_status.py 로 본다.
+#
+# backend/.env 에 넣을 값:
+#   QUEUE_TYPE=sqs
+#   SQS_ENDPOINT_URL=http://localhost:9324        ← 로컬에서만. 프로덕션은 비운다
+#   SQS_QUEUE_URL=http://localhost:9324/queue/glp1-tasks
+#   SQS_DLQ_URL=http://localhost:9324/queue/glp1-tasks-dlq
+#   AWS_DEFAULT_REGION=ap-northeast-2
+#   AWS_ACCESS_KEY_ID=test                        ← boto3 가 요구한다. 로컬 전용
+#   AWS_SECRET_ACCESS_KEY=test
+#
+# 프로덕션에서는 SQS_ENDPOINT_URL 과 AWS 키를 모두 비운다.
+# boto3 가 실제 AWS 로 붙고 인증은 인스턴스 역할이 한다.
+
+services:
+  sqs:
+    image: softwaremill/elasticmq-native
+    container_name: glp1-sqs
+    ports:
+      - "9324:9324"
+    volumes:
+      - ./elasticmq.conf:/opt/elasticmq.conf:ro
+    restart: unless-stopped

@@ -1,0 +1,25 @@
+# 로컬 개발용 PostgreSQL.
+# api·worker 컨테이너는 각 담당 티켓에서 추가한다.
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: glp1-db
+    environment:
+      POSTGRES_USER: glp1
+      POSTGRES_PASSWORD: glp1_local_dev
+      POSTGRES_DB: glp1_dev
+      # 한글 음식명 정렬·비교를 위해 UTF-8 로 초기화한다
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      # 호스트 5432 는 로컬에 설치된 PostgreSQL 서비스가 쓰는 경우가 많아 5433 으로 뺀다.
+      - "5433:5432"
+    volumes:
+      - glp1-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glp1 -d glp1_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  glp1-db-data:

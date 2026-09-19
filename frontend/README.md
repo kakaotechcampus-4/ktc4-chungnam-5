@@ -3,7 +3,6 @@
 사용자가 매 끼니 식사를 기록하고 Q/Q/S 점수·피드백을 확인하는 **네이티브 앱**.
 
 - 스택: **Flutter / Android 우선** (D1, APK 직배포 — 스토어 심사 불필요)
-- 상세 설계: [`../docs/architecture.md`](../docs/architecture.md) · 결정 근거: [`../docs/decisions.md`](../docs/decisions.md)
 
 ---
 
@@ -99,6 +98,4 @@ flutter build apk --release       # 배포용 APK
 
 ## 참고
 
-- API 명세는 [`../contracts/openapi.yaml`](../contracts/)가 기준이다.
-  BE가 아직 없어도 Prism 목 서버로 병렬 개발할 수 있다(R7).
 - 개발 규칙: [`../CLAUDE.md`](../CLAUDE.md)
