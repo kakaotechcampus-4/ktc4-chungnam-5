@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -16,6 +17,7 @@ from app.services.meal import (
     MealNotFoundError,
     _build_scores,
     _build_thumbnail_url,
+    _parse_month_range,
     decode_cursor,
     delete_meal,
     encode_cursor,
@@ -120,3 +122,26 @@ def test_delete_meal_builds_response_when_found(monkeypatch):
     assert response.meal_id == meal_id
     assert response.deleted_at == deleted_at
     assert response.affected_insights == []
+
+
+def test_parse_month_range_returns_kst_boundaries():
+    start, end = _parse_month_range("2026-08")
+
+    assert start == datetime(2026, 8, 1, tzinfo=ZoneInfo("Asia/Seoul"))
+    assert end == datetime(2026, 9, 1, tzinfo=ZoneInfo("Asia/Seoul"))
+
+
+def test_parse_month_range_rolls_over_year_at_december():
+    """12월이면 다음 달 시작이 해가 넘어가야 한다."""
+    _, end = _parse_month_range("2026-12")
+
+    assert end == datetime(2027, 1, 1, tzinfo=ZoneInfo("Asia/Seoul"))
+
+
+@pytest.mark.parametrize(
+    "garbage_month",
+    ["2026-13", "2026-00", "not-a-month", "2026", "2026-08-01"],
+)
+def test_parse_month_range_rejects_invalid_format(garbage_month):
+    with pytest.raises(ValueError):
+        _parse_month_range(garbage_month)
