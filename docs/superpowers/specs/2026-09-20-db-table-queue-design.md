@@ -90,13 +90,24 @@ class ClaimedTask:
     attempts: int          # 지금까지 실패한 횟수. 첫 시도는 0
 
 
+@dataclass
+class Claim:
+    db: Session            # 이 작업을 잠그고 있는 트랜잭션. 핸들러가 그대로 쓴다
+    task: ClaimedTask
+    result: dict[str, Any] | None = None   # 핸들러 반환값. DONE 커밋 때 함께 기록된다
+
+
 def enqueue(db: Session, task_type: str, payload: dict[str, Any]) -> None:
     """호출부의 세션에 INSERT 만 한다. 커밋은 service 가 한 번에 한다."""
 
 
 class TaskQueue(Protocol):
-    def claim(self) -> AbstractContextManager[tuple[Session, ClaimedTask] | None]: ...
+    def claim(self) -> AbstractContextManager[Claim | None]: ...
 ```
+
+`(Session, ClaimedTask)` 튜플이 아니라 `Claim` 객체를 yield 하는 이유는, 컨텍스트
+매니저가 `with` 블록의 반환값을 받을 수 없기 때문이다. 핸들러 반환값을 `result` 컬럼에
+남기려면 호출부가 `claim.result = handle(...)` 로 담아 줘야 한다.
 
 `claim()` 이 책임지는 전부:
 
