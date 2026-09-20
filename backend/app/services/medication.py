@@ -188,6 +188,26 @@ def count_doses(started_at: date, *, today: date) -> int:
     return (today - started_at).days // DOSE_INTERVAL_DAYS + 1
 
 
+def predict_next_dose(started_at: date, *, today: date) -> tuple[date, int]:
+    """(다음 투약 예정일, D-day). 명세 「서버 계산 항목」 공식 그대로다.
+
+        nextDoseDate      = startedAt + 7 x doseCount
+        daysUntilNextDose = nextDoseDate - today
+
+    **예정일이지 사실이 아니다.** 실제로 언제 맞았는지는 기록하지 않는다 —
+    명세의 요청 body 에 투약일 자리가 없고, 행은 용량 변경만 남기기 때문이다.
+
+    D-day 는 구조상 1~7 이다. `doseCount` 가 오늘을 지난 첫 배수를 가리키므로
+    예정일이 과거가 될 수 없다. 늦게 맞아도 회차가 같이 밀려서 음수가 나오지 않는다.
+
+    절대 규칙 1: 이건 **날짜 계산**이지 "맞아라/맞지 마라"가 아니다.
+    """
+    next_dose_date = started_at + timedelta(
+        days=DOSE_INTERVAL_DAYS * count_doses(started_at, today=today)
+    )
+    return next_dose_date, (next_dose_date - today).days
+
+
 # ── 3. 유스케이스 ───────────────────────────────────────────────
 
 
@@ -309,6 +329,7 @@ def get_current_view(
         return CurrentMedicationResponse(stage=MedicationStage.PRE_DOSE)
 
     started_at = crud.get_dosing_start_date(db, user_id) or current.effective_from
+    next_dose_date, days_until_next_dose = predict_next_dose(started_at, today=today)
     return CurrentMedicationResponse(
         stage=current.stage,
         drug_name=current.drug_name,
@@ -316,6 +337,8 @@ def get_current_view(
         dose_count=count_doses(started_at, today=today),
         started_at=started_at,
         effective_from=current.effective_from,
+        next_dose_date=next_dose_date,
+        days_until_next_dose=days_until_next_dose,
     )
 
 

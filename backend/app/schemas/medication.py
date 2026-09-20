@@ -53,3 +53,10 @@ class CurrentMedicationResponse(CamelModel):
     effective_from: date | None = Field(
         default=None, description="현재 용량으로 바꾼 날"
     )
+    next_dose_date: date | None = Field(
+        default=None,
+        description="다음 투약 예정일 = startedAt + 7 x doseCount. **예정이지 사실이 아니다.**",
+    )
+    days_until_next_dose: int | None = Field(
+        default=None, description="D-day = nextDoseDate - today. 구조상 1~7 이다."
+    )

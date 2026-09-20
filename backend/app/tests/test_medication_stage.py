@@ -4,21 +4,25 @@
 
 경계값은 표로 고정한다 (R1 튜닝 때 사다리나 MAINTENANCE_STREAK 를 바꾸면 여기가 먼저 깨져야 한다).
 
-회차 테스트는 없다 — 회차는 행을 세는 DB 질의(`crud.count_doses`)라 여기 대상이 아니다.
+회차·다음 예정일도 여기 있다 — 날짜 산수라 DB 가 필요 없다 (명세 「서버 계산 항목」).
 
 판정 규칙 근거: `docs/be-medication-stage-rule.md`
 """
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
 
 from app.models.enums import DrugName, MedicationStage
 from app.services.medication import (
+    DOSE_INTERVAL_DAYS,
     DOSE_LADDERS,
     MAINTENANCE_STREAK,
+    count_doses,
     dose_context,
     judge_stage,
+    predict_next_dose,
 )
 
 INITIAL = MedicationStage.INITIAL
@@ -250,3 +254,56 @@ def test_ladders_are_ascending() -> None:
     """사다리가 오름차순이 아니면 첫 칸·마지막 칸 비교가 무의미해진다."""
     for drug, ladder in DOSE_LADDERS.items():
         assert list(ladder) == sorted(ladder), drug
+
+
+# ── 서버 계산 항목 ─────────────────────────────────────────────
+#
+#   doseCount         = floor((today - startedAt) / 7) + 1
+#   nextDoseDate      = startedAt + 7 x doseCount
+#   daysUntilNextDose = nextDoseDate - today
+#
+# 명세에 적힌 식 그대로다. 세 값이 한 공식에서 파생되므로 같이 고정해 둔다.
+
+START = date(2026, 9, 1)
+
+
+@pytest.mark.parametrize(
+    ("today", "expected"),
+    [
+        (date(2026, 9, 1), 1),  # 시작일 당일이 1회차
+        (date(2026, 9, 7), 1),  # 6일째 — 아직 1회차
+        (date(2026, 9, 8), 2),  # 7일째에 2회차
+        (date(2026, 9, 15), 3),
+        (date(2026, 11, 10), 11),
+    ],
+)
+def test_dose_count_counts_weeks_not_rows(today: date, expected: int) -> None:
+    """회차는 행이 아니라 날짜에서 나온다 — 같은 용량으로 계속 맞아도 늘어난다."""
+    assert count_doses(START, today=today) == expected
+
+
+@pytest.mark.parametrize(
+    ("today", "next_date", "d_day"),
+    [
+        (date(2026, 9, 1), date(2026, 9, 8), 7),
+        (date(2026, 9, 7), date(2026, 9, 8), 1),
+        (date(2026, 9, 8), date(2026, 9, 15), 7),
+        (date(2026, 9, 14), date(2026, 9, 15), 1),
+    ],
+)
+def test_next_dose_follows_the_spec_formula(
+    today: date, next_date: date, d_day: int
+) -> None:
+    assert predict_next_dose(START, today=today) == (next_date, d_day)
+
+
+@pytest.mark.parametrize("elapsed", range(0, 60))
+def test_d_day_never_leaves_one_to_seven(elapsed: int) -> None:
+    """예정일이 과거가 될 수 없다.
+
+    회차가 오늘을 지난 첫 배수를 가리키므로, 늦게 맞아도 회차가 같이 밀린다.
+    이게 깨지면 FE 의 D-day 배지에 0 이나 음수가 뜬다.
+    """
+    today = date.fromordinal(START.toordinal() + elapsed)
+    _, d_day = predict_next_dose(START, today=today)
+    assert 1 <= d_day <= DOSE_INTERVAL_DAYS
