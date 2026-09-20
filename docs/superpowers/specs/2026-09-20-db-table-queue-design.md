@@ -133,9 +133,20 @@ UPDATE task_queue
 `backoff = QUEUE_BACKOFF_BASE_SEC * 2 ** attempts` (30s → 60s). `FAILED` 로 갈 때도
 `next_run_at` 을 갱신하지만 의미는 없다 — 조건절이 `status='PENDING'` 을 먼저 본다.
 
+`WHERE` 에 `status = 'PENDING'` 가드를 넣는다. 없으면: 워커 A 가 롤백해 잠금을 풀고
+(행은 여전히 PENDING) → 워커 B 가 같은 행을 집어 성공 처리해 DONE 커밋 → 뒤늦게 도착한
+A 의 이 UPDATE 가 (READ COMMITTED 라 `WHERE id = …` 가 여전히 참이라) 그 DONE 을 다시
+PENDING 으로 되돌려 중복 처리를 일으킨다. 가드가 있으면 A 의 UPDATE 는 0행 매칭으로
+조용히 아무 일도 하지 않는다.
+
 **주의:** 실패 기록은 실패 경로에서 도는 코드다. 여기서 또 예외가 나면(DB 연결이 끊긴
 경우 등) 원래 예외를 덮어써서는 안 된다. 기록 실패는 로그만 남기고 원래 예외를 올린다.
 기록이 안 되면 attempts 가 안 오를 뿐, 작업은 PENDING 으로 남아 다음에 다시 집힌다.
+
+**`KeyboardInterrupt`·`SystemExit`·`GeneratorExit` 는 실패로 세지 않는다.** 작업이
+실패한 게 아니라 프로세스가 내려가는 것이라, 롤백만 하고 `attempts` 는 태우지 않는다.
+그러지 않으면 배포·Ctrl+C 로 워커를 내릴 때마다 시도가 하나씩 깎여, `QUEUE_MAX_ATTEMPTS=3`
+인 상황에서 재시작 세 번이면 멀쩡한 작업이 FAILED 로 격리된다.
 
 ### 핸들러에 큐 세션을 넘긴다
 
