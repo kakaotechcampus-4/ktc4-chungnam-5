@@ -81,6 +81,21 @@ class FeedbackPeriodType(str, enum.Enum):
     MONTHLY = "MONTHLY"
 
 
+class TaskStatus(str, enum.Enum):
+    """`task_queue` 행의 상태.
+
+    RUNNING 이 없다. 워커는 처리하는 동안 행 잠금을 쥐고 있을 뿐이고, 그 사실은
+    커밋 전이라 다른 세션에 보이지 않는다 — 써 봐야 아무도 관측할 수 없는 값이 된다.
+    "지금 처리 중"은 곧 "PENDING 인데 행 잠금이 걸린 상태"이고 pg_locks 로 본다.
+
+    FAILED 는 DLQ 자리다. QUEUE_MAX_ATTEMPTS 만큼 실패하면 여기로 옮기고 더 집지 않는다.
+    """
+
+    PENDING = "PENDING"
+    DONE = "DONE"
+    FAILED = "FAILED"
+
+
 def pg_enum(enum_cls: type[enum.Enum], name: str) -> SAEnum:
     """native ENUM 컬럼 타입. 멤버 이름이 아니라 값을 저장한다."""
     return SAEnum(
