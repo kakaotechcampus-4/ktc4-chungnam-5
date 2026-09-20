@@ -2,9 +2,14 @@
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
+from typing import Annotated
 
-from app.models.enums import MealType, MedicationStage
+from pydantic import Field, StringConstraints
+
+from app.models.enums import MealStatus, MealType, MedicationStage
 from app.schemas.base import CamelModel
+from app.schemas.nutrition import NutritionInfo
 
 
 class MealScores(CamelModel):
@@ -49,3 +54,40 @@ class MealDeleteResponse(CamelModel):
     meal_id: uuid.UUID
     deleted_at: datetime
     affected_insights: list[AffectedInsight]
+
+
+# meal_items.confirmed_amount_g 는 Numeric(8, 2) 다 — 최대 999999.99.
+# 스키마에서 막지 않으면 큰 값이 두 갈래로 500 이 된다: quantize 가
+# InvalidOperation 을 던지거나, 통과하더라도 INSERT 가 DataError 로 죽는다.
+# 클라이언트 입력 오류는 4xx 여야 한다(core/response.py 의 규칙).
+_MAX_AMOUNT = Decimal("999999.99")
+
+
+class MealItemCreateRequest(CamelModel):
+    """POST /meals/{mealId}/items 요청.
+
+    `amount` + `unit` 은 항상 함께 온다. g 으로 환산할 수 있는지는 서버가 판단한다
+    (`services.meal.to_grams`) — "2개" 처럼 환산 근거가 없는 단위도 유효한 입력이다.
+    """
+
+    display_name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+    ]
+    amount: Annotated[Decimal, Field(gt=0, le=_MAX_AMOUNT)]
+    unit: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)
+    ]
+
+
+class MealItemCreateResponse(CamelModel):
+    """POST /meals/{mealId}/items 응답.
+
+    `status` · `isRecalculation` 은 추가된 항목이 아니라 **식사 전체**의 상태다.
+    항목 추가가 재분석을 유발하므로 FE 가 곧바로 폴링으로 넘어갈 수 있게 함께 싣는다.
+    """
+
+    item_id: uuid.UUID
+    matched: bool
+    nutrition: NutritionInfo | None
+    status: MealStatus
+    is_recalculation: bool

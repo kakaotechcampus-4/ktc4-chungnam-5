@@ -31,10 +31,18 @@ def run(task: ReceivedTask, ai: AiClient) -> None:
       4. AI 호출
       5. `candidateFoodRefId` 가 `food_refs` 에 실재하는지 확인한다.
          없는 FK 를 그대로 넣으면 커밋이 통째로 깨진다
-      6. 이 식사의 기존 모델 생성 항목을 지우고 새로 넣는다(재배달 대비)
+      6. 이 식사의 기존 모델 생성 항목을 지우고 새로 넣는다(재배달 대비).
+         **`source=USER` 항목은 지우지 않는다** — 사용자가 직접 넣은 음식이다
+         (`POST /meals/{mealId}/items`). 지우면 사용자 입력이 조용히 사라진다.
+         반대로 같은 음식을 AI 가 또 인식해 중복될 수 있다 — 중복 판정 규칙은
+         이 작업에서 정한다
       7. `unit` 을 g 으로 환산한다 — `app.services.meal.to_grams`.
          환산이 안 되면 None 을 넣고 원본 단위는 `raw_ai_result` 에 남긴다
-      8. `status` 를 REVIEW_REQUIRED 로 옮긴다
+      8. `status` 를 REVIEW_REQUIRED 로 옮긴다.
+         **`is_recalculation` 을 어떻게 할지도 이 작업에서 정한다** — 지금은
+         `crud.meal.mark_recalculating` 이 true 로 올리기만 하고 되돌리는 곳이
+         없다. 분석이 끝난 뒤에도 true 로 남겨 "이 식사는 수정된 적이 있다" 로
+         쓸지, false 로 되돌려 "지금 재분석 중" 으로만 쓸지 FE 와 합의할 것
     """
     body = task.body
     meal_id = body["mealId"]

@@ -10,21 +10,54 @@ import base64
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, NamedTuple
 
 from sqlalchemy.orm import Session
 
 from app.crud import meal as meal_crud
-from app.schemas.meal import MealDeleteResponse, MealListItem, MealListResponse, MealScores
+from app.crud import medication as medication_crud
+from app.models.enums import MealStatus
+from app.schemas.meal import (
+    MealDeleteResponse,
+    MealItemCreateRequest,
+    MealItemCreateResponse,
+    MealListItem,
+    MealListResponse,
+    MealScores,
+)
+from app.schemas.nutrition import NutritionInfo
 
 
 class MealNotFoundError(Exception):
     """존재하지 않거나, 남의 것이거나, 이미 삭제된 식사를 가리킬 때."""
+
+
+class MealNotEditableError(Exception):
+    """지금 상태로는 음식을 고칠 수 없는 식사를 가리킬 때."""
+
+
+class AddItemOutcome(NamedTuple):
+    """항목 추가의 결과. 응답과 "커밋 뒤에 보내야 할 작업" 을 함께 돌려준다.
+
+    큐 적재를 서비스 안에서 하지 않는 건, 커밋 실패 시 Worker 가 DB 에 없는 식사를
+    처리하게 되기 때문이다. 순서를 지킬 책임은 호출부(api 레이어)에 있고, 그러려면
+    무엇을 보낼지를 여기서 넘겨줘야 한다.
+    """
+
+    response: MealItemCreateResponse
+    analyze_task: dict[str, Any]
 
 # 그대로 g 으로 볼 수 있는 단위.
 # ml 은 물 기준 1ml ≈ 1g 로 근사한다. 국·음료가 대부분이라 오차를 감수할 만하다.
 _GRAM_EQUIVALENT_UNITS = {"g", "G", "그램", "ml", "mL", "ML", "밀리리터"}
 
 _CURSOR_SEPARATOR = "|"
+
+# 사용자가 음식을 고칠 수 있는 상태.
+# ANALYZING 은 Worker 가 `source=MODEL` 항목을 지우고 다시 넣는 중이라 제외한다
+# (`jobs/analyze_meal.py` 6단계) — 그 와중에 끼어들면 무엇이 남을지 알 수 없다.
+# FAILED 는 인식된 음식이 하나도 없는 상태라 "고친다" 는 말이 성립하지 않는다.
+_EDITABLE_STATUSES = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATED})
 
 
 def to_grams(amount: float | Decimal | None, unit: str | None) -> Decimal | None:
@@ -157,4 +190,73 @@ def delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> MealD
         deleted_at=meal.deleted_at,
         # TODO: 7·8번(insights/long-term) 구현 후 실제 stale 판정 로직으로 교체.
         affected_insights=[],
+    )
+
+
+def add_item(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_id: uuid.UUID,
+    request: MealItemCreateRequest,
+    amount_g: Decimal | None,
+    food_ref_id: str | None,
+    nutrition: NutritionInfo | None,
+) -> AddItemOutcome:
+    """사용자가 직접 입력한 음식을 식사에 더하고 재분석 대기로 되돌린다.
+
+    `amount_g` · `food_ref_id` · `nutrition` 은 이미 결정된 값으로 들어온다.
+    공공 DB 매칭은 `services/nutrition.py` 의 일이고 그 결과를 여기로 옮기는 건
+    호출부(api 레이어)다 — services 끼리는 서로 참조하지 않는다(README 절대 규칙 5).
+    """
+    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+
+    if meal.status not in _EDITABLE_STATUSES:
+        raise MealNotEditableError(
+            f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
+        )
+
+    stage = medication_crud.get_snapshot_stage(db, meal.medication_snapshot_id)
+
+    item = meal_crud.add_item(
+        db,
+        meal_id=meal.id,
+        display_name=request.display_name,
+        amount_g=amount_g,
+        food_ref_id=food_ref_id,
+        # 환산이 안 된 단위("2개")는 여기에만 남는다 — 사용자가 실제로 무엇을
+        # 입력했는지가 유일하게 보존되는 자리다 (`to_grams` 독스트링 참고).
+        raw_input={"amount": str(request.amount), "unit": request.unit},
+    )
+    meal_crud.mark_recalculating(db, meal)
+
+    # 응답을 돌려주기 전에 커밋한다. 큐 적재는 이 커밋 뒤에 호출부가 한다 —
+    # 순서가 뒤집히면 Worker 가 DB 에 없는 항목을 분석하려다 DLQ 로 간다.
+    db.commit()
+
+    return AddItemOutcome(
+        response=MealItemCreateResponse(
+            item_id=item.id,
+            # 계약서(API.md 필드표)가 `matched` 를 "영양정보 유무"로 정의한다 —
+            # "공공 DB 에서 음식을 찾았는가" 가 아니다. 음식은 찾았지만 g 환산이
+            # 안 돼 성분을 못 만든 경우도 false 여야 FE 가 직접 입력으로 유도한다.
+            # DB 의 food_ref_id 링크는 그대로 남는다(둘은 별개다).
+            matched=nutrition is not None,
+            nutrition=nutrition,
+            status=meal.status,
+            is_recalculation=meal.is_recalculation,
+        ),
+        analyze_task={
+            "type": "meal.analyze",
+            "mealId": str(meal.id),
+            "mealType": meal.meal_type.value,
+            "eatenAt": meal.eaten_at.isoformat(),
+            "stage": stage.value,
+            # TODO: 6번(POST /meals)에서 FileStorage 가 붙으면 presigned URL 을 싣는다.
+            # AI 는 S3 권한이 없어 키만으로는 사진을 못 읽는다 (`_build_thumbnail_url` 과 같은 TODO).
+            "imageUrl": None,
+            "rawText": meal.raw_text,
+        },
     )
