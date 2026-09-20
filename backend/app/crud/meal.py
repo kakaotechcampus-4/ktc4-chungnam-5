@@ -1,7 +1,7 @@
 """meals 테이블 접근. 여기 말고는 아무도 Meal 을 직접 쿼리하지 않는다."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Row, and_, distinct, func, or_, select
 from sqlalchemy.orm import Session
@@ -92,7 +92,7 @@ def soft_delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> 
     if meal is None:
         return None
 
-    meal.deleted_at = datetime.now(UTC)
+    meal.deleted_at = datetime.now(timezone.utc)
     return meal
 
 

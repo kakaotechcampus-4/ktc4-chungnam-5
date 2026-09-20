@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -63,7 +63,7 @@ def test_whitespace_in_unit_is_tolerated():
 
 def test_cursor_round_trip():
     """encode 한 걸 decode 하면 원래 값이 그대로 나와야 한다."""
-    eaten_at = datetime(2026, 8, 21, 12, 40, 0, tzinfo=UTC)
+    eaten_at = datetime(2026, 8, 21, 12, 40, 0, tzinfo=timezone.utc)
     meal_id = uuid.uuid4()
 
     cursor = encode_cursor(eaten_at, meal_id)
@@ -109,7 +109,7 @@ def test_delete_meal_raises_when_not_found(monkeypatch):
 def test_delete_meal_builds_response_when_found(monkeypatch):
     """crud 가 Meal 을 돌려주면 그 값 그대로 MealDeleteResponse 로 조립돼야 한다."""
     meal_id = uuid.uuid4()
-    deleted_at = datetime(2026, 8, 22, 10, 4, 0, tzinfo=UTC)
+    deleted_at = datetime(2026, 8, 22, 10, 4, 0, tzinfo=timezone.utc)
     fake_meal = SimpleNamespace(id=meal_id, deleted_at=deleted_at)
 
     monkeypatch.setattr(meal_crud, "soft_delete_meal", lambda db, *, user_id, meal_id: fake_meal)
