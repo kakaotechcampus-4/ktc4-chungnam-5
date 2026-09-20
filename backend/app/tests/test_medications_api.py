@@ -233,3 +233,19 @@ def test_start_date_after_first_change_is_422(client: TestClient, user_id: uuid.
 
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_typo_field_is_rejected(client: TestClient, user_id: uuid.UUID) -> None:
+    """오타난 필드를 조용히 무시하지 않는다 (`extra="forbid"`).
+
+    무시하면 `startedAt` 이 빠진 것으로 처리돼 오늘로 등록되고 회차가 1 로 리셋된다.
+    클라이언트는 200 을 받고 저장됐다고 믿는다. `schemas/user.py` 와 같은 정책이다.
+    """
+    res = client.post(
+        "/api/v1/medications",
+        json={"drugName": "위고비", "doseMg": 1.0, "startedAtt": "2026-06-14"},
+        headers=_h(user_id),
+    )
+
+    assert res.status_code == 422
+    assert res.json()["error"]["code"] == "VALIDATION_ERROR"

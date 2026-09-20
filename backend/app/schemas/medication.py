@@ -13,7 +13,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from app.models.enums import DrugName, MedicationStage
 from app.schemas.base import CamelModel
@@ -28,7 +28,14 @@ class MedicationUpsertRequest(CamelModel):
 
     단계(stage)는 받지 않는다. 서버가 용량으로 판정한다 — 사용자가 고르게 하면
     아키텍처의 Stage Rule Engine 이 사라진다.
+
+    extra="forbid": 오타난 필드(예: `startedAtt`)를 조용히 무시하지 않는다. 무시하면
+    `startedAt` 이 빠진 것으로 처리돼 **오늘로 등록되고 회차가 1 로 리셋된다** —
+    클라이언트는 200 을 받고 저장됐다고 믿는다. `schemas/user.py` 의 요청 스키마들과
+    같은 이유다.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     drug_name: DrugName
     dose_mg: Decimal = Field(gt=0, le=Decimal("999.999"))
