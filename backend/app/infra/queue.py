@@ -262,6 +262,11 @@ class DbTaskQueue:
 
             try:
                 yield claim
+            except (KeyboardInterrupt, SystemExit, GeneratorExit):
+                # 작업이 실패한 게 아니라 프로세스가 내려가는 것이다. 롤백해서 잠금만 풀고
+                # attempts 는 태우지 않는다 — 배포 때마다 한 번씩 까이면 멀쩡한 작업이 격리된다.
+                db.rollback()
+                raise
             except BaseException as exc:
                 db.rollback()
                 self._record_failure(claim.task, exc)
@@ -303,9 +308,14 @@ class DbTaskQueue:
 
         try:
             with self._session_factory() as db:
+                # 상태 가드가 없으면: A 가 롤백해 잠금을 풀고(행은 여전히 PENDING) →
+                # B 가 같은 행을 집어 성공 처리해 DONE 커밋 → A 의 이 UPDATE 가
+                # (READ COMMITTED 라 WHERE id=... 가 여전히 참이라) DONE 을 다시
+                # PENDING 으로 되돌려 버린다. status=PENDING 가드로, 이미 다른
+                # 워커가 끝낸 행이면 0행 매칭으로 조용히 넘어간다.
                 db.execute(
                     update(Task)
-                    .where(Task.id == task.id)
+                    .where(Task.id == task.id, Task.status == TaskStatus.PENDING)
                     .values(
                         attempts=attempts,
                         status=status,

@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.models.enums import TaskStatus
@@ -204,6 +204,53 @@ def test_task_scheduled_in_the_future_is_not_claimed(sessions, queue):
 
     with queue.claim() as claim:
         assert claim is None
+
+
+def test_late_failure_record_does_not_revive_a_done_task(sessions, queue):
+    """진짜 경쟁 조건(A 롤백 → B 가 같은 행을 집어 DONE 커밋 → A 의 실패 기록이 뒤늦게 도착)은
+    타이밍을 강제할 수 없어 결정적으로 재현하지 못한다. 대신 그 상황의 결과 — 이미 DONE 인
+    행에 뒤늦은 실패 기록이 도착하는 것 — 를 `_record_failure` 를 직접 불러 고정한다.
+    이 테스트가 지키는 계약은 "늦게 도착한 실패 기록이 완료된 작업을 건드리지 않는다" 는 것이다.
+    """
+    from app.infra.queue import ClaimedTask
+
+    put = _put(sessions)
+    with sessions() as db:
+        db.execute(
+            update(Task)
+            .where(Task.id == put.id)
+            .values(status=TaskStatus.DONE, result={"ok": True}, finished_at=func.now())
+        )
+        db.commit()
+
+    queue._record_failure(
+        ClaimedTask(id=put.id, type=put.type, payload=put.payload, attempts=0),
+        RuntimeError("늦게 도착한 실패 기록"),
+    )
+
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.DONE
+        assert row.attempts == 0
+        assert row.last_error is None
+
+
+def test_keyboard_interrupt_does_not_consume_an_attempt(sessions, queue):
+    """Ctrl+C·SIGTERM 은 작업 실패가 아니라 프로세스 종료다. attempts 를 태우면 배포할 때마다
+    멀쩡한 작업이 한 번씩 까여 QUEUE_MAX_ATTEMPTS 만에 격리돼 버린다."""
+    put = _put(sessions)
+
+    with pytest.raises(KeyboardInterrupt):
+        with queue.claim() as claim:
+            assert claim is not None
+            raise KeyboardInterrupt()
+
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.PENDING
+        assert row.attempts == 0
+        assert row.last_error is None
+        assert row.next_run_at <= datetime.now(timezone.utc) + timedelta(seconds=1)
 
 
 # ─────────────────────────── 동시성 ───────────────────────────
