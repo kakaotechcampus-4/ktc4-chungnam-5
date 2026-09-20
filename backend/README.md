@@ -272,6 +272,11 @@ UPDATE task_queue SET status='PENDING', attempts=0, next_run_at=now() WHERE id='
 스켈레톤 마지막 줄의 `raise NotImplementedError` 를 **가장 마지막에** 지운다.
 먼저 지우면 `loop.py` 가 성공으로 보고 DONE 을 커밋한다.
 
+**`run(db, task, ai)` 안에서 부르는 `services/`·`crud/` 함수는 커밋하면 안 된다.**
+이 `db` 는 작업을 잠그고 있는 세션이라, 도중에 커밋하는 service 를 그대로 부르면
+AI 호출이 끝나기 전에 행 잠금이 풀려 다른 워커가 같은 작업을 중복 처리한다.
+커밋하는 service 가 있으면 커밋 없는 버전으로 쪼개서 쓴다.
+
 ## 환경변수
 
 `.env.example` 참고. `core/`의 Pydantic `BaseSettings`로 로드해, 없거나 형식이 틀리면

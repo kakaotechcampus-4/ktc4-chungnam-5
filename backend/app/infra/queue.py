@@ -152,6 +152,23 @@ class DbTaskQueue:
 
             try:
                 yield claim
+                # 완료 UPDATE 와 commit 을 이 try 안에 둬야 한다. `SessionLocal` 은
+                # autoflush=False 라, 핸들러가 `claim.db` 에 쌓아 둔 도메인 객체의 flush 는
+                # 여기 commit 시점에야 실제로 나간다 — FK 위반·UNIQUE 충돌은 물론
+                # `result` 에 JSON 직렬화가 안 되는 값이 섞여도 여기서 터진다. try 밖에
+                # 있으면 그 실패가 아래 except 를 타지 않아 attempts 가 오르지 않고,
+                # next_run_at 도 과거 그대로라 다음 폴링에 즉시 다시 집혀 AI 를 또 부른다.
+                db.execute(
+                    update(Task)
+                    .where(Task.id == claim.task.id)
+                    .values(
+                        status=TaskStatus.DONE,
+                        result=claim.result,
+                        finished_at=func.now(),
+                        updated_at=func.now(),
+                    )
+                )
+                db.commit()
             except (KeyboardInterrupt, SystemExit, GeneratorExit):
                 # 작업이 실패한 게 아니라 프로세스가 내려가는 것이다. 롤백해서 잠금만 풀고
                 # attempts 는 태우지 않는다 — 배포 때마다 한 번씩 까이면 멀쩡한 작업이 격리된다.
@@ -161,18 +178,6 @@ class DbTaskQueue:
                 db.rollback()
                 self._record_failure(claim.task, exc)
                 raise
-
-            db.execute(
-                update(Task)
-                .where(Task.id == claim.task.id)
-                .values(
-                    status=TaskStatus.DONE,
-                    result=claim.result,
-                    finished_at=func.now(),
-                    updated_at=func.now(),
-                )
-            )
-            db.commit()
         finally:
             db.close()
 
@@ -193,8 +198,12 @@ class DbTaskQueue:
         # 30s → 60s. 실패할 때마다 두 배로 민다.
         backoff = self._settings.QUEUE_BACKOFF_BASE_SEC * 2 ** task.attempts
 
-        # 예외 메시지에 사용자 입력이 섞여 들어올 수 있다. 타입과 앞부분만 남긴다(규칙 6).
-        reason = f"{type(exc).__name__}: {exc}"[:_ERROR_MAX_CHARS]
+        # 예외 메시지에 사용자 입력이 섞여 들어올 수 있다(규칙 6). 특히 SQLAlchemy
+        # IntegrityError 의 str() 은 "[SQL: INSERT ...]\n[parameters: (...)]" 형태로
+        # 원본 파라미터(음식명 등)를 통째로 붙인다 — 그 부분은 500자 안에도 쉽게 들어오므로
+        # 자르기 전에 SQL 덤프 자체를 먼저 잘라내고, 남은 앞부분만 길이로 다시 자른다.
+        message = f"{type(exc).__name__}: {exc}".split("\n[SQL:")[0]
+        reason = message[:_ERROR_MAX_CHARS]
 
         try:
             with self._session_factory() as db:

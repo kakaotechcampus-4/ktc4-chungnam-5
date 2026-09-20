@@ -56,6 +56,13 @@ def handle(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | Non
     `db` 는 이 작업을 잠그고 있는 세션이다. 핸들러가 도메인 쓰기에 그대로 써야
     작업 완료와 도메인 변경이 한 트랜잭션이 된다. 커밋은 하지 않는다 — 큐가 한다.
 
+    **주의: 이 `db` 로 부르는 `services/`·`crud/` 함수는 절대 커밋하면 안 된다.**
+    이 레포 관례상 `services/` 가 트랜잭션 경계를 정하고 커밋도 직접 하는데
+    (`services/meal.py`·`services/user.py` 참고), 그런 함수를 여기서 그대로 부르면
+    AI 호출이 끝나기 한참 전에 행 잠금이 풀린다 — 다른 워커가 같은 작업을 동시에
+    집어 중복 처리하고, 이후 정말 실패해도 이미 커밋된 도메인 변경은 롤백되지 않는다.
+    커밋하는 service 를 붙여야 하면, 커밋 없는 버전으로 쪼개 그 함수를 부른다.
+
     반환값은 `task_queue.result` 에 남는다. 남길 게 없으면 None.
     """
     handler = _HANDLERS.get(task.type)

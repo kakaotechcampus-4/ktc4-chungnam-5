@@ -163,6 +163,29 @@ def test_failure_leaves_the_task_pending_and_records_the_attempt(sessions, queue
         assert row.next_run_at > before + timedelta(seconds=20)
 
 
+def test_commit_failure_is_recorded_as_a_failed_attempt(sessions, queue):
+    """DONE 커밋 자체가 실패해도(FK 위반·직렬화 불가 등) 실패로 집계돼야 한다.
+
+    `result` 에 JSON 으로 직렬화할 수 없는 값(`datetime`)을 담아 DONE UPDATE 를
+    깨뜨린다. 이 커밋은 `try` 블록 밖에 있었을 때는 실패 경로(`_record_failure`)를
+    타지 않아 attempts 가 오르지 않고 next_run_at 도 과거 그대로 남았다 — 그러면
+    행이 즉시 다시 집혀 AI 를 또 부르면서도 QUEUE_MAX_ATTEMPTS 로 격리되지 않았다.
+    """
+    put = _put(sessions)
+
+    with pytest.raises(Exception):
+        with queue.claim() as claim:
+            assert claim is not None
+            claim.result = {"finishedAt": datetime.now(timezone.utc)}
+
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.PENDING
+        assert row.attempts == 1
+        assert "TypeError" in row.last_error
+        assert row.result is None
+
+
 def test_domain_writes_are_rolled_back_with_the_task(sessions, queue):
     """핸들러가 claim 의 세션에 쓴 것도 함께 되돌아간다.
 
