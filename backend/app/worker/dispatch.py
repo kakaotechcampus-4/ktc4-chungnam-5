@@ -2,7 +2,7 @@
 
 ## 작업을 하나 붙이려면
 
-1. `jobs/` 에 파일을 만들고 `run(task, ai)` 를 둔다
+1. `jobs/` 에 파일을 만들고 `run(db, task, ai)` 를 둔다
 2. 아래 `_HANDLERS` 에 한 줄 더한다
 3. `_NOT_IMPLEMENTED` 에서 그 타입을 지운다
 

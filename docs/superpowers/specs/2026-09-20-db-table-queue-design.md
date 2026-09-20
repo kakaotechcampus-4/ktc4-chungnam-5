@@ -169,12 +169,11 @@ PENDING 으로 되돌려 중복 처리를 일으킨다. 가드가 있으면 A �
 
 ```python
 while _running:
-    with queue.claim() as claimed:
-        if claimed is None:
-            time.sleep(POLL_INTERVAL_SEC)
+    with queue.claim() as claim:
+        if claim is None:
+            time.sleep(settings.QUEUE_POLL_INTERVAL_SEC)
             continue
-        db, task = claimed
-        handle(db, task, ai)
+        claim.result = handle(claim.db, claim.task, ai)
 ```
 
 `loop.py` 의 주제가 "삭제 시점"에서 "커밋 시점"으로 바뀔 뿐 구조는 같다. 예외는
