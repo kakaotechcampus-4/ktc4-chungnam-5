@@ -23,6 +23,9 @@ _SUMMARY = text(
     """
 )
 
+# 잠긴 행을 pg_locks 로 되짚는 건 튜플 단위라 실용적이지 않아, task_queue 를 만지며
+# 트랜잭션을 연 채인 커넥션을 센다. 근사라서 **워커가 아닌 세션도 잡힌다** —
+# 누군가 같은 시각에 이 스크립트를 돌리고 있으면 그 세션도 여기 나온다.
 _IN_FLIGHT = text(
     """
     SELECT pid, now() - xact_start AS elapsed
@@ -54,6 +57,7 @@ def main() -> None:
 
         in_flight = db.execute(_IN_FLIGHT).all()
         print(f"\n처리 중(작업 트랜잭션을 연 커넥션): {len(in_flight)}")
+        print("  (근사치 — task_queue 를 만지며 트랜잭션을 연 커넥션을 센다. 워커가 아닌 세션도 잡힐 수 있다)")
         for pid, elapsed in in_flight:
             print(f"  pid={pid} 경과={elapsed}")
 
