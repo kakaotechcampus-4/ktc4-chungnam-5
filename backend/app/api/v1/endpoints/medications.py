@@ -15,8 +15,8 @@ from app.core.deps import get_current_user_id
 from app.core.response import ApiResponse, ok
 from app.db.session import get_db
 from app.schemas.medication import (
-    CurrentMedicationResponse,
     MedicationUpsertRequest,
+    MedicationUpsertResponse,
 )
 from app.services import medication as medication_service
 
@@ -25,25 +25,27 @@ router = APIRouter()
 
 @router.post(
     "/medications",
-    response_model=ApiResponse[CurrentMedicationResponse],
+    response_model=ApiResponse[MedicationUpsertResponse],
     summary="투약 정보 등록·수정",
 )
 def upsert_medication(
     payload: MedicationUpsertRequest,
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
-) -> ApiResponse[CurrentMedicationResponse]:
+) -> ApiResponse[MedicationUpsertResponse]:
     # 지원하지 않는 약물은 여기 오지 않는다 — DrugName ENUM 이 422 로 막는다.
     #
     # 미래 시작일도 422 다. 명세의 에러 코드 목록에 날짜 전용 코드가 없고,
     # 이건 값이 잘못된 경우라 VALIDATION_ERROR 로 흡수하는 게 맞다.
     # (핸들러가 422 → VALIDATION_ERROR 로 매핑한다)
     try:
-        medication_service.upsert(db, user_id, payload)
+        result = medication_service.upsert(db, user_id, payload)
     except medication_service.FutureStartDateError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from None
 
-    return ok(medication_service.get_current_view(db, user_id))
+    # 응답 스키마가 GET /medications/current 와 다르다 — 이쪽은 현재 상태에 더해
+    # 이번 요청으로 무엇이 바뀌었는지까지 내린다 (명세 POST /medications).
+    return ok(medication_service.build_upsert_view(db, user_id, result))

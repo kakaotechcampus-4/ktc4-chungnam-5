@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Final, NamedTuple
 
@@ -34,7 +34,10 @@ from app.models.enums import DrugName, MedicationStage
 from app.models.medication import MedicationRecord, MedicationSnapshot
 from app.schemas.medication import (
     CurrentMedicationResponse,
+    DoseDirection,
+    DoseEvent,
     MedicationUpsertRequest,
+    MedicationUpsertResponse,
 )
 
 # ── 1. 용량 사다리 ──────────────────────────────────────────────
@@ -208,6 +211,56 @@ def predict_next_dose(started_at: date, *, today: date) -> tuple[date, int]:
     return next_dose_date, (next_dose_date - today).days
 
 
+def dose_direction(
+    dose_mg: Decimal, *, previous_dose_mg: Decimal | None
+) -> DoseDirection:
+    """이전 용량 대비 방향. 명세의 표 그대로다.
+
+    | 조건 | direction |
+    | --- | --- |
+    | 새 값 > 현재 값 | INCREASE |
+    | 새 값 < 현재 값 | DECREASE |
+    | 같음 | 기록 없음 — 애초에 이벤트가 안 생긴다 |
+
+    이전 용량이 없으면(첫 등록) MAINTAIN 이다 — 명세 `dose-events` 예시의 `de_001`.
+
+    ⚠️ **약물이 바뀐 경우는 명세에 없다.** 위고비 1.0 → 마운자로 2.5 는 사다리가 달라
+    mg 비교가 의미를 잃는다(첫 칸으로 되돌아가는 것이므로 실질은 감량에 가깝다).
+    지금은 명세 그대로 mg 로 비교한다 — 문서 「논의할 내용」 11 참고.
+    """
+    if previous_dose_mg is None:
+        return DoseDirection.MAINTAIN
+    if dose_mg > previous_dose_mg:
+        return DoseDirection.INCREASE
+    if dose_mg < previous_dose_mg:
+        return DoseDirection.DECREASE
+    # 용량은 그대로인데 이벤트가 생긴 경우 = 약물만 바뀌었다.
+    return DoseDirection.MAINTAIN
+
+
+RULE_VERSION: Final = "v1"
+"""판정 규칙의 버전. 응답의 `ruleVersion` 이다.
+
+사다리 수치나 `judge_stage` 의 순서를 바꾸면 올린다 — 같은 입력에 다른 단계가 나온
+이유를 나중에 추적하려면 어느 규칙으로 찍힌 값인지가 필요하다.
+"""
+
+STAGE_REASONS: Final[dict[MedicationStage, str]] = {
+    MedicationStage.PRE_DOSE: "아직 투약을 시작하기 전이에요",
+    MedicationStage.INITIAL: "몸이 약에 적응하는 구간",
+    MedicationStage.TITRATION: "용량을 맞춰가는 구간",
+    MedicationStage.MAINTENANCE: "약효가 줄고 식욕이 돌아오는 구간",
+    MedicationStage.REDUCED: "용량을 낮추고 다시 적응하는 구간",
+}
+"""단계를 사용자에게 설명하는 한 줄. 응답의 `stageReason` 이다.
+
+MAINTENANCE 문구는 명세 예시 그대로고 **나머지 넷은 초안이다** — 팀 확인 필요.
+
+절대 규칙 1·FE 규칙 2(처방 톤 금지)를 지킨다. 지금 상태를 서술만 하고
+"올려라/줄여라"를 말하지 않는다. 문구를 고칠 때도 이 선을 넘지 않는다.
+"""
+
+
 # ── 3. 유스케이스 ───────────────────────────────────────────────
 
 
@@ -224,13 +277,35 @@ class FutureStartDateError(ValueError):
         self.today = today
 
 
+class UpsertResult(NamedTuple):
+    """`upsert()` 가 남기는 것. 행 하나로는 부족하다.
+
+    명세의 `POST /medications` 응답은 현재 상태뿐 아니라 **이번 요청으로 무엇이
+    바뀌었는지**(`doseChanged` · `stageChanged` · `doseEvent`)를 함께 내린다.
+    그 판단은 이전 행을 들고 있는 여기서만 할 수 있어서, 나중에 다시 조회해
+    복원할 수 없다 — 그래서 결과에 실어 내보낸다.
+    """
+
+    record: MedicationRecord
+    """반영이 끝난 뒤의 현재 행."""
+
+    dose_changed: bool
+    """이번 요청으로 약이나 용량이 바뀌었는지. 같은 값으로 다시 보내면 False."""
+
+    stage_changed: bool
+    """이번 요청으로 단계 판정이 달라졌는지. 첫 등록은 PRE_DOSE 에서 오므로 True."""
+
+    previous_dose_mg: Decimal | None = None
+    """직전 용량. `direction` 을 여기서 뽑는다. 첫 등록이거나 변경이 없으면 None."""
+
+
 def upsert(
     db: Session,
     user_id: uuid.UUID,
     payload: MedicationUpsertRequest,
     *,
     today: date | None = None,
-) -> MedicationRecord:
+) -> UpsertResult:
     """투약 정보 등록·수정 겸용. 커밋까지 한다.
 
     **행은 용량 변경 1건이다.** 같은 약·같은 용량으로 다시 보내면 행을 만들지 않는다 —
@@ -269,7 +344,8 @@ def upsert(
             effective_from=started_at,
         )
         db.commit()
-        return record
+        # 첫 등록은 PRE_DOSE 에서 넘어온 것이라 단계도 용량도 바뀐 것으로 본다.
+        return UpsertResult(record, dose_changed=True, stage_changed=True)  # 첫 등록
 
     # startedAt 정정 — 가장 오래된 행의 날짜가 곧 전체 시작일이다.
     first = crud.get_first(db, user_id)
@@ -280,7 +356,7 @@ def upsert(
     if unchanged:
         # 변경이 없으면 이력에 남길 게 없다. startedAt 반영만 하고 끝낸다.
         db.commit()
-        return current
+        return UpsertResult(current, dose_changed=False, stage_changed=False)
 
     context = dose_context(
         payload.drug_name,
@@ -293,11 +369,18 @@ def upsert(
         crud.close_current(db, current, effective_to=change_date - timedelta(days=1))
     else:
         # 같은 날 두 번 바꾸면 이력이 두 줄이 될 이유가 없다. 현재 행을 고친다.
+        previous_stage = current.stage
+        previous_dose_mg = current.dose_mg
         current.drug_name = payload.drug_name
         current.dose_mg = payload.dose_mg
         current.stage = judge_stage(payload.drug_name, payload.dose_mg, **context._asdict())
         db.commit()
-        return current
+        return UpsertResult(
+            current,
+            dose_changed=True,
+            stage_changed=current.stage != previous_stage,
+            previous_dose_mg=previous_dose_mg,
+        )
 
     record = crud.create(
         db,
@@ -309,7 +392,12 @@ def upsert(
         effective_from=change_date,
     )
     db.commit()
-    return record
+    return UpsertResult(
+        record,
+        dose_changed=True,
+        stage_changed=record.stage != current.stage,
+        previous_dose_mg=current.dose_mg,
+    )
 
 
 def get_current_view(
@@ -339,6 +427,63 @@ def get_current_view(
         effective_from=current.effective_from,
         next_dose_date=next_dose_date,
         days_until_next_dose=days_until_next_dose,
+    )
+
+
+def _build_dose_event(result: UpsertResult) -> DoseEvent | None:
+    """`UpsertResult` → 명세의 `doseEvent`. 변경이 없으면 None 이다."""
+    if not result.dose_changed:
+        return None
+    record = result.record
+    return DoseEvent(
+        dose_event_id=record.id,
+        dose_mg=record.dose_mg,
+        direction=dose_direction(
+            record.dose_mg, previous_dose_mg=result.previous_dose_mg
+        ),
+        effective_from=record.effective_from,
+    )
+
+
+def build_upsert_view(
+    db: Session,
+    user_id: uuid.UUID,
+    result: UpsertResult,
+    *,
+    today: date | None = None,
+) -> MedicationUpsertResponse:
+    """`POST /medications` 응답을 조립한다.
+
+    `get_current_view()` 를 쓰지 않는다 — 명세의 POST 응답은 현재 상태에 더해
+    `doseChanged` · `doseEvent` · `stageChanged` · `decidedAt` 을 요구하고,
+    그 넷은 `UpsertResult` 에만 있다. 반대로 `effectiveFrom` 은 POST 응답에 없다.
+
+    여기서 새로 판정하지 않는다. 단계는 `upsert()` 가 이미 행에 박아 둔 값을 읽기만 한다 —
+    두 번 판정하면 같은 요청에 두 답이 나올 수 있다.
+    """
+    today = today or date.today()
+    record = result.record
+
+    started_at = crud.get_dosing_start_date(db, user_id) or record.effective_from
+    next_dose_date, days_until_next_dose = predict_next_dose(started_at, today=today)
+
+    return MedicationUpsertResponse(
+        medication_id=record.id,
+        drug_name=record.drug_name,
+        dose_mg=record.dose_mg,
+        started_at=started_at,
+        dose_count=count_doses(started_at, today=today),
+        next_dose_date=next_dose_date,
+        days_until_next_dose=days_until_next_dose,
+        stage=record.stage,
+        stage_reason=STAGE_REASONS[record.stage],
+        rule_version=RULE_VERSION,
+        dose_changed=result.dose_changed,
+        # 변경이 없으면 이벤트도 없다 (명세: "같음 → 기록 없음"). 현재 행을 그대로
+        # 실어 보내면 FE 가 "방금 바뀐 것"과 "예전부터 쓰던 것"을 구분하지 못한다.
+        dose_event=_build_dose_event(result),
+        stage_changed=result.stage_changed,
+        decided_at=datetime.now(timezone.utc),
     )
 
 

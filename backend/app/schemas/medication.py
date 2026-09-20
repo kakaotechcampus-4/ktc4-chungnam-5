@@ -8,7 +8,9 @@ snake_case 를 그대로 쓰고, 직렬화 시점에만 alias 로 바꾼다.
 입력은 Decimal 로 받아 정밀도를 지키고(Numeric(6,3) 컬럼), 출력에서만 float 로 바꾼다.
 """
 
-from datetime import date
+import enum
+import uuid
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import Field
@@ -34,6 +36,69 @@ class MedicationUpsertRequest(CamelModel):
         default=None,
         description="**전체 투약 시작일.** 회차를 여기서 역산한다. 생략하면 오늘.",
     )
+
+
+class DoseDirection(str, enum.Enum):
+    """이전 용량 대비 방향. 명세 `doseEvent.direction` 이다.
+
+    DB 에 저장하지 않는다 — 이전 행의 용량과 비교하면 언제든 다시 나오는 값이라
+    컬럼으로 두면 두 진실이 생긴다.
+    """
+
+    INCREASE = "INCREASE"
+    DECREASE = "DECREASE"
+    MAINTAIN = "MAINTAIN"
+    """첫 등록. 비교할 이전 용량이 없다.
+
+    명세 `GET /medications/dose-events` 예시의 `de_001` 이 이 경우다.
+    같은 용량으로 다시 보낸 경우는 여기 해당하지 않는다 — 그건 이벤트 자체가 안 생긴다.
+    """
+
+
+class DoseEvent(CamelModel):
+    """용량 변경 1건. `medication_records` 행 하나가 그대로 한 이벤트다.
+
+    명세에 `dose_events` 라는 별도 테이블이 있는 것처럼 적혀 있지만, 우리 모델은
+    **행 하나가 곧 용량 변경 1건**이라 `medication_records` 가 그 테이블이다
+    (「행 하나 = 용량 변경 1건」 참고). `doseEventId` 는 그 행의 id 다.
+    """
+
+    dose_event_id: uuid.UUID
+    dose_mg: float
+    direction: DoseDirection
+    effective_from: date = Field(description="이 용량으로 바꾼 날")
+
+
+class MedicationUpsertResponse(CamelModel):
+    """`POST /medications` 응답.
+
+    **`GET /medications/current` 와 필드가 다르다.** 겹치는 건 현재 상태 5개뿐이고,
+    이쪽은 "이번 요청으로 무엇이 바뀌었는가"(`doseChanged` · `doseEvent` ·
+    `stageChanged` · `decidedAt`)를 함께 내린다. 그래서 스키마를 따로 둔다 —
+    `CurrentMedicationResponse` 를 재사용하면 변경 여부를 실을 자리가 없다.
+
+    명세에 없는 `effectiveFrom` 은 여기서 내리지 않는다. 현재 용량으로 바꾼 날은
+    `doseEvent.effectiveFrom` 에 이미 들어 있다.
+    """
+
+    medication_id: uuid.UUID = Field(
+        description="방금 반영된 `medication_records` 행 id."
+    )
+    drug_name: DrugName
+    dose_mg: float
+    started_at: date = Field(description="전체 투약 시작일")
+    dose_count: int = Field(description="floor((today - startedAt) / 7) + 1")
+    next_dose_date: date = Field(description="startedAt + 7 x doseCount")
+    days_until_next_dose: int = Field(description="nextDoseDate - today. 구조상 1~7")
+    stage: MedicationStage
+    stage_reason: str = Field(description="단계를 사용자에게 설명하는 한 줄")
+    rule_version: str = Field(description="판정에 쓰인 규칙 버전")
+    dose_changed: bool = Field(description="이번 요청으로 약·용량이 바뀌었는지")
+    dose_event: DoseEvent | None = Field(
+        default=None, description="바뀌었다면 그 변경 1건. 아니면 null"
+    )
+    stage_changed: bool = Field(description="이번 요청으로 단계 판정이 달라졌는지")
+    decided_at: datetime = Field(description="판정 시각")
 
 
 class CurrentMedicationResponse(CamelModel):

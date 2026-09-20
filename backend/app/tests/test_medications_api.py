@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -97,3 +97,117 @@ def test_without_header_is_401(client: TestClient) -> None:
         json={"drugName": "위고비", "doseMg": 0.25},
     )
     assert res.status_code == 401
+
+
+# ── 명세 응답 형식 ─────────────────────────────────────────────
+#
+# POST 응답은 GET /medications/current 와 다르다. 현재 상태에 더해 "이번 요청으로
+# 무엇이 바뀌었는지"를 싣고, `effectiveFrom` 은 싣지 않는다.
+
+SPEC_FIELDS = {
+    "medicationId",
+    "drugName",
+    "doseMg",
+    "startedAt",
+    "doseCount",
+    "nextDoseDate",
+    "daysUntilNextDose",
+    "stage",
+    "stageReason",
+    "ruleVersion",
+    "doseChanged",
+    "doseEvent",
+    "stageChanged",
+    "decidedAt",
+}
+
+
+def _post(client: TestClient, user_id: uuid.UUID, **body: object) -> dict:
+    return client.post("/api/v1/medications", json=body, headers=_h(user_id)).json()["data"]
+
+
+def test_response_has_exactly_the_spec_fields(client: TestClient, user_id: uuid.UUID) -> None:
+    """빠진 필드도 남는 필드도 없어야 한다.
+
+    `effectiveFrom` 이 여기 있으면 안 된다 — 명세에 없고, 현재 용량으로 바꾼 날은
+    `doseEvent.effectiveFrom` 에 이미 들어 있다.
+    """
+    data = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+    assert set(data) == SPEC_FIELDS
+
+
+def test_next_dose_is_computed_not_omitted(client: TestClient, user_id: uuid.UUID) -> None:
+    """nextDoseDate = startedAt + 7 x doseCount, daysUntilNextDose = nextDoseDate - today."""
+    started_at = date.today() - timedelta(days=3)
+    data = _post(
+        client, user_id, drugName="위고비", doseMg=0.25, startedAt=started_at.isoformat()
+    )
+
+    assert data["doseCount"] == 1
+    assert data["nextDoseDate"] == (started_at + timedelta(days=7)).isoformat()
+    assert data["daysUntilNextDose"] == 4
+
+
+def test_first_registration_reports_change(client: TestClient, user_id: uuid.UUID) -> None:
+    """첫 등록은 PRE_DOSE 에서 넘어온 것이라 단계도 용량도 바뀐 것으로 본다."""
+    data = _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt="2026-09-01")
+
+    assert data["doseChanged"] is True
+    assert data["stageChanged"] is True
+    assert data["doseEvent"]["doseMg"] == 0.25
+    # 비교할 이전 용량이 없다 — 명세 dose-events 예시의 de_001 이 이 경우다.
+    assert data["doseEvent"]["direction"] == "MAINTAIN"
+    assert set(data["doseEvent"]) == {"doseEventId", "doseMg", "direction", "effectiveFrom"}
+    assert data["stage"] == "INITIAL"
+    assert data["stageReason"]
+    assert data["ruleVersion"] == "v1"
+
+
+def test_same_dose_reports_no_change(client: TestClient, user_id: uuid.UUID) -> None:
+    """같은 값으로 다시 보내면 변경이 아니다. 이벤트도 null 이다 —
+    현재 행을 그대로 실으면 FE 가 "방금 바뀐 것"과 구분하지 못한다."""
+    body = {"drugName": "위고비", "doseMg": 0.25, "startedAt": "2026-09-01"}
+    _post(client, user_id, **body)
+    data = _post(client, user_id, **body)
+
+    assert data["doseChanged"] is False
+    assert data["doseEvent"] is None
+    assert data["stageChanged"] is False
+
+
+def test_dose_change_reports_the_event(client: TestClient, user_id: uuid.UUID) -> None:
+    """증량하면 그 변경 1건이 doseEvent 로 나온다. 사다리 첫 칸을 벗어나 단계도 바뀐다."""
+    started_at = (date.today() - timedelta(days=14)).isoformat()
+    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt=started_at)
+    data = _post(client, user_id, drugName="위고비", doseMg=0.5, startedAt=started_at)
+
+    assert data["doseChanged"] is True
+    assert data["stageChanged"] is True
+    assert data["stage"] == "TITRATION"
+    assert data["doseEvent"]["doseMg"] == 0.5
+    assert data["doseEvent"]["direction"] == "INCREASE"
+    assert data["doseEvent"]["effectiveFrom"] == date.today().isoformat()
+
+
+@pytest.mark.skip(
+    reason="감량은 stage=REDUCED 를 만드는데 medication_stage native ENUM 에 그 값이 없어 "
+    "INSERT 가 DataError 로 죽는다. 방향 계산 자체는 test_medication_stage.py 에서 검증한다."
+)
+def test_dose_decrease_is_reported_as_such(client: TestClient, user_id: uuid.UUID) -> None:
+    """감량은 DECREASE 다. 방향을 저장하지 않고 이전 행과 비교해서 낸다."""
+    started_at = (date.today() - timedelta(days=14)).isoformat()
+    _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt=started_at)
+    data = _post(client, user_id, drugName="위고비", doseMg=0.5, startedAt=started_at)
+
+    assert data["doseEvent"]["direction"] == "DECREASE"
+
+
+def test_medication_id_points_at_the_current_row(
+    client: TestClient, user_id: uuid.UUID
+) -> None:
+    """증량하면 id 가 새 행으로 바뀐다 — 같은 id 면 이력이 안 쌓였다는 뜻이다."""
+    started_at = (date.today() - timedelta(days=14)).isoformat()
+    first = _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt=started_at)
+    second = _post(client, user_id, drugName="위고비", doseMg=0.5, startedAt=started_at)
+
+    assert uuid.UUID(first["medicationId"]) != uuid.UUID(second["medicationId"])

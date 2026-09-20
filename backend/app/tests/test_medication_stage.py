@@ -15,12 +15,15 @@ from decimal import Decimal
 import pytest
 
 from app.models.enums import DrugName, MedicationStage
+from app.schemas.medication import DoseDirection
 from app.services.medication import (
     DOSE_INTERVAL_DAYS,
     DOSE_LADDERS,
     MAINTENANCE_STREAK,
+    STAGE_REASONS,
     count_doses,
     dose_context,
+    dose_direction,
     judge_stage,
     predict_next_dose,
 )
@@ -307,3 +310,38 @@ def test_d_day_never_leaves_one_to_seven(elapsed: int) -> None:
     today = date.fromordinal(START.toordinal() + elapsed)
     _, d_day = predict_next_dose(START, today=today)
     assert 1 <= d_day <= DOSE_INTERVAL_DAYS
+
+
+def test_every_stage_has_a_reason() -> None:
+    """`stageReason` 이 비면 FE 가 빈 줄을 띄운다. 단계를 늘리면 여기서 걸린다."""
+    for stage in MedicationStage:
+        assert STAGE_REASONS[stage].strip()
+
+
+# ── 용량 변경 방향 ────────────────────────────────────────────
+#
+# 명세의 표 그대로다. DB 에 저장하지 않고 이전 행과 비교해서 낸다 —
+# 컬럼으로 두면 행의 용량과 방향이 어긋날 수 있다.
+
+
+@pytest.mark.parametrize(
+    ("dose", "previous", "expected"),
+    [
+        ("0.5", "0.25", DoseDirection.INCREASE),
+        ("1.7", "1.0", DoseDirection.INCREASE),
+        ("0.5", "1.0", DoseDirection.DECREASE),
+        ("1.7", "2.4", DoseDirection.DECREASE),
+        ("0.25", None, DoseDirection.MAINTAIN),  # 첫 등록 — 비교할 이전 용량이 없다
+        ("1.0", "1.0", DoseDirection.MAINTAIN),  # 용량은 같고 약물만 바뀐 경우
+    ],
+)
+def test_direction_compares_with_the_previous_dose(
+    dose: str, previous: str | None, expected: DoseDirection
+) -> None:
+    assert (
+        dose_direction(
+            Decimal(dose),
+            previous_dose_mg=Decimal(previous) if previous is not None else None,
+        )
+        is expected
+    )
