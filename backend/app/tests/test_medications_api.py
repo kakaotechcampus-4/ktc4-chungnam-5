@@ -189,10 +189,6 @@ def test_dose_change_reports_the_event(client: TestClient, user_id: uuid.UUID) -
     assert data["doseEvent"]["effectiveFrom"] == date.today().isoformat()
 
 
-@pytest.mark.skip(
-    reason="감량은 stage=REDUCED 를 만드는데 medication_stage native ENUM 에 그 값이 없어 "
-    "INSERT 가 DataError 로 죽는다. 방향 계산 자체는 test_medication_stage.py 에서 검증한다."
-)
 def test_dose_decrease_is_reported_as_such(client: TestClient, user_id: uuid.UUID) -> None:
     """감량은 DECREASE 다. 방향을 저장하지 않고 이전 행과 비교해서 낸다."""
     started_at = (date.today() - timedelta(days=14)).isoformat()

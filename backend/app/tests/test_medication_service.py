@@ -162,10 +162,6 @@ def test_stage_moves_with_dose(db: Session, user_id: uuid.UUID) -> None:
         assert medication_crud.get_current(db, user_id).stage is expected
 
 
-@pytest.mark.skip(
-    reason="medication_stage native ENUM 에 REDUCED 가 없어 INSERT 가 DataError 로 죽는다. "
-    "ALTER TYPE 마이그레이션은 단계 개수(명세 3개 / DB 4개 / 구현 5개) 협의 후 별도로 올린다."
-)
 def test_dose_reduction_is_marked_reduced(db: Session, user_id: uuid.UUID) -> None:
     """2.4 → 1.7 로 내리면 감량기다. 사다리 위치만 보면 TITRATION 으로 잡혔을 자리다."""
     service.upsert(db, user_id, _req("2.4", date(2026, 9, 1)), today=TODAY)
