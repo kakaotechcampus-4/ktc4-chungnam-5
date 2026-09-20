@@ -32,11 +32,14 @@ AI 쪽은 끼니와 하루를 같은 `/short-feedback` 으로 받는다 — AI �
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
+
+from sqlalchemy.orm import Session
 
 from app.infra.ai import AiClient
-from app.infra.queue import ReceivedTask
+from app.infra.queue import ClaimedTask
 
-_HANDLERS: dict[str, Callable[[ReceivedTask, AiClient], None]] = {}
+_HANDLERS: dict[str, Callable[[Session, ClaimedTask, AiClient], dict[str, Any] | None]] = {}
 
 # 계약은 정해졌지만 아직 구현이 없는 것들. 알 수 없는 타입과 구분해서 알려 준다.
 _NOT_IMPLEMENTED = {
@@ -47,14 +50,19 @@ _NOT_IMPLEMENTED = {
 }
 
 
-def handle(task: ReceivedTask, ai: AiClient) -> None:
-    task_type = task.body.get("type")
+def handle(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
+    """작업 하나를 처리한다.
 
-    handler = _HANDLERS.get(task_type)
+    `db` 는 이 작업을 잠그고 있는 세션이다. 핸들러가 도메인 쓰기에 그대로 써야
+    작업 완료와 도메인 변경이 한 트랜잭션이 된다. 커밋은 하지 않는다 — 큐가 한다.
+
+    반환값은 `task_queue.result` 에 남는다. 남길 게 없으면 None.
+    """
+    handler = _HANDLERS.get(task.type)
     if handler is not None:
-        return handler(task, ai)
+        return handler(db, task, ai)
 
-    if task_type in _NOT_IMPLEMENTED:
-        raise NotImplementedError(f"{_NOT_IMPLEMENTED[task_type]} 미구현")
+    if task.type in _NOT_IMPLEMENTED:
+        raise NotImplementedError(f"{_NOT_IMPLEMENTED[task.type]} 미구현")
 
-    raise ValueError(f"알 수 없는 작업 타입: {task_type!r}")
+    raise ValueError(f"알 수 없는 작업 타입: {task.type!r}")
