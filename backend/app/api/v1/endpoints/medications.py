@@ -35,12 +35,14 @@ def upsert_medication(
 ) -> ApiResponse[MedicationUpsertResponse]:
     # 지원하지 않는 약물은 여기 오지 않는다 — DrugName ENUM 이 422 로 막는다.
     #
-    # 미래 시작일도 422 다. 명세의 에러 코드 목록에 날짜 전용 코드가 없고,
+    # 시작일 오류도 422 다. 명세의 에러 코드 목록에 날짜 전용 코드가 없고,
     # 이건 값이 잘못된 경우라 VALIDATION_ERROR 로 흡수하는 게 맞다.
     # (핸들러가 422 → VALIDATION_ERROR 로 매핑한다)
+    #
+    # 미래 시작일과 "첫 용량 변경 이후로 미는 시작일" 둘 다 InvalidStartDateError 다.
     try:
         result = medication_service.upsert(db, user_id, payload)
-    except medication_service.FutureStartDateError as exc:
+    except medication_service.InvalidStartDateError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),

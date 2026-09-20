@@ -264,7 +264,11 @@ MAINTENANCE 문구는 명세 예시 그대로고 **나머지 넷은 초안이다
 # ── 3. 유스케이스 ───────────────────────────────────────────────
 
 
-class FutureStartDateError(ValueError):
+class InvalidStartDateError(ValueError):
+    """받아들일 수 없는 시작일. API 층은 이 조상 하나만 잡아 422 로 옮긴다."""
+
+
+class FutureStartDateError(InvalidStartDateError):
     """투약 시작일이 미래인 경우.
 
     회차 공식이 `(today - startedAt) / 7 + 1` 이라 미래 날짜면 0 이나 음수가 나온다.
@@ -275,6 +279,32 @@ class FutureStartDateError(ValueError):
         super().__init__(f"투약 시작일 {started_at} 이 오늘 {today} 보다 미래다")
         self.started_at = started_at
         self.today = today
+
+
+class StartDateAfterFirstChangeError(InvalidStartDateError):
+    """시작일을 첫 용량 변경일 뒤로 밀려는 경우.
+
+    시작일 정정은 **가장 오래된 행의 날짜를 옮기는 것**인데, 그 행이 이미 닫혀 있으면
+    자기 종료일을 넘어설 수 없다. 넘기면 `effective_from > effective_to` 가 되어
+    기간이 뒤집힌다 — 그 행은 어느 날짜에도 걸리지 않는 유령이 된다.
+
+        BEFORE  [(09-01, 09-14, 0.25), (09-15, None, 0.5)]
+        POST    {doseMg: 0.5, startedAt: 09-15}
+        AFTER   [(09-15, 09-14, 0.25), ...]   ← 뒤집힘
+
+    의미상으로도 모순이다. 09-15 에 용량을 바꿨다는 기록이 있는데 투약을 09-15 에
+    시작했다면, 그 변경은 시작 전에 일어난 일이 된다.
+
+    FE 의 회차 스테퍼는 이 상한을 모른다 — 회차를 낮추면 시작일이 뒤로 밀리므로,
+    용량 변경 이력이 있는 사용자는 첫 변경일까지만 내릴 수 있다.
+    """
+
+    def __init__(self, started_at: date, latest_allowed: date) -> None:
+        super().__init__(
+            f"투약 시작일 {started_at} 이 첫 용량 변경 이후다 — {latest_allowed} 까지만 가능하다"
+        )
+        self.started_at = started_at
+        self.latest_allowed = latest_allowed
 
 
 class UpsertResult(NamedTuple):
@@ -350,6 +380,10 @@ def upsert(
     # startedAt 정정 — 가장 오래된 행의 날짜가 곧 전체 시작일이다.
     first = crud.get_first(db, user_id)
     if first is not None and first.effective_from != started_at:
+        # 이미 닫힌 행이면 자기 종료일을 넘어설 수 없다. 여기서 막지 않으면
+        # effective_from > effective_to 인 행이 남는다.
+        if first.effective_to is not None and started_at > first.effective_to:
+            raise StartDateAfterFirstChangeError(started_at, first.effective_to)
         first.effective_from = started_at
 
     unchanged = current.drug_name == payload.drug_name and current.dose_mg == payload.dose_mg

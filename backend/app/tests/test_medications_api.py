@@ -211,3 +211,25 @@ def test_medication_id_points_at_the_current_row(
     second = _post(client, user_id, drugName="위고비", doseMg=0.5, startedAt=started_at)
 
     assert uuid.UUID(first["medicationId"]) != uuid.UUID(second["medicationId"])
+
+
+def test_start_date_after_first_change_is_422(client: TestClient, user_id: uuid.UUID) -> None:
+    """시작일을 첫 용량 변경일 뒤로 밀면 422 다.
+
+    막지 않으면 첫 행의 기간이 뒤집힌다 (effective_from > effective_to).
+    미래 시작일과 같은 이유로 VALIDATION_ERROR 에 흡수한다 —
+    명세의 에러 코드 목록에 날짜 전용 코드가 없다.
+    """
+    old = (date.today() - timedelta(days=30)).isoformat()
+    changed_today = date.today().isoformat()
+    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt=old)
+    _post(client, user_id, drugName="위고비", doseMg=0.5, startedAt=old)
+
+    res = client.post(
+        "/api/v1/medications",
+        json={"drugName": "위고비", "doseMg": 0.5, "startedAt": changed_today},
+        headers=_h(user_id),
+    )
+
+    assert res.status_code == 422
+    assert res.json()["error"]["code"] == "VALIDATION_ERROR"

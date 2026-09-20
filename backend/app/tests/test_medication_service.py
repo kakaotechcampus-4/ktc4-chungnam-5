@@ -209,3 +209,60 @@ def test_snapshot_for_pre_dose_user_is_empty(db: Session, user_id: uuid.UUID) ->
     assert snapshot.drug_name is None
     assert snapshot.dose_mg is None
     assert snapshot.source_record_id is None
+
+
+# ── 시작일 정정의 상한 ─────────────────────────────────────────
+
+
+def _open_two_records(db: Session, user_id: uuid.UUID) -> None:
+    """[(09-01, 09-14, 0.25), (09-15, None, 0.5)] 을 만든다."""
+    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=date(2026, 9, 10))
+    service.upsert(db, user_id, _req("0.5", date(2026, 9, 1)), today=date(2026, 9, 15))
+
+
+def test_started_at_cannot_pass_the_first_dose_change(db: Session, user_id: uuid.UUID) -> None:
+    """시작일을 첫 용량 변경일 뒤로 밀 수 없다.
+
+    막지 않으면 첫 행이 `effective_from > effective_to` 가 되어 기간이 뒤집힌다 —
+    어느 날짜에도 걸리지 않는 유령 행이 남는다.
+    """
+    _open_two_records(db, user_id)
+
+    with pytest.raises(service.StartDateAfterFirstChangeError):
+        service.upsert(db, user_id, _req("0.5", date(2026, 9, 15)), today=TODAY)
+
+
+def test_rejected_start_date_leaves_history_intact(db: Session, user_id: uuid.UUID) -> None:
+    """거부된 요청이 이력을 건드리고 가면 안 된다."""
+    _open_two_records(db, user_id)
+    before = [(r.effective_from, r.effective_to, r.dose_mg) for r in medication_crud.list_history(db, user_id)]
+
+    with pytest.raises(service.StartDateAfterFirstChangeError):
+        service.upsert(db, user_id, _req("0.5", date(2026, 9, 15)), today=TODAY)
+    db.rollback()
+
+    after = [(r.effective_from, r.effective_to, r.dose_mg) for r in medication_crud.list_history(db, user_id)]
+    assert after == before
+
+
+def test_every_period_stays_ordered(db: Session, user_id: uuid.UUID) -> None:
+    """모든 행이 effective_from <= effective_to 를 지킨다."""
+    _open_two_records(db, user_id)
+    # 첫 변경일 전날까지는 옮길 수 있다.
+    service.upsert(db, user_id, _req("0.5", date(2026, 9, 14)), today=TODAY)
+
+    rows = medication_crud.list_history(db, user_id)
+    assert [(r.effective_from, r.effective_to) for r in rows if r.effective_to is not None] == [
+        (date(2026, 9, 14), date(2026, 9, 14))
+    ]
+    for row in rows:
+        assert row.effective_to is None or row.effective_from <= row.effective_to
+
+
+def test_started_at_can_still_move_backward(db: Session, user_id: uuid.UUID) -> None:
+    """뒤로 미는 것만 막는다 — 앞으로 당기는 건 회차 스테퍼의 정상 동작이다."""
+    _open_two_records(db, user_id)
+
+    service.upsert(db, user_id, _req("0.5", date(2026, 8, 1)), today=TODAY)
+
+    assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 8, 1)
