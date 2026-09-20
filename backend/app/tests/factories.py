@@ -6,7 +6,7 @@
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -17,7 +17,7 @@ from app.models.meal import Meal
 from app.models.medication import MedicationSnapshot
 from app.models.user import User
 
-EATEN_AT = datetime(2026, 8, 22, 12, 30, tzinfo=timezone.utc)
+EATEN_AT = datetime(2026, 8, 22, 12, 30, tzinfo=UTC)
 
 
 def make_user(db: Session, nickname: str = "종호") -> User:

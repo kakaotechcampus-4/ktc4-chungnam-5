@@ -7,7 +7,7 @@
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -89,7 +89,7 @@ def test_list_meals_keeps_other_meals_after_one_is_deleted(db):
     user = make_user(db)
     kept = make_meal(db, user_id=user.id, eaten_at=EATEN_AT)
     removed = make_meal(
-        db, user_id=user.id, eaten_at=datetime(2026, 8, 22, 19, 0, tzinfo=timezone.utc)
+        db, user_id=user.id, eaten_at=datetime(2026, 8, 22, 19, 0, tzinfo=UTC)
     )
 
     meal_crud.soft_delete_meal(db, user_id=user.id, meal_id=removed.id)
