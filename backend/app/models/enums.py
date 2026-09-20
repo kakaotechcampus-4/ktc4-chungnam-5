@@ -16,12 +16,42 @@ class GoalStatus(str, enum.Enum):
 
 
 class MedicationStage(str, enum.Enum):
-    """포즈 단계. 여기까지가 분류의 전부이고, 용량 판단은 하지 않는다 (규칙 1)."""
+    """포즈 단계. 여기까지가 분류의 전부이고, 용량 판단은 하지 않는다 (규칙 1).
+
+    판정 규칙은 `docs/be-medication-stage-rule.md`. TITRATION 은 "증량기"가 아니라
+    **조정기**다 — 중간 용량인데 아직 정착 전이라는 뜻이고, 방향을 함의하지 않는다.
+    """
 
     PRE_DOSE = "PRE_DOSE"
     INITIAL = "INITIAL"
     TITRATION = "TITRATION"
     MAINTENANCE = "MAINTENANCE"
+    REDUCED = "REDUCED"
+    """직전보다 낮은 용량으로 내렸고 아직 정착 전.
+
+    TODO(모델): DB native ENUM `medication_stage` 에는 아직 이 값이 없다.
+    `ALTER TYPE medication_stage ADD VALUE 'REDUCED'` 마이그레이션이 필요하고,
+    그 전까지 이 값으로 INSERT 하면 DataError 로 죽는다.
+    단계 개수(4개 vs 5개)는 FE 협의 안건이라 회의 후 마지막에 진행한다.
+    """
+
+
+class DrugName(str, enum.Enum):
+    """지원 약물.
+
+    **DB native ENUM 이 아니다** — `medication_records.drug_name` 은 VARCHAR 이고
+    여기 값이 문자열로 저장된다. API 경계에서 값 집합을 막으려고 두는 것이라,
+    약물을 추가하려면 여기와 `services/medication.py` 의 DOSE_LADDERS 두 곳을 고친다.
+
+    **값이 한글인 이유:** FE 가 `"위고비"` 로 보내고 받는다 (투약 화면의 약 선택 탭).
+    API 명세에 DrugName 열거형이 없어 FE 표기를 따랐다. 멤버 이름은 영문이라
+    내부 코드(`DOSE_LADDERS` 등)는 값이 바뀌어도 그대로다.
+    """
+
+    WEGOVY = "위고비"
+    MOUNJARO = "마운자로"
+
+
 
 
 class HandoffTriggerType(str, enum.Enum):
