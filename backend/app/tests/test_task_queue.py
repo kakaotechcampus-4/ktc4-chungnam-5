@@ -49,3 +49,35 @@ def test_new_task_defaults_to_pending_and_runnable_now(sessions):
         assert task.last_error is None
         assert task.finished_at is None
         assert task.next_run_at <= datetime.now(timezone.utc) + timedelta(seconds=1)
+
+
+# ─────────────────────────── 넣기 ───────────────────────────
+
+
+def test_enqueue_is_atomic_with_the_domain_transaction(sessions):
+    """도메인 커밋이 롤백되면 작업도 같이 사라진다.
+
+    SQS 를 쓸 때는 이게 불가능해서 "커밋이 먼저다" 라는 규칙을 사람이 지켜야 했다.
+    """
+    from app.infra.queue import enqueue
+
+    with sessions() as db:
+        enqueue(db, "meal.analyze", {"mealId": "m1"})
+        db.rollback()
+
+    with sessions() as db:
+        assert db.execute(select(Task)).scalars().all() == []
+
+
+def test_enqueue_writes_the_row_on_commit(sessions):
+    from app.infra.queue import enqueue
+
+    with sessions() as db:
+        enqueue(db, "meal.analyze", {"mealId": "m1"})
+        db.commit()
+
+    with sessions() as db:
+        task = db.execute(select(Task)).scalar_one()
+        assert task.type == "meal.analyze"
+        assert task.payload == {"mealId": "m1"}
+        assert task.status is TaskStatus.PENDING

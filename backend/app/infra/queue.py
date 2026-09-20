@@ -19,6 +19,9 @@ from typing import Any, Protocol
 
 import boto3
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.orm import Session
+
+from app.models.task import Task
 
 
 @dataclass(frozen=True)
@@ -142,3 +145,16 @@ def build_task_queue(settings: QueueSettings | None = None, *, dlq: bool = False
         access_key_id=settings.AWS_ACCESS_KEY_ID,
         secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
     )
+
+
+def enqueue(db: Session, task_type: str, payload: dict[str, Any]) -> None:
+    """작업을 넣는다. **커밋하지 않는다.**
+
+    호출부(service)가 쓰던 세션을 그대로 받아 INSERT 만 한다. 그래서 도메인 변경과
+    작업 등록이 한 트랜잭션이다 — `meals` INSERT 는 됐는데 작업은 안 들어가는(또는
+    그 반대인) 상태가 애초에 만들어지지 않는다.
+
+    세션을 인자로 받는 게 핵심이다. 여기서 자기 세션을 열어 커밋해 버리면 SQS 때와
+    똑같이 "커밋 순서를 사람이 지켜야 하는" 문제로 돌아간다.
+    """
+    db.add(Task(type=task_type, payload=payload))
