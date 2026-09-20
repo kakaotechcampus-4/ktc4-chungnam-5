@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user_id
 from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
-from app.schemas.meal import MealDeleteResponse, MealListResponse
+from app.schemas.meal import MealCalendarResponse, MealDeleteResponse, MealListResponse
 from app.services import meal as meal_service
 
 router = APIRouter()
@@ -29,6 +29,22 @@ def list_meals(
         return ok(
             meal_service.list_meals(db, user_id=user_id, cursor=cursor, limit=limit)
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/meals/calendar",
+    response_model=ApiResponse[MealCalendarResponse],
+    responses=error_responses(400, 401, 422),
+)
+def get_meals_calendar(
+    month: str = Query(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[MealCalendarResponse]:
+    try:
+        return ok(meal_service.get_calendar(db, user_id=user_id, month=month))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
