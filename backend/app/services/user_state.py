@@ -79,6 +79,9 @@ def create_user_state(
         gi_symptoms=[symptom.model_dump(mode="json") for symptom in request.gi_symptoms],
         note=request.note,
     )
+    # flush 만 된 객체는 요청값(예: 78.456)을 그대로 들고 있다. Numeric(5,2) 로 반올림된
+    # DB 저장값을 다시 읽어야 응답·변화량이 GET /user-states/latest 와 어긋나지 않는다.
+    db.refresh(state)
     response = build_user_state_response(db, state)
     db.commit()
     return response
