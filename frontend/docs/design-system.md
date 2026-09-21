@@ -226,7 +226,7 @@ Figma 원본 폰트는 Inter지만 한글 UI이므로 구현은 **Pretendard** �
 |---|---|---|---|---|
 | 1 | 투약 정보 입력 | `60:11` | `lib/screens/medication_info_screen.dart` | ✅ 레이아웃 |
 | 2 | 홈 (위 게이지 · 오늘의 식사) | `60:189` | `lib/screens/home_screen.dart` | ✅ 레이아웃 |
-| 2-a | 컨디션 기록 팝업 | `74:8` | — | ⬜ |
+| 2-a | 컨디션 기록 팝업 | `74:8` | `lib/popups/daily_condition_popup.dart` | ✅ 레이아웃 |
 | 3 | 식사 입력 | `86:6` | — | ⬜ |
 | 4 | AI 분석 진행 | `89:6` | — | ⬜ |
 | 5 | 음식 확인·수정 | `92:6` | — | ⬜ |
