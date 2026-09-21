@@ -40,7 +40,7 @@ def user_id(db: Session) -> uuid.UUID:
 
 
 def _req(
-    dose: str, started_at: date, drug: DrugName = DrugName.WEGOVY
+    dose: str, started_at: date | None = None, drug: DrugName = DrugName.WEGOVY
 ) -> MedicationUpsertRequest:
     return MedicationUpsertRequest(
         drug_name=drug, dose_mg=Decimal(dose), started_at=started_at
@@ -124,6 +124,42 @@ def test_started_at_moves_the_first_row(db: Session, user_id: uuid.UUID) -> None
 
     assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 8, 30)
     assert _rows(db, user_id) == 1  # 시작일만 옮겼지 변경 이력이 아니다
+
+
+def test_omitted_started_at_keeps_the_existing_start_date(
+    db: Session, user_id: uuid.UUID
+) -> None:
+    """`startedAt` 생략은 '오늘'이 아니라 '건드리지 마라'다.
+
+    오늘로 채우면 용량만 바꾸는 요청이 가장 오래된 행을 오늘로 밀어 회차가 1 로
+    리셋된다 — 클라이언트는 200 을 받고 이력이 멀쩡하다고 믿는다.
+    """
+    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
+
+    service.upsert(db, user_id, _req("1.0"), today=TODAY)
+
+    assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 9, 1)
+    assert service.get_current_view(db, user_id, today=TODAY).dose_count == 3
+
+
+def test_omitted_started_at_on_first_registration_uses_today(
+    db: Session, user_id: uuid.UUID
+) -> None:
+    """기록이 없으면 옮길 시작일도 없다 — 오늘로 연다."""
+    service.upsert(db, user_id, _req("0.25"), today=TODAY)
+
+    assert medication_crud.get_dosing_start_date(db, user_id) == TODAY
+
+
+def test_omitted_started_at_never_trips_the_boundary_check(
+    db: Session, user_id: uuid.UUID
+) -> None:
+    """첫 변경 이후 용량만 다시 바꿔도 거부되면 안 된다."""
+    _open_two_records(db, user_id)
+
+    service.upsert(db, user_id, _req("1.0"), today=TODAY)
+
+    assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 9, 1)
 
 
 def test_dose_count_is_computed_from_started_at(db: Session, user_id: uuid.UUID) -> None:

@@ -30,7 +30,7 @@ class MedicationUpsertRequest(CamelModel):
     아키텍처의 Stage Rule Engine 이 사라진다.
 
     extra="forbid": 오타난 필드(예: `startedAtt`)를 조용히 무시하지 않는다. 무시하면
-    `startedAt` 이 빠진 것으로 처리돼 **오늘로 등록되고 회차가 1 로 리셋된다** —
+    `startedAt` 이 빠진 것으로 처리돼 **첫 등록이 오늘 날짜로 들어가고 회차가 1 이 된다** —
     클라이언트는 200 을 받고 저장됐다고 믿는다. `schemas/user.py` 의 요청 스키마들과
     같은 이유다.
     """
@@ -41,7 +41,10 @@ class MedicationUpsertRequest(CamelModel):
     dose_mg: Decimal = Field(gt=0, le=Decimal("999.999"))
     started_at: date | None = Field(
         default=None,
-        description="**전체 투약 시작일.** 회차를 여기서 역산한다. 생략하면 오늘.",
+        description=(
+            "**전체 투약 시작일.** 회차를 여기서 역산한다. "
+            "생략하면 기존 시작일을 그대로 둔다 — 첫 등록일 때만 오늘."
+        ),
     )
 
 

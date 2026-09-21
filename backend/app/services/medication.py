@@ -343,17 +343,23 @@ def upsert(
 
     네 갈래다:
 
-    1. 기록이 없다              → 첫 행을 연다 (`effective_from` = startedAt)
+    1. 기록이 없다              → 첫 행을 연다 (`effective_from` = startedAt, 생략하면 오늘)
     2. 약·용량이 그대로다        → 행을 안 만든다. `startedAt` 만 반영한다
     3. 약이나 용량이 바뀌었다     → 현재 행을 어제로 닫고 새 행을 연다
     4. `startedAt` 이 바뀌었다   → 가장 오래된 행의 날짜를 옮긴다
 
     4번은 FE 의 회차 스테퍼다. 회차를 올리면 시작일이 과거로 밀리고, 그 값이 그대로
     온다. 회차를 직접 받는 자리가 명세에 없어서 이렇게 들어온다.
+
+    `startedAt` 을 생략하면 4번을 건너뛴다. 이미 기록이 있는데 생략을 오늘로 채우면
+    용량만 바꾸는 요청이 시작일을 오늘로 끌어와 회차가 1 로 리셋된다.
     """
     today = today or date.today()
-    started_at = payload.started_at or today
-    if started_at > today:
+    # `startedAt` 생략은 '오늘'이 아니라 '건드리지 마라'다. 오늘로 치환하면 용량만
+    # 고치는 요청이 가장 오래된 행을 오늘로 밀어 전체 회차가 1 로 리셋된다.
+    # 기록이 없을 때만 오늘을 첫 행의 시작일로 쓴다.
+    started_at = payload.started_at
+    if started_at is not None and started_at > today:
         raise FutureStartDateError(started_at, today)
 
     current = crud.get_current(db, user_id)
@@ -371,7 +377,7 @@ def upsert(
                 previous_different_dose_mg=None,
                 same_dose_streak=1,
             ),
-            effective_from=started_at,
+            effective_from=started_at or today,
         )
         db.commit()
         # 첫 등록은 PRE_DOSE 에서 넘어온 것이라 단계도 용량도 바뀐 것으로 본다.
@@ -379,7 +385,7 @@ def upsert(
 
     # startedAt 정정 — 가장 오래된 행의 날짜가 곧 전체 시작일이다.
     first = crud.get_first(db, user_id)
-    if first is not None and first.effective_from != started_at:
+    if started_at is not None and first is not None and first.effective_from != started_at:
         # 이미 닫힌 행이면 자기 종료일을 넘어설 수 없다. 여기서 막지 않으면
         # effective_from > effective_to 인 행이 남는다.
         if first.effective_to is not None and started_at > first.effective_to:
