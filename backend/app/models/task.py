@@ -57,6 +57,8 @@ class Task(Base):
 
     __table_args__ = (
         # 집는 쿼리 전용 부분 인덱스. DONE 행이 쌓여도 이 인덱스는 커지지 않는다.
+        # 컬럼 순서는 claim 쿼리의 `ORDER BY next_run_at, created_at` 과 반드시 같아야
+        # 한다 — 어긋나면 인덱스가 정렬을 못 태워 LIMIT 1 이전에 PENDING 을 전부 읽는다.
         Index(
             "ix_task_queue_pending",
             "next_run_at",

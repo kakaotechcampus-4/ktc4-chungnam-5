@@ -52,4 +52,9 @@ services:
     # API 와 같은 이미지, 다른 진입점
     command: ["python", "-m", "app.worker_main"]
     environment: *be-env
+    # SIGTERM 을 받으면 워커는 진행 중인 작업을 끝까지 처리하고 내려간다. compose 기본
+    # 유예는 10초뿐이라 AI 타임아웃(AI_TIMEOUT_SEC=45)보다 짧고, 그러면 배포할 때마다
+    # SIGKILL 이 떨어져 진행 중이던 작업이 강제 롤백된다. 강제 종료는 파이썬 예외 경로가
+    # 아니라 attempts 도 오르지 않으므로 같은 작업이 곧바로 다시 집힌다.
+    stop_grace_period: 60s
     restart: unless-stopped

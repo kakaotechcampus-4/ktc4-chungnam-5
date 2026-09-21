@@ -19,11 +19,10 @@ import uuid
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Any, Protocol
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import func, select, text, update
+from sqlalchemy import case, cast, func, select, text, update
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
@@ -133,7 +132,12 @@ class DbTaskQueue:
             row = db.execute(
                 select(Task)
                 .where(Task.status == TaskStatus.PENDING, Task.next_run_at <= func.now())
-                .order_by(Task.created_at)
+                # 정렬 키는 `ix_task_queue_pending` 의 컬럼 순서(next_run_at, created_at)와
+                # 같아야 한다. `ORDER BY created_at` 만 쓰면 선두 컬럼이 어긋나 인덱스가
+                # 정렬을 못 태우고, LIMIT 1 이전에 조건에 맞는 PENDING 을 전부 읽어
+                # Sort 를 돌린다 — 백로그가 쌓인 순간(워커 복구, 대량 재시도) 폴링마다
+                # 전체 정렬이 된다. next_run_at 우선은 재시도 backoff 순서와도 맞다.
+                .order_by(Task.next_run_at, Task.created_at)
                 .limit(1)
                 .with_for_update(skip_locked=True)
             ).scalar_one_or_none()
@@ -189,14 +193,28 @@ class DbTaskQueue:
         여기서 또 터져도 원래 예외를 덮어쓰지 않는다 — 기록이 안 되면 attempts 가
         안 오를 뿐, 작업은 PENDING 으로 남아 다음에 다시 집힌다.
         """
-        attempts = task.attempts + 1
-        status = (
-            TaskStatus.FAILED
-            if attempts >= self._settings.QUEUE_MAX_ATTEMPTS
-            else TaskStatus.PENDING
+        # attempts 는 **DB 안에서** 증분한다. 파이썬에서 `task.attempts + 1` 로 계산한
+        # 절대값을 쓰면 실패 횟수가 유실된다: A 가 롤백해 잠금을 풀고(행은 PENDING) →
+        # B 가 같은 행(attempts=0)을 집어 실패해 attempts=1 을 기록 → A 의 이 UPDATE 가
+        # 뒤늦게 또 attempts=1 을 쓴다. 실패 2회가 1회로 집계돼 QUEUE_MAX_ATTEMPTS 가
+        # 상한 보장이 아니게 된다. 아래 SET 안의 `Task.attempts` 는 전부 UPDATE 이전의
+        # 값(OLD)이라, 증분과 backoff·상태 판정이 같은 값 위에서 일관되게 계산된다.
+        attempts = Task.attempts + 1
+        # status 컬럼은 native ENUM 이다. CASE 의 가지가 둘 다 타입 없는 리터럴이면
+        # Postgres 가 CASE 전체를 text 로 해석해 "column is of type task_status but
+        # expression is of type text" 로 대입이 깨진다. 결과 타입을 못 박는다.
+        status_type = Task.__table__.c.status.type
+        status = cast(
+            case(
+                (attempts >= self._settings.QUEUE_MAX_ATTEMPTS, TaskStatus.FAILED.value),
+                else_=TaskStatus.PENDING.value,
+            ),
+            status_type,
         )
-        # 30s → 60s. 실패할 때마다 두 배로 민다.
-        backoff = self._settings.QUEUE_BACKOFF_BASE_SEC * 2 ** task.attempts
+        # 30s → 60s. 실패할 때마다 두 배로 민다. make_interval 의 인자는
+        # (years, months, weeks, days, hours, mins, secs) 순이라 초만 채운다.
+        backoff_secs = self._settings.QUEUE_BACKOFF_BASE_SEC * func.pow(2, Task.attempts)
+        backoff = func.make_interval(0, 0, 0, 0, 0, 0, backoff_secs)
 
         # 예외 메시지에 사용자 입력이 섞여 들어올 수 있다(규칙 6). 특히 SQLAlchemy
         # IntegrityError 의 str() 은 "[SQL: INSERT ...]\n[parameters: (...)]" 형태로
@@ -219,7 +237,7 @@ class DbTaskQueue:
                         attempts=attempts,
                         status=status,
                         last_error=reason,
-                        next_run_at=func.now() + timedelta(seconds=backoff),
+                        next_run_at=func.now() + backoff,
                         updated_at=func.now(),
                     )
                 )
