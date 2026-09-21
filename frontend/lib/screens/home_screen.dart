@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../popups/satiety_checkin_popup.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -76,11 +77,15 @@ class HomeStomach {
   const HomeStomach({
     required this.satietyPct,
     required this.minutesSinceMeal,
+    this.sourceMealId,
     this.feedbackSummary,
   });
 
   final int satietyPct;
   final int minutesSinceMeal;
+
+  /// 게이지가 기준으로 삼은 끼니. 사후 포만감 체크인 팝업에 넘긴다.
+  final String? sourceMealId;
 
   /// 나중에 도착하는 문구. 비어 있어도 게이지·목록은 정상이어야 한다
   /// (`design-system.md` §7 규칙 3).
@@ -89,6 +94,7 @@ class HomeStomach {
   factory HomeStomach.fromJson(Map<String, dynamic> json) => HomeStomach(
     satietyPct: json['satietyPct'] as int,
     minutesSinceMeal: json['minutesSinceMeal'] as int,
+    sourceMealId: json['sourceMealId'] as String?,
     feedbackSummary: json['feedbackSummary'] as String?,
   );
 }
@@ -319,6 +325,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// 위 게이지 탭 → 사후 포만감 체크인 팝업. 저장했으면 게이지가 바뀌니
+  /// 홈을 다시 불러온다.
+  Future<void> _openSatietyCheckin(String mealId) async {
+    final saved = await showSatietyCheckinPopup(context, mealId: mealId);
+    if (!mounted || !saved) return;
+    _load();
+  }
+
   /// `＋ 저녁 식사 기록하기` 카드 탭 → 식사 입력 화면(3번). 돌아오면 끼니가
   /// 새로 기록됐을 수 있으니 홈을 다시 불러온다.
   Future<void> _openMealInput() async {
@@ -416,31 +430,44 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       const SizedBox(height: AppSpacing.xl),
 
-      Center(
-        child: StomachGauge(satiety: hasMeals ? home.stomach.satietyPct : 0),
-      ),
-      const SizedBox(height: AppSpacing.lg),
-
-      if (!hasMeals)
-        const EmptyBlock(message: '아직 기록된 식사가 없어요')
-      else
-        Center(
-          child: Column(
-            children: [
-              Text(
-                _formatElapsed(home.stomach.minutesSinceMeal),
-                style: AppTypography.bodySecondary,
+      // 위 게이지 영역 탭 → 사후 포만감 체크인 팝업. 기준 끼니가 없으면 막는다.
+      InkWell(
+        onTap: hasMeals && home.stomach.sourceMealId != null
+            ? () => _openSatietyCheckin(home.stomach.sourceMealId!)
+            : null,
+        borderRadius: AppRadius.lgRadius,
+        child: Column(
+          children: [
+            Center(
+              child: StomachGauge(
+                satiety: hasMeals ? home.stomach.satietyPct : 0,
               ),
-              // 문구 생성이 실패하면 이 줄만 빠지고 나머지는 정상이다.
-              if (home.stomach.feedbackSummary != null)
-                Text(
-                  home.stomach.feedbackSummary!,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.bodySecondary,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            if (!hasMeals)
+              const EmptyBlock(message: '아직 기록된 식사가 없어요')
+            else
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      _formatElapsed(home.stomach.minutesSinceMeal),
+                      style: AppTypography.bodySecondary,
+                    ),
+                    // 문구 생성이 실패하면 이 줄만 빠지고 나머지는 정상이다.
+                    if (home.stomach.feedbackSummary != null)
+                      Text(
+                        home.stomach.feedbackSummary!,
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodySecondary,
+                      ),
+                  ],
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
+      ),
       const SizedBox(height: AppSpacing.xl),
 
       _SectionHeader(trailing: '${home.recordedCount}끼 기록됨'),

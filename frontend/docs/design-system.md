@@ -234,7 +234,7 @@ Figma 원본 폰트는 Inter지만 한글 UI이므로 구현은 **Pretendard** �
 | 7 | 단기 피드백 | `60:331` | — | ⬜ |
 | 8 | 장기 피드백 | `60:103` | `lib/screens/long_term_feedback_screen.dart` | 🚧 뼈대 |
 | 9 | 기록 (달력) | `94:6` | `lib/screens/meal_history_screen.dart` | ✅ 레이아웃 |
-| 10 | 사후 포만감 체크인 | `100:6` | — | ⬜ |
+| 10 | 사후 포만감 체크인 | `100:6` | `lib/popups/satiety_checkin_popup.dart` | ✅ 레이아웃 |
 | 11 | 영양정보 직접 입력 | `102:6` | — | ⬜ |
 
 탭바 4탭은 `lib/navigation/root_shell.dart` 가 묶는다. 현재 **마이** 탭에 대응하는 Figma 노드가 없다

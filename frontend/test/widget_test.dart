@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/main.dart';
+import 'package:frontend/screens/home_screen.dart' show StomachGauge;
 
 /// 기본 테스트 화면(800×600)은 팝업 아래쪽 버튼이 잘려 세로를 늘린다.
 /// 폭은 줄이지 않는다 — 테스트 글꼴(Ahem)은 실제 글꼴보다 넓어서 375 폭에서는
@@ -108,5 +109,36 @@ void main() {
     await tester.tap(find.text('심함'));
     await tester.pump();
     expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+  });
+
+  testWidgets('tapping the stomach gauge opens the satiety check-in', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(StomachGauge));
+    await tester.pumpAndSettle();
+    expect(find.text('지금 얼마나 부르세요?'), findsOneWidget);
+    expect(find.textContaining('3시간 경과'), findsOneWidget);
+
+    final save = find.widgetWithText(FilledButton, '기록 저장');
+    expect(tester.widget<FilledButton>(save).onPressed, isNull);
+
+    // 직접 입력은 0~100 으로 잘린다.
+    await tester.enterText(find.byType(TextField), '120');
+    await tester.pump();
+    expect(find.text('100'), findsOneWidget);
+
+    await tester.tap(find.text('1시간 전'));
+    await tester.pump();
+    expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(find.text('지금 얼마나 부르세요?'), findsNothing);
   });
 }
