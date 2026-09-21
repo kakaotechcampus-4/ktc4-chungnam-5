@@ -1,9 +1,15 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+
+const List<String> _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
+
+String _formatDateShort(DateTime d) =>
+    '${d.month}월 ${d.day}일 (${_weekdayNames[d.weekday - 1]})';
 
 class MealInputScreen extends StatefulWidget {
   const MealInputScreen({super.key});
@@ -18,32 +24,25 @@ class _MealInputScreenState extends State<MealInputScreen> {
   DateTime _eatenAt = DateTime.now();
   double _satiety = 20;
 
+  final TextEditingController _searchController = TextEditingController();
+
   void _pickPhoto() {}
 
   Future<void> _changeDateTime() async {
-    final pickedDate = await showDatePicker(
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: _eatenAt,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheetRadius),
+      builder: (context) => _DateTimeDialPicker(initial: _eatenAt),
     );
-    if (pickedDate == null || !mounted) return;
+    if (picked == null) return;
+    setState(() => _eatenAt = picked);
+  }
 
-    final pickedTime = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_eatenAt),
-    );
-    if (pickedTime == null) return;
-
-    setState(() {
-      _eatenAt = DateTime(
-        pickedDate.year,
-        pickedDate.month,
-        pickedDate.day,
-        pickedTime.hour,
-        pickedTime.minute,
-      );
-    });
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _startAnalysis() {}
@@ -92,43 +91,11 @@ class _MealInputScreenState extends State<MealInputScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // 사진 업로드 영역
-              CustomPaint(
-                painter: const _DashedBorderPainter(),
-                child: InkWell(
-                  onTap: _pickPhoto,
-                  borderRadius: AppRadius.lgRadius,
-                  child: Container(
-                    width: double.infinity,
-                    height: 220,
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: const BoxDecoration(
-                            color: AppColors.surface,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text('사진 올리기', style: AppTypography.sectionHead),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          '갤러리에서 선택하거나 텍스트로 입력',
-                          style: AppTypography.bodySecondary,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              // 사진으로 / 검색 — 탭에 따라 내용을 바꾼다.
+              if (_selectedTab == 0)
+                _buildPhotoUpload()
+              else
+                _buildSearchInput(),
               const SizedBox(height: AppSpacing.xl),
 
               // 끼니 선택
@@ -256,6 +223,234 @@ class _MealInputScreenState extends State<MealInputScreen> {
   String _formatDate(DateTime dt) {
     // YYYY. MM. DD hh:mm 형태(간단 구현)
     return '${dt.year.toString().padLeft(4, '0')}. ${dt.month.toString().padLeft(2, '0')}. ${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildPhotoUpload() {
+    return CustomPaint(
+      painter: const _DashedBorderPainter(),
+      child: InkWell(
+        onTap: _pickPhoto,
+        borderRadius: AppRadius.lgRadius,
+        child: Container(
+          width: double.infinity,
+          height: 220,
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add, color: AppColors.primary),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text('사진 올리기', style: AppTypography.sectionHead),
+              const SizedBox(height: AppSpacing.xs),
+              Text('갤러리에서 선택하거나 텍스트로 입력', style: AppTypography.bodySecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppRadius.mdRadius,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.search,
+                size: AppLayout.tabIconSize,
+                color: AppColors.inactive,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  style: AppTypography.body,
+                  decoration: InputDecoration(
+                    hintText: '음식 이름으로 검색해요',
+                    hintStyle: AppTypography.bodySecondary,
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.md,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Center(
+          child: Text('검색 결과가 여기에 표시돼요', style: AppTypography.bodySecondary),
+        ),
+      ],
+    );
+  }
+}
+
+/// "변경" 버튼이 여는 바텀시트. 달력/시계 대신 숫자 다이얼(휠)로 조정한다.
+class _DateTimeDialPicker extends StatefulWidget {
+  const _DateTimeDialPicker({required this.initial});
+
+  final DateTime initial;
+
+  @override
+  State<_DateTimeDialPicker> createState() => _DateTimeDialPickerState();
+}
+
+class _DateTimeDialPickerState extends State<_DateTimeDialPicker> {
+  static const double _itemExtent = 36;
+
+  late final List<DateTime> _dates;
+  late int _dateIndex;
+  late int _hour;
+  late int _minute;
+
+  @override
+  void initState() {
+    super.initState();
+    final today = DateTime.now();
+    final startDate = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).subtract(const Duration(days: 365));
+    _dates = List.generate(366, (i) => startDate.add(Duration(days: i)));
+
+    final initialDay = DateTime(
+      widget.initial.year,
+      widget.initial.month,
+      widget.initial.day,
+    );
+    final foundIndex = _dates.indexWhere((d) => d == initialDay);
+    _dateIndex = foundIndex >= 0 ? foundIndex : _dates.length - 1;
+    _hour = widget.initial.hour;
+    _minute = widget.initial.minute;
+  }
+
+  DateTime get _result {
+    final d = _dates[_dateIndex];
+    return DateTime(d.year, d.month, d.day, _hour, _minute);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenHorizontal,
+          AppSpacing.lg,
+          AppSpacing.screenHorizontal,
+          AppSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('식사 시각 변경', style: AppTypography.sectionHead),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              height: 180,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: CupertinoPicker(
+                      itemExtent: _itemExtent,
+                      scrollController: FixedExtentScrollController(
+                        initialItem: _dateIndex,
+                      ),
+                      onSelectedItemChanged: (i) =>
+                          setState(() => _dateIndex = i),
+                      children: _dates
+                          .map(
+                            (d) => Center(
+                              child: Text(
+                                _formatDateShort(d),
+                                style: AppTypography.body,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                  Expanded(
+                    child: CupertinoPicker(
+                      itemExtent: _itemExtent,
+                      scrollController: FixedExtentScrollController(
+                        initialItem: _hour,
+                      ),
+                      onSelectedItemChanged: (i) => setState(() => _hour = i),
+                      children: List.generate(
+                        24,
+                        (h) => Center(
+                          child: Text(
+                            h.toString().padLeft(2, '0'),
+                            style: AppTypography.body,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: CupertinoPicker(
+                      itemExtent: _itemExtent,
+                      scrollController: FixedExtentScrollController(
+                        initialItem: _minute,
+                      ),
+                      onSelectedItemChanged: (i) => setState(() => _minute = i),
+                      children: List.generate(
+                        60,
+                        (m) => Center(
+                          child: Text(
+                            m.toString().padLeft(2, '0'),
+                            style: AppTypography.body,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('취소'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(_result),
+                    child: const Text('완료'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
