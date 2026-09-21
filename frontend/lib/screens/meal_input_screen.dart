@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_analysis_screen.dart';
 
 const List<String> _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -45,7 +46,19 @@ class _MealInputScreenState extends State<MealInputScreen> {
     super.dispose();
   }
 
-  void _startAnalysis() {}
+  /// 분석 시작 → AI 분석 진행 화면(4번)으로 교체 이동.
+  ///
+  /// 교체(`pushReplacement`)라서 분석 이후 화면에서 뒤로 가면 입력 화면이 아니라
+  /// 이 화면을 연 탭으로 바로 돌아간다.
+  void _startAnalysis() {
+    // TODO: `POST /meals` 가 생기면 응답의 mealId 를 넘긴다. 지금은 더미.
+    const mealId = 'meal_dummy';
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => const MealAnalysisScreen(mealId: mealId),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

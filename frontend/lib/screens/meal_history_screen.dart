@@ -4,6 +4,8 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_evaluation_screen.dart';
+import 'meal_input_screen.dart';
 import 'shared_meal_widgets.dart';
 
 // ── 모델 ────────────────────────────────────────────────────
@@ -384,12 +386,27 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     _loadMeals();
   }
 
-  void _openMealInput() {
-    // TODO: 식사 입력 화면(3번)이 머지되면 연결한다.
+  /// 식사 기록 버튼 → 식사 입력 화면(3번). 돌아오면 끼니가 새로 기록됐을 수
+  /// 있으니 달력과 선택한 날의 목록을 다시 불러온다.
+  Future<void> _openMealInput() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const MealInputScreen()),
+    );
+    if (!mounted) return;
+    _loadCalendar();
+    _loadMeals();
   }
 
-  void _openEvaluation(HistoryMeal meal) {
-    // TODO: 식사 평가 화면(6번)이 머지되면 연결한다. meal.mealId 를 넘긴다.
+  /// 끼니 카드 탭 → 식사 평가 화면(6번). 돌아오면 목록을 다시 불러온다.
+  Future<void> _openEvaluation(HistoryMeal meal) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MealEvaluationScreen(mealId: meal.mealId),
+      ),
+    );
+    if (!mounted) return;
+    _loadCalendar();
+    _loadMeals();
   }
 
   static const List<String> _weekdayLabels = [
