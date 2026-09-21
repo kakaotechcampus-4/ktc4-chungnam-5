@@ -1,7 +1,7 @@
-"""medication_records · medication_snapshots 테이블 접근.
+"""medication_records 테이블 접근.
 
-지금은 onboardingStatus 판정과 식사에 박제된 단계 조회뿐이다. POST /medications
-작업에서 나머지가 붙는다.
+지금은 onboardingStatus 판정에 필요한 함수 하나뿐이다. POST /medications 작업에서
+나머지가 붙는다.
 """
 
 import uuid
@@ -9,8 +9,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.enums import MedicationStage
-from app.models.medication import MedicationRecord, MedicationSnapshot
+from app.models.medication import MedicationRecord
 
 
 def get_current(db: Session, user_id: uuid.UUID) -> MedicationRecord | None:
@@ -24,12 +23,3 @@ def get_current(db: Session, user_id: uuid.UUID) -> MedicationRecord | None:
     )
     return db.execute(stmt).scalar_one_or_none()
 
-
-def get_snapshot_stage(db: Session, snapshot_id: uuid.UUID) -> MedicationStage:
-    """식사에 박제된 투약 단계.
-
-    `meals.medication_snapshot_id` 는 NOT NULL + FK RESTRICT 라 행이 반드시 있다 —
-    없으면 데이터가 깨진 것이므로 조용히 넘기지 않고 죽는다.
-    """
-    stmt = select(MedicationSnapshot.stage).where(MedicationSnapshot.id == snapshot_id)
-    return db.execute(stmt).scalar_one()

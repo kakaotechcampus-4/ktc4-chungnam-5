@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import platform
 from collections.abc import Generator
@@ -43,7 +42,6 @@ from sqlalchemy.orm import Session  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
-from app.core.deps import get_task_queue  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -111,39 +109,10 @@ def db(test_engine: Engine) -> Generator[Session, None, None]:
         connection.close()
 
 
-class FakeQueue:
-    """보낸 메시지를 메모리에 쌓아 두는 큐. `infra.queue.TaskQueue` 와 같은 모양이다.
-
-    ElasticMQ 를 띄우지 않고도 "커밋 뒤에 정확히 한 번 적재했는가" 를 검증할 수 있다.
-    큐 자체의 동작(재시도·DLQ)은 `test_queue_integration.py` 가 진짜 큐로 확인한다.
-    """
-
-    def __init__(self) -> None:
-        self.sent: list[dict] = []
-
-    def send(self, body: dict) -> None:
-        # 진짜 SqsQueue 처럼 JSON 왕복을 거친다. 그냥 dict 를 담으면 나중에 누가
-        # Decimal·UUID·datetime 을 페이로드에 넣었을 때 테스트는 초록색인데
-        # 운영에서 TypeError 가 난다.
-        self.sent.append(json.loads(json.dumps(body, ensure_ascii=False)))
-
-    def receive(self, max_count: int = 1, wait_seconds: int = 5) -> list:
-        return []
-
-    def delete(self, receipt: str) -> None:
-        pass
-
-
 @pytest.fixture
-def fake_queue() -> FakeQueue:
-    return FakeQueue()
-
-
-@pytest.fixture
-def client(db: Session, fake_queue: FakeQueue) -> Generator[TestClient, None, None]:
-    """get_db 와 get_task_queue 를 테스트용으로 갈아끼운 앱."""
+def client(db: Session) -> Generator[TestClient, None, None]:
+    """get_db 가 위 db 세션을 돌려주도록 오버라이드한 앱."""
     app.dependency_overrides[get_db] = lambda: db
-    app.dependency_overrides[get_task_queue] = lambda: fake_queue
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

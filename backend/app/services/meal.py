@@ -10,13 +10,11 @@ import base64
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, NamedTuple
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
 from app.crud import meal as meal_crud
-from app.crud import medication as medication_crud
 from app.models.enums import MealStatus
 from app.models.meal import Meal
 from app.schemas.meal import (
@@ -42,17 +40,6 @@ class MealNotFoundError(Exception):
 class MealNotEditableError(Exception):
     """지금 상태로는 음식을 고칠 수 없는 식사를 가리킬 때."""
 
-
-class AddItemOutcome(NamedTuple):
-    """항목 추가의 결과. 응답과 "커밋 뒤에 보내야 할 작업" 을 함께 돌려준다.
-
-    큐 적재를 서비스 안에서 하지 않는 건, 커밋 실패 시 Worker 가 DB 에 없는 식사를
-    처리하게 되기 때문이다. 순서를 지킬 책임은 호출부(api 레이어)에 있고, 그러려면
-    무엇을 보낼지를 여기서 넘겨줘야 한다.
-    """
-
-    response: MealItemCreateResponse
-    analyze_task: dict[str, Any]
 
 # 그대로 g 으로 볼 수 있는 단위.
 # ml 은 물 기준 1ml ≈ 1g 로 근사한다. 국·음료가 대부분이라 오차를 감수할 만하다.
@@ -282,12 +269,23 @@ def add_item(
     amount_g: Decimal | None,
     food_ref_id: str | None,
     nutrition: NutritionInfo | None,
-) -> AddItemOutcome:
-    """사용자가 직접 입력한 음식을 식사에 더하고 재분석 대기로 되돌린다.
+) -> MealItemCreateResponse:
+    """사용자가 직접 입력한 음식을 식사에 더하고 재계산 대기로 표시한다.
 
     `amount_g` · `food_ref_id` · `nutrition` 은 이미 결정된 값으로 들어온다.
     공공 DB 매칭은 `services/nutrition.py` 의 일이고 그 결과를 여기로 옮기는 건
     호출부(api 레이어)다 — services 끼리는 서로 참조하지 않는다(README 절대 규칙 5).
+
+    ## 여기서 비동기 작업을 만들지 않는다
+
+    사용자가 음식명과 양을 직접 알려줬으므로 AI 에게 물을 것이 없다. 다시 계산할
+    Q/Q/S 는 순수 함수라 0.01 초면 끝나고(README 절대 규칙 2), 애초에 확인 화면은
+    **[확인] 을 누르기 전까지 점수를 보여 주지 않는다** — 편집 중에는 계산할
+    필요조차 없다.
+
+    `ANALYZING` 은 "워커가 도는 중" 이 아니라 **"점수가 아직 유효하지 않다"** 는
+    표시다. 해소는 사용자가 [확인] 을 누를 때 `POST /meals/{mealId}/confirm` 이
+    한다 — `add_meal_item` 독스트링의 의존성 항목 참고.
     """
     meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
     if meal is None:
@@ -297,8 +295,6 @@ def add_item(
         raise MealNotEditableError(
             f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
         )
-
-    stage = medication_crud.get_snapshot_stage(db, meal.medication_snapshot_id)
 
     item = meal_crud.add_item(
         db,
@@ -312,31 +308,17 @@ def add_item(
     )
     meal_crud.mark_recalculating(db, meal)
 
-    # 응답을 돌려주기 전에 커밋한다. 큐 적재는 이 커밋 뒤에 호출부가 한다 —
-    # 순서가 뒤집히면 Worker 가 DB 에 없는 항목을 분석하려다 DLQ 로 간다.
+    # 트랜잭션 경계는 services 가 정한다(README 절대 규칙 5).
     db.commit()
 
-    return AddItemOutcome(
-        response=MealItemCreateResponse(
-            item_id=item.id,
-            # 계약서(API.md 필드표)가 `matched` 를 "영양정보 유무"로 정의한다 —
-            # "공공 DB 에서 음식을 찾았는가" 가 아니다. 음식은 찾았지만 g 환산이
-            # 안 돼 성분을 못 만든 경우도 false 여야 FE 가 직접 입력으로 유도한다.
-            # DB 의 food_ref_id 링크는 그대로 남는다(둘은 별개다).
-            matched=nutrition is not None,
-            nutrition=nutrition,
-            status=meal.status,
-            is_recalculation=meal.is_recalculation,
-        ),
-        analyze_task={
-            "type": "meal.analyze",
-            "mealId": str(meal.id),
-            "mealType": meal.meal_type.value,
-            "eatenAt": meal.eaten_at.isoformat(),
-            "stage": stage.value,
-            # TODO: 6번(POST /meals)에서 FileStorage 가 붙으면 presigned URL 을 싣는다.
-            # AI 는 S3 권한이 없어 키만으로는 사진을 못 읽는다 (`_build_thumbnail_url` 과 같은 TODO).
-            "imageUrl": None,
-            "rawText": meal.raw_text,
-        },
+    return MealItemCreateResponse(
+        item_id=item.id,
+        # API 명세서(필드표)가 `matched` 를 "영양정보 유무" 로 정의한다 — "공공 DB
+        # 에서 음식을 찾았는가" 가 아니다. 음식은 찾았지만 g 환산이 안 돼 성분을
+        # 못 만든 경우도 false 여야 FE 가 직접 입력으로 유도한다. DB 의
+        # food_ref_id 링크는 그대로 남는다(둘은 별개다).
+        matched=nutrition is not None,
+        nutrition=nutrition,
+        status=meal.status,
+        is_recalculation=meal.is_recalculation,
     )

@@ -41,29 +41,10 @@ def test_add_item_returns_created_item_with_scaled_nutrition(client, db):
     assert data["nutrition"]["sodiumMg"] == 1200
 
 
-def test_add_item_enqueues_reanalysis(client, db, fake_queue):
-    """항목 추가는 재계산을 유발한다 — Worker 가 다시 분석하도록 작업을 넣는다."""
-    user = make_user(db)
-    meal = make_meal(db, user_id=user.id)
-
-    response = client.post(
-        f"/api/v1/meals/{meal.id}/items",
-        headers={"X-User-Id": str(user.id)},
-        json={"displayName": "미역국", "amount": 200, "unit": "g"},
-    )
-
-    assert response.status_code == 201, response.text
-    assert len(fake_queue.sent) == 1
-
-    task = fake_queue.sent[0]
-    assert task["type"] == "meal.analyze"
-    assert task["mealId"] == str(meal.id)
-    assert task["mealType"] == "LUNCH"
-    assert task["stage"] == "MAINTENANCE"
-    assert task["eatenAt"] == meal.eaten_at.isoformat()
 
 
-def test_failed_add_does_not_enqueue_anything(client, db, fake_queue):
+
+def test_failed_add_does_not_enqueue_anything(client, db):
     """커밋되지 않은 변경에 Worker 를 붙이면 DB 에 없는 식사를 처리하려다 DLQ 로 간다."""
     user = make_user(db)
 
@@ -74,11 +55,10 @@ def test_failed_add_does_not_enqueue_anything(client, db, fake_queue):
     )
 
     assert response.status_code == 404
-    assert fake_queue.sent == []
 
 
 @pytest.mark.parametrize("status", [MealStatus.ANALYZING, MealStatus.FAILED])
-def test_add_item_is_conflict_while_meal_is_not_editable(client, db, fake_queue, status):
+def test_add_item_is_conflict_while_meal_is_not_editable(client, db, status):
     """최초 분석 중에는 Worker 가 `meal_items` 를 갈아엎고 있고, 실패한 식사는 고칠 대상이 없다.
 
     여기 `ANALYZING` 은 `is_recalculation=False` — 최초 분석이다. 사용자 수정으로
@@ -95,10 +75,9 @@ def test_add_item_is_conflict_while_meal_is_not_editable(client, db, fake_queue,
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "CONFLICT"
-    assert fake_queue.sent == []
 
 
-def test_user_can_keep_editing_while_recalculation_is_pending(client, db, fake_queue):
+def test_user_can_keep_editing_while_recalculation_is_pending(client, db):
     """확인 화면에서는 음식을 여러 개 고친 뒤 "확인" 을 누른다 — 한 번만 되면 기능이 아니다.
 
     첫 추가가 식사를 `ANALYZING` 으로 바꾸므로, `ANALYZING` 을 통째로 막으면 두 번째
@@ -124,10 +103,6 @@ def test_user_can_keep_editing_while_recalculation_is_pending(client, db, fake_q
         data = response.json()["data"]
         assert data["status"] == MealStatus.ANALYZING.value
         assert data["isRecalculation"] is True
-
-    # 수정 한 번에 재분석 요청 하나. 마지막 작업이 최종 상태를 반영한다.
-    assert len(fake_queue.sent) == 3
-    assert {task["mealId"] for task in fake_queue.sent} == {str(meal.id)}
 
 
 def test_add_item_is_allowed_after_evaluation(client, db):
@@ -161,7 +136,7 @@ def test_add_item_is_allowed_after_evaluation(client, db):
         ({"displayName": "미역국", "amount": 1e30, "unit": "g"}, "quantize 가 터지는 값"),
     ],
 )
-def test_add_item_rejects_invalid_payload(client, db, fake_queue, payload, reason):
+def test_add_item_rejects_invalid_payload(client, db, payload, reason):
     user = make_user(db)
     meal = make_meal(db, user_id=user.id)
 
@@ -173,7 +148,6 @@ def test_add_item_rejects_invalid_payload(client, db, fake_queue, payload, reaso
 
     assert response.status_code == 422, reason
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
-    assert fake_queue.sent == []
 
 
 def test_add_item_without_public_db_match_returns_no_nutrition(client, db):
@@ -347,29 +321,3 @@ def test_broken_public_db_value_never_reaches_the_response_as_invalid_json(clien
     assert response.json()["data"]["nutrition"]["kcal"] is None
 
 
-def test_item_is_already_committed_when_enqueue_fails(client, db, fake_queue):
-    """"커밋이 먼저다" 를 순서까지 고정한다 (README "큐 사용법").
-
-    적재가 먼저였다면 커밋 실패 시 Worker 가 DB 에 없는 항목을 분석하려다 DLQ 로
-    간다. 반대 순서인 지금은 적재가 실패해도 데이터는 남는다 — 사용자는 ANALYZING
-    에 갇히지만 그건 별도로 기록된 알려진 한계다.
-    """
-    user = make_user(db)
-    meal = make_meal(db, user_id=user.id)
-
-    def explode(body: dict) -> None:
-        raise RuntimeError("SQS 불통")
-
-    fake_queue.send = explode
-
-    with pytest.raises(RuntimeError):
-        client.post(
-            f"/api/v1/meals/{meal.id}/items",
-            headers={"X-User-Id": str(user.id)},
-            json={"displayName": "미역국", "amount": 200, "unit": "g"},
-        )
-
-    item = db.execute(select(MealItem).where(MealItem.meal_id == meal.id)).scalar_one()
-    assert item.display_name == "미역국"
-    db.refresh(meal)
-    assert meal.status is MealStatus.ANALYZING
