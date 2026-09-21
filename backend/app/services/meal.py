@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, NamedTuple
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,9 @@ from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.models.enums import MealStatus
 from app.schemas.meal import (
+    CalendarDay,
+    CalendarSummary,
+    MealCalendarResponse,
     MealDeleteResponse,
     MealItemCreateRequest,
     MealItemCreateResponse,
@@ -26,6 +30,8 @@ from app.schemas.meal import (
     MealScores,
 )
 from app.schemas.nutrition import NutritionInfo
+
+_KST_ZONE = ZoneInfo("Asia/Seoul")
 
 
 class MealNotFoundError(Exception):
@@ -191,6 +197,60 @@ def delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> MealD
         # TODO: 7·8번(insights/long-term) 구현 후 실제 stale 판정 로직으로 교체.
         affected_insights=[],
     )
+
+
+def _parse_month_range(month: str) -> tuple[datetime, datetime]:
+    """"YYYY-MM" 을 KST 기준 그 달의 [시작, 다음 달 시작) 구간으로 바꾼다."""
+    try:
+        year_str, month_str = month.split("-")
+        year, mon = int(year_str), int(month_str)
+        if not (1 <= mon <= 12):
+            raise ValueError
+    except ValueError as exc:
+        raise ValueError(f"잘못된 month 형식입니다: {month!r} (YYYY-MM 이어야 함)") from exc
+
+    start = datetime(year, mon, 1, tzinfo=_KST_ZONE)
+    end = datetime(year + 1, 1, 1, tzinfo=_KST_ZONE) if mon == 12 else datetime(year, mon + 1, 1, tzinfo=_KST_ZONE)
+    return start, end
+
+
+def get_calendar(db: Session, *, user_id: uuid.UUID, month: str) -> MealCalendarResponse:
+    """월별 날짜별 집계 + 그 달 전체 요약을 조립한다."""
+    month_start, month_end = _parse_month_range(month)
+
+    day_rows = meal_crud.get_calendar_days(
+        db, user_id=user_id, month_start=month_start, month_end=month_end
+    )
+    stage_by_day = {
+        row.day.date(): row.stage
+        for row in meal_crud.get_calendar_day_stages(
+            db, user_id=user_id, month_start=month_start, month_end=month_end
+        )
+    }
+
+    days = [
+        CalendarDay(
+            date=row.day.date(),
+            count=row.count,
+            recorded_meal_types=row.meal_types,
+            stage=stage_by_day[row.day.date()],
+        )
+        for row in day_rows
+    ]
+
+    summary_row = meal_crud.get_calendar_summary(
+        db, user_id=user_id, month_start=month_start, month_end=month_end
+    )
+    summary = CalendarSummary(
+        total_meals=summary_row.total_meals,
+        avg_scores=MealScores(
+            quantity=round(summary_row.avg_quantity) if summary_row.avg_quantity is not None else None,
+            quality=round(summary_row.avg_quality) if summary_row.avg_quality is not None else None,
+            satiety=round(summary_row.avg_satiety) if summary_row.avg_satiety is not None else None,
+        ),
+    )
+
+    return MealCalendarResponse(month=month, days=days, summary=summary)
 
 
 def add_item(

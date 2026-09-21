@@ -1,7 +1,7 @@
 """식사(meal) 관련 API 요청/응답 스키마."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated
 
@@ -54,6 +54,30 @@ class MealDeleteResponse(CamelModel):
     meal_id: uuid.UUID
     deleted_at: datetime
     affected_insights: list[AffectedInsight]
+
+
+class CalendarDay(CamelModel):
+    """달력의 날짜 하나 (KST 기준 하루)."""
+
+    date: date
+    count: int
+    recorded_meal_types: list[MealType]
+    stage: MedicationStage
+
+
+class CalendarSummary(CamelModel):
+    """그 달 전체 요약."""
+
+    total_meals: int
+    avg_scores: MealScores
+
+
+class MealCalendarResponse(CamelModel):
+    """GET /meals/calendar 응답."""
+
+    month: str
+    days: list[CalendarDay]
+    summary: CalendarSummary
 
 
 # meal_items.confirmed_amount_g 는 Numeric(8, 2) 다 — 최대 999999.99.
