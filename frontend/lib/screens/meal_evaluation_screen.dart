@@ -302,40 +302,45 @@ class _SatietyCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    children: [
-                      Slider(
-                        value: value,
-                        min: 0,
-                        max: 100,
-                        onChanged: onChanged,
-                        activeColor: AppColors.primary,
-                        inactiveColor: AppColors.surfaceMuted,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('0%', style: AppTypography.caption),
-                          Text('100%', style: AppTypography.caption),
-                        ],
-                      ),
-                    ],
+                  child: Slider(
+                    value: value,
+                    min: 0,
+                    max: 100,
+                    onChanged: onChanged,
+                    activeColor: AppColors.primary,
+                    inactiveColor: AppColors.surfaceMuted,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Container(
-                  width: 64,
-                  height: 36,
+                  width: 76,
+                  height: 44,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: AppRadius.mdRadius,
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Text(
                     '${value.toInt()} %',
-                    style: AppTypography.cardTitle,
+                    style: AppTypography.sectionHead,
                   ),
                 ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('0%', style: AppTypography.caption),
+                      Text('100%', style: AppTypography.caption),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: 76),
               ],
             ),
           ],
