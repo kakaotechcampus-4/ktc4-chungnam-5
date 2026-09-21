@@ -11,8 +11,10 @@ import '../theme/app_typography.dart';
 ///
 /// **서버는 이 단계를 모른다.** `meals.status` 는 `ANALYZING` 하나뿐이고
 /// `meal.analyze` 워커도 `ANALYZING → REVIEW_REQUIRED` 로 한 번에 넘어간다
-/// (`backend/app/worker/jobs/analyze_meal.py`). 즉 아래 3단계는 실제 서버
-/// 진행률이 아니라, 폴링 경과 시간에 맞춰 프론트가 연출하는 것이다.
+/// (`backend/app/worker/jobs/analyze_meal.py`). 그래서 셋을 똑같이 다루지
+/// 않는다 — 계산량을 예측할 수 있는 1·3단계는 고정 연출 타이머를 쓰고,
+/// 소요 시간을 가늠할 수 없는(백엔드 DB 조회) 2단계만 실제 폴링 완료
+/// 신호를 기다린다.
 enum AnalysisStep { recognizeFood, matchNutritionDb, applyDoseStage }
 
 enum _StepState { done, inProgress, pending }
@@ -51,54 +53,54 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
   static const _pollInterval = Duration(milliseconds: 1500);
   static const _pollTimeout = Duration(seconds: 45);
 
+  // 1·3단계 연출 타이머. 계산량을 예측할 수 있는 구간이라 고정값을 쓴다.
+  static const _recognizeFoodDuration = Duration(seconds: 2);
+  static const _applyDoseStageDuration = Duration(milliseconds: 800);
+
   final MealAnalysisApiService _api = MealAnalysisApiService();
-  final Stopwatch _stopwatch = Stopwatch();
-  Timer? _pollTimer;
 
   AnalysisStep _step = AnalysisStep.recognizeFood;
 
   @override
   void initState() {
     super.initState();
-    _stopwatch.start();
-    _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
+    _runAnalysisFlow();
   }
 
-  @override
-  void dispose() {
-    _pollTimer?.cancel();
-    super.dispose();
-  }
+  Future<void> _runAnalysisFlow() async {
+    // 1단계 — 음식 인식. 고정 연출.
+    await Future.delayed(_recognizeFoodDuration);
+    if (!mounted) return;
 
-  Future<void> _poll() async {
-    if (_stopwatch.elapsed >= _pollTimeout) {
-      _pollTimer?.cancel();
+    // 2단계 — 영양 DB 매칭. 실제 폴링이 REVIEW_REQUIRED 를 돌려줄 때까지.
+    setState(() => _step = AnalysisStep.matchNutritionDb);
+    final reviewRequired = await _pollUntilReviewRequired();
+    if (!mounted) return;
+    if (!reviewRequired) {
       // TODO: 45초 초과 — 폴링을 끊고 FCM 푸시 인계 안내로 전환한다.
       return;
     }
 
-    final done = await _api.isReviewRequired(widget.mealId);
+    // 3단계 — 투약 단계 기준 적용. 백엔드는 이미 끝났지만, 연출상 잠깐 보여준다.
+    setState(() => _step = AnalysisStep.applyDoseStage);
+    await Future.delayed(_applyDoseStageDuration);
     if (!mounted) return;
 
-    if (done) {
-      _pollTimer?.cancel();
-      // TODO: REVIEW_REQUIRED 확정 — 음식 확인·수정 화면(5번)으로 교체 이동한다.
-      return;
-    }
-
-    setState(() => _step = _stepFor(_stopwatch.elapsed));
+    // TODO: REVIEW_REQUIRED 확정 — 음식 확인·수정 화면(5번)으로 교체 이동한다.
   }
 
-  /// 서버 하위 단계가 없어 경과 시간을 3등분해 흉내 낸다.
-  /// 화면 문구("보통 5~10초 걸려요") 기준.
-  AnalysisStep _stepFor(Duration elapsed) {
-    if (elapsed < const Duration(seconds: 3)) {
-      return AnalysisStep.recognizeFood;
+  /// `true` 를 돌려주면 분석 완료, `false` 면 45초 타임아웃.
+  Future<bool> _pollUntilReviewRequired() async {
+    final deadline = DateTime.now().add(_pollTimeout);
+    while (mounted) {
+      if (DateTime.now().isAfter(deadline)) return false;
+
+      await Future.delayed(_pollInterval);
+      if (!mounted) return false;
+
+      if (await _api.isReviewRequired(widget.mealId)) return true;
     }
-    if (elapsed < const Duration(seconds: 7)) {
-      return AnalysisStep.matchNutritionDb;
-    }
-    return AnalysisStep.applyDoseStage;
+    return false;
   }
 
   _StepState _stateFor(AnalysisStep step) {
@@ -107,10 +109,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
     return _StepState.pending;
   }
 
-  void _cancel() {
-    _pollTimer?.cancel();
-    Navigator.of(context).pop();
-  }
+  void _cancel() => Navigator.of(context).pop();
 
   @override
   Widget build(BuildContext context) {
