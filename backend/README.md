@@ -505,9 +505,27 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 | --- | --- | --- |
 | id | UUID PK | 수정 ID |
 | meal_item_id | UUID FK | 대상 음식 |
-| original_value | JSONB | AI 최초 추정값 |
+| original_value | JSONB | 고치기 직전의 값 |
 | corrected_value | JSONB | 사용자 수정값 |
 | corrected_at | TIMESTAMP | 수정 시각 |
+
+`PATCH /meals/{mealId}/items` 가 유일한 기록 지점이고, **`source = MODEL` 항목만** 남긴다 —
+사용자가 직접 넣은 음식(`POST /meals/{mealId}/items`)에는 고칠 AI 인식값이 없다.
+
+```json
+// original_value
+{ "displayName": "김밥", "amountG": "250.00" }
+// corrected_value — amount·unit 은 사용자가 입력한 원본 그대로
+{ "displayName": "참치김밥", "amountG": "220.00", "amount": "220", "unit": "g" }
+```
+
+`amountG` 는 g 환산값이고 환산이 안 되는 단위("2개")면 `null` 이다 — 그때 사용자가 실제로
+무엇을 입력했는지는 `amount` · `unit` 에만 남는다(AI 인식 항목의 `raw_ai_result` 는 AI
+원본이라 덮어쓰지 않는다). 숫자를 문자열로 담는 건 자릿수(`250.00`)를 잃지 않기 위해서다.
+
+같은 항목을 두 번 고치면 두 행이 쌓이고, 두 번째 행의 `original_value` 는 AI 인식값이 아니라
+첫 수정의 결과다. **AI 최초 추정값이 기준일 때는 `meal_items.original_food_name` ·
+`estimated_amount_g` 를 본다** — 그쪽은 어떤 수정에도 덮이지 않는다.
 
 ---
 

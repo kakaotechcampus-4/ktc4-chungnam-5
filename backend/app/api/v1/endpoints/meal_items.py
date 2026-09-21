@@ -1,7 +1,7 @@
 """식사 구성 음식(meal item) 수정 API.
 
 세 동작(PATCH · POST · DELETE)이 모두 식사를 재계산 대기로 표시한다 — 점수가 더는
-유효하지 않다는 뜻이다. 지금은 POST 만 구현돼 있다.
+유효하지 않다는 뜻이다. 지금은 PATCH · POST 가 구현돼 있다.
 """
 
 import uuid
@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user_id
 from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
-from app.schemas.meal import MealItemCreateRequest, MealItemCreateResponse
+from app.schemas.meal import (
+    MealItemCreateRequest,
+    MealItemCreateResponse,
+    MealItemsUpdateRequest,
+    MealItemsUpdateResponse,
+    MealItemUpdate,
+)
 from app.services import meal as meal_service
 from app.services import nutrition as nutrition_service
 
@@ -118,6 +124,82 @@ def add_meal_item(
             nutrition=match.nutrition if match is not None else None,
         )
     except meal_service.MealNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except meal_service.MealNotEditableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return ok(response)
+
+
+def _resolve_update(
+    db: Session, *, update: MealItemUpdate
+) -> meal_service.ResolvedItemUpdate:
+    """수정 요청 한 건의 g 환산과 공공 DB 매칭을 미리 풀어 둔다.
+
+    이름이 그대로여도 일단 찾아 둔다 — 기존 링크를 유지할지는 DB 의 현재 이름을 아는
+    `services.meal.update_items` 가 정한다. 여기서 미리 가를 수 없는 건 이 레이어가
+    항목의 현재 값을 모르기 때문이고, `normalized_name` 에 인덱스가 있어 한 건 더
+    찾는 비용이 그 순서를 뒤집을 만큼 크지 않다.
+    """
+    amount_g = meal_service.to_grams(update.amount, update.unit)
+    match = nutrition_service.resolve_by_name(
+        db, name=update.display_name, amount_g=amount_g
+    )
+    return meal_service.ResolvedItemUpdate(
+        request=update,
+        amount_g=amount_g,
+        food_ref_id=match.food_ref_id if match is not None else None,
+    )
+
+
+@router.patch(
+    "/meals/{meal_id}/items",
+    response_model=ApiResponse[MealItemsUpdateResponse],
+    responses=error_responses(401, 404, 409, 422),
+)
+def update_meal_items(
+    meal_id: uuid.UUID,
+    request: MealItemsUpdateRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[MealItemsUpdateResponse]:
+    """사용자가 확인 화면에서 AI 인식 결과를 고친다.
+
+    고친 항목만 배열에 담아 보낸다. 항목 하나는 통째로 교체된다 — 세 필드가 모두
+    필수다(`MealItemUpdate` 참고).
+
+    ## 이름이 바뀔 때만 공공 DB 를 다시 찾는다
+
+    양만 고친 경우 기존 `food_ref_id` 를 그대로 둔다. 이름 매칭
+    (`crud.food.find_unique_by_name`)은 일부러 보수적이라 `김치찌개` 같은 흔한
+    음식에 `None` 을 주는데, AI 가 `candidateFoodRefId` 로 정확히 연결해 둔 링크를
+    "250g → 220g" 같은 수정이 끊어 버리면 영양정보가 이유 없이 사라진다.
+
+    이름이 바뀌면 다른 음식이 된 것이므로 다시 찾고, 못 찾으면 링크를 끊는다
+    (`matched: false` 폴백 경로로 간다 — `add_meal_item` 독스트링 참고).
+
+    없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다. 요청한 항목 중
+    하나라도 이 식사의 것이 아닐 때도 404 이며, 이 경우 **아무 항목도 반영되지
+    않는다**(`services.meal.update_items` 참고).
+
+    ## ⚠️ 응답의 `steps` 는 고정값이다
+
+    명세서(`contracts/API.md`)의 예시를 그대로 돌려준다 — 실시간 진행상황이
+    아니다. POST 와 마찬가지로 여기서는 큐에 아무것도 넣지 않으므로
+    (`schemas.meal.RECALCULATION_STEPS` 참고) `DB_MATCHING: RUNNING` 이라고 나가도
+    실제로 도는 작업은 없다. 공공 DB 매칭은 이 요청을 처리하는 동안 끝난다.
+
+    **FE 가 이 응답을 보고 `GET /meals/{mealId}` 폴링을 시작하면 상태는 영원히
+    바뀌지 않는다.** `ANALYZING` + `is_recalculation = true` 를 푸는 것은 워커가
+    아니라 사용자가 [확인] 을 누를 때 불리는 `POST /meals/{mealId}/confirm` 이다.
+    """
+    resolved = [_resolve_update(db, update=update) for update in request.items]
+
+    try:
+        response = meal_service.update_items(
+            db, user_id=user_id, meal_id=meal_id, resolved=resolved
+        )
+    except (meal_service.MealNotFoundError, meal_service.MealItemNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except meal_service.MealNotEditableError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

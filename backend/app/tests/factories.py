@@ -12,9 +12,15 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.crud import user as user_crud
-from app.models.enums import FoodCategory, MealStatus, MealType, MedicationStage
+from app.models.enums import (
+    FoodCategory,
+    MealItemSource,
+    MealStatus,
+    MealType,
+    MedicationStage,
+)
 from app.models.food import FoodRef
-from app.models.meal import Meal
+from app.models.meal import Meal, MealItem
 from app.models.medication import MedicationSnapshot
 from app.models.user import User
 
@@ -98,3 +104,39 @@ def make_food_ref(
     db.add(food_ref)
     db.flush()
     return food_ref
+
+
+def make_meal_item(
+    db: Session,
+    *,
+    meal_id: uuid.UUID,
+    display_name: str = "참치김밥",
+    food_ref_id: str | None = None,
+    estimated_amount_g: Decimal | None = Decimal("250.00"),
+    confirmed_amount_g: Decimal | None = None,
+    confidence: Decimal | None = Decimal("0.620"),
+    source: MealItemSource = MealItemSource.MODEL,
+    raw_ai_result: dict | None = None,
+) -> MealItem:
+    """식사에 딸린 음식 1건. flush 까지만 하고 커밋하지 않는다.
+
+    기본값은 **AI 가 인식한 항목**이다 — `source=MODEL`, 양은 `estimated_amount_g`
+    에만 있고 `confirmed_amount_g` 는 NULL(사용자 확인 전). `PATCH` 가 고치는 것이
+    주로 이 모양이라 기본값으로 뒀다. 사용자가 직접 넣은 항목을 만들려면
+    `source=MealItemSource.USER, confidence=None` 을 넘긴다 — 신뢰도는 AI 인식값에만
+    있는 개념이다(`crud.meal.add_item` 참고).
+    """
+    item = MealItem(
+        meal_id=meal_id,
+        food_ref_id=food_ref_id,
+        original_food_name=display_name,
+        display_name=display_name,
+        estimated_amount_g=estimated_amount_g,
+        confirmed_amount_g=confirmed_amount_g,
+        confidence=confidence,
+        source=source,
+        raw_ai_result=raw_ai_result,
+    )
+    db.add(item)
+    db.flush()
+    return item

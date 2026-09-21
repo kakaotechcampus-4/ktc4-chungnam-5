@@ -1,6 +1,7 @@
 """meals 테이블 접근. 여기 말고는 아무도 Meal 을 직접 쿼리하지 않는다."""
 
 import uuid
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import MealItemSource, MealStatus
 from app.models.evaluation import QQSEvaluation
-from app.models.meal import Meal, MealItem
+from app.models.meal import Meal, MealItem, UserCorrection
 from app.models.medication import MedicationSnapshot
 
 _KST = "Asia/Seoul"
@@ -232,3 +233,68 @@ def mark_recalculating(db: Session, meal: Meal) -> None:
     """
     meal.status = MealStatus.ANALYZING
     meal.is_recalculation = True
+
+
+def get_items_by_ids(
+    db: Session, *, meal_id: uuid.UUID, item_ids: Iterable[uuid.UUID]
+) -> list[MealItem]:
+    """이 식사에 속한 항목만 골라 온다.
+
+    `meal_id` 를 WHERE 에 함께 넣는 게 핵심이다 — 남의 식사 항목 id 를 넣어도 여기서
+    빠지므로, 호출부는 "요청한 개수만큼 안 나왔다" 만 보고 404 를 낼 수 있다
+    (`get_owned_meal` 이 소유권을 이미 확인한 뒤다).
+    """
+    return list(
+        db.execute(
+            select(MealItem).where(
+                MealItem.meal_id == meal_id, MealItem.id.in_(list(item_ids))
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+def update_item(
+    db: Session,
+    *,
+    item: MealItem,
+    display_name: str,
+    amount_g: Decimal | None,
+    food_ref_id: str | None,
+) -> None:
+    """사용자가 고친 값을 항목에 반영한다. 커밋하지 않는다.
+
+    `original_food_name` 은 건드리지 않는다 — AI 최초 추정값 자리이고, 사용자 수정으로
+    덮으면 인식 성능 평가의 기준이 사라진다(`user_corrections` 도 같은 이유로 있다).
+
+    양은 `confirmed_amount_g` 로 들어간다. 사용자가 직접 말한 값이라 확인이 끝난 것으로
+    본다 — `crud.meal.add_item` 과 같은 규칙이다.
+    """
+    item.display_name = display_name
+    item.confirmed_amount_g = amount_g
+    item.food_ref_id = food_ref_id
+
+
+def add_correction(
+    db: Session,
+    *,
+    meal_item_id: uuid.UUID,
+    original_value: dict,
+    corrected_value: dict,
+) -> UserCorrection:
+    """고치기 직전의 값과 고친 값을 한 쌍으로 남긴다. 커밋하지 않는다.
+
+    같은 항목을 두 번 고치면 두 행이 쌓인다 — 두 번째 행의 `original_value` 는 AI
+    인식값이 아니라 첫 수정의 결과다. AI 최초 추정값은 항상
+    `meal_items.original_food_name` · `estimated_amount_g` 에 그대로 있으므로,
+    인식 성능을 볼 때는 그쪽을 기준으로 삼는다.
+    """
+    correction = UserCorrection(
+        meal_item_id=meal_item_id,
+        original_value=original_value,
+        corrected_value=corrected_value,
+    )
+    db.add(correction)
+    db.flush()
+    return correction

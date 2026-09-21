@@ -3,9 +3,9 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import Field, StringConstraints
+from pydantic import Field, StringConstraints, field_validator
 
 from app.models.enums import MealStatus, MealType, MedicationStage
 from app.schemas.base import CamelModel
@@ -115,3 +115,79 @@ class MealItemCreateResponse(CamelModel):
     nutrition: NutritionInfo | None
     status: MealStatus
     is_recalculation: bool
+
+
+class MealItemUpdate(CamelModel):
+    """PATCH /meals/{mealId}/items 요청의 항목 하나.
+
+    세 필드가 모두 필수다 — 항목 하나를 통째로 교체하는 모양이다. FE 는 확인 화면에
+    이미 세 값을 다 들고 있고, `amount` 와 `unit` 이 짝이라 한쪽만 오는 애매한 입력이
+    생기지 않는다. 부분 수정은 **항목 단위**로 이뤄진다: 고친 항목만 배열에 담는다.
+    """
+
+    item_id: uuid.UUID
+    display_name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+    ]
+    amount: Annotated[Decimal, Field(gt=0, le=_MAX_AMOUNT)]
+    unit: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)
+    ]
+
+
+class MealItemsUpdateRequest(CamelModel):
+    """PATCH /meals/{mealId}/items 요청."""
+
+    items: Annotated[list[MealItemUpdate], Field(min_length=1)]
+
+    @field_validator("items")
+    @classmethod
+    def _reject_duplicate_items(
+        cls, items: list[MealItemUpdate]
+    ) -> list[MealItemUpdate]:
+        """같은 항목이 두 번 오면 거절한다.
+
+        어느 값이 맞는지 서버가 정할 근거가 없다. 뒤엣것으로 덮으면 사용자가 보낸
+        값 하나가 조용히 사라지고, 앞엣것을 쓰면 반대가 된다 — 둘 다 사용자는
+        모른다. 클라이언트의 버그이므로 422 로 돌려보낸다.
+        """
+        seen = {item.item_id for item in items}
+        if len(seen) != len(items):
+            raise ValueError("같은 itemId 가 두 번 이상 왔습니다.")
+        return items
+
+
+class AnalysisStep(CamelModel):
+    """분석 진행 단계 하나. 명세서의 `steps` 배열 원소."""
+
+    key: Literal["FOOD_RECOGNITION", "DB_MATCHING", "STAGE_RULE_APPLY"]
+    state: Literal["DONE", "RUNNING", "PENDING"]
+
+
+# 명세서(contracts/API.md PATCH /meals/{mealId}/items)의 예시를 그대로 고정한 값이다.
+#
+# ⚠️ **실시간 상태가 아니다.** 이 엔드포인트는 큐에 아무것도 넣지 않으므로
+# `DB_MATCHING: RUNNING` 이라고 나가도 실제로 도는 작업은 없다 — 공공 DB 매칭은
+# 요청을 처리하는 동안 동기로 이미 끝난다. FE 가 이 값을 보고
+# `GET /meals/{mealId}` 폴링을 시작하면 상태는 사용자가 [확인] 을 눌러
+# `POST /meals/{mealId}/confirm` 이 불릴 때까지 영원히 그대로다.
+#
+# 진짜 진행상황을 내보내려면 값이 아니라 이 설계를 먼저 바꿔야 한다
+# (`endpoints/meal_items.py` 의 `update_meal_items` 독스트링 참고).
+RECALCULATION_STEPS: tuple[AnalysisStep, ...] = (
+    AnalysisStep(key="FOOD_RECOGNITION", state="DONE"),
+    AnalysisStep(key="DB_MATCHING", state="RUNNING"),
+    AnalysisStep(key="STAGE_RULE_APPLY", state="PENDING"),
+)
+
+
+class MealItemsUpdateResponse(CamelModel):
+    """PATCH /meals/{mealId}/items 응답.
+
+    POST 와 달리 고친 항목을 되돌려주지 않는다 — 명세서가 식사 전체의 상태만
+    요구한다. 항목의 최신 모양이 필요하면 FE 는 `GET /meals/{mealId}` 를 부른다.
+    """
+
+    status: MealStatus
+    is_recalculation: bool
+    steps: list[AnalysisStep]

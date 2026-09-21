@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -15,15 +16,18 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.crud import meal as meal_crud
-from app.models.enums import MealStatus
-from app.models.meal import Meal
+from app.models.enums import MealItemSource, MealStatus
+from app.models.meal import Meal, MealItem
 from app.schemas.meal import (
+    RECALCULATION_STEPS,
     CalendarDay,
     CalendarSummary,
     MealCalendarResponse,
     MealDeleteResponse,
     MealItemCreateRequest,
     MealItemCreateResponse,
+    MealItemsUpdateResponse,
+    MealItemUpdate,
     MealListItem,
     MealListResponse,
     MealScores,
@@ -39,6 +43,23 @@ class MealNotFoundError(Exception):
 
 class MealNotEditableError(Exception):
     """지금 상태로는 음식을 고칠 수 없는 식사를 가리킬 때."""
+
+
+class MealItemNotFoundError(Exception):
+    """이 식사에 없는 항목을 가리킬 때. 남의 식사 항목도 여기로 온다."""
+
+
+@dataclass(frozen=True)
+class ResolvedItemUpdate:
+    """수정 요청 한 건 + api 레이어가 미리 풀어 둔 값.
+
+    `amount_g` 는 `to_grams`, `food_ref_id` 는 공공 DB 매칭 결과다. 둘 다
+    `services/` 끼리 부를 수 없어서(README 절대 규칙 5) 호출부가 채워 넣는다.
+    """
+
+    request: MealItemUpdate
+    amount_g: Decimal | None
+    food_ref_id: str | None
 
 
 # 그대로 g 으로 볼 수 있는 단위.
@@ -325,4 +346,117 @@ def add_item(
         nutrition=nutrition,
         status=meal.status,
         is_recalculation=meal.is_recalculation,
+    )
+
+
+def _correction_snapshot(item: MealItem) -> dict[str, str | None]:
+    """`user_corrections` 에 남길 항목의 값 한 벌.
+
+    양은 `confirmed_amount_g`(사용자 확인값)가 있으면 그걸, 없으면
+    `estimated_amount_g`(AI 추정값)를 본다 — 사용자가 확인하기 전 AI 인식 항목은
+    확인값이 NULL 이라 추정값이 곧 "고치기 전의 값" 이다.
+
+    Decimal 을 문자열로 담는다. JSONB 직렬화가 Decimal 을 모르고, float 로 바꾸면
+    `250.00` 이 `250.0` 이 되어 자릿수가 사라진다 — 인식 오차를 나중에 계산할 값이라
+    그대로 보존한다.
+    """
+    amount_g = item.confirmed_amount_g
+    if amount_g is None:
+        amount_g = item.estimated_amount_g
+    return {
+        "displayName": item.display_name,
+        "amountG": str(amount_g) if amount_g is not None else None,
+    }
+
+
+def update_items(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_id: uuid.UUID,
+    resolved: list[ResolvedItemUpdate],
+) -> MealItemsUpdateResponse:
+    """사용자가 고친 음식들을 반영하고 재계산 대기로 표시한다.
+
+    `add_item` 과 같은 규칙을 따른다 — g 환산과 공공 DB 매칭은 이미 끝난 값으로
+    들어오고(README 절대 규칙 5), 여기서는 비동기 작업을 만들지 않는다.
+
+    ## 전부 되거나 전부 안 되거나
+
+    요청한 항목 중 하나라도 이 식사의 것이 아니면 `MealItemNotFoundError` 를 내고
+    **아무것도 반영하지 않는다.** 확인 화면은 여러 항목을 한 번에 보내므로, 절반만
+    반영되면 사용자는 화면과 서버 중 어느 쪽이 맞는지 알 수 없다.
+    """
+    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+
+    if not _is_editable(meal):
+        raise MealNotEditableError(
+            f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
+        )
+
+    items = meal_crud.get_items_by_ids(
+        db, meal_id=meal.id, item_ids=[update.request.item_id for update in resolved]
+    )
+    by_id = {item.id: item for item in items}
+
+    # 고치기 전에 전부 확인한다. 루프 안에서 확인하면 앞쪽 항목은 이미 바뀐 채로
+    # 예외가 나가고, "아무것도 반영되지 않았다" 는 세션 롤백이 대신 지켜 주는
+    # 우연한 성질이 된다 — 규칙이면 코드로 드러나 있어야 한다.
+    missing = [
+        update.request.item_id
+        for update in resolved
+        if update.request.item_id not in by_id
+    ]
+    if missing:
+        raise MealItemNotFoundError(f"item {missing[0]} 는 이 식사의 항목이 아닙니다.")
+
+    for update in resolved:
+        item = by_id[update.request.item_id]
+        renamed = item.display_name != update.request.display_name
+        before = _correction_snapshot(item)
+
+        meal_crud.update_item(
+            db,
+            item=item,
+            display_name=update.request.display_name,
+            amount_g=update.amount_g,
+            # 이름이 그대로면 기존 링크를 지킨다. 다시 찾으면 AI 가 정확히 연결해 둔
+            # 항목이 끊길 수 있다 — 이름 매칭은 흔한 음식에 None 을 주기 때문이다
+            # (`endpoints/meal_items.py` 의 update_meal_items 독스트링 참고).
+            food_ref_id=update.food_ref_id if renamed else item.food_ref_id,
+        )
+
+        # 고친 값은 요청에서 만든다. 항목을 다시 읽으면 안 된다 — 환산이 안 된
+        # 단위("2개")는 `confirmed_amount_g` 가 NULL 이 되고, 그러면
+        # `_correction_snapshot` 이 AI 추정값으로 되돌아가 "안 고쳤다" 로 보인다.
+        after: dict[str, str | None] = {
+            "displayName": update.request.display_name,
+            "amountG": str(update.amount_g) if update.amount_g is not None else None,
+        }
+        if item.source is MealItemSource.MODEL and before != after:
+            meal_crud.add_correction(
+                db,
+                meal_item_id=item.id,
+                original_value=before,
+                corrected_value=after
+                | {
+                    # 환산이 안 된 단위는 여기에만 남는다. AI 인식 항목의
+                    # `raw_ai_result` 는 AI 원본이라 덮어쓸 수 없기 때문이다
+                    # (`add_item` 은 반대로 거기에 남긴다 — 그쪽은 AI 원본이 없다).
+                    "amount": str(update.request.amount),
+                    "unit": update.request.unit,
+                },
+            )
+
+    meal_crud.mark_recalculating(db, meal)
+
+    # 트랜잭션 경계는 services 가 정한다(README 절대 규칙 5).
+    db.commit()
+
+    return MealItemsUpdateResponse(
+        status=meal.status,
+        is_recalculation=meal.is_recalculation,
+        steps=list(RECALCULATION_STEPS),
     )
