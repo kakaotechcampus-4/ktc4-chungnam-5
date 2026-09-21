@@ -457,3 +457,23 @@ def test_openapi_declares_401(schema):
 def test_openapi_declares_404_and_422(schema, status):
     """A25: 문서의 POST /api/v1/user-states 에 404 · 422 가 선언돼 있다."""
     assert status in _responses(schema)
+
+
+# ─────────────────────────── 응답 = 저장값 (사이클 2) ───────────────────────────
+
+
+def test_three_decimal_weight_is_returned_as_stored_value(client, db):
+    """A28: 소수 셋째 자리 weightKg(78.456)는 DB 에 저장된 값(78.46)으로 응답한다 (D7 후속).
+
+    weight_kg 는 Numeric(5,2) 라 DB 는 반올림해 저장한다. 응답이 요청값을 그대로 돌려주면
+    이후 GET latest 가 보여주는 값과 어긋난다 — 응답은 DB 저장값과 같아야 한다.
+    """
+    user = make_user(db)
+    response = client.post(URL, json=_body(weightKg=78.456), headers=_headers(user))
+
+    assert response.status_code == 201, response.text
+    assert response.json()["data"]["weightKg"] == 78.46
+
+    rows = _states(db, user.id)
+    assert len(rows) == 1
+    assert rows[0].weight_kg == Decimal("78.46")
