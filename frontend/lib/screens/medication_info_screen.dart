@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../common/api_format.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -52,13 +53,6 @@ class MedicationCurrent {
         stageReason: json['stageReason'] as String?,
       );
 }
-
-String stageLabel(String stage) => switch (stage) {
-  'INITIAL' => '도입기',
-  'TITRATION' => '증량기',
-  'MAINTENANCE' => '유지기',
-  _ => stage,
-};
 
 /// `2026-06-14` 형식. 요청 body 에 쓴다.
 String formatApiDate(DateTime d) =>

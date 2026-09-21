@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../screens/home_screen.dart' show mealTypeLabel;
+import '../common/api_format.dart';
 import '../screens/shared_meal_widgets.dart' show SkeletonBox;
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
