@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from app.models.enums import MealItemSource, MealStatus
 from app.models.meal import MealItem
+from app.models.task import Task
 from app.tests.factories import make_food_ref, make_meal, make_user
 
 
@@ -318,7 +319,7 @@ def test_broken_public_db_value_never_reaches_the_response_as_invalid_json(clien
     assert response.json()["data"]["nutrition"]["kcal"] is None
 
 
-def test_add_item_never_touches_the_task_queue(client, db, monkeypatch):
+def test_add_item_never_touches_the_task_queue(client, db):
     """음식 추가는 비동기 작업을 만들지 않는다 — 설계 결정을 코드로 고정한다.
 
     사용자가 음식명과 양을 직접 알려줬으므로 AI 에게 물을 것이 없고, 다시 계산할
@@ -327,21 +328,10 @@ def test_add_item_never_touches_the_task_queue(client, db, monkeypatch):
 
     이 판단은 독스트링 세 곳에 길게 적혀 있지만 **글로는 회귀를 막지 못한다.**
 
-    `build_task_queue` 가 아니라 `SqsQueue.send` 를 막는다. 호출부가
-    `from app.infra.queue import build_task_queue` 로 이름을 당겨 오면 그 이름은
-    임포트 시점에 호출부 모듈에 박히므로, 팩토리를 패치해도 잡히지 않는다.
-    보내는 쪽 클래스를 막으면 어떤 경로로 만들어진 큐든 걸린다.
+    큐가 테이블이라 보내는 함수를 패치할 필요가 없다 — 행이 생겼는지 직접 본다.
+    `enqueue` 를 패치하면 호출부가 `from app.infra.queue import enqueue` 로 이름을
+    당겨 왔을 때 잡지 못하지만, 결과를 보면 어떤 경로로 넣었든 걸린다.
     """
-    from app.infra.queue import SqsQueue
-
-    def explode(self, body):
-        raise AssertionError(
-            f"음식 추가 경로에서 큐로 작업을 보냈다: {body!r} "
-            "— `add_meal_item` 독스트링의 'ANALYZING 은 워커가 도는 중이 아니다' 참고"
-        )
-
-    monkeypatch.setattr(SqsQueue, "send", explode)
-
     user = make_user(db)
     meal = make_meal(db, user_id=user.id)
 
@@ -352,3 +342,8 @@ def test_add_item_never_touches_the_task_queue(client, db, monkeypatch):
     )
 
     assert response.status_code == 201, response.text
+    queued = db.execute(select(Task)).scalars().all()
+    assert queued == [], (
+        "음식 추가 경로에서 큐에 작업을 넣었다 "
+        "— `add_meal_item` 독스트링의 'ANALYZING 은 워커가 도는 중이 아니다' 참고"
+    )

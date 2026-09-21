@@ -50,7 +50,7 @@ backend/app/
 ├── api/v1/endpoints/      공개 REST — JWT
 ├── internal/v1/       ★  AI Service 전용 REST — 서비스 토큰
 ├── worker/            ★  큐 소비 + 스케줄 배치
-├── infra/             ★  S3 · SQS · FCM · AI HTTP
+├── infra/             ★  S3 · 큐 · FCM · AI HTTP
 └── tests/
 ```
 
@@ -58,7 +58,7 @@ backend/app/
   상태는 `crud/`를 거쳐 DB가 들고, 채점기는 현재 baseline을 인자로 받는 순수 함수다.
 - `infra/`는 `Protocol`(또는 ABC) 뒤에 구현을 숨긴다 (D13):
   - `FileStorage` → `S3Storage`(prod) / `LocalDiskStorage`(로컬 개발)
-  - `TaskQueue` → `SqsQueue`(prod) / `LocalQueue`(로컬 개발)
+  - `TaskQueue` → `DbTaskQueue` (PostgreSQL `task_queue` 테이블. 로컬·프로덕션 같은 구현)
   - 도메인은 어느 구현이 붙는지 모른다.
 
 ---
@@ -97,8 +97,9 @@ alembic upgrade head
 # 공공 영양DB 시드 복원 (336,351건)
 docker exec -i glp1-db pg_restore -U glp1 -d glp1_dev --data-only --no-owner < ../infra/seed/food_refs_20260828.dump
 
-# 큐(ElasticMQ) · AI 스텁 — Worker 가 쓴다. 자세한 건 ../infra/README.md
-cd ../infra && docker compose -f docker-compose.queue.yml -f docker-compose.ai-stub.yml up -d && cd ../backend
+# AI 스텁 — Worker 가 쓴다. 큐는 위 PostgreSQL 의 task_queue 테이블이라 따로 안 띄운다.
+# 자세한 건 ../infra/README.md
+cd ../infra && docker compose -f docker-compose.ai-stub.yml up -d && cd ../backend
 
 # API — http://127.0.0.1:8000/docs
 uvicorn app.main:app --reload
@@ -200,79 +201,81 @@ alembic check                               # 모델과 DB 가 어긋났는지 �
 
 ## 큐 사용법
 
-비동기 작업은 SQS 를 거친다. 로컬에서도 같은 `SqsQueue` 구현을 쓴다 —
-SQS API 호환 서버(ElasticMQ)를 컨테이너로 띄우고 `SQS_ENDPOINT_URL` 로 가리킨다.
+비동기 작업은 PostgreSQL 의 `task_queue` 테이블을 거친다. 큐 컨테이너는 없다.
 
-### API 3개
-
-```python
-from app.infra.queue import QueueSettings, build_task_queue
-
-queue = build_task_queue(QueueSettings())              # .env 에서 설정을 읽는다
-
-queue.send({...})                                      # 넣기
-tasks = queue.receive(max_count=1, wait_seconds=5)     # 꺼내기 (롱 폴링)
-queue.delete(task.receipt)                             # 처리 완료를 알리기
-```
-
-`receive` 는 **지우지 않는다.** 60초 동안 다른 소비자에게 안 보이게 할 뿐이고,
-그 안에 `delete` 하지 않으면 다시 나타난다.
-
-### 넣기
+### 넣기 — 도메인과 같은 트랜잭션
 
 ```python
-queue.send({
-    "type": "meal.analyze",       # Worker 가 이걸 보고 분기한다
-    "mealId": "meal_456",
-    "mealType": "LUNCH",
-    "eatenAt": "2026-08-21T12:40:00+09:00",
-    "stage": "MAINTENANCE",
-    "rawText": "김밥 한 줄",
-})
+from app.infra.queue import enqueue
+
+def create_meal(db: Session, ...) -> MealResponse:
+    meal = crud.meal.create(db, ...)
+    enqueue(db, "meal.analyze", {
+        "mealId": str(meal.id),
+        "mealType": "LUNCH",
+        "eatenAt": "2026-08-21T12:40:00+09:00",
+        "stage": "MAINTENANCE",
+        "rawText": "김밥 한 줄",
+    })
+    db.commit()     # 식사와 작업이 한 번에 들어간다
+    return ...
 ```
 
-dict 를 주면 JSON 으로 직렬화된다. `POST /meals` 가 `202` 를 돌려주기 직전에 하는 일이 이것이다.
-**커밋이 먼저다** — `queue.send()` 를 앞에 두면 커밋이 실패했을 때 Worker 가 DB 에 없는
-식사를 처리하려다 DLQ 로 간다.
+`enqueue` 는 **커밋하지 않는다.** 쓰던 세션에 INSERT 만 하므로 도메인 변경과 작업
+등록이 원자적이다 — 커밋이 실패하면 둘 다 없고, 성공하면 둘 다 있다. SQS 를 쓸 때
+지켜야 했던 "커밋이 먼저다" 규칙은 이제 없다.
 
-### 꺼내기
+### 꺼내기 — 잠금을 쥔 채로 처리한다
 
 ```python
-for task in queue.receive(max_count=1, wait_seconds=5):
-    task.body           # dict 로 파싱돼 있다
-    task.receipt        # delete 에 쓰는 손잡이
-    task.receive_count  # 이 메시지가 몇 번째로 배달됐는지
+with queue.claim() as claim:
+    if claim is None:
+        ...          # 빈 큐
+    claim.db         # 이 작업을 잠근 세션. 핸들러가 도메인 쓰기에 그대로 쓴다
+    claim.task.type  # 'meal.analyze'
+    claim.task.payload
+    claim.task.attempts   # 지금까지 실패한 횟수. 첫 시도는 0
+    claim.result = {...}  # 담아 두면 DONE 과 함께 result 컬럼에 들어간다
 ```
 
-`wait_seconds` 는 롱 폴링이다. 큐가 비어 있으면 그만큼 기다렸다 빈 리스트를 준다.
-`0` 으로 두면 즉시 반환하는데, 루프에서 쓰면 빈 큐를 쉬지 않고 때리게 된다.
+`SELECT … FOR UPDATE SKIP LOCKED` 로 한 행을 집고 **블록이 끝날 때까지 잠금을
+유지한다.** 잠긴 행은 다른 워커가 건너뛴다. 워커를 늘리면 그대로 분산된다.
 
-### 지우기 — 여기가 전부다
+### 커밋 시점 — 여기가 전부다
 
-```python
-try:
-    handle(task, ai)
-except Exception:
-    logger.exception(...)        # 지우지 않는다 → 재배달 → 3회 넘으면 DLQ
-else:
-    queue.delete(task.receipt)   # 성공했을 때만
+| 블록이 | 큐가 하는 일 |
+|---|---|
+| 정상 종료 | `status='DONE'`, `result`, `finished_at` 커밋 |
+| 예외 | 롤백 → 별도 트랜잭션에 `attempts+1`·`last_error`·`next_run_at`(30s→60s) → 3회째면 `FAILED` |
+
+**롤백되면 핸들러가 쓴 도메인 변경까지 통째로 되돌아간다.** 그래서 재시도할 때
+이전 시도의 흔적이 없다. 반대로 실패했는데 예외를 삼키면 큐는 성공으로 보고 DONE 을
+커밋한다 — 작업이 조용히 사라진다. `app/worker/loop.py` 의 `run()` 이 이 구조이고,
+`app/tests/test_worker_loop.py` 가 이것만 검증한다.
+
+`FAILED` 는 DLQ 자리다. 자동으로 되살리지 않는다 — 3번 실패한 작업은 대개 코드나
+데이터가 잘못된 것이라 사람이 원인을 보고 다시 넣는다.
+
+```sql
+UPDATE task_queue SET status='PENDING', attempts=0, next_run_at=now() WHERE id='…';
 ```
 
-**실패했는데 지우면 재시도도 DLQ 도 일어나지 않고 작업이 조용히 사라진다.**
-반대로 성공했는데 안 지우면 같은 작업을 3번 더 한다. `app/worker/loop.py` 의 `run()` 이
-이 구조이고, `app/tests/test_worker_loop.py` 가 이것만 검증한다.
-
-실패할 때마다 즉시 반환(visibility 0)하고 싶어지는데, 그러면 재시도가 밀리초 단위로 일어나
-`maxReceiveCount` 를 순식간에 태운다. **visibility timeout 이 곧 백오프다.**
+상태는 `python -m scripts.queue_status` 로 본다. "처리 중" 이라는 상태 컬럼은 없다 —
+워커는 행 잠금을 쥐고 있을 뿐이고 그건 커밋 전이라 다른 세션에 보이지 않는다.
 
 ### 작업을 하나 붙이려면
 
-1. `app/worker/jobs/` 에 파일을 만들고 `run(task, ai)` 를 둔다
+1. `app/worker/jobs/` 에 파일을 만들고 `run(db, task, ai)` 를 둔다
 2. `app/worker/dispatch.py` 의 `_HANDLERS` 에 한 줄 더한다
 3. `_NOT_IMPLEMENTED` 에서 그 타입을 지운다
 
 스켈레톤 마지막 줄의 `raise NotImplementedError` 를 **가장 마지막에** 지운다.
-먼저 지우면 `loop.py` 가 성공으로 보고 메시지를 큐에서 지운다.
+먼저 지우면 `loop.py` 가 성공으로 보고 DONE 을 커밋한다.
+
+**`run(db, task, ai)` 안에서 부르는 `services/`·`crud/` 함수는 커밋하면 안 된다.**
+이 `db` 는 작업을 잠그고 있는 세션이라, 도중에 커밋하는 service 를 그대로 부르면
+AI 호출이 끝나기 전에 행 잠금이 풀려 다른 워커가 같은 작업을 중복 처리한다.
+커밋하는 service 가 있으면 커밋 없는 버전으로 쪼개서 쓴다.
 
 ## 환경변수
 
@@ -290,21 +293,12 @@ else:
 | `AI_STUB_SCENARIO`                        | ai-stub 의 실패 경로를 부르는 손잡이. **로컬 전용, 평소엔 비움**       |
 | `STORAGE_TYPE`                            | `s3` \| `local`                                                        |
 | `S3_BUCKET`                               | **`glp1-team-*` 패턴이어야 함.** 인스턴스 역할 권한이 이 패턴으로 한정 |
-| `QUEUE_TYPE`                              | `sqs`. 로컬에서도 `sqs` 를 쓴다 (ElasticMQ)                            |
-| `SQS_ENDPOINT_URL`                        | 로컬 ElasticMQ 주소. **프로덕션에서는 비운다** → 실제 AWS 로 붙는다    |
-| `SQS_QUEUE_URL` · `SQS_DLQ_URL`           | 비동기 파이프라인                                                      |
-| `AWS_DEFAULT_REGION`                      | 기본 `ap-northeast-2`                                                  |
-| `AWS_ACCESS_KEY_ID` · `AWS_SECRET_ACCESS_KEY` | **로컬 전용.** ElasticMQ 는 값을 검사하지 않는다 (`test` 로 둔다)  |
+| `QUEUE_POLL_INTERVAL_SEC`                 | 빈 큐일 때 쉬는 시간. 기본 1.0                                         |
+| `QUEUE_MAX_ATTEMPTS`                      | 이 횟수만큼 실패하면 FAILED 로 격리. 기본 3                            |
+| `QUEUE_BACKOFF_BASE_SEC`                  | 재시도 지연 기준. 기본 30 (30s → 60s)                                  |
 | `FCM_*`                                   | 푸시 발송                                                              |
 
-> 🚨 AWS 액세스 키는 두지 않는다. 서버는 **인스턴스 역할**로 S3·SQS에 접근한다.
->
-> 로컬의 `AWS_ACCESS_KEY_ID=test` 는 인증용이 아니라 **boto3 가 요청에 서명을 붙이려면
-> 뭔가 값이 있어야 해서**다. 프로덕션 `.env` 에는 `SQS_ENDPOINT_URL` 과 함께 이 둘도 비운다 —
-> 비어 있으면 boto3 가 EC2 메타데이터에서 임시 자격증명을 가져온다.
->
-> boto3 는 `.env` 를 읽지 않는다(실제 환경변수만 본다). 그래서 `QueueSettings` 가 받아
-> `boto3.client()` 에 명시적으로 넘긴다.
+> 🚨 AWS 액세스 키는 두지 않는다. 서버는 **인스턴스 역할**로 S3 에 접근한다.
 
 ---
 
@@ -318,7 +312,8 @@ else:
 | Rule Engine  | **순수 함수 단위 테스트.** 입력→기대 점수 표로 고정(`pytest.mark.parametrize`). 단계를 바꾸면 점수가 실제로 달라지는지 검증(R1) |
 | 레이어 경계  | import-linter — `services/*` 상호 참조 금지 · `services` → `crud` 단방향을 CI에서 강제                                          |
 | API          | `httpx.ASGITransport` + Testcontainers(Postgres)                                                                                |
-| Worker 루프  | 가짜 큐·가짜 AI 로 **삭제 시점**만 검증 — 실패한 작업을 지우지 않는지(`test_worker_loop.py`). 외부 의존 0                        |
+| Worker 루프  | 가짜 큐·가짜 AI 로 **커밋 시점**만 검증 — 실패한 작업을 DONE 으로 커밋하지 않는지(`test_worker_loop.py`). 외부 의존 0 |
+| 작업 큐      | 실제 Postgres 로 SKIP LOCKED·재시도·격리 검증(`test_task_queue.py`). 커넥션 둘로 동시 집기를 확인한다                 |
 | infra 추상화 | 로컬 구현으로 테스트, 외부 의존 0                                                                                               |
 
 ---

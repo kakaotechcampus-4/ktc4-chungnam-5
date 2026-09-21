@@ -1,7 +1,7 @@
 """add meals.is_recalculation
 
 Revision ID: a3c71e08d5b2
-Revises: fb9324353300
+Revises: 6d64d26899b5
 Create Date: 2026-09-20 11:40:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'a3c71e08d5b2'
-down_revision: Union[str, Sequence[str], None] = 'fb9324353300'
+down_revision: Union[str, Sequence[str], None] = '6d64d26899b5'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

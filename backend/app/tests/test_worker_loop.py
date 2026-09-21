@@ -1,55 +1,55 @@
 """워커 루프 검증.
 
-이 루프에서 틀리기 쉬운 건 하나다 — 실패한 작업을 지워 버리는 것.
-지우면 재시도도 DLQ 도 일어나지 않고, 작업이 조용히 사라진다.
+이 루프에서 틀리기 쉬운 건 하나다 — 실패한 작업을 완료로 커밋해 버리는 것.
+그러면 재시도도 격리도 일어나지 않고 작업이 조용히 사라진다.
 """
 
 from __future__ import annotations
 
+import uuid
+from contextlib import contextmanager
 from typing import Any
 
 import pytest
 
-from app.infra.queue import ReceivedTask
+from app.infra.queue import Claim, ClaimedTask
 from app.worker.dispatch import handle
 from app.worker.loop import run
 
 
 class FakeQueue:
-    """한 배치만 돌려주고 그 뒤로는 빈 결과를 주는 가짜 큐."""
+    """작업 몇 개를 차례로 내주고 그 뒤로는 None 을 주는 가짜 큐.
 
-    def __init__(self, tasks: list[ReceivedTask]) -> None:
-        self._batches = [tasks]
-        self.deleted: list[str] = []
-        self.sent: list[dict[str, Any]] = []
+    진짜 `DbTaskQueue` 와 같은 자리에서 커밋·롤백을 흉내 낸다 — 블록이 정상으로
+    끝나면 done 에, 예외가 나면 failed 에 담는다.
+    """
 
-    def send(self, body: dict[str, Any]) -> None:
-        self.sent.append(body)
+    def __init__(self, tasks: list[ClaimedTask]) -> None:
+        self._tasks = list(tasks)
+        self.done: list[tuple[uuid.UUID, dict[str, Any] | None]] = []
+        self.failed: list[uuid.UUID] = []
 
-    def receive(self, max_count: int = 1, wait_seconds: int = 5) -> list[ReceivedTask]:
-        if self._batches:
-            return self._batches.pop(0)
+    @contextmanager
+    def claim(self):
+        if not self._tasks:
+            from app.worker import loop
 
-        from app.worker import loop
+            loop.request_stop()
+            yield None
+            return
 
-        loop.request_stop()
-        return []
-
-    def delete(self, receipt: str) -> None:
-        self.deleted.append(receipt)
+        claim = Claim(db=None, task=self._tasks.pop(0))
+        try:
+            yield claim
+        except BaseException:
+            self.failed.append(claim.task.id)
+            raise
+        self.done.append((claim.task.id, claim.result))
 
 
 class FakeAi:
-    def __init__(self, response: dict[str, Any] | None = None, error: Exception | None = None):
-        self._response = response or {"mealId": "m1", "items": [], "safetyStatus": "SAFE"}
-        self._error = error
-        self.calls: list[dict[str, Any]] = []
-
     def analyze_meal(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self.calls.append(payload)
-        if self._error:
-            raise self._error
-        return self._response
+        return {"mealId": payload.get("mealId"), "items": [], "safetyStatus": "SAFE"}
 
     def short_feedback(self, payload: dict[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
@@ -67,65 +67,73 @@ def _reset_running():
     loop._running = True
 
 
-def _analyze_body(meal_id: str = "m1") -> dict[str, Any]:
-    return {
-        "type": "meal.analyze",
-        "mealId": meal_id,
-        "mealType": "LUNCH",
-        "eatenAt": "2026-08-21T12:40:00+09:00",
-        "stage": "MAINTENANCE",
-        "rawText": "김밥 한 줄",
-    }
+@pytest.fixture(autouse=True)
+def _no_sleep(monkeypatch):
+    """빈 큐일 때의 폴링 대기를 없앤다. 테스트가 1초씩 쉴 이유가 없다."""
+    monkeypatch.setattr("app.worker.loop.time.sleep", lambda _seconds: None)
 
 
-def _task(body: dict[str, Any], receipt: str = "r1", receive_count: int = 1) -> ReceivedTask:
-    return ReceivedTask(body=body, receipt=receipt, receive_count=receive_count)
+def _task(task_type: str = "meal.analyze", attempts: int = 0) -> ClaimedTask:
+    return ClaimedTask(
+        id=uuid.uuid4(),
+        type=task_type,
+        payload={
+            "mealId": "m1",
+            "mealType": "LUNCH",
+            "eatenAt": "2026-08-21T12:40:00+09:00",
+            "stage": "MAINTENANCE",
+            "rawText": "김밥 한 줄",
+        },
+        attempts=attempts,
+    )
 
 
-# ─────────────────────────── 삭제 시점 ───────────────────────────
+# ─────────────────────────── 커밋 시점 ───────────────────────────
 
 
-def test_failed_task_is_not_deleted(monkeypatch):
-    """처리가 터지면 지우지 않는다 — visibility timeout 뒤 재배달돼야 한다."""
+def test_failed_task_is_not_committed_as_done(monkeypatch):
+    """처리가 터지면 완료로 커밋하지 않는다 — 롤백돼 다시 집혀야 한다."""
 
-    def boom(task, ai):
+    def boom(db, task, ai):
         raise RuntimeError("AI 가 500 을 냈다")
 
     monkeypatch.setattr("app.worker.loop.handle", boom)
-    queue = FakeQueue([_task(_analyze_body())])
+    task = _task()
+    queue = FakeQueue([task])
 
     run(queue, FakeAi())
 
-    assert queue.deleted == []
+    assert queue.done == []
+    assert queue.failed == [task.id]
 
 
-def test_successful_task_is_deleted(monkeypatch):
-    monkeypatch.setattr("app.worker.loop.handle", lambda task, ai: None)
-    queue = FakeQueue([_task(_analyze_body(), receipt="abc")])
+def test_successful_task_is_committed_with_its_result(monkeypatch):
+    monkeypatch.setattr("app.worker.loop.handle", lambda db, task, ai: {"items": 3})
+    task = _task()
+    queue = FakeQueue([task])
 
     run(queue, FakeAi())
 
-    assert queue.deleted == ["abc"]
+    assert queue.done == [(task.id, {"items": 3})]
+    assert queue.failed == []
 
 
-def test_one_failure_does_not_stop_the_batch(monkeypatch):
-    """한 건이 터져도 나머지는 처리된다."""
+def test_one_failure_does_not_stop_the_worker(monkeypatch):
+    """한 건이 터져도 루프는 다음 작업을 계속 처리한다."""
+    bad, good = _task(), _task()
 
-    def flaky(task: ReceivedTask, ai: Any) -> None:
-        if task.receipt == "bad":
+    def flaky(db, task, ai):
+        if task.id == bad.id:
             raise RuntimeError("처리 실패")
+        return None
 
     monkeypatch.setattr("app.worker.loop.handle", flaky)
-    queue = FakeQueue(
-        [
-            _task(_analyze_body(), receipt="bad"),
-            _task(_analyze_body(), receipt="good"),
-        ]
-    )
+    queue = FakeQueue([bad, good])
 
     run(queue, FakeAi())
 
-    assert queue.deleted == ["good"]
+    assert queue.failed == [bad.id]
+    assert [task_id for task_id, _result in queue.done] == [good.id]
 
 
 # ─────────────────────────── 작업 분기 ───────────────────────────
@@ -133,20 +141,20 @@ def test_one_failure_does_not_stop_the_batch(monkeypatch):
 
 def test_unknown_task_type_raises():
     with pytest.raises(ValueError, match="알 수 없는 작업 타입"):
-        handle(_task({"type": "nope"}), FakeAi())
+        handle(None, _task("nope"), FakeAi())
 
 
 @pytest.mark.parametrize(
     "task_type",
-    ["feedback.meal", "feedback.daily", "feedback.long"],
+    ["meal.analyze", "feedback.meal", "feedback.daily", "feedback.long"],
 )
-def test_remaining_task_types_are_not_implemented_yet(task_type):
+def test_task_types_are_not_implemented_yet(task_type):
     """파이프라인이 붙으면 이 테스트를 지운다."""
     with pytest.raises(NotImplementedError):
-        handle(_task({"type": task_type}), FakeAi())
+        handle(None, _task(task_type), FakeAi())
 
 
 def test_feedback_types_are_not_collapsed_into_one():
     """피드백 셋을 한 타입으로 묶지 않는다 — 모으는 데이터도 쓰는 테이블도 다르다."""
     with pytest.raises(ValueError, match="알 수 없는 작업 타입"):
-        handle(_task({"type": "feedback.generate"}), FakeAi())
+        handle(None, _task("feedback.generate"), FakeAi())
