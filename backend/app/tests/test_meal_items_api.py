@@ -79,7 +79,11 @@ def test_failed_add_does_not_enqueue_anything(client, db, fake_queue):
 
 @pytest.mark.parametrize("status", [MealStatus.ANALYZING, MealStatus.FAILED])
 def test_add_item_is_conflict_while_meal_is_not_editable(client, db, fake_queue, status):
-    """분석 중에는 Worker 가 `meal_items` 를 갈아엎고 있고, 실패한 식사는 고칠 대상이 없다."""
+    """최초 분석 중에는 Worker 가 `meal_items` 를 갈아엎고 있고, 실패한 식사는 고칠 대상이 없다.
+
+    여기 `ANALYZING` 은 `is_recalculation=False` — 최초 분석이다. 사용자 수정으로
+    인한 `ANALYZING` 은 반대로 허용된다(`test_user_can_keep_editing_...` 참고).
+    """
     user = make_user(db)
     meal = make_meal(db, user_id=user.id, status=status)
 
@@ -92,6 +96,38 @@ def test_add_item_is_conflict_while_meal_is_not_editable(client, db, fake_queue,
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "CONFLICT"
     assert fake_queue.sent == []
+
+
+def test_user_can_keep_editing_while_recalculation_is_pending(client, db, fake_queue):
+    """확인 화면에서는 음식을 여러 개 고친 뒤 "확인" 을 누른다 — 한 번만 되면 기능이 아니다.
+
+    첫 추가가 식사를 `ANALYZING` 으로 바꾸므로, `ANALYZING` 을 통째로 막으면 두 번째
+    추가가 409 로 막힌다. 사용자가 방금 스스로 만든 상태에 갇히는 셈이다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
+    db.commit()
+    headers = {"X-User-Id": str(user.id)}
+
+    added = [
+        client.post(
+            f"/api/v1/meals/{meal.id}/items",
+            headers=headers,
+            json={"displayName": name, "amount": 100, "unit": "g"},
+        )
+        for name in ("미역국", "김치", "현미밥")
+    ]
+
+    assert [r.status_code for r in added] == [201, 201, 201]
+    # 모든 응답이 명세대로 재분석 대기를 알린다.
+    for response in added:
+        data = response.json()["data"]
+        assert data["status"] == MealStatus.ANALYZING.value
+        assert data["isRecalculation"] is True
+
+    # 수정 한 번에 재분석 요청 하나. 마지막 작업이 최종 상태를 반영한다.
+    assert len(fake_queue.sent) == 3
+    assert {task["mealId"] for task in fake_queue.sent} == {str(meal.id)}
 
 
 def test_add_item_is_allowed_after_evaluation(client, db):

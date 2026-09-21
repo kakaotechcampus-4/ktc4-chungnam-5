@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.models.enums import MealStatus
+from app.models.meal import Meal
 from app.schemas.meal import (
     CalendarDay,
     CalendarSummary,
@@ -60,10 +61,29 @@ _GRAM_EQUIVALENT_UNITS = {"g", "G", "그램", "ml", "mL", "ML", "밀리리터"}
 _CURSOR_SEPARATOR = "|"
 
 # 사용자가 음식을 고칠 수 있는 상태.
-# ANALYZING 은 Worker 가 `source=MODEL` 항목을 지우고 다시 넣는 중이라 제외한다
-# (`jobs/analyze_meal.py` 6단계) — 그 와중에 끼어들면 무엇이 남을지 알 수 없다.
 # FAILED 는 인식된 음식이 하나도 없는 상태라 "고친다" 는 말이 성립하지 않는다.
 _EDITABLE_STATUSES = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATED})
+
+
+def _is_editable(meal: Meal) -> bool:
+    """지금 이 식사의 음식을 고칠 수 있는가.
+
+    **`ANALYZING` 은 뜻이 두 개다.** `is_recalculation` 이 가른다:
+
+    - `False` — 최초 분석 중. Worker 가 `source=MODEL` 항목을 지우고 다시 넣는
+      중이라(`jobs/analyze_meal.py` 6단계) 끼어들면 무엇이 남을지 알 수 없다.
+      애초에 사용자에게는 "분석 중" 화면이라 고칠 수단도 없다 → **금지**
+    - `True` — 사용자가 확인 화면에서 음식을 고쳐 재분석을 기다리는 중.
+      사용자는 여전히 그 확인 화면에 있고 음식을 더 고치는 게 정상 흐름이다
+      → **허용**
+
+    둘을 구분하지 않고 `ANALYZING` 을 통째로 막으면 **음식을 하나밖에 못 넣는다** —
+    첫 추가가 상태를 `ANALYZING` 으로 바꾸고, 그 상태가 두 번째 추가를 409 로
+    막는다. 스스로 문을 잠그는 셈이다.
+    """
+    if meal.status in _EDITABLE_STATUSES:
+        return True
+    return meal.status is MealStatus.ANALYZING and meal.is_recalculation
 
 
 def to_grams(amount: float | Decimal | None, unit: str | None) -> Decimal | None:
@@ -273,7 +293,7 @@ def add_item(
     if meal is None:
         raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
 
-    if meal.status not in _EDITABLE_STATUSES:
+    if not _is_editable(meal):
         raise MealNotEditableError(
             f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
         )

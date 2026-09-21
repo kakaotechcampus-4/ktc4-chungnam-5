@@ -50,14 +50,30 @@ def add_meal_item(
     여기서 조합한다: g 환산 → 공공 DB 매칭 → 저장 → 큐 적재. `services/` 끼리는
     서로 부르지 않으므로(README 절대 규칙 5) 순서를 아는 건 이 레이어뿐이다.
 
+    응답의 `status` · `isRecalculation` 은 API 명세서(`contracts/API.md` POST
+    /meals/{mealId}/items)를 그대로 따른다 — 항목 하나가 아니라 **식사 전체**의
+    상태다. 확인 화면에서는 음식을 여러 번 고친 뒤 "확인" 을 누르므로, 재분석을
+    기다리는 동안에도 편집은 계속 허용된다(`services.meal._is_editable`).
+
     ## 지금 이 API 를 쓰면 식사가 ANALYZING 에 갇힌다
 
     `worker/jobs/analyze_meal.py` 가 아직 미구현이라 `dispatch.handle` 이
     `NotImplementedError` 를 던진다 → 루프가 메시지를 지우지 않는다 → 재배달을
-    거쳐 **DLQ 로 간다.** 그 사이 식사는 `ANALYZING` 이고, 이 엔드포인트의 상태
-    가드가 `ANALYZING` 을 막으므로 사용자는 더 고칠 수도 확정할 수도 없다
-    (삭제만 가능). 워커가 붙으면 이 엔드포인트는 수정 없이 정상 동작한다.
-    배포 전에 워커가 먼저 병합돼야 한다.
+    거쳐 **DLQ 로 간다.** 그 사이 식사는 `ANALYZING` 에 머문다. 음식을 더 고치는
+    것과 삭제는 되지만 확정은 못 한다. 워커가 붙으면 이 엔드포인트는 수정 없이
+    정상 동작한다. 배포 전에 워커가 먼저 병합돼야 한다.
+
+    ## 미해결 — 워커 작업에서 정할 것
+
+    수정 한 번에 재분석 작업 하나가 쌓인다. 음식 3개를 고치면 같은 식사에 대한
+    `meal.analyze` 가 3건이다. SQS 는 어차피 at-least-once 라 워커가 중복 배달을
+    견뎌야 하지만(`jobs/analyze_meal.py` 독스트링), 여기서 나가는 건 재배달이
+    아니라 **서로 다른 진짜 작업**이라 "이미 처리함" 으로 넘길 수 없다.
+
+    더불어 `meal.analyze` 는 사진에서 음식을 **다시 인식**하는 작업이다. 사용자가
+    방금 이름을 직접 알려줬는데 같은 사진으로 AI 를 또 부르는 셈이라, 사용자가
+    넣은 음식을 AI 가 또 인식해 중복될 수 있다. 재인식을 건너뛰는 작업 타입이
+    필요한지 워커 작업에서 판단한다.
     """
     amount_g = meal_service.to_grams(request.amount, request.unit)
     match = nutrition_service.resolve_by_name(
