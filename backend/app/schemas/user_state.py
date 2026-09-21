@@ -11,12 +11,11 @@ import enum
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import AwareDatetime, ConfigDict, Field, field_validator
 
 from app.schemas.base import CamelModel, KstDatetime
-
-WEIGHT_CHANGE_BASELINE_LAST_WEEK = "LAST_WEEK"
 
 
 class GiSymptomCode(str, enum.Enum):
@@ -94,7 +93,7 @@ class UserStateResponse(CamelModel):
     weight_kg: float | None
     weight_change_kg: float | None
     """이번 체중 − 지난주 비교 대상 체중. 비교 대상이 없으면 None (0 이 아니다)."""
-    weight_change_baseline: str | None
+    weight_change_baseline: Literal["LAST_WEEK"] = "LAST_WEEK"
     """비교 기준. 지금은 항상 "LAST_WEEK" — 비교 대상이 없어도 같다 (D4)."""
     appetite_level: int | None
     gi_symptoms: list[GiSymptom]

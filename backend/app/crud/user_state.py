@@ -4,26 +4,13 @@
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.user import UserState
-
-_KST = "Asia/Seoul"
-_KST_ZONE = ZoneInfo(_KST)
-
-
-def _kst_day(column):
-    """recorded_at(UTC 로 저장됨)을 KST 기준 '그 날' 로 자른다.
-
-    crud/meal.py 의 _kst_day 와 같은 식이다. 그쪽은 GET /dashboard 작업에서 이름이
-    바뀌는 중이라 충돌을 피하려고 여기 따로 둔다 — 머지 후 한 곳으로 합친다.
-    """
-    return func.date_trunc("day", func.timezone(_KST, column))
 
 
 def create(
@@ -64,23 +51,20 @@ def get_latest_weight(db: Session, user_id: uuid.UUID) -> Decimal | None:
     return db.execute(stmt).scalar_one_or_none()
 
 
-def get_last_week_weight(
-    db: Session, *, user_id: uuid.UUID, recorded_at: datetime
+def get_latest_weight_before(
+    db: Session, *, user_id: uuid.UUID, before: datetime
 ) -> Decimal | None:
-    """recorded_at 기준 "지난주" 비교 대상 체중. 없으면 None.
+    """before 보다 앞선, 체중이 적힌 내 기록 중 가장 최근 것의 체중. 없으면 None.
 
-    비교 대상 = KST 날짜가 (recorded_at 의 KST 날짜 − 7일) 이하인, 체중이 적힌 내 기록 중
-    가장 최근 것. 날짜 단위로 자르므로 경계 날에도 그날 마지막 기록이 대표값이 된다
-    (GET /dashboard 의 하루 대표값 규칙과 같다). 기준은 서버 now 가 아니라 recorded_at 이다.
+    recorded_at 을 함수로 감싸지 않아 ix_user_states_user_id_recorded_at 범위 탐색을 탄다.
+    경계(before)를 어떻게 잡을지는 호출하는 쪽이 정한다.
     """
-    kst_date = recorded_at.astimezone(_KST_ZONE).date()
-    cutoff_day = datetime.combine(kst_date - timedelta(days=7), datetime.min.time())
     stmt = (
         select(UserState.weight_kg)
         .where(
             UserState.user_id == user_id,
             UserState.weight_kg.is_not(None),
-            _kst_day(UserState.recorded_at) <= cutoff_day,
+            UserState.recorded_at < before,
         )
         .order_by(UserState.recorded_at.desc())
         .limit(1)

@@ -6,11 +6,10 @@
 
 from datetime import datetime
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, PlainSerializer, WithJsonSchema
+from pydantic import AwareDatetime, BaseModel, ConfigDict, PlainSerializer, WithJsonSchema
 
-_KST_ZONE = ZoneInfo("Asia/Seoul")
+from app.core.time import KST
 
 
 def to_camel(snake_str: str) -> str:
@@ -27,16 +26,16 @@ class CamelModel(BaseModel):
 
 
 def _to_kst_iso(value: datetime) -> str:
-    return value.astimezone(_KST_ZONE).isoformat()
+    return value.astimezone(KST).isoformat()
 
 
 KstDatetime = Annotated[
-    datetime,
+    AwareDatetime,
     PlainSerializer(_to_kst_iso, return_type=str, when_used="json"),
     WithJsonSchema({"type": "string", "format": "date-time"}),
 ]
 """응답 시각 타입. JSON 으로 나갈 때 Asia/Seoul 로 바꿔 +09:00 을 붙인 ISO 8601 로 쓴다 (팀 관례).
 
 DB 는 UTC 로 돌려주므로 그대로 두면 "+00:00" 으로 나간다. 파이썬 안(model_dump)에서는
-datetime 그대로다. 시간대 없는(naive) 값은 서버 로컬 시간으로 해석되니 넣지 않는다.
+datetime 그대로다. 시간대 없는(naive) 값은 KST/UTC 를 추측하지 않고 검증에서 거부한다.
 """
