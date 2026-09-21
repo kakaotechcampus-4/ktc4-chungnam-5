@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from app.models.enums import MealItemSource, MealStatus
 from app.models.meal import UserCorrection
+from app.models.task import Task
 from app.tests.factories import (
     make_food_ref,
     make_meal,
@@ -688,26 +689,17 @@ def test_correction_keeps_the_users_raw_unit_when_grams_are_unknown(client, db):
     assert correction.corrected_value["amountG"] is None
 
 
-def test_update_never_touches_the_task_queue(client, db, monkeypatch):
+def test_update_never_touches_the_task_queue(client, db):
     """음식 수정은 비동기 작업을 만들지 않는다 — 설계 결정을 코드로 고정한다.
 
     응답의 `steps` 가 `DB_MATCHING: RUNNING` 이라 "워커가 돈다" 로 읽히기 쉽다.
     실제로는 사용자가 이름과 양을 직접 알려줬으므로 AI 에게 물을 것이 없고, 다시
     계산할 Q/Q/S 는 순수 함수다(README 절대 규칙 2).
 
-    `build_task_queue` 가 아니라 `SqsQueue.send` 를 막는다 — 호출부가 팩토리 이름을
-    당겨 오면 그 이름은 임포트 시점에 박히므로 팩토리 패치로는 잡히지 않는다.
+    큐가 테이블이라 보내는 함수를 패치할 필요가 없다 — 행이 생겼는지 직접 본다.
+    `enqueue` 를 패치하면 호출부가 `from app.infra.queue import enqueue` 로 이름을
+    당겨 왔을 때 잡지 못하지만, 결과를 보면 어떤 경로로 넣었든 걸린다.
     """
-    from app.infra.queue import SqsQueue
-
-    def explode(self, body):
-        raise AssertionError(
-            f"음식 수정 경로에서 큐로 작업을 보냈다: {body!r} "
-            "— `update_meal_items` 독스트링의 'steps 는 고정값이다' 참고"
-        )
-
-    monkeypatch.setattr(SqsQueue, "send", explode)
-
     user = make_user(db)
     meal = make_meal(db, user_id=user.id)
     item = make_meal_item(db, meal_id=meal.id)
@@ -720,6 +712,11 @@ def test_update_never_touches_the_task_queue(client, db, monkeypatch):
     )
 
     assert response.status_code == 200, response.text
+    queued = db.execute(select(Task)).scalars().all()
+    assert queued == [], (
+        "음식 수정 경로에서 큐에 작업을 넣었다 "
+        "— `update_meal_items` 독스트링의 'steps 는 고정값이다' 참고"
+    )
 
 
 def test_amount_edit_in_a_countable_unit_is_not_silently_dropped(client, db):
