@@ -9,7 +9,7 @@
 판정 규칙 근거: `docs/be-medication-stage-rule.md`
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -26,6 +26,7 @@ from app.services.medication import (
     dose_direction,
     judge_stage,
     predict_next_dose,
+    previous_different_dose,
 )
 
 INITIAL = MedicationStage.INITIAL
@@ -47,36 +48,72 @@ def M(*values: str) -> list[tuple[str, Decimal]]:
     return [(MOUNJARO, Decimal(v)) for v in values]
 
 
-# ── dose_context: 이력에서 두 값 뽑기 ──────────────────────────
+# ── previous_different_dose: 이력에서 직전의 '다른' 용량 ──────
 #
-# previous_doses 는 **최신이 먼저**다. 창(window)이 아니라 용량이 바뀌는 지점까지만 센다.
+# previous 는 **최신이 먼저**다. 용량이 바뀌는 지점 또는 약물이 바뀌는 지점에서 멈춘다.
 
 
 @pytest.mark.parametrize(
-    ("dose", "previous", "expected_streak", "expected_prev"),
+    ("dose", "previous", "expected"),
     [
         # 첫 투약 — 비교할 과거가 없다
-        ("0.25", [], 1, None),
-        # 같은 용량이 이어진다
-        ("0.5", W("0.5"), 2, None),
-        ("0.5", W("0.5", "0.5", "0.5"), 4, None),
+        ("0.25", [], None),
+        # 쭉 같은 용량뿐이면 '다른 용량'이 없다
+        ("0.5", W("0.5"), None),
+        ("0.5", W("0.5", "0.5", "0.5"), None),
         # 용량이 바뀌는 지점에서 멈춘다. 그 너머는 안 본다
-        ("1.0", W("0.5", "0.5", "0.25"), 1, Decimal("0.5")),
-        ("1.0", W("1.0", "0.5", "0.5"), 2, Decimal("0.5")),
+        ("1.0", W("0.5", "0.5", "0.25"), Decimal("0.5")),
+        ("1.0", W("1.0", "0.5", "0.5"), Decimal("0.5")),
         # 감량 — 직전의 '다른' 용량이 더 크다
-        ("1.7", W("2.4", "2.4"), 1, Decimal("2.4")),
-        ("1.7", W("1.7", "1.7", "2.4"), 3, Decimal("2.4")),
+        ("1.7", W("2.4", "2.4"), Decimal("2.4")),
+        ("1.7", W("1.7", "1.7", "2.4"), Decimal("2.4")),
     ],
 )
-def test_dose_context(
-    dose: str,
-    previous: list[tuple[str, Decimal]],
-    expected_streak: int,
-    expected_prev: Decimal | None,
+def test_previous_different_dose(
+    dose: str, previous: list[tuple[str, Decimal]], expected: Decimal | None
 ) -> None:
-    context = dose_context(WEGOVY, Decimal(dose), previous)
+    assert previous_different_dose(WEGOVY, Decimal(dose), previous) == expected
+
+
+# ── same_dose_streak: 행이 아니라 날짜에서 나온다 ──────────────
+
+
+@pytest.mark.parametrize(
+    ("days_since_change", "expected_streak"),
+    [
+        (0, 1),    # 바꾼 당일이 1회차
+        (6, 1),    # 아직 한 주 안 지났다
+        (7, 2),
+        (20, 3),
+        (21, 4),   # MAINTENANCE_STREAK 경계
+        (35, 6),
+    ],
+)
+def test_streak_counts_doses_not_rows(days_since_change: int, expected_streak: int) -> None:
+    """streak 은 `count_doses` 와 같은 공식이고 앵커만 다르다 (이 행의 시작일).
+
+    행을 세면 안 되는 이유: 행은 '용량 변경 1건'이라 인접한 두 행의 (약물, 용량) 이
+    같을 수 없다. 세면 구조적으로 항상 1 이고 정착 판정이 죽는다 (코드 리뷰 지적).
+    """
+    change_day = date(2026, 3, 2)
+    context = dose_context(
+        WEGOVY,
+        Decimal("1.0"),
+        W("0.5"),
+        effective_from=change_day,
+        today=change_day + timedelta(days=days_since_change),
+    )
     assert context.same_dose_streak == expected_streak
-    assert context.previous_different_dose_mg == expected_prev
+    assert context.previous_different_dose_mg == Decimal("0.5")
+
+
+def test_streak_is_one_when_change_date_is_ahead_of_today() -> None:
+    """아직 시작하지 않은 구간은 1 로 본다 — 0 이나 음수가 나오면 안 된다."""
+    context = dose_context(
+        WEGOVY, Decimal("1.0"), [],
+        effective_from=date(2026, 3, 9), today=date(2026, 3, 2),
+    )
+    assert context.same_dose_streak == 1
 
 
 # ── 약물 전환: 이력이 거기서 끊긴다 ────────────────────────────
@@ -84,23 +121,17 @@ def test_dose_context(
 
 def test_drug_switch_cuts_history() -> None:
     """마운자로 15 → 위고비 2.4 는 감량이 아니다. 사다리가 다르면 숫자를 비교할 수 없다."""
-    context = dose_context(WEGOVY, Decimal("2.4"), M("15", "15"))
-    assert context.same_dose_streak == 1
-    assert context.previous_different_dose_mg is None
+    assert previous_different_dose(WEGOVY, Decimal("2.4"), M("15", "15")) is None
 
 
 def test_returning_to_previous_drug_does_not_rejoin_old_run() -> None:
     """약을 바꿨다 되돌아와도 옛 구간과 이어붙지 않는다.
 
-    위고비 1.7 x3 → 마운자로 → 다시 위고비 1.7 은 **연속 4회차가 아니라 1회차**다.
     이력을 SQL 에서 `drug_name = ?` 로 걸렀다면 마운자로 구간을 건너뛰고 이어붙어,
-    돌아오자마자 유지기로 판정됐을 것이다.
+    돌아오자마자 옛 용량과 비교됐을 것이다.
     """
     previous = M("7.5", "5.0") + W("1.7", "1.7", "1.7")
-    context = dose_context(WEGOVY, Decimal("1.7"), previous)
-    assert context.same_dose_streak == 1
-    assert context.previous_different_dose_mg is None
-    assert judge_stage(WEGOVY, Decimal("1.7"), **context._asdict()) is TITRATION
+    assert previous_different_dose(WEGOVY, Decimal("1.7"), previous) is None
 
 
 # ── judge_stage: 사다리 위치 축 ────────────────────────────────
@@ -223,28 +254,6 @@ def test_reduction_to_first_rung_is_reduced_not_initial() -> None:
 # ── 시나리오: 표준 증량 경로를 처음부터 끝까지 ─────────────────
 
 
-def test_standard_escalation_path() -> None:
-    """위고비 표준 경로(한 칸에 4회)를 주차별로 재현한다.
-
-    ⚠️ MAINTENANCE_STREAK 가 4 라서 **매 칸의 4회차가 유지기로 잡힌다.**
-    정상적으로 증량 중인데도 그렇다 — 이건 버그가 아니라 현재 선택한 경계값의 결과이고,
-    팀 피드백 안건이다 (`docs/be-medication-stage-rule.md` 안건 2).
-    이 테스트는 그 동작을 눈에 보이게 고정해 둔다. 값을 5·6 으로 바꾸면 여기가 깨진다.
-    """
-    history = W("0.25", "0.25", "0.25", "0.25", "0.5", "0.5", "0.5", "0.5", "1.0", "1.0")
-    stages = []
-    for i, (drug, dose) in enumerate(history):
-        context = dose_context(drug, dose, list(reversed(history[:i])))
-        stages.append(judge_stage(drug, dose, **context._asdict()))
-
-    assert stages == [
-        INITIAL, INITIAL, INITIAL, INITIAL,      # 0.25 — 첫 칸이라 streak 무관
-        TITRATION, TITRATION, TITRATION,          # 0.5 1~3회차
-        MAINTENANCE,                              # 0.5 4회차 ← 다음 주에 올릴 건데 유지기
-        TITRATION, TITRATION,                     # 1.0 1~2회차
-    ]
-
-
 # ── 사다리 상수 자체의 불변식 ──────────────────────────────────
 
 
@@ -345,3 +354,43 @@ def test_direction_compares_with_the_previous_dose(
         )
         is expected
     )
+
+
+def test_standard_escalation_path() -> None:
+    """위고비 표준 경로(한 칸에 4주)를 주차별로 재현한다.
+
+    **이력이 아니라 날짜로 만든다.** 예전 버전은 `W("0.5","0.5","0.5")` 처럼 같은
+    용량이 연속된 이력을 지어내서 돌렸는데, 그런 이력은 DB 가 만들 수 없다 — 행은
+    용량 변경 1건이라 인접한 두 행의 용량이 같을 수 없다. 그래서 streak 가 실제로는
+    항상 1 인데도 이 테스트는 통과했다 (코드 리뷰 지적).
+
+    ⚠️ MAINTENANCE_STREAK 가 4 라서 **매 칸의 4회차가 유지기로 잡힌다.**
+    정상적으로 증량 중인데도 그렇다 — 버그가 아니라 현재 경계값의 결과이고,
+    팀 피드백 안건이다 (`docs/be-medication-stage-rule.md` 안건 2).
+    """
+    start_day = date(2026, 1, 5)
+    # (용량, 이 용량을 시작한 주차, 직전의 다른 용량, 머무는 주차)
+    rungs = [
+        ("0.25", 0, None, 4),
+        ("0.5", 4, Decimal("0.25"), 4),
+        ("1.0", 8, Decimal("0.5"), 2),
+    ]
+    stages = []
+    for dose, first_week, prev, weeks in rungs:
+        change_day = start_day + timedelta(weeks=first_week)
+        for w in range(weeks):
+            context = dose_context(
+                WEGOVY,
+                Decimal(dose),
+                W(str(prev)) if prev is not None else [],
+                effective_from=change_day,
+                today=change_day + timedelta(weeks=w),
+            )
+            stages.append(judge_stage(WEGOVY, Decimal(dose), **context._asdict()))
+
+    assert stages == [
+        INITIAL, INITIAL, INITIAL, INITIAL,      # 0.25 — 첫 칸이라 streak 무관
+        TITRATION, TITRATION, TITRATION,          # 0.5 1~3회차
+        MAINTENANCE,                              # 0.5 4회차 ← 다음 주에 올릴 건데 유지기
+        TITRATION, TITRATION,                     # 1.0 1~2회차
+    ]

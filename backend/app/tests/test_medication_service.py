@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -85,7 +85,7 @@ def test_dose_change_closes_previous_row_the_day_before(
 
     history = medication_crud.list_history(db, user_id)
     assert len(history) == 2
-    assert history[0].effective_to == TODAY - __import__("datetime").timedelta(days=1)
+    assert history[0].effective_to == TODAY - timedelta(days=1)
     assert history[1].effective_from == TODAY
     assert history[1].effective_to is None
 
@@ -298,3 +298,81 @@ def test_started_at_can_still_move_backward(db: Session, user_id: uuid.UUID) -> 
     service.upsert(db, user_id, _req("0.5", date(2026, 8, 1)), today=TODAY)
 
     assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 8, 1)
+
+
+# ── 단계 전이: 시간이 지나야 일어난다 ──────────────────────────
+
+
+def test_middle_dose_settles_into_maintenance_over_time(
+    db: Session, user_id: uuid.UUID
+) -> None:
+    """중간 칸 용량도 회차를 채우면 유지기가 된다.
+
+    streak 을 행으로 세던 때는 이 전이가 구조적으로 불가능했다 — 인접한 두 행은
+    (약물, 용량) 이 같을 수 없어 streak 이 항상 1 이었다 (코드 리뷰 지적).
+    """
+    start = date(2026, 3, 2)
+    raised = start + timedelta(weeks=4)
+    service.upsert(db, user_id, _req("0.5", start), today=start)
+    service.upsert(db, user_id, _req("1.0"), today=raised)  # 1.0 으로 올린 날
+
+    # 올린 당일은 1회차 — 아직 정착 전이다
+    assert service.get_current_view(db, user_id, today=raised).stage is MedicationStage.TITRATION
+    # 3주 뒤 4회차 — 정착
+    settled = raised + timedelta(weeks=3)
+    assert service.get_current_view(db, user_id, today=settled).stage is MedicationStage.MAINTENANCE
+
+
+def test_stage_advances_without_any_write(db: Session, user_id: uuid.UUID) -> None:
+    """앱을 안 켜도 단계가 흐른다.
+
+    단계는 시간만 지나도 바뀌는데 그 순간에는 쓰기 이벤트가 없다. 저장값을 그대로
+    읽으면 사용자가 요청을 보낼 때까지 단계가 멈춘다 — 그래서 조회 시 재판정한다.
+    """
+    start = date(2026, 3, 2)
+    raised = start + timedelta(weeks=4)
+    service.upsert(db, user_id, _req("0.5", start), today=start)
+    service.upsert(db, user_id, _req("1.0"), today=raised)
+    stored = medication_crud.get_current(db, user_id).stage
+
+    view = service.get_current_view(db, user_id, today=raised + timedelta(weeks=3))
+
+    assert stored is MedicationStage.TITRATION  # 저장값은 쓰기 시점 그대로
+    assert view.stage is MedicationStage.MAINTENANCE  # 응답은 오늘 기준
+    # 조회가 쓰기를 하지 않는다
+    assert medication_crud.get_current(db, user_id).stage is stored
+
+
+def test_resending_same_dose_updates_the_stored_stage(
+    db: Session, user_id: uuid.UUID
+) -> None:
+    """같은 용량 재전송은 행을 안 만들지만 단계는 갱신한다."""
+    start = date(2026, 3, 2)
+    raised = start + timedelta(weeks=4)
+    service.upsert(db, user_id, _req("0.5", start), today=start)
+    service.upsert(db, user_id, _req("1.0"), today=raised)
+
+    result = service.upsert(db, user_id, _req("1.0"), today=raised + timedelta(weeks=3))
+
+    assert result.dose_changed is False
+    assert result.stage_changed is True
+    assert _rows(db, user_id) == 2  # 행은 안 늘었다
+    assert medication_crud.get_current(db, user_id).stage is MedicationStage.MAINTENANCE
+
+
+def test_reduced_releases_once_the_lower_dose_settles(
+    db: Session, user_id: uuid.UUID
+) -> None:
+    """감량 후 회차를 채우면 REDUCED 에서 풀린다.
+
+    MAINTENANCE_STREAK docstring 이 약속한 동작인데, streak 이 1 에 갇혀 있던 동안은
+    감량하면 영원히 REDUCED 였다.
+    """
+    start = date(2026, 3, 2)
+    lowered = start + timedelta(weeks=4)
+    service.upsert(db, user_id, _req("1.7", start), today=start)
+    service.upsert(db, user_id, _req("1.0"), today=lowered)  # 감량
+
+    assert service.get_current_view(db, user_id, today=lowered).stage is MedicationStage.REDUCED
+    settled = lowered + timedelta(weeks=3)
+    assert service.get_current_view(db, user_id, today=settled).stage is MedicationStage.MAINTENANCE

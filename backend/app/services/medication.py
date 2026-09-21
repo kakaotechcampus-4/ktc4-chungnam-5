@@ -71,6 +71,7 @@ MAINTENANCE_STREAK: Final = 4
 ⚠️ 4 는 곧 "예정대로"다. 정상적으로 증량 중인 사용자도 매 칸의 4회차에 한 번씩
    MAINTENANCE 로 잡힌다 (`docs/be-medication-stage-rule.md` 안건 2). 팀 피드백 대기 중이고,
    R1 튜닝 상수라 여기 숫자만 바꾸면 된다.
+   streak 가 행을 세느라 항상 1 이던 동안은 이 경계에 닿지도 않아 증상이 안 보였다.
 
 감량기(REDUCED) 지속 기간도 이 값이 정한다 — 내린 용량으로 이만큼 채우면 유지기로 넘어간다.
 """
@@ -80,7 +81,10 @@ class DoseContext(NamedTuple):
     """`judge_stage` 가 사다리 위치 말고 더 봐야 하는 두 값."""
 
     same_dose_streak: int
-    """현재 용량으로 연속 투약한 회차. 이번 회차를 포함한다."""
+    """현재 용량으로 연속 투약한 **회차**. 이번 회차를 포함한다.
+
+    **행이 아니라 날짜에서 나온다** — `dose_context` 참고.
+    """
     previous_different_dose_mg: Decimal | None
     """직전의 *다른* 용량. 첫 용량이거나 쭉 같은 용량뿐이면 None."""
 
@@ -94,12 +98,12 @@ class DoseContext(NamedTuple):
 # 있으며, 결정되면 judge_stage 와 DOSE_LADDERS 를 함께 고친다.
 
 
-def dose_context(
+def previous_different_dose(
     drug_name: DrugName,
     dose_mg: Decimal,
     previous: Sequence[tuple[str, Decimal]],
-) -> DoseContext:
-    """판정에 필요한 두 값을 과거 이력에서 한 번에 뽑는다.
+) -> Decimal | None:
+    """같은 약물 안에서 **직전의 다른 용량**. 없으면 None.
 
     `previous` 는 **이번 회차를 뺀** (약물, 용량) 목록이고 **최신이 먼저**다
     (`crud.list_doses_desc`). 최신부터 거꾸로 훑다가 **둘 중 먼저 오는 지점에서 멈춘다.**
@@ -107,26 +111,47 @@ def dose_context(
     1. **약물이 다르다** → 거기서 이력이 끝난다. 사다리가 통째로 다르면 용량을 비교할 수 없다.
        위고비 2.4 다음 마운자로 5.0 은 증량이 아니고, 마운자로 15 다음 위고비 2.4 도 감량이 아니다.
        약을 바꾸면 새 사다리를 처음부터 다시 타는 것으로 본다.
-    2. **용량이 다르다** → 그게 `previous_different_dose_mg` 다.
+    2. **용량이 다르다** → 그게 답이다.
 
     1번이 2번보다 앞이라, 약을 바꿨다 **되돌아온** 경우에도 옛 구간과 이어붙지 않는다.
-    (위고비 1.7 x3 → 마운자로 → 다시 위고비 1.7 은 연속 4회차가 아니라 1회차다.)
 
-    - `same_dose_streak` — 현재 용량 구간의 길이. 창(window)이 아니다. 최근 N 개를
-      보는 게 아니라 **끊기는 지점까지만** 센다.
-    - `previous_different_dose_mg` — 같은 약물 안에서 직전의 *다른* 용량. 없으면 None.
-
-    직전 **회차**가 아니라 직전의 **다른 용량**인 이유: 회차로 비교하면 감량 2회차부터
+    직전 **회차**가 아니라 직전의 **다른** 용량인 이유: 회차로 비교하면 감량 2회차부터
     "직전과 같음"이 되어 REDUCED 가 1회 만에 풀린다.
     """
-    streak = 1
     for past_drug, past_dose in previous:
         if past_drug != drug_name:
-            return DoseContext(same_dose_streak=streak, previous_different_dose_mg=None)
+            return None
         if past_dose != dose_mg:
-            return DoseContext(same_dose_streak=streak, previous_different_dose_mg=past_dose)
-        streak += 1
-    return DoseContext(same_dose_streak=streak, previous_different_dose_mg=None)
+            return past_dose
+    return None
+
+
+def dose_context(
+    drug_name: DrugName,
+    dose_mg: Decimal,
+    previous: Sequence[tuple[str, Decimal]],
+    *,
+    effective_from: date,
+    today: date,
+) -> DoseContext:
+    """`judge_stage` 에 넘길 두 값을 모은다. **축이 서로 다르다.**
+
+    - `same_dose_streak` — **날짜**에서 나온다. 이 용량을 시작한 날(`effective_from`)
+      부터 몇 회차를 채웠는지다. `count_doses` 와 같은 공식이고 앵커만 다르다
+      (`startedAt` 대신 이 행의 시작일).
+    - `previous_different_dose_mg` — **이력**에서 나온다 (`previous_different_dose`).
+
+    **streak 을 행으로 세면 안 된다.** 행은 용량 변경 1건이라 인접한 두 행의
+    (약물, 용량) 이 같을 수 없다. 세면 구조적으로 항상 1 이 나오고, `judge_stage` 의
+    규칙 4(정착 → MAINTENANCE)가 통째로 죽는다. 감량도 영원히 REDUCED 에서 안 풀린다.
+    `doseCount` 가 행을 안 세는 것과 같은 이유다 (코드 리뷰 지적).
+
+    `effective_from` 이 오늘보다 뒤면 1 로 본다 — 아직 한 회차도 안 채운 것이다.
+    """
+    return DoseContext(
+        same_dose_streak=max(1, count_doses(effective_from, today=today)),
+        previous_different_dose_mg=previous_different_dose(drug_name, dose_mg, previous),
+    )
 
 
 def judge_stage(
@@ -243,6 +268,9 @@ RULE_VERSION: Final = "v1"
 
 사다리 수치나 `judge_stage` 의 순서를 바꾸면 올린다 — 같은 입력에 다른 단계가 나온
 이유를 나중에 추적하려면 어느 규칙으로 찍힌 값인지가 필요하다.
+
+⚠️ 올릴지 말지는 팀이 정한다. streak 산출 방식과 `MAINTENANCE_STREAK` 가 바뀌어
+   같은 저장 데이터가 다른 단계를 내므로 올릴 근거는 있다 — 회의 안건이다.
 """
 
 STAGE_REASONS: Final[dict[MedicationStage, str]] = {
@@ -329,6 +357,37 @@ class UpsertResult(NamedTuple):
     """직전 용량. `direction` 을 여기서 뽑는다. 첫 등록이거나 변경이 없으면 None."""
 
 
+def restage(
+    db: Session,
+    user_id: uuid.UUID,
+    record: MedicationRecord,
+    *,
+    today: date,
+) -> MedicationStage:
+    """저장된 행을 **오늘 기준으로** 다시 판정한다.
+
+    단계는 시간만 지나도 바뀐다 — 같은 용량으로 회차를 채우면 정착(MAINTENANCE)이고,
+    감량 후 회차를 채우면 REDUCED 에서 풀린다. 그런데 그 순간에는 쓰기 이벤트가 없다.
+    `judge_stage` 를 쓰기 시점에만 부르면 사용자가 앱을 안 켜는 동안 단계가 멈춘다.
+
+    그래서 `doseCount`·`nextDoseDate` 와 같은 모델을 쓴다 — **읽을 때 계산한다.**
+    저장된 `record.stage` 는 "그때 판정 결과"의 기록으로 남기고 여기서 덮지 않는다
+    (조회가 쓰기를 하면 안 된다).
+
+    `exclude_id` 로 **이 행 자신을 이력에서 뺀다.** 안 빼면 직전의 '다른' 용량을 찾는
+    훑기가 자기 자신부터 시작한다.
+    """
+    drug_name = DrugName(record.drug_name)
+    context = dose_context(
+        drug_name,
+        record.dose_mg,
+        crud.list_doses_desc(db, user_id, exclude_id=record.id),
+        effective_from=record.effective_from,
+        today=today,
+    )
+    return judge_stage(drug_name, record.dose_mg, **context._asdict())
+
+
 def upsert(
     db: Session,
     user_id: uuid.UUID,
@@ -375,7 +434,8 @@ def upsert(
                 payload.drug_name,
                 payload.dose_mg,
                 previous_different_dose_mg=None,
-                same_dose_streak=1,
+                # 과거 시작일로 첫 등록하면 그만큼 회차를 이미 채운 것이다.
+                same_dose_streak=max(1, count_doses(started_at or today, today=today)),
             ),
             effective_from=started_at or today,
         )
@@ -394,17 +454,25 @@ def upsert(
 
     unchanged = current.drug_name == payload.drug_name and current.dose_mg == payload.dose_mg
     if unchanged:
-        # 변경이 없으면 이력에 남길 게 없다. startedAt 반영만 하고 끝낸다.
+        # 변경이 없으면 이력에 남길 게 없다. 행은 안 만든다.
+        # 다만 **단계는 바뀔 수 있다** — 같은 용량으로 회차를 채우면 정착이다.
+        # 여기서 재판정하지 않으면 매주 같은 용량을 보내는 사용자가 영원히 TITRATION 이다.
+        restaged = restage(db, user_id, current, today=today)
+        stage_changed = restaged != current.stage
+        current.stage = restaged
         db.commit()
-        return UpsertResult(current, dose_changed=False, stage_changed=False)
+        return UpsertResult(current, dose_changed=False, stage_changed=stage_changed)
 
+    # 변경일은 오늘이다 — 명세 body 에 '언제 바꿨는지' 자리가 없다.
+    change_date = max(today, current.effective_from)
+    # 용량이 바뀌면 그 날부터 새 구간이라 streak 은 1 부터 다시 센다.
     context = dose_context(
         payload.drug_name,
         payload.dose_mg,
         crud.list_doses_desc(db, user_id),
+        effective_from=change_date,
+        today=today,
     )
-    # 변경일은 오늘이다 — 명세 body 에 '언제 바꿨는지' 자리가 없다.
-    change_date = max(today, current.effective_from)
     if change_date > current.effective_from:
         crud.close_current(db, current, effective_to=change_date - timedelta(days=1))
     else:
@@ -458,8 +526,10 @@ def get_current_view(
 
     started_at = crud.get_dosing_start_date(db, user_id) or current.effective_from
     next_dose_date, days_until_next_dose = predict_next_dose(started_at, today=today)
+    # 단계는 저장값을 읽지 않고 오늘 기준으로 다시 판정한다 — 시간만 지나도 바뀌는데
+    # 그 순간에는 쓰기 이벤트가 없다. doseCount·nextDoseDate 와 같은 모델이다.
     return CurrentMedicationResponse(
-        stage=current.stage,
+        stage=restage(db, user_id, current, today=today),
         drug_name=current.drug_name,
         dose_mg=current.dose_mg,
         dose_count=count_doses(started_at, today=today),
