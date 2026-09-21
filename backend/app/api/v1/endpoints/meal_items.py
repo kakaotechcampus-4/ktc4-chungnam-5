@@ -34,11 +34,36 @@ def add_meal_item(
     """사용자가 빠진 음식을 직접 더한다.
 
     AI 가 준 후보(`candidateFoodRefId`)가 없으므로 공공 DB 를 이름으로 찾는다.
-    하나로 좁혀졌고 섭취량을 g 으로 옮길 수 있으면 `matched: true` 와 환산한
-    영양성분이 함께 나간다. 좁혀지지 않았거나("김치찌개" 28건) 환산이 안 되면
-    ("2개") `matched: false` 다 — API 명세서가 `matched` 를 "영양정보 유무" 로
-    정의하기 때문이다. 그때도 DB 의 `food_ref_id` 링크는 남아, 나중에 g 으로
-    고치면 곧바로 환산된다. 매칭 규칙은 `crud.food.find_unique_by_name` 참고.
+    `matched` 는 API 명세서의 정의대로 **"영양정보가 함께 나가는가"** 이지
+    "공공 DB 에서 음식을 찾았는가" 가 아니다. 세 갈래다:
+
+    | 결과 | `matched` | `nutrition` | DB `food_ref_id` |
+    |---|---|---|---|
+    | 하나로 좁혀짐 + g 환산 가능 | `true` | 있음 | 연결 |
+    | 하나로 좁혀짐 + 환산 불가("2개") | `false` | `null` | **연결 유지** |
+    | 못 좁힘 (없음 · "김치찌개" 28건) | `false` | `null` | `NULL` |
+
+    두 번째가 링크를 남기는 건 사용자가 나중에 양을 g 으로 고치면 곧바로 환산되기
+    때문이다. 매칭 규칙은 `crud.food.find_unique_by_name` 참고.
+
+    ## `matched: false` 는 에러가 아니라 폴백 신호다
+
+    항목은 **정상 저장된다(201).** 영양정보만 비어 있다. FE 는 이 값을 보고 API
+    명세서의 "영양정보 폴백" 으로 넘어간다:
+
+        matched: false
+          → GET /nutrition/candidates?q=<displayName>&limit=5   후보 검색
+          → 사용자가 고르거나 직접 입력
+          → PUT /meals/{mealId}/items/{itemId}/nutrition
+
+    이름 매칭을 일부러 좁게 잡았다 — 틀린 영양성분이 `food_ref_id` 로 박제돼
+    Q/Q/S 채점까지 흘러가는 것보다 비어 있는 편이 낫기 때문이다(`quality_score`
+    가 NULL 허용인 이유). 그래서 흔한 음식도 이 경로로 간다: 실측하면
+    `김치찌개` · `미역국` · `제육볶음` · `현미밥` 이 전부 여기 해당한다.
+
+    ⚠️ **`/nutrition/candidates` 와 `PUT .../nutrition` 이 붙기 전까지 사용자는
+    영양정보를 채울 수단이 없다.** 항목과 양은 남으므로 데이터가 유실되지는
+    않지만, 그 두 엔드포인트가 이 기능의 선행 조건이다.
 
     없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다
     (`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).
