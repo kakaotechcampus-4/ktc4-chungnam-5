@@ -318,8 +318,8 @@ def test_middle_dose_settles_into_maintenance_over_time(
 
     # 올린 당일은 1회차 — 아직 정착 전이다
     assert service.get_current_view(db, user_id, today=raised).stage is MedicationStage.TITRATION
-    # 3주 뒤 4회차 — 정착
-    settled = raised + timedelta(weeks=3)
+    # 4주 뒤 5회차 — 예정일에 안 올렸으니 정착
+    settled = raised + timedelta(weeks=4)
     assert service.get_current_view(db, user_id, today=settled).stage is MedicationStage.MAINTENANCE
 
 
@@ -335,7 +335,7 @@ def test_stage_advances_without_any_write(db: Session, user_id: uuid.UUID) -> No
     service.upsert(db, user_id, _req("1.0"), today=raised)
     stored = medication_crud.get_current(db, user_id).stage
 
-    view = service.get_current_view(db, user_id, today=raised + timedelta(weeks=3))
+    view = service.get_current_view(db, user_id, today=raised + timedelta(weeks=4))
 
     assert stored is MedicationStage.TITRATION  # 저장값은 쓰기 시점 그대로
     assert view.stage is MedicationStage.MAINTENANCE  # 응답은 오늘 기준
@@ -352,7 +352,7 @@ def test_resending_same_dose_updates_the_stored_stage(
     service.upsert(db, user_id, _req("0.5", start), today=start)
     service.upsert(db, user_id, _req("1.0"), today=raised)
 
-    result = service.upsert(db, user_id, _req("1.0"), today=raised + timedelta(weeks=3))
+    result = service.upsert(db, user_id, _req("1.0"), today=raised + timedelta(weeks=4))
 
     assert result.dose_changed is False
     assert result.stage_changed is True
@@ -374,5 +374,5 @@ def test_reduced_releases_once_the_lower_dose_settles(
     service.upsert(db, user_id, _req("1.0"), today=lowered)  # 감량
 
     assert service.get_current_view(db, user_id, today=lowered).stage is MedicationStage.REDUCED
-    settled = lowered + timedelta(weeks=3)
+    settled = lowered + timedelta(weeks=4)
     assert service.get_current_view(db, user_id, today=settled).stage is MedicationStage.MAINTENANCE

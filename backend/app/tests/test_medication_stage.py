@@ -19,6 +19,7 @@ from app.schemas.medication import DoseDirection
 from app.services.medication import (
     DOSE_INTERVAL_DAYS,
     DOSE_LADDERS,
+    ESCALATION_DOSES,
     MAINTENANCE_STREAK,
     STAGE_REASONS,
     count_doses,
@@ -85,7 +86,8 @@ def test_previous_different_dose(
         (6, 1),    # 아직 한 주 안 지났다
         (7, 2),
         (20, 3),
-        (21, 4),   # MAINTENANCE_STREAK 경계
+        (21, 4),   # 정상 증량의 최댓값 — 다음 주에 올린다
+        (28, 5),   # MAINTENANCE_STREAK 경계 — 예정일에 안 올렸다
         (35, 6),
     ],
 )
@@ -254,6 +256,70 @@ def test_reduction_to_first_rung_is_reduced_not_initial() -> None:
 # ── 시나리오: 표준 증량 경로를 처음부터 끝까지 ─────────────────
 
 
+def test_standard_escalation_path() -> None:
+    """위고비 표준 경로(한 칸에 4주)를 주차별로 재현한다.
+
+    **이력이 아니라 날짜로 만든다.** 예전 버전은 `W("0.5","0.5","0.5")` 처럼 같은
+    용량이 연속된 이력을 지어내서 돌렸는데, 그런 이력은 DB 가 만들 수 없다 — 행은
+    용량 변경 1건이라 인접한 두 행의 용량이 같을 수 없다. 그래서 streak 가 실제로는
+    항상 1 인데도 이 테스트는 통과했다 (코드 리뷰 지적).
+
+    **정상 증량 중에는 유지기가 한 번도 나오면 안 된다.** MAINTENANCE_STREAK 가 4 이던
+    때는 매 칸 4회차가 유지기로 잡혔다 — 다음 주에 올릴 사람한테 "약효가 줄고 식욕이
+    돌아오는 구간"이라고 말하는 셈이었다 (안건 2).
+    """
+    start_day = date(2026, 1, 5)
+    # (용량, 이 용량을 시작한 주차, 직전의 다른 용량, 머무는 주차)
+    rungs = [
+        ("0.25", 0, None, 4),
+        ("0.5", 4, Decimal("0.25"), 4),
+        ("1.0", 8, Decimal("0.5"), 4),
+        ("1.7", 12, Decimal("1.0"), 2),
+    ]
+    stages = []
+    for dose, first_week, prev, weeks in rungs:
+        change_day = start_day + timedelta(weeks=first_week)
+        for w in range(weeks):
+            context = dose_context(
+                WEGOVY,
+                Decimal(dose),
+                W(str(prev)) if prev is not None else [],
+                effective_from=change_day,
+                today=change_day + timedelta(weeks=w),
+            )
+            stages.append(judge_stage(WEGOVY, Decimal(dose), **context._asdict()))
+
+    assert stages == [
+        INITIAL, INITIAL, INITIAL, INITIAL,       # 0.25 — 첫 칸
+        TITRATION, TITRATION, TITRATION, TITRATION,   # 0.5
+        TITRATION, TITRATION, TITRATION, TITRATION,   # 1.0
+        TITRATION, TITRATION,                     # 1.7
+    ]
+
+
+def test_streak_boundary_clears_normal_escalation() -> None:
+    """경계는 정상 증량보다 최소 한 칸 위여야 한다.
+
+    정상 증량 사용자의 streak 는 `ESCALATION_DOSES` 를 넘지 않는다. 경계가 그 이하면
+    **정상 경로를 밟는 사람이 매 칸 반드시 한 번씩** 유지기로 잡힌다. 예외가 아니라
+    필연이라 실사용 데이터로도 안 걸러진다. 튜닝할 때 이 관계를 깨지 않도록 고정한다.
+    """
+    assert MAINTENANCE_STREAK > ESCALATION_DOSES
+
+    at_schedule = judge_stage(
+        WEGOVY, Decimal("1.0"),
+        previous_different_dose_mg=Decimal("0.5"),
+        same_dose_streak=ESCALATION_DOSES,
+    )
+    one_late = judge_stage(
+        WEGOVY, Decimal("1.0"),
+        previous_different_dose_mg=Decimal("0.5"),
+        same_dose_streak=ESCALATION_DOSES + 1,
+    )
+    assert at_schedule is TITRATION   # 예정대로 — 다음 주에 올린다
+    assert one_late is MAINTENANCE    # 한 회차 늦음 — 정착으로 본다
+
+
 # ── 사다리 상수 자체의 불변식 ──────────────────────────────────
 
 
@@ -354,43 +420,3 @@ def test_direction_compares_with_the_previous_dose(
         )
         is expected
     )
-
-
-def test_standard_escalation_path() -> None:
-    """위고비 표준 경로(한 칸에 4주)를 주차별로 재현한다.
-
-    **이력이 아니라 날짜로 만든다.** 예전 버전은 `W("0.5","0.5","0.5")` 처럼 같은
-    용량이 연속된 이력을 지어내서 돌렸는데, 그런 이력은 DB 가 만들 수 없다 — 행은
-    용량 변경 1건이라 인접한 두 행의 용량이 같을 수 없다. 그래서 streak 가 실제로는
-    항상 1 인데도 이 테스트는 통과했다 (코드 리뷰 지적).
-
-    ⚠️ MAINTENANCE_STREAK 가 4 라서 **매 칸의 4회차가 유지기로 잡힌다.**
-    정상적으로 증량 중인데도 그렇다 — 버그가 아니라 현재 경계값의 결과이고,
-    팀 피드백 안건이다 (`docs/be-medication-stage-rule.md` 안건 2).
-    """
-    start_day = date(2026, 1, 5)
-    # (용량, 이 용량을 시작한 주차, 직전의 다른 용량, 머무는 주차)
-    rungs = [
-        ("0.25", 0, None, 4),
-        ("0.5", 4, Decimal("0.25"), 4),
-        ("1.0", 8, Decimal("0.5"), 2),
-    ]
-    stages = []
-    for dose, first_week, prev, weeks in rungs:
-        change_day = start_day + timedelta(weeks=first_week)
-        for w in range(weeks):
-            context = dose_context(
-                WEGOVY,
-                Decimal(dose),
-                W(str(prev)) if prev is not None else [],
-                effective_from=change_day,
-                today=change_day + timedelta(weeks=w),
-            )
-            stages.append(judge_stage(WEGOVY, Decimal(dose), **context._asdict()))
-
-    assert stages == [
-        INITIAL, INITIAL, INITIAL, INITIAL,      # 0.25 — 첫 칸이라 streak 무관
-        TITRATION, TITRATION, TITRATION,          # 0.5 1~3회차
-        MAINTENANCE,                              # 0.5 4회차 ← 다음 주에 올릴 건데 유지기
-        TITRATION, TITRATION,                     # 1.0 1~2회차
-    ]
