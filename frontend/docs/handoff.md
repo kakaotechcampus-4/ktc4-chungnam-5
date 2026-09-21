@@ -14,7 +14,8 @@
 | `lib/theme/app_typography.dart` | 폰트 스타일 9종 (Pretendard) |
 | `lib/theme/app_theme.dart` | 위 토큰들을 모아 `ThemeData` 조립. `AppTheme.light`를 `main.dart`가 씀 |
 | `lib/state/app_state.dart` | 전역 상태(`ChangeNotifier`) 예시. 실제 기능은 아직 없음 — 패턴만 참고 |
-| `lib/screens/*.dart` | 탭별 화면. 전부 `Center(child: Text('...'))`뿐인 빈 뼈대 |
+| `lib/screens/*.dart` | 화면별 파일 |
+| `lib/screens/shared_meal_widgets.dart` | **여러 화면이 같이 쓰는 조각.** 식사 카드·Q·Q·S 배지·단계 배지·로딩/실패/빈 상태 블록. **새로 만들지 말고 여기 것을 쓴다** (규칙은 `design-system.md` §10). `lib/widgets/` 로 옮기는 게 맞지만 폴더 구조 확정 전까지 여기 둔다 |
 | `assets/fonts/` | Pretendard 폰트 파일 (번들, 네트워크 의존 없음) |
 | `docs/design-system.md` | 색·타이포·여백·컴포넌트 규칙. **디자인 문서, API 명세 아님** |
 | `README_FLUTTER.md` | 개발 환경·실행 방법·컨벤션(상태관리/라우팅) |
@@ -25,7 +26,7 @@
 - **상태관리: Provider.** 화면 하나짜리는 `setState`, 화면 여러 개가 공유하면 `ChangeNotifier` 만들어 `lib/state/`에 추가 + `main.dart`에 등록.
 - **라우팅: `Navigator.push` + `MaterialPageRoute`.** 라이브러리 없음. 화면은 생성자 파라미터로 값을 받는다.
 - **색·여백·폰트는 항상 `theme/`의 토큰을 쓴다.** 생 hex·매직 넘버 금지.
-- **브랜치명: `fe/<이슈번호>-<타입>-<작업명>`** (예 `fe/1-feat-home-screen`).
+- **브랜치명: `fe/<이슈번호>-<작업명>`** (예 `fe/2-home-screen`). 이슈 번호는 화면 번호를 쓴다.
 - 배포 타깃은 **Android**. 웹(`flutter run -d chrome`)은 UI 확인용, 데스크톱은 지원 안 함(폴더 자체 삭제).
 
 ## 아직 안 된 것 / 다음 사람이 볼 것
