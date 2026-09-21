@@ -115,7 +115,7 @@ pytest
 위 절차가 제대로 끝났는지 확인한다. 셋 다 기대값과 같아야 한다.
 
 ```bash
-# 1. 테이블 수 — 18 이 나와야 한다
+# 1. 테이블 수 — 19 가 나와야 한다
 docker exec glp1-db psql -U glp1 -d glp1_dev -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';"
 
 # 2. 시드 건수 — GENERAL 19617 / PROCESSED 316734
@@ -127,7 +127,7 @@ alembic check
 
 | 확인 | 기대값 |
 | --- | --- |
-| 테이블 수 | **18** — 도메인 테이블 17개 + Alembic 이 쓰는 `alembic_version` 1개 |
+| 테이블 수 | **19** — 도메인 테이블 17개 + 작업 큐 `task_queue` 1개 + Alembic 이 쓰는 `alembic_version` 1개 |
 | `food_refs` | GENERAL 19,617 · PROCESSED 316,734 (합 336,351) |
 | `alembic check` | `No new upgrade operations detected.` |
 
