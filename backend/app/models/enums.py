@@ -111,6 +111,64 @@ class FeedbackPeriodType(str, enum.Enum):
     MONTHLY = "MONTHLY"
 
 
+# ── 여기부터는 응답 전용 ENUM ────────────────────────────────
+#
+# **DB 컬럼이 아니다.** `pg_enum()` 에 넘기지 않으므로 `ALTER TYPE` 마이그레이션도
+# 필요 없다 (파일 상단 설명은 위쪽의 DB ENUM 들에 대한 것이다). API 명세
+# 「열거형」의 값 집합을 응답 스키마에서 강제하려고 둔다 — 값이 늘면 여기만 고친다.
+
+
+class NutrientCode(str, enum.Enum):
+    """명세 「열거형」의 NutrientCode. 응답 `nutrients[].code` 다."""
+
+    CALORIE = "CALORIE"
+    PROTEIN = "PROTEIN"
+    FAT = "FAT"
+    CARB = "CARB"
+    FIBER = "FIBER"
+    SODIUM = "SODIUM"
+
+
+class NutrientState(str, enum.Enum):
+    """목표 대비 현재 위치. 목표가 미정이면 None 이고 이 값은 안 나간다."""
+
+    SHORT = "SHORT"
+    OK = "OK"
+    OVER = "OVER"
+
+
+class FeedbackStatus(str, enum.Enum):
+    """피드백 문장의 생성 상태. 점수(Q/Q/S)와 별개다 — AI 가 죽어도 점수는 남는다."""
+
+    PENDING = "PENDING"
+    GENERATING = "GENERATING"
+    READY = "READY"
+    FAILED = "FAILED"
+
+
+class NutritionSource(str, enum.Enum):
+    """성분값의 출처. 명세 `evidence.nutritionSources` 다.
+
+    `meal_items` 에 컬럼이 없어 지금은 응답 조립 시점에 판단한다 — food_refs 에서
+    온 것은 PUBLIC_DB, 사용자가 직접 넣은 것은 USER_INPUT.
+    """
+
+    PUBLIC_DB = "PUBLIC_DB"
+    USER_INPUT = "USER_INPUT"
+
+
+class ScoreAxis(str, enum.Enum):
+    """Q/Q/S 세 축. 응답 `stageEmphasis` 가 이 값들의 부분집합이다.
+
+    명세 「열거형」에 이름이 없어서 여기서 정의한다 — `stageEmphasis` 예시
+    (`["SATIETY", "QUALITY"]`)의 원소가 곧 점수 축이다.
+    """
+
+    QUANTITY = "QUANTITY"
+    QUALITY = "QUALITY"
+    SATIETY = "SATIETY"
+
+
 def pg_enum(enum_cls: type[enum.Enum], name: str) -> SAEnum:
     """native ENUM 컬럼 타입. 멤버 이름이 아니라 값을 저장한다."""
     return SAEnum(
