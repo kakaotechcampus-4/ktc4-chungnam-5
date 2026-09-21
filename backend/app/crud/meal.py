@@ -13,12 +13,18 @@ from app.models.medication import MedicationSnapshot
 _KST = "Asia/Seoul"
 
 
-def _kst_day(column):
+def kst_day(column):
     """eaten_at(UTC 로 저장됨)을 KST 기준 '그 날' 로 자른다.
 
     UTC 기준으로 자르면 밤 11시(KST)에 먹은 야식이 다음날로 잘못 집계된다.
+    calendar 뿐 아니라 dashboard 등 날짜별 집계가 필요한 곳이면 어디서든 쓴다.
     """
     return func.date_trunc("day", func.timezone(_KST, column))
+
+
+def kst_month(column):
+    """eaten_at(UTC 로 저장됨)을 KST 기준 '그 달' 로 자른다. 월별 집계용."""
+    return func.date_trunc("month", func.timezone(_KST, column))
 
 
 def list_meals(
@@ -104,7 +110,7 @@ def get_calendar_days(
     month_end: datetime,
 ) -> list[Row]:
     """KST 기준 날짜별 (day, count, meal_types) 를 조회한다."""
-    day = _kst_day(Meal.eaten_at)
+    day = kst_day(Meal.eaten_at)
     stmt = (
         select(
             day.label("day"),
@@ -123,27 +129,27 @@ def get_calendar_days(
     return list(db.execute(stmt).all())
 
 
-def get_calendar_day_stages(
+def get_day_stages(
     db: Session,
     *,
     user_id: uuid.UUID,
-    month_start: datetime,
-    month_end: datetime,
+    range_start: datetime | None,
+    range_end: datetime,
 ) -> list[Row]:
-    """날짜별 대표 stage — 그날 가장 마지막(eaten_at 최신)에 먹은 식사 기준."""
-    day = _kst_day(Meal.eaten_at)
+    """날짜 범위 안에서 날짜별 대표 stage — 그날 가장 마지막(eaten_at 최신)에 먹은 식사 기준.
+
+    calendar·dashboard 등 "하루당 대표 stage 하나"가 필요한 곳에서 공통으로 쓴다.
+    """
+    day = kst_day(Meal.eaten_at)
     stmt = (
         select(day.label("day"), MedicationSnapshot.stage)
         .join(MedicationSnapshot, Meal.medication_snapshot_id == MedicationSnapshot.id)
-        .where(
-            Meal.user_id == user_id,
-            Meal.deleted_at.is_(None),
-            Meal.eaten_at >= month_start,
-            Meal.eaten_at < month_end,
-        )
+        .where(Meal.user_id == user_id, Meal.deleted_at.is_(None), Meal.eaten_at < range_end)
         .distinct(day)
         .order_by(day, Meal.eaten_at.desc())
     )
+    if range_start is not None:
+        stmt = stmt.where(Meal.eaten_at >= range_start)
     return list(db.execute(stmt).all())
 
 
