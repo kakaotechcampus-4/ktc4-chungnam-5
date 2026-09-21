@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.crud import medication as medication_crud
 from app.crud import user as user_crud
 from app.models.enums import DrugName, MedicationStage
-from app.schemas.medication import MedicationUpsertRequest
+from app.schemas.medication import DoseDirection, MedicationUpsertRequest
 from app.services import medication as service
 
 TODAY = date(2026, 9, 20)
@@ -376,3 +376,99 @@ def test_reduced_releases_once_the_lower_dose_settles(
     assert service.get_current_view(db, user_id, today=lowered).stage is MedicationStage.REDUCED
     settled = lowered + timedelta(weeks=4)
     assert service.get_current_view(db, user_id, today=settled).stage is MedicationStage.MAINTENANCE
+
+
+# ── 같은 날 재등록은 '정정'이다 ─────────────────────────────────
+#
+# 같은 날 다시 보내면 새 행을 만들지 않고 현재 행을 고친다. 그때 **덮어쓰는 값은
+# 한 번도 맞은 적이 없다** — 몇 초 존재했다 지워지는 오타다. 그 값을 '직전 용량'으로
+# 잡으면 오타를 고친 것이 감량으로 기록된다 (코드 리뷰 지적).
+
+
+def _upsert_view(
+    db: Session, user_id: uuid.UUID, req: MedicationUpsertRequest, *, today: date
+):
+    """POST 응답까지 만들어서 돌려준다 — stage 와 direction 을 함께 봐야 한다."""
+    result = service.upsert(db, user_id, req, today=today)
+    return service.build_upsert_view(db, user_id, result, today=today)
+
+
+def test_same_day_correction_is_not_a_reduction(db: Session, user_id: uuid.UUID) -> None:
+    """첫 등록을 오타 냈다가 같은 날 고치면 감량이 아니다.
+
+    1.0 을 0.5 로 고친 것뿐인데 REDUCED 로 분류되면, 기록이 한 줄뿐인 사용자가
+    "용량을 낮추고 다시 적응하는 구간"이라는 안내를 받는다.
+    """
+    service.upsert(db, user_id, _req("1.0", TODAY), today=TODAY)
+
+    view = _upsert_view(db, user_id, _req("0.5"), today=TODAY)
+
+    assert _rows(db, user_id) == 1  # 정정이라 행이 안 늘었다
+    assert view.stage is not MedicationStage.REDUCED
+    # 비교할 앞 기록이 없다 — 명세 dose-events 예시의 de_001 과 같은 경우다
+    assert view.dose_event.direction is DoseDirection.MAINTAIN
+
+
+def test_same_day_correction_compares_against_the_previous_record(
+    db: Session, user_id: uuid.UUID
+) -> None:
+    """정정의 기준은 덮어쓰는 값이 아니라 **앞 기록**이다.
+
+    0.25 로 지내다 1.0 을 잘못 넣고 같은 날 0.5 로 고쳤다면, 실제 이력은
+    0.25 → 0.5 라 증량이다. 덮어쓴 1.0 을 기준으로 삼으면 감량으로 뒤집힌다.
+
+    ⚠️ 명세의 direction 표는 "새 값 vs 현재 값"인데, 정정에서는 그 '현재 값'이
+    실재하지 않은 오타다. 명세가 정정을 상정하지 않아 생기는 간극이라
+    앞 기록을 기준으로 둔다 (`docs/be-medications-create.md` 참고).
+    """
+    raised = TODAY + timedelta(weeks=4)
+    service.upsert(db, user_id, _req("0.25", TODAY), today=TODAY)
+    service.upsert(db, user_id, _req("1.0"), today=raised)  # 오타
+
+    view = _upsert_view(db, user_id, _req("0.5"), today=raised)
+
+    assert _rows(db, user_id) == 2
+    assert view.dose_event.direction is DoseDirection.INCREASE
+    assert view.stage is MedicationStage.TITRATION
+
+
+def test_correction_makes_post_and_get_agree(db: Session, user_id: uuid.UUID) -> None:
+    """정정 직후 POST 응답과 GET 조회가 같은 단계를 말해야 한다.
+
+    쓰기 경로만 자기 자신을 이력에 포함하던 때는 POST 가 REDUCED, GET 이
+    TITRATION 이었다 — 등록 화면과 상세 화면이 서로 다른 답을 보여 줬다.
+    """
+    service.upsert(db, user_id, _req("1.0", TODAY), today=TODAY)
+
+    post = _upsert_view(db, user_id, _req("0.5"), today=TODAY)
+    get = service.get_current_view(db, user_id, today=TODAY)
+
+    assert post.stage is get.stage
+
+
+def test_reduction_on_a_later_day_is_still_a_reduction(
+    db: Session, user_id: uuid.UUID
+) -> None:
+    """다른 날 내린 것은 진짜 감량이다 — 정정 처리가 여기까지 번지면 안 된다.
+
+    새 행을 여는 분기에서는 직전 행이 실제로 맞은 용량이므로 이력에서 빼면 안 된다.
+    """
+    lowered = TODAY + timedelta(weeks=4)
+    service.upsert(db, user_id, _req("1.7", TODAY), today=TODAY)
+
+    view = _upsert_view(db, user_id, _req("1.0"), today=lowered)
+
+    assert _rows(db, user_id) == 2
+    assert view.stage is MedicationStage.REDUCED
+    assert view.dose_event.direction is DoseDirection.DECREASE
+
+
+def test_increase_on_a_later_day_is_unaffected(db: Session, user_id: uuid.UUID) -> None:
+    """증량도 그대로여야 한다."""
+    raised = TODAY + timedelta(weeks=4)
+    service.upsert(db, user_id, _req("0.5", TODAY), today=TODAY)
+
+    view = _upsert_view(db, user_id, _req("1.0"), today=raised)
+
+    assert view.dose_event.direction is DoseDirection.INCREASE
+    assert view.stage is MedicationStage.TITRATION

@@ -370,7 +370,12 @@ class UpsertResult(NamedTuple):
     """이번 요청으로 단계 판정이 달라졌는지. 첫 등록은 PRE_DOSE 에서 오므로 True."""
 
     previous_dose_mg: Decimal | None = None
-    """직전 용량. `direction` 을 여기서 뽑는다. 첫 등록이거나 변경이 없으면 None."""
+    """**앞 기록의** 용량. `direction` 을 여기서 뽑는다. 첫 등록이거나 변경이 없으면 None.
+
+    "방금 덮어쓴 값"이 아니다. 같은 날 정정이면 지워지는 값은 한 번도 맞은 적이
+    없어서 비교 기준이 못 된다 — 그쪽 분기는 `dose_context` 가 이력에서 찾은
+    직전의 다른 용량을 쓴다.
+    """
 
 
 def restage(
@@ -481,20 +486,25 @@ def upsert(
 
     # 변경일은 오늘이다 — 명세 body 에 '언제 바꿨는지' 자리가 없다.
     change_date = max(today, current.effective_from)
+    # 같은 날 다시 보낸 것은 새 변경이 아니라 방금 넣은 값의 정정으로 본다.
+    in_place = change_date == current.effective_from
     # 용량이 바뀌면 그 날부터 새 구간이라 streak 은 1 부터 다시 센다.
     context = dose_context(
         payload.drug_name,
         payload.dose_mg,
-        crud.list_doses_desc(db, user_id),
+        # 정정이면 **고치고 있는 행 자신을 이력에서 뺀다.** 안 빼면 오타로 넣었던
+        # 값이 '직전의 다른 용량'이 되어, 1.0 을 0.5 로 고친 것이 감량으로 잡힌다
+        # (기록이 한 줄뿐인 사용자가 REDUCED 로 분류된다). 새 행을 여는 경우에는
+        # current 가 진짜 직전 용량이므로 빼면 안 된다.
+        crud.list_doses_desc(db, user_id, exclude_id=current.id if in_place else None),
         effective_from=change_date,
         today=today,
     )
-    if change_date > current.effective_from:
+    if not in_place:
         crud.close_current(db, current, effective_to=change_date - timedelta(days=1))
     else:
         # 같은 날 두 번 바꾸면 이력이 두 줄이 될 이유가 없다. 현재 행을 고친다.
         previous_stage = current.stage
-        previous_dose_mg = current.dose_mg
         current.drug_name = payload.drug_name
         current.dose_mg = payload.dose_mg
         current.stage = judge_stage(payload.drug_name, payload.dose_mg, **context._asdict())
@@ -503,7 +513,10 @@ def upsert(
             current,
             dose_changed=True,
             stage_changed=current.stage != previous_stage,
-            previous_dose_mg=previous_dose_mg,
+            # 덮어쓰는 값이 아니라 **앞 기록의 용량**이다. 정정으로 지워지는 값은
+            # 한 번도 맞은 적이 없으므로 direction 의 기준이 될 수 없다 —
+            # 오타 1.0 을 0.5 로 고친 것이 감량으로 나간다.
+            previous_dose_mg=context.previous_different_dose_mg,
         )
 
     record = crud.create(
