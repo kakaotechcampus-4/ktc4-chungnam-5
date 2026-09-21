@@ -41,11 +41,8 @@ def test_add_item_returns_created_item_with_scaled_nutrition(client, db):
     assert data["nutrition"]["sodiumMg"] == 1200
 
 
-
-
-
-def test_failed_add_does_not_enqueue_anything(client, db):
-    """커밋되지 않은 변경에 Worker 를 붙이면 DB 에 없는 식사를 처리하려다 DLQ 로 간다."""
+def test_add_item_to_unknown_meal_is_404(client, db):
+    """없는 mealId 는 404 다. 소유권 누출을 막으려 남의 것·삭제된 것과 같게 응답한다."""
     user = make_user(db)
 
     response = client.post(
@@ -321,3 +318,37 @@ def test_broken_public_db_value_never_reaches_the_response_as_invalid_json(clien
     assert response.json()["data"]["nutrition"]["kcal"] is None
 
 
+def test_add_item_never_touches_the_task_queue(client, db, monkeypatch):
+    """음식 추가는 비동기 작업을 만들지 않는다 — 설계 결정을 코드로 고정한다.
+
+    사용자가 음식명과 양을 직접 알려줬으므로 AI 에게 물을 것이 없고, 다시 계산할
+    Q/Q/S 는 순수 함수다(README 절대 규칙 2). `worker/dispatch.py` 도 "여기 있는 건
+    AI 를 부르는 작업뿐이다" 라고 못박는다.
+
+    이 판단은 독스트링 세 곳에 길게 적혀 있지만 **글로는 회귀를 막지 못한다.**
+
+    `build_task_queue` 가 아니라 `SqsQueue.send` 를 막는다. 호출부가
+    `from app.infra.queue import build_task_queue` 로 이름을 당겨 오면 그 이름은
+    임포트 시점에 호출부 모듈에 박히므로, 팩토리를 패치해도 잡히지 않는다.
+    보내는 쪽 클래스를 막으면 어떤 경로로 만들어진 큐든 걸린다.
+    """
+    from app.infra.queue import SqsQueue
+
+    def explode(self, body):
+        raise AssertionError(
+            f"음식 추가 경로에서 큐로 작업을 보냈다: {body!r} "
+            "— `add_meal_item` 독스트링의 'ANALYZING 은 워커가 도는 중이 아니다' 참고"
+        )
+
+    monkeypatch.setattr(SqsQueue, "send", explode)
+
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+
+    response = client.post(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json={"displayName": "미역국", "amount": 200, "unit": "g"},
+    )
+
+    assert response.status_code == 201, response.text

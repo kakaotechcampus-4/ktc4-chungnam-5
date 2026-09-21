@@ -49,12 +49,20 @@ def find_unique_by_name(db: Session, name: str) -> FoodRef | None:
 
     ## GENERAL 을 먼저 보는 이유
 
-    사용자가 "미역국" 이라 쓰면 브랜드 제품이 아니라 그 요리를 뜻한다. 편차는
-    대부분 `PROCESSED`(가공식품 31.6만건)에서 나온다 — `미역국` 을 GENERAL 로
-    좁히면 7~450 kcal 이 7~12 kcal 이 된다.
+    사용자가 "배추김치" 라 쓰면 브랜드 제품이 아니라 그 음식을 뜻한다. 동명 행은
+    대부분 `PROCESSED`(가공식품 31.6만건)라, GENERAL 에 딱 하나만 있으면 그게
+    사용자가 말한 것이다 — `배추김치` 는 전체 75건이지만 GENERAL 은 1건이다.
 
     GENERAL 에 한 건도 없을 때만 전체에서 다시 찾는다. GENERAL 이 여러 건이면
     거기서 포기한다 — PROCESSED 를 더 봐도 더 애매해질 뿐이다.
+
+    **기대는 낮게 잡을 것.** 이 분기가 실제로 구제하는 건 모호한 이름 31,101 개
+    중 149 개(0.5%)다. `미역국`(GENERAL 5건) · `김치찌개`(GENERAL 5건)처럼
+    GENERAL 안에서도 여러 건인 이름이 훨씬 많아 대부분은 그대로 포기한다.
+    좁히는 것만으로 매칭률이 오르지는 않는다 — 나머지는 폴백의 몫이다.
+
+    (측정: `dataset_version='20260828'` 기준. 정규화한 이름으로 묶어
+    `total > 1 AND general = 1` 인 그룹 수를 셌다.)
     """
     matches_name = _normalized_name() == normalize_name(name)
 

@@ -74,7 +74,11 @@ def _is_editable(meal: Meal) -> bool:
 
 
 def to_grams(amount: float | Decimal | None, unit: str | None) -> Decimal | None:
-    """AI 가 준 `amount` + `unit` 을 g 으로 옮긴다. 옮길 수 없으면 None.
+    """`amount` + `unit` 을 g 으로 옮긴다. 옮길 수 없으면 None.
+
+    AI 가 추정한 값(`jobs/analyze_meal.py` 7단계)과 사용자가 직접 입력한 값
+    (`POST /meals/{mealId}/items`)이 **같은 규칙을 탄다** — 어느 쪽에서 왔든
+    "2개" 는 g 이 아니다.
 
     **환산표가 없다.** `food_refs.serving_size` 는 "영양성분함량기준량"(성분값이
     어느 양 기준인지, 보통 100g)이지 "1개 = 50g" 이 아니다. 즉 "계란 2개" 를 g 으로

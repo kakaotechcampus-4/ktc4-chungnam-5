@@ -53,10 +53,20 @@ def resolve_by_name(
 
     # 먹은 양을 모르거나(g 환산 불가) 기준량을 모르면 비례 계산의 근거가 없다.
     # 0 도 걸러진다 — 나누면 터진다.
-    if amount_g is None or not food_ref.serving_size:
+    #
+    # 기준량의 NaN 을 `_scale` 이 잡아 주지 못한다는 점에 주의: `_scale` 은 곱해질
+    # 값만 보는데, 기준량이 NaN 이면 배율 자체가 NaN 이 되어 모든 성분이 NaN 으로
+    # 물든다. `not Decimal("NaN")` 은 False 라(NaN 은 truthy) 여기서 걸러야 한다.
+    serving_size = food_ref.serving_size
+    if (
+        amount_g is None
+        or serving_size is None
+        or not serving_size.is_finite()
+        or serving_size <= 0
+    ):
         return NutritionMatch(food_ref_id=food_ref.id, nutrition=None)
 
-    factor = amount_g / food_ref.serving_size
+    factor = amount_g / serving_size
     nutrition = NutritionInfo(
         kcal=_scale(food_ref.calories, factor),
         protein_g=_scale(food_ref.protein_g, factor),

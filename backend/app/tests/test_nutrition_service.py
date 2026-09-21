@@ -150,3 +150,22 @@ def test_resolve_falls_back_to_processed_when_no_general_row_exists(db):
 
     assert match is not None
     assert match.food_ref_id == "KFD_ONLY"
+
+
+def test_resolve_survives_a_broken_serving_size(db):
+    """기준량이 NaN 이면 배율이 NaN 이 되어 모든 성분을 물들인다.
+
+    `_scale` 은 곱해질 값만 검사하므로 여기서 막지 않으면 NaN 이 그대로 통과해
+    `NutritionInfo` 검증에서 터진다 — 사용자에게는 500 이다. Postgres NUMERIC 은
+    NaN 을 담을 수 있어 공공 DB 적재분에 한 건만 섞여도 재현된다.
+    """
+    make_food_ref(db, food_ref_id="KFD_NAN", name="기준량깨진음식",
+                  serving_size=Decimal("NaN"), calories=Decimal("50.000"))
+
+    match = nutrition_service.resolve_by_name(
+        db, name="기준량깨진음식", amount_g=Decimal("200")
+    )
+
+    assert match is not None
+    assert match.food_ref_id == "KFD_NAN"
+    assert match.nutrition is None
