@@ -12,7 +12,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.crud import user as user_crud
-from app.models.enums import MealStatus, MealType, MedicationStage
+from app.models.enums import FoodCategory, MealStatus, MealType, MedicationStage
 from app.models.food import FoodRef
 from app.models.meal import Meal
 from app.models.medication import MedicationSnapshot
@@ -67,6 +67,7 @@ def make_food_ref(
     *,
     food_ref_id: str = "KFD_TEST_01",
     name: str = "미역국",
+    category: FoodCategory | None = FoodCategory.GENERAL,
     serving_size: Decimal | None = Decimal("100.000"),
     calories: Decimal | None = Decimal("50.000"),
     protein_g: Decimal | None = Decimal("3.000"),
@@ -75,10 +76,16 @@ def make_food_ref(
     fiber_g: Decimal | None = Decimal("0.500"),
     sodium_mg: Decimal | None = Decimal("600.000"),
 ) -> FoodRef:
-    """공공 영양 DB 음식 1건. flush 까지만 하고 커밋하지 않는다."""
+    """공공 영양 DB 음식 1건. flush 까지만 하고 커밋하지 않는다.
+
+    `category` 기본값이 `GENERAL` 인 건 이름 매칭이 GENERAL 을 먼저 보기 때문이다
+    (`crud.food.find_unique_by_name`). 기본값을 NULL 로 두면 대부분의 테스트가
+    폴백 경로만 타게 되어 정작 주 경로를 검증하지 못한다.
+    """
     food_ref = FoodRef(
         id=food_ref_id,
         name=name,
+        category=category,
         serving_size=serving_size,
         calories=calories,
         protein_g=protein_g,

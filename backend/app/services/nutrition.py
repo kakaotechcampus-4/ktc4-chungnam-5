@@ -40,8 +40,14 @@ def _scale(value: Decimal | None, factor: Decimal) -> Decimal | None:
 def resolve_by_name(
     db: Session, *, name: str, amount_g: Decimal | None
 ) -> NutritionMatch | None:
-    """음식명으로 공공 DB 를 찾는다. 찾지 못하면 None."""
-    food_ref = food_crud.find_by_name(db, name)
+    """음식명으로 공공 DB 를 찾는다. **하나로 좁혀지지 않으면 None.**
+
+    못 찾은 것과 여러 건이라 고르지 못한 것을 구분하지 않는다 — 호출부가 할 일이
+    `matched: false` 로 같기 때문이다. 그 신호를 받은 FE 는 `GET /nutrition/candidates`
+    로 후보를 띄우고 사용자가 고른다. 왜 임의로 하나를 집지 않는지는
+    `crud.food.find_unique_by_name` 참고.
+    """
+    food_ref = food_crud.find_unique_by_name(db, name)
     if food_ref is None:
         return None
 

@@ -6,6 +6,7 @@
 
 from decimal import Decimal
 
+from app.models.enums import FoodCategory
 from app.services import nutrition as nutrition_service
 from app.tests.factories import make_food_ref
 
@@ -72,38 +73,80 @@ def test_resolve_leaves_nutrition_empty_when_serving_size_is_unknown(db):
     assert match.nutrition is None
 
 
-def test_resolve_is_deterministic_when_names_collide(db):
-    """동명이인 음식이 있어도 항상 같은 행을 고른다.
+def test_resolve_gives_up_when_the_name_is_ambiguous(db):
+    """동명 음식이 여러 건이면 **고르지 않는다.**
 
-    공공 DB 는 33만건이고 가공식품은 제조사만 다른 동명 행이 흔하다. 정렬이 없으면
-    같은 입력이 시점에 따라 다른 kcal 을 돌려주고, 그 값이 `food_ref_id` 로 박제돼
-    Q/Q/S 점수까지 달라진다 — 사용자는 어디서 틀렸는지 알 수 없다.
+    실측하면 `미역국` 14건의 열량이 7~450 kcal(64배), `김치찌개` 28건이
+    16~140 kcal 이다. 정렬로 하나를 집으면 결정적이긴 해도 결정적으로 틀린 답이
+    되고, 그 값이 `meal_items.food_ref_id` 로 박제돼 Q/Q/S 채점까지 흘러간다.
+    영양정보가 비는 건 Rule Engine 이 처리하지만, 틀린 영양정보는 조용한 오염이다.
     """
-    make_food_ref(db, food_ref_id="KFD_ZZZ", name="된장국")
-    make_food_ref(db, food_ref_id="KFD_AAA", name="된장국")
+    make_food_ref(db, food_ref_id="KFD_AAA", name="된장국", calories=Decimal("19.000"))
+    make_food_ref(db, food_ref_id="KFD_ZZZ", name="된장국", calories=Decimal("140.000"))
 
-    picked = {
-        nutrition_service.resolve_by_name(
-            db, name="된장국", amount_g=Decimal("100")
-        ).food_ref_id
-        for _ in range(3)
-    }
-
-    assert picked == {"KFD_AAA"}
+    assert nutrition_service.resolve_by_name(
+        db, name="된장국", amount_g=Decimal("100")
+    ) is None
 
 
-def test_resolve_prefers_a_row_that_actually_has_nutrition(db):
-    """결측 행을 먼저 집으면 매칭에 성공하고도 영양성분이 비어 나간다.
-
-    원본 데이터에 결측이 많다 — `외식` 15,225건은 지방 87% · 탄수화물 84% 가
-    비어 있다(README "공공 영양DB" 절). 이름이 같다면 값이 있는 행을 고른다.
-    """
-    make_food_ref(db, food_ref_id="KFD_AAA_EMPTY", name="순두부찌개", calories=None)
-    make_food_ref(db, food_ref_id="KFD_ZZZ_FULL", name="순두부찌개", calories=Decimal("80.000"))
+def test_resolve_matches_across_spacing_and_underscores(db):
+    """공공 DB 는 `달걀_삶은것`, 사용자는 `달걀 삶은것` 이라 친다 — 같은 음식이다."""
+    make_food_ref(db, food_ref_id="KFD_EGG", name="달걀_삶은것")
 
     match = nutrition_service.resolve_by_name(
-        db, name="순두부찌개", amount_g=Decimal("100")
+        db, name="달걀 삶은것", amount_g=Decimal("100")
     )
 
-    assert match.food_ref_id == "KFD_ZZZ_FULL"
-    assert match.nutrition.kcal == Decimal("80.00")
+    assert match is not None
+    assert match.food_ref_id == "KFD_EGG"
+
+
+def test_resolve_prefers_the_general_row_over_processed_products(db):
+    """"미역국" 은 브랜드 제품이 아니라 그 요리를 뜻한다.
+
+    편차는 대부분 가공식품(31.6만건)에서 나온다 — GENERAL 로 좁히면 `미역국` 의
+    열량 범위가 7~450 kcal 에서 7~12 kcal 이 된다.
+    """
+    make_food_ref(
+        db, food_ref_id="KFD_DISH", name="미역국",
+        category=FoodCategory.GENERAL, calories=Decimal("12.000"),
+    )
+    make_food_ref(
+        db, food_ref_id="KFD_POUCH_1", name="미역국",
+        category=FoodCategory.PROCESSED, calories=Decimal("450.000"),
+    )
+    make_food_ref(
+        db, food_ref_id="KFD_POUCH_2", name="미역국",
+        category=FoodCategory.PROCESSED, calories=Decimal("8.000"),
+    )
+
+    match = nutrition_service.resolve_by_name(db, name="미역국", amount_g=Decimal("100"))
+
+    assert match is not None
+    assert match.food_ref_id == "KFD_DISH"
+
+
+def test_resolve_gives_up_when_general_itself_is_ambiguous(db):
+    """GENERAL 이 여러 건이면 거기서 포기한다 — 가공식품을 더 봐도 더 애매해질 뿐이다."""
+    make_food_ref(db, food_ref_id="KFD_G1", name="김치찌개", category=FoodCategory.GENERAL)
+    make_food_ref(db, food_ref_id="KFD_G2", name="김치찌개", category=FoodCategory.GENERAL)
+    make_food_ref(db, food_ref_id="KFD_P1", name="김치찌개", category=FoodCategory.PROCESSED)
+
+    assert nutrition_service.resolve_by_name(
+        db, name="김치찌개", amount_g=Decimal("100")
+    ) is None
+
+
+def test_resolve_falls_back_to_processed_when_no_general_row_exists(db):
+    """GENERAL 에 한 건도 없을 때만 전체에서 다시 찾는다. 유일하면 그건 써도 된다."""
+    make_food_ref(
+        db, food_ref_id="KFD_ONLY", name="아메리카노",
+        category=FoodCategory.PROCESSED, calories=Decimal("5.000"),
+    )
+
+    match = nutrition_service.resolve_by_name(
+        db, name="아메리카노", amount_g=Decimal("100")
+    )
+
+    assert match is not None
+    assert match.food_ref_id == "KFD_ONLY"
