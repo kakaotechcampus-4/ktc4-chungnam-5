@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -27,7 +30,72 @@ class _MealInputScreenState extends State<MealInputScreen> {
 
   final TextEditingController _searchController = TextEditingController();
 
-  void _pickPhoto() {}
+  final ImagePicker _imagePicker = ImagePicker();
+
+  /// 고른 식사 사진. 분석 요청(`POST /meals`) 때 올린다.
+  XFile? _photo;
+
+  /// 미리보기용. 웹에서는 파일 경로로 그릴 수 없어서 바이트로 들고 있는다.
+  Uint8List? _photoBytes;
+
+  /// 사진 올리기 → 카메라/갤러리 선택 → 미리보기.
+  ///
+  /// 업로드 용량을 줄이려고 긴 변 1600px · 품질 85 로 줄여서 받는다.
+  /// 웹에서 "사진 찍기"는 브라우저가 파일 선택/카메라 중 하나를 띄운다.
+  Future<void> _pickPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheetRadius),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: Text('사진 찍기', style: AppTypography.cardTitle),
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text('갤러리에서 선택', style: AppTypography.cardTitle),
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    try {
+      final photo = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+      if (photo == null) return; // 사용자가 취소
+      final bytes = await photo.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _photo = photo;
+        _photoBytes = bytes;
+      });
+    } catch (e) {
+      // 권한 거부 · 카메라 없음 등.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('사진을 불러오지 못했어요: $e')),
+      );
+    }
+  }
+
+  void _removePhoto() {
+    setState(() {
+      _photo = null;
+      _photoBytes = null;
+    });
+  }
 
   Future<void> _changeDateTime() async {
     final picked = await showModalBottomSheet<DateTime>(
@@ -51,7 +119,8 @@ class _MealInputScreenState extends State<MealInputScreen> {
   /// 교체(`pushReplacement`)라서 분석 이후 화면에서 뒤로 가면 입력 화면이 아니라
   /// 이 화면을 연 탭으로 바로 돌아간다.
   void _startAnalysis() {
-    // TODO: `POST /meals` 가 생기면 응답의 mealId 를 넘긴다. 지금은 더미.
+    // TODO: `POST /meals` 가 생기면 [_photo] 를 올리고 응답의 mealId 를 넘긴다.
+    //   지금은 더미.
     const mealId = 'meal_dummy';
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
@@ -239,6 +308,8 @@ class _MealInputScreenState extends State<MealInputScreen> {
   }
 
   Widget _buildPhotoUpload() {
+    final bytes = _photoBytes;
+    if (_photo != null && bytes != null) return _buildPhotoPreview(bytes);
     return CustomPaint(
       painter: const _DashedBorderPainter(),
       child: InkWell(
@@ -266,6 +337,39 @@ class _MealInputScreenState extends State<MealInputScreen> {
               Text('갤러리에서 선택하거나 텍스트로 입력', style: AppTypography.bodySecondary),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// 고른 사진 미리보기. 사진을 탭하면 다시 고르고, ✕ 로 지운다.
+  Widget _buildPhotoPreview(Uint8List bytes) {
+    return ClipRRect(
+      borderRadius: AppRadius.lgRadius,
+      child: SizedBox(
+        width: double.infinity,
+        height: 220,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            InkWell(
+              onTap: _pickPhoto,
+              child: Image.memory(bytes, fit: BoxFit.cover),
+            ),
+            Positioned(
+              top: AppSpacing.sm,
+              right: AppSpacing.sm,
+              child: Material(
+                color: AppColors.overlay,
+                shape: const CircleBorder(),
+                child: IconButton(
+                  onPressed: _removePhoto,
+                  icon: const Icon(Icons.close, color: AppColors.textInverse),
+                  tooltip: '사진 지우기',
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
