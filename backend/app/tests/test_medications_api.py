@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.crud import medication as medication_crud
 from app.crud import user as user_crud
 
 
@@ -97,6 +98,36 @@ def test_without_header_is_401(client: TestClient) -> None:
         json={"drugName": "위고비", "doseMg": 0.25},
     )
     assert res.status_code == 401
+
+
+def test_unknown_user_is_404_not_500(client: TestClient) -> None:
+    """UUID 형식은 맞지만 없는 사용자는 404 다. 500 이 아니다.
+
+    막지 않으면 `crud.create` 가 users FK 를 위반해 IntegrityError 가 나고
+    전역 핸들러가 500 INTERNAL_ERROR 로 내린다. `core/response.py` 가
+    "INTERNAL_ERROR 는 5xx 전용, 4xx 는 클라이언트 책임"이라고 규정해 두었고,
+    500 으로 나가면 서버가 멀쩡한데 장애 알림이 뜬다 (코드 리뷰 지적).
+    """
+    res = client.post(
+        "/api/v1/medications",
+        json={"drugName": "위고비", "doseMg": 0.25, "startedAt": "2026-03-02"},
+        headers={"X-User-Id": "00000000-0000-0000-0000-000000000000"},
+    )
+
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "USER_NOT_FOUND"
+
+
+def test_unknown_user_leaves_no_rows(db: Session, client: TestClient) -> None:
+    """거부된 요청이 이력을 남기고 가면 안 된다."""
+    ghost = uuid.UUID("00000000-0000-0000-0000-000000000000")
+    client.post(
+        "/api/v1/medications",
+        json={"drugName": "위고비", "doseMg": 0.25, "startedAt": "2026-03-02"},
+        headers={"X-User-Id": str(ghost)},
+    )
+
+    assert medication_crud.list_history(db, ghost) == []
 
 
 # ── 명세 응답 형식 ─────────────────────────────────────────────

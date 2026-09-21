@@ -29,7 +29,9 @@ from typing import Final, NamedTuple
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import ApiError, ErrorCode
 from app.crud import medication as crud
+from app.crud import user as user_crud
 from app.models.enums import DrugName, MedicationStage
 from app.models.medication import MedicationRecord, MedicationSnapshot
 from app.schemas.medication import (
@@ -434,6 +436,14 @@ def upsert(
     `startedAt` 을 생략하면 4번을 건너뛴다. 이미 기록이 있는데 생략을 오늘로 채우면
     용량만 바꾸는 요청이 시작일을 오늘로 끌어와 회차가 1 로 리셋된다.
     """
+    # 없는 사용자를 여기서 막는다. 안 막으면 crud.create 가 users FK 를 위반해
+    # IntegrityError -> 500 INTERNAL_ERROR 로 나간다. `core/response.py` 가
+    # "INTERNAL_ERROR 는 5xx 전용, 4xx 는 클라이언트 책임"이라고 규정해 두었고,
+    # 없는 사용자는 클라이언트 잘못이다. 500 은 에러 알림도 오염시킨다 —
+    # 서버가 멀쩡한데 장애로 잡힌다. `services/user.py` 와 같은 처리다.
+    if user_crud.get(db, user_id) is None:
+        raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
+
     today = today or date.today()
     # `startedAt` 생략은 '오늘'이 아니라 '건드리지 마라'다. 오늘로 치환하면 용량만
     # 고치는 요청이 가장 오래된 행을 오늘로 밀어 전체 회차가 1 로 리셋된다.
