@@ -62,12 +62,19 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // 다음 복귀 때 다시 확인한다.
     if (ModalRoute.of(context)?.isCurrent == false) return;
 
-    if (!_popupGate.isCompletedToday(PopupGate.dailyCondition)) {
-      _popupShowing = true;
-      final saved = await showDailyConditionPopup(context);
+    // 저장소를 읽는 동안 복귀 이벤트가 또 와도 겹치지 않게 먼저 잠근다.
+    _popupShowing = true;
+    try {
+      if (!await _popupGate.isCompletedToday(PopupGate.dailyCondition)) {
+        if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+        final saved = await showDailyConditionPopup(context);
+        // "나중에"·닫기는 완료로 치지 않는다 — 다음 접속 때 다시 뜬다.
+        if (saved) {
+          await _popupGate.markCompletedToday(PopupGate.dailyCondition);
+        }
+      }
+    } finally {
       _popupShowing = false;
-      // "나중에"·닫기는 완료로 치지 않는다 — 다음 접속 때 다시 뜬다.
-      if (saved) _popupGate.markCompletedToday(PopupGate.dailyCondition);
     }
   }
 

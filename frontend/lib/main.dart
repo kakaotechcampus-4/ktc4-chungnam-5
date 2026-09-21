@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'api/api_client.dart';
 import 'navigation/root_shell.dart';
 import 'state/app_state.dart';
 import 'state/tab_state.dart';
+import 'state/user_session.dart';
 import 'theme/app_theme.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  // 첫 화면을 고르려면 저장된 userId 를 먼저 읽어야 한다.
+  WidgetsFlutterBinding.ensureInitialized();
+  final session = await UserSession.load();
+  runApp(MyApp(session: session));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, required this.session});
+
+  final UserSession session;
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +26,8 @@ class MyApp extends StatelessWidget {
     // 기능별 ChangeNotifier 를 추가할 때마다 항목을 늘린다 (lib/state/app_state.dart 참고).
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: session),
+        Provider(create: (_) => ApiClient(session: session)),
         ChangeNotifierProvider(create: (_) => AppState()),
         ChangeNotifierProvider(create: (_) => TabState()),
       ],

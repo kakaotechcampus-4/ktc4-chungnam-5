@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/main.dart';
 import 'package:frontend/screens/home_screen.dart' show StomachGauge;
+import 'package:frontend/state/user_session.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 기본 테스트 화면(800×600)은 팝업 아래쪽 버튼이 잘려 세로를 늘린다.
 /// 폭은 줄이지 않는다 — 테스트 글꼴(Ahem)은 실제 글꼴보다 넓어서 375 폭에서는
@@ -33,13 +35,23 @@ Future<void> _backgroundAndResume(WidgetTester tester) async {
 
 final _popupTitle = find.text('오늘 컨디션 기록');
 
+/// 앱을 띄운다. [withProfile] 이면 프로필을 이미 저장한 사용자로 시작한다
+/// (온보딩을 건너뛰고 탭 화면으로).
+Future<void> _pumpApp(WidgetTester tester, {bool withProfile = true}) async {
+  SharedPreferences.setMockInitialValues(
+    withProfile ? {'session.userId': 'test-user'} : {},
+  );
+  final session = await UserSession.load();
+  await tester.pumpWidget(MyApp(session: session));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('bottom nav switches between the four tabs', (
     WidgetTester tester,
   ) async {
     _useDesignSize(tester);
-    await tester.pumpWidget(const MyApp());
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
 
     // 앱 진입 팝업을 먼저 닫는다.
     await tester.tap(find.text('나중에'));
@@ -57,8 +69,7 @@ void main() {
     WidgetTester tester,
   ) async {
     _useDesignSize(tester);
-    await tester.pumpWidget(const MyApp());
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
     expect(_popupTitle, findsOneWidget);
 
     await tester.tap(find.text('나중에'));
@@ -73,8 +84,7 @@ void main() {
     WidgetTester tester,
   ) async {
     _useDesignSize(tester);
-    await tester.pumpWidget(const MyApp());
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
 
     final save = find.widgetWithText(FilledButton, '기록 저장');
     expect(tester.widget<FilledButton>(save).onPressed, isNull);
@@ -96,8 +106,7 @@ void main() {
     WidgetTester tester,
   ) async {
     _useDesignSize(tester);
-    await tester.pumpWidget(const MyApp());
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
 
     final save = find.widgetWithText(FilledButton, '기록 저장');
     await tester.tap(find.text('보통').first); // 식욕
@@ -115,8 +124,7 @@ void main() {
     WidgetTester tester,
   ) async {
     _useDesignSize(tester);
-    await tester.pumpWidget(const MyApp());
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
     await tester.tap(find.text('나중에')); // 컨디션 팝업
     await tester.pumpAndSettle();
 
@@ -140,5 +148,24 @@ void main() {
     await tester.tap(save);
     await tester.pumpAndSettle();
     expect(find.text('지금 얼마나 부르세요?'), findsNothing);
+  });
+
+  testWidgets('condition popup stays closed after an app restart', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    await _pumpApp(tester);
+    await tester.tap(find.text('보통').first);
+    await tester.tap(find.text('없음').last);
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, '기록 저장'));
+    await tester.pumpAndSettle();
+
+    // 같은 기기 저장소로 앱을 새로 띄운다.
+    await tester.pumpWidget(const SizedBox());
+    final session = await UserSession.load();
+    await tester.pumpWidget(MyApp(session: session));
+    await tester.pumpAndSettle();
+    expect(_popupTitle, findsNothing);
   });
 }
