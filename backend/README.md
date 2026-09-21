@@ -493,17 +493,21 @@ FAILED
 | confirmed_amount_g | DECIMAL, NULL | 사용자 확인·수정 섭취량. 확인 전에는 NULL |
 | confidence | DECIMAL | AI 분석 신뢰도. `CHECK (0 ~ 1)` |
 | source | ENUM, DEFAULT MODEL | MODEL / USER |
-| raw_ai_result | JSONB | AI 원본 결과. `source=USER` 면 사용자가 입력한 `{amount, unit}` |
+| raw_ai_result | JSONB, NULL | AI 원본 결과. `source=USER` 는 인식된 적이 없으므로 NULL |
 
-`confirmed_amount_g` 는 g 으로 환산된 양만 담는다("2개" 는 NULL). 사용자가 실제로 입력한
-숫자·단위는 `raw_ai_result` 에 남는다 — `source=USER` 는 통째가 그 값이고(`POST`),
-`source=MODEL` 은 AI 원본을 덮을 수 없어 `userInput` 키 아래에 따로 둔다
-(`PATCH /meals/{mealId}/items`).
+양이 세 컬럼으로 나뉜다. **`confirmed_amount_g` 는 g 으로 환산된 값만 담는다** — "2개"
+처럼 환산 근거가 없는 단위면 사용자가 확인했어도 NULL 이다. 사용자가 말한 값 자체는
+`confirmed_amount` · `confirmed_unit` 에 언제나 남으므로, `GET /meals/{mealId}` 의
+`amount` · `unit` 은 그 두 컬럼에서 그대로 나온다.
 
-```json
-// source=MODEL 항목을 "3개" 로 고친 뒤
-{ "foodName": "삶은 계란", "confidence": 0.96, "userInput": { "amount": "3", "unit": "개" } }
-```
+| 상황 | confirmed_amount / _unit | confirmed_amount_g |
+| --- | --- | --- |
+| 사용자가 "220g" 으로 확인 | `220` / `g` | `220.00` |
+| 사용자가 "2개" 로 확인 | `2` / `개` | NULL (환산 불가) |
+| 아직 확인 전 (AI 인식만) | NULL / NULL | NULL — 양은 `estimated_amount_g` |
+
+`raw_ai_result` 에는 사용자 입력을 섞지 않는다. 섞으면 읽는 쪽이 출처(MODEL/USER)와
+수정 이력에 따라 다른 자리를 뒤져야 한다.
 
 ---
 
@@ -531,8 +535,9 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 ```
 
 `amountG` 는 g 환산값이고 환산이 안 되는 단위("2개")면 `null` 이다. **그때도 사용자 입력이
-사라지지는 않는다** — 값 자체는 `meal_items.raw_ai_result` 에 남고(아래 참고), 여기에는
-바뀐 이력으로 함께 적힌다. 숫자를 문자열로 담는 건 자릿수(`250.00`)를 잃지 않기 위해서다.
+사라지지는 않는다** — 값 자체는 `meal_items.confirmed_amount` · `confirmed_unit` 에 남고,
+여기에는 `amount` · `unit` 으로 바뀐 이력이 함께 적힌다. 숫자를 문자열로 담는 건
+자릿수(`250.00`)를 잃지 않기 위해서다.
 
 `confidence` 가 `original_value` 에만 있는 건 **이름을 바꾸면 그 신뢰도를 항목에서 지우기**
 때문이다 — 사용자가 직접 써 넣은 이름을 FE 가 "AI 가 자신 없어함"(`< 0.8`)으로 강조하면

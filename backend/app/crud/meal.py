@@ -197,9 +197,10 @@ def add_item(
     *,
     meal_id: uuid.UUID,
     display_name: str,
+    amount: Decimal,
+    unit: str,
     amount_g: Decimal | None,
     food_ref_id: str | None,
-    raw_input: dict,
 ) -> MealItem:
     """사용자가 직접 추가한 음식 1건을 넣는다. add + flush 까지만 하고 커밋하지 않는다.
 
@@ -207,17 +208,22 @@ def add_item(
     이름이 곧 원본이다. `confidence` 는 NULL 이다: AI 가 인식한 게 아니라 신뢰도라는
     개념 자체가 없다(0 이나 1 을 넣으면 인식 성능 통계가 오염된다).
 
-    양은 `confirmed_amount_g` 로 들어간다. 사용자가 직접 말한 값이라 확인이 끝난
-    것으로 본다 — `estimated_amount_g` 는 AI 추정값 자리다.
+    양은 `confirmed_*` 로 들어간다. 사용자가 직접 말한 값이라 확인이 끝난 것으로
+    본다 — `estimated_amount_g` 는 AI 추정값 자리다. `confirmed_amount_g` 는 g 으로
+    환산된 값만 담으므로 "2개" 면 NULL 이고, 그때도 `confirmed_amount` ·
+    `confirmed_unit` 에는 사용자가 말한 그대로 남는다.
+
+    `raw_ai_result` 는 NULL 이다 — AI 가 인식한 적이 없는 항목이다.
     """
     item = MealItem(
         meal_id=meal_id,
         food_ref_id=food_ref_id,
         original_food_name=display_name,
         display_name=display_name,
+        confirmed_amount=amount,
+        confirmed_unit=unit,
         confirmed_amount_g=amount_g,
         source=MealItemSource.USER,
-        raw_ai_result=raw_input,
     )
     db.add(item)
     db.flush()
@@ -260,10 +266,11 @@ def update_item(
     *,
     item: MealItem,
     display_name: str,
+    amount: Decimal,
+    unit: str,
     amount_g: Decimal | None,
     food_ref_id: str | None,
     confidence: Decimal | None,
-    raw_ai_result: dict,
 ) -> None:
     """사용자가 고친 값을 항목에 반영한다. 커밋하지 않는다.
 
@@ -274,19 +281,18 @@ def update_item(
     `original_food_name` · `estimated_amount_g` 는 건드리지 않는다 — AI 최초 추정값
     자리이고, 사용자 수정으로 덮으면 인식 성능 평가의 기준이 사라진다.
 
-    양은 `confirmed_amount_g` 로 들어간다. 사용자가 직접 말한 값이라 확인이 끝난 것으로
-    본다 — `crud.meal.add_item` 과 같은 규칙이다. **g 으로 환산되지 않는 단위("2개")면
-    여기는 NULL 이 되므로, 사용자가 실제로 입력한 값은 `raw_ai_result` 로 들어와야
-    한다** — 무엇을 담을지는 항목의 출처가 정하므로 호출부(services)가 미리 만든다.
+    양은 `confirmed_*` 로 들어간다 — `add_item` 과 같은 규칙이다. `confirmed_amount_g`
+    는 g 으로 환산된 값만 담아 "2개" 면 NULL 이 되지만, 사용자가 말한 값 자체는
+    `confirmed_amount` · `confirmed_unit` 에 언제나 남는다.
 
-    새 dict 를 대입한다. JSONB 컬럼을 제자리에서 고치면 SQLAlchemy 가 변경을 알아채지
-    못해 UPDATE 가 나가지 않는다.
+    `raw_ai_result` 는 건드리지 않는다 — AI 원본 전용이다.
     """
     item.display_name = display_name
+    item.confirmed_amount = amount
+    item.confirmed_unit = unit
     item.confirmed_amount_g = amount_g
     item.food_ref_id = food_ref_id
     item.confidence = confidence
-    item.raw_ai_result = raw_ai_result
 
 
 def add_correction(

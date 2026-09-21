@@ -102,7 +102,17 @@ class MealItem(Base):
 
     estimated_amount_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
     confirmed_amount_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
-    """사용자 확인 전에는 NULL."""
+    """사용자 확인 전에는 NULL. **g 으로 환산된 값만 담는다** — "2개" 처럼 환산 근거가
+    없는 단위면 사용자가 확인했어도 NULL 이다. 그 경우 양의 진실은 아래 두 컬럼이다."""
+
+    confirmed_amount: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    """사용자가 입력한 양의 숫자. 확인 전에는 NULL."""
+    confirmed_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    """그 숫자의 단위("g" · "개" · "ml"). `confirmed_amount_g` 는 이걸 환산한 결과다.
+
+    `GET /meals/{mealId}` 의 `amount` · `unit` 이 그대로 여기서 나온다. 사용자 입력을
+    `raw_ai_result` 에 섞어 두면 읽는 쪽이 출처(MODEL/USER)와 수정 이력에 따라 다른
+    자리를 뒤져야 해서 컬럼으로 뺐다 — `raw_ai_result` 는 AI 원본 전용이다."""
     confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
 
     source: Mapped[MealItemSource] = mapped_column(

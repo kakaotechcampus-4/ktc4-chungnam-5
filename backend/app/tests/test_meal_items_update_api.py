@@ -678,10 +678,9 @@ def test_correction_keeps_the_users_raw_unit_when_grams_are_unknown(client, db):
 
     db.refresh(item)
     assert item.confirmed_amount_g is None
-    # AI 원본은 그대로 두고, 사용자 입력은 `userInput` 아래에 따로 얹는다.
-    assert item.raw_ai_result["foodName"] == "삶은 계란"
-    assert item.raw_ai_result["confidence"] == 0.96
-    assert item.raw_ai_result["userInput"] == {"amount": "2", "unit": "개"}
+    assert (item.confirmed_amount, item.confirmed_unit) == (Decimal("2"), "개")
+    # AI 원본은 사용자 입력과 섞이지 않는다.
+    assert item.raw_ai_result == {"foodName": "삶은 계란", "confidence": 0.96}
 
     (correction,) = _corrections(db, item.id)
     assert correction.corrected_value["amount"] == "2"
@@ -749,9 +748,9 @@ def test_amount_edit_in_a_countable_unit_is_not_silently_dropped(client, db):
     assert response.status_code == 200, response.text
 
     db.refresh(item)
-    # AI 원본은 그대로 두고, 사용자 입력은 따로 남긴다.
-    assert item.raw_ai_result["foodName"] == "삶은 계란"
-    assert item.raw_ai_result["userInput"] == {"amount": "3", "unit": "개"}
+    # 사용자 입력은 전용 컬럼으로, AI 원본은 손대지 않는다.
+    assert (item.confirmed_amount, item.confirmed_unit) == (Decimal("3"), "개")
+    assert item.raw_ai_result == {"foodName": "삶은 계란", "amount": 2, "unit": "개"}
 
     (correction,) = _corrections(db, item.id)
     assert correction.corrected_value["amount"] == "3"
@@ -759,10 +758,9 @@ def test_amount_edit_in_a_countable_unit_is_not_silently_dropped(client, db):
 
 
 def test_user_added_item_keeps_its_raw_input_in_sync(client, db):
-    """POST 가 남긴 `raw_ai_result` 의 amount·unit 이 낡은 값으로 남으면 안 된다.
+    """사용자가 직접 넣은 항목도 AI 인식 항목과 같은 자리를 쓴다.
 
-    사용자가 직접 넣은 항목에는 보호할 AI 원본이 없다 — 그 자리는 처음부터
-    "사용자가 무엇을 입력했는가" 다(`crud.meal.add_item`).
+    출처에 따라 양이 다른 곳에 있으면 읽는 쪽(`GET /meals/{mealId}`)이 분기해야 한다.
     """
     user = make_user(db)
     meal = make_meal(db, user_id=user.id)
@@ -773,8 +771,9 @@ def test_user_added_item_keeps_its_raw_input_in_sync(client, db):
         source=MealItemSource.USER,
         confidence=None,
         estimated_amount_g=None,
+        confirmed_amount=Decimal("200"),
+        confirmed_unit="g",
         confirmed_amount_g=Decimal("200.00"),
-        raw_ai_result={"amount": "200", "unit": "g"},
     )
     db.commit()
 
@@ -786,7 +785,7 @@ def test_user_added_item_keeps_its_raw_input_in_sync(client, db):
     assert response.status_code == 200, response.text
 
     db.refresh(item)
-    assert item.raw_ai_result == {"amount": "2", "unit": "개"}
+    assert (item.confirmed_amount, item.confirmed_unit) == (Decimal("2"), "개")
     assert item.confirmed_amount_g is None
 
 
@@ -966,3 +965,56 @@ def test_update_rejects_an_absurdly_long_items_array(client, db):
     )
 
     assert response.status_code == 422
+
+
+def test_user_input_amount_and_unit_land_in_their_own_columns(client, db):
+    """사용자가 말한 양은 환산 여부와 무관하게 항상 같은 자리에 있어야 한다.
+
+    `confirmed_amount_g` 는 g 으로 환산된 값만 담으므로 "3개" 는 NULL 이 된다.
+    읽는 쪽(`GET /meals/{mealId}` 의 `amount`·`unit`)이 출처와 수정 이력에 따라
+    다른 곳을 뒤지게 만들지 않는다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="삶은 계란",
+        estimated_amount_g=None,
+        raw_ai_result={"foodName": "삶은 계란", "confidence": 0.96},
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="삶은 계란", amount=3, unit="개"),
+    )
+    assert response.status_code == 200, response.text
+
+    db.refresh(item)
+    assert item.confirmed_amount == Decimal("3")
+    assert item.confirmed_unit == "개"
+    assert item.confirmed_amount_g is None
+    # AI 원본은 이제 사용자 입력과 섞이지 않는다.
+    assert item.raw_ai_result == {"foodName": "삶은 계란", "confidence": 0.96}
+
+
+def test_convertible_unit_fills_both_the_raw_pair_and_the_grams(client, db):
+    """g 으로 환산되는 단위여도 사용자가 말한 값은 그대로 남는다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(db, meal_id=meal.id, display_name="참치김밥")
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, amount=220, unit="g"),
+    )
+    assert response.status_code == 200, response.text
+
+    db.refresh(item)
+    assert item.confirmed_amount == Decimal("220")
+    assert item.confirmed_unit == "g"
+    assert item.confirmed_amount_g == Decimal("220.00")

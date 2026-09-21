@@ -243,6 +243,8 @@ def test_add_item_persists_row_and_meal_state(client, db):
     assert [item.display_name for item in items] == ["미역국"]
     assert items[0].source is MealItemSource.USER
     assert items[0].confirmed_amount_g == Decimal("200.00")
+    # 사용자가 말한 값 자체는 환산 여부와 무관하게 이 두 컬럼에 남는다.
+    assert (items[0].confirmed_amount, items[0].confirmed_unit) == (Decimal("200"), "g")
 
     db.refresh(meal)
     assert meal.status is MealStatus.ANALYZING
