@@ -38,4 +38,3 @@ def get_current_user_id(x_user_id: str | None = Header(default=None)) -> uuid.UU
         raise ApiError(
             ErrorCode.UNAUTHORIZED, "X-User-Id 형식이 올바르지 않습니다.", 401
         ) from exc
-

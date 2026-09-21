@@ -22,4 +22,3 @@ def get_current(db: Session, user_id: uuid.UUID) -> MedicationRecord | None:
         MedicationRecord.effective_to.is_(None),
     )
     return db.execute(stmt).scalar_one_or_none()
-
