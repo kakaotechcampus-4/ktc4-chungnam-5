@@ -493,7 +493,17 @@ FAILED
 | confirmed_amount_g | DECIMAL, NULL | 사용자 확인·수정 섭취량. 확인 전에는 NULL |
 | confidence | DECIMAL | AI 분석 신뢰도. `CHECK (0 ~ 1)` |
 | source | ENUM, DEFAULT MODEL | MODEL / USER |
-| raw_ai_result | JSONB | AI 원본 결과 |
+| raw_ai_result | JSONB | AI 원본 결과. `source=USER` 면 사용자가 입력한 `{amount, unit}` |
+
+`confirmed_amount_g` 는 g 으로 환산된 양만 담는다("2개" 는 NULL). 사용자가 실제로 입력한
+숫자·단위는 `raw_ai_result` 에 남는다 — `source=USER` 는 통째가 그 값이고(`POST`),
+`source=MODEL` 은 AI 원본을 덮을 수 없어 `userInput` 키 아래에 따로 둔다
+(`PATCH /meals/{mealId}/items`).
+
+```json
+// source=MODEL 항목을 "3개" 로 고친 뒤
+{ "foodName": "삶은 계란", "confidence": 0.96, "userInput": { "amount": "3", "unit": "개" } }
+```
 
 ---
 
@@ -513,15 +523,24 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 사용자가 직접 넣은 음식(`POST /meals/{mealId}/items`)에는 고칠 AI 인식값이 없다.
 
 ```json
-// original_value
-{ "displayName": "김밥", "amountG": "250.00" }
+// original_value — 고치기 직전의 값. amount·unit 은 직전에 들어온 사용자 입력(없으면 null)
+{ "displayName": "김밥", "amountG": "250.00", "confidence": "0.620",
+  "amount": null, "unit": null }
 // corrected_value — amount·unit 은 사용자가 입력한 원본 그대로
 { "displayName": "참치김밥", "amountG": "220.00", "amount": "220", "unit": "g" }
 ```
 
-`amountG` 는 g 환산값이고 환산이 안 되는 단위("2개")면 `null` 이다 — 그때 사용자가 실제로
-무엇을 입력했는지는 `amount` · `unit` 에만 남는다(AI 인식 항목의 `raw_ai_result` 는 AI
-원본이라 덮어쓰지 않는다). 숫자를 문자열로 담는 건 자릿수(`250.00`)를 잃지 않기 위해서다.
+`amountG` 는 g 환산값이고 환산이 안 되는 단위("2개")면 `null` 이다. **그때도 사용자 입력이
+사라지지는 않는다** — 값 자체는 `meal_items.raw_ai_result` 에 남고(아래 참고), 여기에는
+바뀐 이력으로 함께 적힌다. 숫자를 문자열로 담는 건 자릿수(`250.00`)를 잃지 않기 위해서다.
+
+`confidence` 가 `original_value` 에만 있는 건 **이름을 바꾸면 그 신뢰도를 항목에서 지우기**
+때문이다 — 사용자가 직접 써 넣은 이름을 FE 가 "AI 가 자신 없어함"(`< 0.8`)으로 강조하면
+거짓말이다. 지운 값이 필요한 곳은 인식 성능 평가뿐이라 여기에만 남긴다.
+
+"고쳤다" 의 판정은 이름과 양이다. 이름은 공백을 무시하고 비교하며(FE 가 화면의 값을 그대로
+돌려보내는 경우), 양은 g 환산값이 있으면 그것으로, 없으면 사용자가 입력한 숫자·단위 쌍으로
+비교한다 — 둘을 섞으면 "2개 → 3개" 가 양쪽 다 `amountG: null` 이라 '안 고쳤다' 가 된다.
 
 같은 항목을 두 번 고치면 두 행이 쌓이고, 두 번째 행의 `original_value` 는 AI 인식값이 아니라
 첫 수정의 결과다. **AI 최초 추정값이 기준일 때는 `meal_items.original_food_name` ·

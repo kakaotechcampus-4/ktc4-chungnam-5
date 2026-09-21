@@ -678,8 +678,10 @@ def test_correction_keeps_the_users_raw_unit_when_grams_are_unknown(client, db):
 
     db.refresh(item)
     assert item.confirmed_amount_g is None
-    # AI 원본은 그대로다.
-    assert item.raw_ai_result == {"foodName": "삶은 계란", "confidence": 0.96}
+    # AI 원본은 그대로 두고, 사용자 입력은 `userInput` 아래에 따로 얹는다.
+    assert item.raw_ai_result["foodName"] == "삶은 계란"
+    assert item.raw_ai_result["confidence"] == 0.96
+    assert item.raw_ai_result["userInput"] == {"amount": "2", "unit": "개"}
 
     (correction,) = _corrections(db, item.id)
     assert correction.corrected_value["amount"] == "2"
@@ -719,3 +721,248 @@ def test_update_never_touches_the_task_queue(client, db, monkeypatch):
     )
 
     assert response.status_code == 200, response.text
+
+
+def test_amount_edit_in_a_countable_unit_is_not_silently_dropped(client, db):
+    """AI 가 "삶은 계란 2개" 로 인식한 항목의 양을 3개로 고친다.
+
+    g 환산이 안 되므로 `confirmed_amount_g` 에는 담을 수 없다. 그렇다고 요청을
+    받아 놓고 200 을 준 뒤 아무 데도 남기지 않으면 사용자 입력이 사라진다 —
+    화면에는 3개, DB 에는 아무것도 없는 상태가 된다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="삶은 계란",
+        estimated_amount_g=None,
+        raw_ai_result={"foodName": "삶은 계란", "amount": 2, "unit": "개"},
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="삶은 계란", amount=3, unit="개"),
+    )
+    assert response.status_code == 200, response.text
+
+    db.refresh(item)
+    # AI 원본은 그대로 두고, 사용자 입력은 따로 남긴다.
+    assert item.raw_ai_result["foodName"] == "삶은 계란"
+    assert item.raw_ai_result["userInput"] == {"amount": "3", "unit": "개"}
+
+    (correction,) = _corrections(db, item.id)
+    assert correction.corrected_value["amount"] == "3"
+    assert correction.corrected_value["unit"] == "개"
+
+
+def test_user_added_item_keeps_its_raw_input_in_sync(client, db):
+    """POST 가 남긴 `raw_ai_result` 의 amount·unit 이 낡은 값으로 남으면 안 된다.
+
+    사용자가 직접 넣은 항목에는 보호할 AI 원본이 없다 — 그 자리는 처음부터
+    "사용자가 무엇을 입력했는가" 다(`crud.meal.add_item`).
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="미역국",
+        source=MealItemSource.USER,
+        confidence=None,
+        estimated_amount_g=None,
+        confirmed_amount_g=Decimal("200.00"),
+        raw_ai_result={"amount": "200", "unit": "g"},
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="미역국", amount=2, unit="개"),
+    )
+    assert response.status_code == 200, response.text
+
+    db.refresh(item)
+    assert item.raw_ai_result == {"amount": "2", "unit": "개"}
+    assert item.confirmed_amount_g is None
+
+
+def test_renaming_clears_the_ai_confidence(client, db):
+    """사용자가 이름을 바꾸면 그 신뢰도는 더는 이 항목의 것이 아니다.
+
+    명세서상 FE 는 `confidence < 0.8` 을 강조한다 — 사용자가 직접 써 넣은 이름이
+    "AI 가 자신 없어함" 으로 표시되면 거짓말이다. `crud.meal.add_item` 이 사용자
+    입력 항목의 신뢰도를 NULL 로 두는 것과 같은 이유다.
+
+    값 자체는 `user_corrections` 에 남아 AI 인식 성능 평가에 쓸 수 있다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db, meal_id=meal.id, display_name="김밥", confidence=Decimal("0.620")
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="참치김밥", amount=220, unit="g"),
+    )
+    assert response.status_code == 200, response.text
+
+    db.refresh(item)
+    assert item.confidence is None
+
+    (correction,) = _corrections(db, item.id)
+    assert correction.original_value["confidence"] == "0.620"
+
+
+def test_amount_only_edit_keeps_the_ai_confidence(client, db):
+    """이름이 그대로면 AI 인식은 여전히 유효하다 — 신뢰도를 지울 이유가 없다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db, meal_id=meal.id, display_name="참치김밥", confidence=Decimal("0.620")
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, amount=220),
+    )
+    assert response.status_code == 200, response.text
+
+    db.refresh(item)
+    assert item.confidence == Decimal("0.620")
+
+
+def test_trailing_whitespace_in_the_name_is_not_a_rename(client, db):
+    """FE 가 화면의 이름을 그대로 돌려보낼 때 공백 하나로 링크가 끊기면 안 된다.
+
+    요청의 이름은 pydantic 이 strip 하지만 저장된 이름은 워커가 쓴 그대로다. 둘을
+    날것으로 비교하면 `"참치김밥 "` → `"참치김밥"` 이 rename 으로 보이고, 이름
+    매칭이 못 좁히는 순간 `food_ref_id` 가 사라진다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    make_food_ref(db, food_ref_id="KFD_GIMBAP_1", name="참치김밥")
+    make_food_ref(db, food_ref_id="KFD_GIMBAP_2", name="참치김밥")
+    item = make_meal_item(
+        db, meal_id=meal.id, display_name="참치김밥 ", food_ref_id="KFD_GIMBAP_1"
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="참치김밥", amount=250),
+    )
+    assert response.status_code == 200, response.text
+
+    db.refresh(item)
+    assert item.food_ref_id == "KFD_GIMBAP_1"
+    # 공백만 다른 건 사용자가 고친 게 아니다 — 이력에 쌓이면 인식 오차가 오염된다.
+    assert _corrections(db, item.id) == []
+
+
+def test_editing_the_same_item_twice_chains_the_corrections(client, db):
+    """두 번째 행의 `original_value` 는 AI 인식값이 아니라 첫 수정의 결과다.
+
+    README 의 `user_corrections` 절이 약속하는 내용이다 — 이걸 모르고 두 번째 행을
+    AI 인식값으로 읽으면 인식 성능 통계가 조용히 틀어진다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db, meal_id=meal.id, display_name="김밥", estimated_amount_g=Decimal("250.00")
+    )
+    db.commit()
+    headers = {"X-User-Id": str(user.id)}
+
+    first = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers=headers,
+        json=_payload(item.id, displayName="김밥", amount=230),
+    )
+    second = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers=headers,
+        json=_payload(item.id, displayName="김밥", amount=220),
+    )
+    assert [first.status_code, second.status_code] == [200, 200]
+
+    corrections = sorted(
+        _corrections(db, item.id), key=lambda row: row.corrected_value["amountG"]
+    )
+    assert [row.original_value["amountG"] for row in corrections] == ["230.00", "250.00"]
+    assert [row.corrected_value["amountG"] for row in corrections] == ["220.00", "230.00"]
+
+    # AI 최초 추정값은 어떤 수정에도 덮이지 않는다 — 인식 성능의 기준점이다.
+    db.refresh(item)
+    assert item.estimated_amount_g == Decimal("250.00")
+    assert item.original_food_name == "김밥"
+
+
+def test_rejected_request_writes_no_correction_rows(client, db):
+    """404 로 거절된 요청은 이력도 남기지 않는다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(db, meal_id=meal.id, display_name="김밥")
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json={
+            "items": [
+                {
+                    "itemId": str(item.id),
+                    "displayName": "참치김밥",
+                    "amount": 220,
+                    "unit": "g",
+                },
+                {
+                    "itemId": str(uuid.uuid4()),
+                    "displayName": "없는 항목",
+                    "amount": 100,
+                    "unit": "g",
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 404
+    assert _corrections(db, item.id) == []
+
+
+def test_update_rejects_an_absurdly_long_items_array(client, db):
+    """확인 화면 한 끼에 담길 수 있는 양을 넘어서면 거절한다.
+
+    상한이 없으면 아무 UUID 로나 5만 건을 보내 공공 DB 조회를 5만 번 시킬 수 있다 —
+    소유권 확인(404)보다 이름 매칭이 먼저 돌기 때문이다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json={
+            "items": [
+                {
+                    "itemId": str(uuid.uuid4()),
+                    "displayName": f"음식{index}",
+                    "amount": 100,
+                    "unit": "g",
+                }
+                for index in range(51)
+            ]
+        },
+    )
+
+    assert response.status_code == 422

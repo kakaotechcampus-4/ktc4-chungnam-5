@@ -262,18 +262,31 @@ def update_item(
     display_name: str,
     amount_g: Decimal | None,
     food_ref_id: str | None,
+    confidence: Decimal | None,
+    raw_ai_result: dict,
 ) -> None:
     """사용자가 고친 값을 항목에 반영한다. 커밋하지 않는다.
 
-    `original_food_name` 은 건드리지 않는다 — AI 최초 추정값 자리이고, 사용자 수정으로
-    덮으면 인식 성능 평가의 기준이 사라진다(`user_corrections` 도 같은 이유로 있다).
+    `db` 를 받지만 쓰지 않는다 — 이미 세션에 붙어 있는 객체라 대입만으로 UPDATE 가
+    나간다. 시그니처를 맞춰 두는 건 "행을 바꾸는 일은 crud 를 거친다" 는 규칙을
+    호출부에서 눈에 보이게 하려는 것이다(`mark_recalculating` 과 같다).
+
+    `original_food_name` · `estimated_amount_g` 는 건드리지 않는다 — AI 최초 추정값
+    자리이고, 사용자 수정으로 덮으면 인식 성능 평가의 기준이 사라진다.
 
     양은 `confirmed_amount_g` 로 들어간다. 사용자가 직접 말한 값이라 확인이 끝난 것으로
-    본다 — `crud.meal.add_item` 과 같은 규칙이다.
+    본다 — `crud.meal.add_item` 과 같은 규칙이다. **g 으로 환산되지 않는 단위("2개")면
+    여기는 NULL 이 되므로, 사용자가 실제로 입력한 값은 `raw_ai_result` 로 들어와야
+    한다** — 무엇을 담을지는 항목의 출처가 정하므로 호출부(services)가 미리 만든다.
+
+    새 dict 를 대입한다. JSONB 컬럼을 제자리에서 고치면 SQLAlchemy 가 변경을 알아채지
+    못해 UPDATE 가 나가지 않는다.
     """
     item.display_name = display_name
     item.confirmed_amount_g = amount_g
     item.food_ref_id = food_ref_id
+    item.confidence = confidence
+    item.raw_ai_result = raw_ai_result
 
 
 def add_correction(

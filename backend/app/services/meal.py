@@ -349,24 +349,72 @@ def add_item(
     )
 
 
-def _correction_snapshot(item: MealItem) -> dict[str, str | None]:
-    """`user_corrections` 에 남길 항목의 값 한 벌.
+# 사용자가 입력한 amount·unit 을 AI 인식 항목의 `raw_ai_result` 안에 담는 키.
+# AI 가 쓴 키들과 같은 층에 두면 원본을 덮게 된다.
+_USER_INPUT_KEY = "userInput"
 
-    양은 `confirmed_amount_g`(사용자 확인값)가 있으면 그걸, 없으면
-    `estimated_amount_g`(AI 추정값)를 본다 — 사용자가 확인하기 전 AI 인식 항목은
-    확인값이 NULL 이라 추정값이 곧 "고치기 전의 값" 이다.
 
-    Decimal 을 문자열로 담는다. JSONB 직렬화가 Decimal 을 모르고, float 로 바꾸면
-    `250.00` 이 `250.0` 이 되어 자릿수가 사라진다 — 인식 오차를 나중에 계산할 값이라
-    그대로 보존한다.
+def _previous_user_input(item: MealItem) -> dict[str, str | None]:
+    """이 항목에 마지막으로 들어온 사용자 입력(amount·unit). 없으면 None 쌍.
+
+    자리가 출처마다 다르다. 사용자가 직접 넣은 항목은 `raw_ai_result` 통째가 곧
+    사용자 입력이고(`crud.meal.add_item`), AI 인식 항목은 원본을 덮을 수 없어
+    `userInput` 아래에 따로 둔다.
     """
-    amount_g = item.confirmed_amount_g
-    if amount_g is None:
-        amount_g = item.estimated_amount_g
-    return {
-        "displayName": item.display_name,
-        "amountG": str(amount_g) if amount_g is not None else None,
-    }
+    raw = item.raw_ai_result or {}
+    pair = raw if item.source is MealItemSource.USER else (raw.get(_USER_INPUT_KEY) or {})
+    return {"amount": pair.get("amount"), "unit": pair.get("unit")}
+
+
+def _merged_raw_input(item: MealItem, user_input: dict[str, str]) -> dict:
+    """사용자가 입력한 amount·unit 을 항목의 `raw_ai_result` 에 얹은 새 dict.
+
+    `confirmed_amount_g` 는 g 으로 환산된 양만 담는다. "2개" 처럼 환산 근거가 없는
+    단위면 NULL 이 되므로, 사용자가 실제로 무엇을 입력했는지가 남을 곳은 여기뿐이다.
+
+    출처에 따라 자리가 다르다:
+
+    - `USER` — 사용자가 직접 넣은 음식이라 보호할 AI 원본이 없다. `raw_ai_result`
+      통째가 사용자 입력이고, `POST /meals/{mealId}/items` 가 쓰는 모양과 같다.
+      덮지 않으면 POST 때 넣은 낡은 `200 g` 이 그대로 남아 행이 자기모순이 된다.
+    - `MODEL` — `raw_ai_result` 는 AI 원본이다. 같은 층에 쓰면 원본을 덮으므로
+      `userInput` 아래에 따로 둔다.
+    """
+    if item.source is MealItemSource.USER:
+        return dict(user_input)
+    return (item.raw_ai_result or {}) | {_USER_INPUT_KEY: dict(user_input)}
+
+
+def _stored_amount_g(item: MealItem) -> Decimal | None:
+    """고치기 전의 양. 사용자 확인값이 있으면 그걸, 없으면 AI 추정값이다."""
+    return (
+        item.confirmed_amount_g
+        if item.confirmed_amount_g is not None
+        else item.estimated_amount_g
+    )
+
+
+def _amount_key(
+    amount_g: Decimal | None, raw: dict[str, str | None]
+) -> tuple[str, ...]:
+    """양을 비교 가능한 하나의 값으로 만든다.
+
+    g 으로 환산된 값이 있으면 그것이 곧 양이다. 없으면("2개") 사용자가 입력한
+    숫자·단위 쌍이 그 양의 유일한 표현이다 — 둘을 섞어 비교하면 "2개 → 3개" 가 둘 다
+    `amountG: null` 이라 '안 고쳤다' 로 보인다.
+    """
+    if amount_g is not None:
+        return ("g", str(amount_g))
+    return ("raw", str(raw["amount"]), str(raw["unit"]))
+
+
+def _as_text(value: Decimal | None) -> str | None:
+    """Decimal 을 JSONB 에 담을 문자열로.
+
+    JSONB 직렬화가 Decimal 을 모르고, float 로 바꾸면 `250.00` 이 `250.0` 이 되어
+    자릿수가 사라진다 — 인식 오차를 나중에 계산할 값이라 그대로 보존한다.
+    """
+    return str(value) if value is not None else None
 
 
 def update_items(
@@ -410,12 +458,36 @@ def update_items(
         if update.request.item_id not in by_id
     ]
     if missing:
-        raise MealItemNotFoundError(f"item {missing[0]} 는 이 식사의 항목이 아닙니다.")
+        # 하나만 알리면 FE 가 낡은 확인 화면을 한 번에 고치지 못한다.
+        ids = ", ".join(str(item_id) for item_id in missing)
+        raise MealItemNotFoundError(f"item {ids} 는 이 식사의 항목이 아닙니다.")
 
     for update in resolved:
         item = by_id[update.request.item_id]
-        renamed = item.display_name != update.request.display_name
-        before = _correction_snapshot(item)
+        # 저장된 이름은 워커가 쓴 그대로고 요청의 이름은 pydantic 이 strip 한 값이다.
+        # 날것으로 비교하면 공백 하나 차이가 rename 으로 보이고, 이름 매칭이 못
+        # 좁히는 순간 멀쩡한 `food_ref_id` 가 끊긴다.
+        renamed = item.display_name.strip() != update.request.display_name
+
+        user_input = {
+            "amount": str(update.request.amount),
+            "unit": update.request.unit,
+        }
+        stored_amount_g = _stored_amount_g(item)
+        before: dict[str, str | None] = {
+            "displayName": item.display_name,
+            "amountG": _as_text(stored_amount_g),
+            "confidence": _as_text(item.confidence),
+            **_previous_user_input(item),
+        }
+        # 고친 값은 요청에서 만든다. 항목을 다시 읽으면 안 된다 — 환산이 안 된
+        # 단위("2개")는 `confirmed_amount_g` 가 NULL 이라 고치기 전 값(AI 추정값)으로
+        # 되돌아가 '안 고쳤다' 로 보인다.
+        after: dict[str, str | None] = {
+            "displayName": update.request.display_name,
+            "amountG": _as_text(update.amount_g),
+            **user_input,
+        }
 
         meal_crud.update_item(
             db,
@@ -426,28 +498,25 @@ def update_items(
             # 항목이 끊길 수 있다 — 이름 매칭은 흔한 음식에 None 을 주기 때문이다
             # (`endpoints/meal_items.py` 의 update_meal_items 독스트링 참고).
             food_ref_id=update.food_ref_id if renamed else item.food_ref_id,
+            # 이름을 바꿨으면 그 신뢰도는 더는 이 항목의 것이 아니다. 남겨 두면
+            # 사용자가 직접 써 넣은 이름이 FE 에서 "AI 가 자신 없어함"(`< 0.8`)으로
+            # 강조된다. 값은 바로 위 `before` 에 담겨 user_corrections 로 간다.
+            confidence=None if renamed else item.confidence,
+            raw_ai_result=_merged_raw_input(item, user_input),
         )
 
-        # 고친 값은 요청에서 만든다. 항목을 다시 읽으면 안 된다 — 환산이 안 된
-        # 단위("2개")는 `confirmed_amount_g` 가 NULL 이 되고, 그러면
-        # `_correction_snapshot` 이 AI 추정값으로 되돌아가 "안 고쳤다" 로 보인다.
-        after: dict[str, str | None] = {
-            "displayName": update.request.display_name,
-            "amountG": str(update.amount_g) if update.amount_g is not None else None,
-        }
-        if item.source is MealItemSource.MODEL and before != after:
+        # 반영 전 값으로 비교한다(`stored_amount_g` 는 update_item 앞에서 읽었다).
+        # 이름은 `renamed` 를 그대로 쓴다 — 공백만 다른 건 사용자가 고친 게 아니라
+        # FE 가 화면의 값을 돌려보낸 것이고, 이력에 쌓이면 인식 오차 통계에 섞인다.
+        changed = renamed or _amount_key(stored_amount_g, before) != _amount_key(
+            update.amount_g, after
+        )
+        if item.source is MealItemSource.MODEL and changed:
             meal_crud.add_correction(
                 db,
                 meal_item_id=item.id,
                 original_value=before,
-                corrected_value=after
-                | {
-                    # 환산이 안 된 단위는 여기에만 남는다. AI 인식 항목의
-                    # `raw_ai_result` 는 AI 원본이라 덮어쓸 수 없기 때문이다
-                    # (`add_item` 은 반대로 거기에 남긴다 — 그쪽은 AI 원본이 없다).
-                    "amount": str(update.request.amount),
-                    "unit": update.request.unit,
-                },
+                corrected_value=after,
             )
 
     meal_crud.mark_recalculating(db, meal)

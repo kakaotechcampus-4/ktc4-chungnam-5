@@ -138,7 +138,11 @@ class MealItemUpdate(CamelModel):
 class MealItemsUpdateRequest(CamelModel):
     """PATCH /meals/{mealId}/items 요청."""
 
-    items: Annotated[list[MealItemUpdate], Field(min_length=1)]
+    # 상한이 없으면 아무 UUID 로나 수만 건을 보내 공공 DB 이름 매칭을 그만큼
+    # 돌릴 수 있다 — 소유권 확인(404)보다 매칭이 먼저 돈다
+    # (`endpoints/meal_items.py` 의 `_resolve_update`). 한 끼 확인 화면에
+    # 담길 수 있는 항목 수를 넉넉히 잡은 값이다.
+    items: Annotated[list[MealItemUpdate], Field(min_length=1, max_length=50)]
 
     @field_validator("items")
     @classmethod
@@ -158,7 +162,13 @@ class MealItemsUpdateRequest(CamelModel):
 
 
 class AnalysisStep(CamelModel):
-    """분석 진행 단계 하나. 명세서의 `steps` 배열 원소."""
+    """분석 진행 단계 하나. 명세서의 `steps` 배열 원소.
+
+    `frozen=True` 다 — 아래 `RECALCULATION_STEPS` 가 인스턴스를 모든 응답이
+    공유하므로, 누군가 한 응답에서 고치면 그 뒤 모든 응답이 바뀐다.
+    """
+
+    model_config = CamelModel.model_config | {"frozen": True}
 
     key: Literal["FOOD_RECOGNITION", "DB_MATCHING", "STAGE_RULE_APPLY"]
     state: Literal["DONE", "RUNNING", "PENDING"]
