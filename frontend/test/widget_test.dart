@@ -150,6 +150,47 @@ void main() {
     expect(find.text('지금 얼마나 부르세요?'), findsNothing);
   });
 
+  testWidgets('first launch starts with profile input, then shows tabs', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    await _pumpApp(tester, withProfile: false);
+    expect(find.text('프로필 입력'), findsOneWidget);
+
+    // 빈 값으로는 넘어가지 않는다.
+    await tester.tap(find.text('시작하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('닉네임을 입력해 주세요'), findsOneWidget);
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), '영우');
+    await tester.enterText(fields.at(1), '175');
+    await tester.enterText(fields.at(2), '78.4');
+    await tester.enterText(fields.at(3), '700');
+    await tester.tap(find.text('시작하기'));
+    await tester.pumpAndSettle();
+
+    // 탭 화면으로 넘어가면 오늘의 컨디션 팝업이 뜬다.
+    expect(find.text('프로필 입력'), findsNothing);
+    expect(_popupTitle, findsOneWidget);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('session.userId'), isNotNull);
+  });
+
+  testWidgets('my tab shows member info', (WidgetTester tester) async {
+    _useDesignSize(tester);
+    await _pumpApp(tester);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('마이'));
+    await tester.pumpAndSettle();
+    expect(find.text('영우 님'), findsOneWidget);
+    expect(find.text('175cm'), findsOneWidget);
+    expect(find.text('700kcal'), findsOneWidget);
+  });
+
   testWidgets('condition popup stays closed after an app restart', (
     WidgetTester tester,
   ) async {

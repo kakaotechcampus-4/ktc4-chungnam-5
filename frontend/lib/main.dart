@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'api/api_client.dart';
 import 'navigation/root_shell.dart';
+import 'screens/profile_input_screen.dart';
 import 'state/app_state.dart';
 import 'state/tab_state.dart';
 import 'state/user_session.dart';
@@ -38,8 +39,20 @@ class MyApp extends StatelessWidget {
         title: 'GLP-1 식사 코치',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        home: const RootShell(),
+        home: const _StartScreen(),
       ),
     );
+  }
+}
+
+/// 저장된 사용자가 없으면 프로필 입력(온보딩), 있으면 탭 화면.
+/// 프로필을 저장하면 [UserSession] 이 바뀌어 자동으로 탭 화면으로 넘어간다.
+class _StartScreen extends StatelessWidget {
+  const _StartScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final hasProfile = context.select<UserSession, bool>((s) => s.hasProfile);
+    return hasProfile ? const RootShell() : const ProfileInputScreen();
   }
 }
