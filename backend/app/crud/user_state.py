@@ -49,3 +49,24 @@ def get_latest_weight(db: Session, user_id: uuid.UUID) -> Decimal | None:
         .limit(1)
     )
     return db.execute(stmt).scalar_one_or_none()
+
+
+def get_latest_weight_before(
+    db: Session, *, user_id: uuid.UUID, before: datetime
+) -> Decimal | None:
+    """before 보다 앞선, 체중이 적힌 내 기록 중 가장 최근 것의 체중. 없으면 None.
+
+    recorded_at 을 함수로 감싸지 않아 ix_user_states_user_id_recorded_at 범위 탐색을 탄다.
+    경계(before)를 어떻게 잡을지는 호출하는 쪽이 정한다.
+    """
+    stmt = (
+        select(UserState.weight_kg)
+        .where(
+            UserState.user_id == user_id,
+            UserState.weight_kg.is_not(None),
+            UserState.recorded_at < before,
+        )
+        .order_by(UserState.recorded_at.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none()
