@@ -20,7 +20,7 @@ from app.schemas.base import CamelModel, KstDatetime
 
 
 class MedicationUpsertRequest(CamelModel):
-    """투약 정보 등록·수정 겸용.
+    """투약 정보 등록. 정정은 `PATCH /medications/{id}` 다.
 
     `startedAt` 은 **이번에 맞은 날이 아니라 전체 투약 시작일**이다. 명세의 서버 계산
     항목이 여기서 나온다 — `doseCount = floor((today - startedAt) / 7) + 1`.

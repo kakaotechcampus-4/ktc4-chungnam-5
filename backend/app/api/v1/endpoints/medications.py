@@ -26,7 +26,7 @@ router = APIRouter()
 @router.post(
     "/medications",
     response_model=ApiResponse[MedicationUpsertResponse],
-    summary="투약 정보 등록·수정",
+    summary="투약 정보 등록",
     # 422 를 빠뜨리면 FastAPI 가 자동 생성한 응답이
     # `#/components/schemas/HTTPValidationError` 를 가리키는데, `main.py` 의
     # custom_openapi 가 그 컴포넌트를 지운다 — 모든 라우트가 422 를 ErrorResponse 로
@@ -45,7 +45,9 @@ def upsert_medication(
     # 이건 값이 잘못된 경우라 VALIDATION_ERROR 로 흡수하는 게 맞다.
     # (핸들러가 422 → VALIDATION_ERROR 로 매핑한다)
     #
-    # 미래 시작일과 "첫 용량 변경 이후로 미는 시작일" 둘 다 InvalidStartDateError 다.
+    # **등록 전용이다.** 잘못 넣은 값을 고치는 건 `PATCH /medications/{id}` 다.
+    # 같은 날 다시 등록하거나 전체 시작일을 옮기려 하면 409 로 그쪽을 가리킨다 —
+    # 요청만 봐서는 "정말 용량을 바꿨다" 와 "잘못 쳐서 고친다" 가 구분되지 않는다.
     try:
         result = medication_service.upsert(db, user_id, payload)
     except medication_service.InvalidStartDateError as exc:
