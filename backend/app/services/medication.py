@@ -553,29 +553,57 @@ def get_current_view(
     *,
     today: date | None = None,
 ) -> CurrentMedicationResponse:
-    """`GET /medications/current` 응답.
+    """`GET /medications/current` 응답. 명세의 POST 응답과 같은 14필드다.
 
-    투약 기록이 없으면 stage=PRE_DOSE 에 나머지가 전부 null 이다. 에러가 아니다 —
-    "아직 투약 전"은 정상 상태이고, 투약 전 식사 평가가 제품 기능이다 (D8).
+    **단계를 저장값에서 읽지 않고 오늘 기준으로 다시 판정한다** (`restage`).
+    시간만 지나도 단계는 바뀌는데 그 순간에는 쓰기 이벤트가 없어서, 저장값을 읽으면
+    마지막 POST 시점에 멈춘 단계를 내보낸다. `doseCount`·`nextDoseDate` 가 오늘에서
+    계산되는 것과 같은 모델이고, `decidedAt` 이 조회 시각인 근거이기도 하다.
+
+    `build_upsert_view` 와 합치지 않는다 — 그쪽은 `upsert()` 가 행에 박아 둔 단계를
+    **읽기만** 한다. 같은 요청 안에서 두 번 판정하면 두 답이 나올 수 있어서다.
+
+    투약 기록이 없으면 `STAGE_NOT_SET` 이다 (명세).
+
+    ⚠️ **팀 안건.** 투약 전 사용자도 200 + `stage: PRE_DOSE` 로 내리는 편이 FE 에는
+    낫다 — 에러로 내리면 "아직 투약 전"과 "진짜 에러"를 구분하지 못하고, 투약 전
+    식사 평가가 제품 기능(D8)이라 PRE_DOSE 는 비정상이 아니다. `MedicationStage` 에
+    그 값이 있는 것도 그래서다. 지금은 명세를 그대로 따르고, 바꾸기로 하면 아래
+    raise 한 줄만 고치면 된다.
     """
+    # 없는 사용자를 먼저 거른다. 안 그러면 STAGE_NOT_SET 이 나가서 "등록만 하면 된다"
+    # 고 읽히는데, 실제로는 사용자부터 없다. `upsert` · `list_dose_events` 와 같은 처리다.
+    if user_crud.get(db, user_id) is None:
+        raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
+
     today = today or date.today()
     current = crud.get_current(db, user_id)
     if current is None:
-        return CurrentMedicationResponse(stage=MedicationStage.PRE_DOSE)
+        raise ApiError(
+            ErrorCode.STAGE_NOT_SET, "투약 정보가 아직 등록되지 않았습니다.", 409
+        )
 
     started_at = crud.get_dosing_start_date(db, user_id) or current.effective_from
     next_dose_date, days_until_next_dose = predict_next_dose(started_at, today=today)
-    # 단계는 저장값을 읽지 않고 오늘 기준으로 다시 판정한다 — 시간만 지나도 바뀌는데
-    # 그 순간에는 쓰기 이벤트가 없다. doseCount·nextDoseDate 와 같은 모델이다.
+    stage = restage(db, user_id, current, today=today)
+
     return CurrentMedicationResponse(
-        stage=restage(db, user_id, current, today=today),
+        medication_id=current.id,
         drug_name=current.drug_name,
         dose_mg=current.dose_mg,
-        dose_count=count_doses(started_at, today=today),
         started_at=started_at,
-        effective_from=current.effective_from,
+        dose_count=count_doses(started_at, today=today),
         next_dose_date=next_dose_date,
         days_until_next_dose=days_until_next_dose,
+        stage=stage,
+        stage_reason=STAGE_REASONS[stage],
+        rule_version=RULE_VERSION,
+        # 아래 넷은 쓰기 결과를 담는 자리라 조회에는 대응물이 없다. 값이 거짓말은
+        # 아니다 — 조회는 정말 아무것도 바꾸지 않고, 단계는 방금 판정했다.
+        dose_changed=False,
+        dose_event=None,
+        stage_changed=False,
+        decided_at=datetime.now(timezone.utc),
     )
 
 

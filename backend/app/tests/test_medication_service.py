@@ -18,6 +18,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
+from app.core.errors import ApiError, ErrorCode
 from app.crud import medication as medication_crud
 from app.crud import user as user_crud
 from app.models.enums import DrugName, MedicationStage
@@ -206,12 +207,22 @@ def test_dose_reduction_is_marked_reduced(db: Session, user_id: uuid.UUID) -> No
     assert medication_crud.get_current(db, user_id).stage is MedicationStage.REDUCED
 
 
-def test_no_record_is_pre_dose(db: Session, user_id: uuid.UUID) -> None:
-    """투약 기록이 없으면 PRE_DOSE. 에러가 아니다 — 투약 전 식사 평가가 제품 기능이다 (D8)."""
-    view = service.get_current_view(db, user_id, today=TODAY)
-    assert view.stage is MedicationStage.PRE_DOSE
-    assert view.drug_name is None
-    assert view.dose_count is None
+def test_no_record_is_stage_not_set(db: Session, user_id: uuid.UUID) -> None:
+    """투약 기록이 없으면 `STAGE_NOT_SET` 이다 — 명세 `GET /medications/current`.
+
+    ⚠️ **팀 안건.** 원래는 200 + `stage: PRE_DOSE` 였다. 그쪽이 FE 에는 나은데,
+    에러로 내리면 "아직 투약 전"과 "진짜 에러"를 구분하지 못하고 투약 전 식사 평가가
+    제품 기능(D8)이라 PRE_DOSE 는 비정상이 아니기 때문이다. `MedicationStage` 에
+    그 값이 남아 있는 것도 그래서고, `STAGE_REASONS[PRE_DOSE]` 문구도 그대로다.
+
+    지금은 명세를 따른다. 되돌리기로 하면 `get_current_view` 의 raise 한 줄과
+    이 테스트만 고치면 된다.
+    """
+    with pytest.raises(ApiError) as exc:
+        service.get_current_view(db, user_id, today=TODAY)
+
+    assert exc.value.code is ErrorCode.STAGE_NOT_SET
+    assert exc.value.http_status == 409
 
 
 # ── 스냅샷 ─────────────────────────────────────────────────────
