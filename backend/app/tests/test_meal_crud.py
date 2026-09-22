@@ -150,9 +150,10 @@ def test_add_item_stores_a_user_sourced_row(db):
         db,
         meal_id=meal.id,
         display_name="미역국",
+        amount=Decimal("200"),
+        unit="g",
         amount_g=Decimal("200.00"),
         food_ref_id=None,
-        raw_input={"amount": "200", "unit": "g"},
     )
 
     assert item.meal_id == meal.id
@@ -160,9 +161,11 @@ def test_add_item_stores_a_user_sourced_row(db):
     assert item.original_food_name == "미역국"
     assert item.source is MealItemSource.USER
     assert item.confirmed_amount_g == Decimal("200.00")
+    assert (item.confirmed_amount, item.confirmed_unit) == (Decimal("200"), "g")
     assert item.estimated_amount_g is None
     assert item.confidence is None
-    assert item.raw_ai_result == {"amount": "200", "unit": "g"}
+    # AI 가 인식한 적이 없는 항목이다 — AI 원본 자리는 비어 있어야 한다.
+    assert item.raw_ai_result is None
 
 
 def test_add_item_links_the_matched_food_ref(db):
@@ -174,9 +177,10 @@ def test_add_item_links_the_matched_food_ref(db):
         db,
         meal_id=meal.id,
         display_name="미역국",
+        amount=Decimal("200"),
+        unit="g",
         amount_g=Decimal("200.00"),
         food_ref_id=food_ref.id,
-        raw_input={"amount": "200", "unit": "g"},
     )
 
     assert item.food_ref_id == "KFD_MIYEOK"
