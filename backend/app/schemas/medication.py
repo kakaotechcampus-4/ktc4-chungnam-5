@@ -10,13 +10,13 @@ snake_case 를 그대로 쓰고, 직렬화 시점에만 alias 로 바꾼다.
 
 import enum
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 from pydantic import ConfigDict, Field
 
 from app.models.enums import DrugName, MedicationStage
-from app.schemas.base import CamelModel
+from app.schemas.base import CamelModel, KstDatetime
 
 
 class MedicationUpsertRequest(CamelModel):
@@ -108,7 +108,9 @@ class MedicationUpsertResponse(CamelModel):
         default=None, description="바뀌었다면 그 변경 1건. 아니면 null"
     )
     stage_changed: bool = Field(description="이번 요청으로 단계 판정이 달라졌는지")
-    decided_at: datetime = Field(description="판정 시각")
+    decided_at: KstDatetime = Field(
+        description="판정 시각. `+09:00` 으로 나간다 (규약: ISO 8601 +09:00)."
+    )
 
 
 class CurrentMedicationResponse(CamelModel):

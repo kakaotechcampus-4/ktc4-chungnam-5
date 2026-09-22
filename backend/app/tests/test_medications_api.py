@@ -157,6 +157,18 @@ def _post(client: TestClient, user_id: uuid.UUID, **body: object) -> dict:
     return client.post("/api/v1/medications", json=body, headers=_h(user_id)).json()["data"]
 
 
+def test_decided_at_is_kst(client: TestClient, user_id: uuid.UUID) -> None:
+    """응답 시각은 `+09:00` 이다 — 규약 "날짜 ISO 8601 (+09:00)".
+
+    `datetime.now()` 도 DB 도 UTC 라 그냥 두면 "…Z" 로 나간다. 값을 만들 때 KST 로
+    바꾸는 방식으로는 부족하다 — DB 에서 읽어온 시각이 그대로 샌다. 직렬화 자리에서
+    바꾸는 `KstDatetime`(`schemas/base.py`)을 쓴다.
+    """
+    data = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    assert data["decidedAt"].endswith("+09:00"), data["decidedAt"]
+
+
 def test_response_has_exactly_the_spec_fields(client: TestClient, user_id: uuid.UUID) -> None:
     """빠진 필드도 남는 필드도 없어야 한다.
 
