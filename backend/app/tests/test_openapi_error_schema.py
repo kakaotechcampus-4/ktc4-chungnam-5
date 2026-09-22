@@ -73,3 +73,34 @@ def test_default_validation_error_schema_is_removed(schema):
     (`register_exception_handlers` 의 RequestValidationError 핸들러).
     """
     assert "HTTPValidationError" not in schema["components"]["schemas"]
+
+
+def test_no_route_references_the_removed_validation_schema(schema):
+    """지워진 `HTTPValidationError` 를 가리키는 `$ref` 가 남으면 안 된다.
+
+    위 테스트는 컴포넌트가 **없는지**만 본다. 참조까지 보지 않으면, 라우트에
+    `responses=` 를 빠뜨렸을 때 FastAPI 가 자동 생성한 422 가 지워진 스키마를
+    가리킨 채로 통과한다. 그 문서는 Swagger UI 에서 에러가 나고
+    `openapi-generator` · `orval` 같은 코드 생성기가 죽는다 — FE 가 계약으로
+    읽는 문서다.
+
+    라우트를 새로 추가하면서 `responses` 를 빠뜨리는 **같은 실수를 전부** 잡는다.
+    """
+    dangling = []
+
+    def walk(node, path=""):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "$ref" and "HTTPValidationError" in str(value):
+                    dangling.append(path)
+                walk(value, f"{path}/{key}")
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, f"{path}[{i}]")
+
+    walk(schema.get("paths", {}))
+
+    assert dangling == [], (
+        "지워진 스키마를 가리키는 $ref 가 있다. 해당 라우트에 "
+        "responses=error_responses(..., 422) 를 명시할 것: " + ", ".join(dangling)
+    )
