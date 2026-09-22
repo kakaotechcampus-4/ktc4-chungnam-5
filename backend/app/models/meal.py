@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -48,6 +49,11 @@ class Meal(Base):
         nullable=False,
         server_default=MealStatus.ANALYZING.value,
     )
+    is_recalculation: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    """사용자가 음식을 고쳐서 다시 분석 중인지. FE 는 최초 분석과 재분석의 문구를 다르게 띄운다."""
+
     created_at: Mapped[datetime] = created_at()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     """NULL 이면 살아있는 식사. soft delete — 값이 채워지면 삭제된 것으로 취급한다."""
@@ -94,9 +100,34 @@ class MealItem(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     """최종 확정 음식명."""
 
+    # 양은 여섯 컬럼이다 — 쌍 두 개 + 각 쌍의 g 환산값. 규칙 하나로 읽는다:
+    #
+    #     확인됐으면(`confirmed_amount is not None`) confirmed_*, 아니면 estimated_*
+    #
+    # 각 쌍은 **사용자·AI 가 말한 그대로(숫자 + 단위)** 를 담고, `*_amount_g` 는 그걸
+    # g 으로 환산한 결과다. "2개" 처럼 환산 근거가 없으면 `*_amount_g` 만 NULL 이 되고
+    # 숫자·단위는 남는다 — 그래서 `*_amount_g` 는 "양이 있는가" 의 기준이 될 수 없다.
+    estimated_amount: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    """AI 가 추정한 양의 숫자."""
+    estimated_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    """그 숫자의 단위("g" · "개" · "ml"). `estimated_amount_g` 는 이걸 환산한 결과다.
+
+    `source=USER` 행은 AI 가 추정한 적이 없으므로 NULL 이다."""
     estimated_amount_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    """AI 추정 양의 g 환산값. **사용자 수정에 덮이지 않는다** — 인식 성능 평가의 기준이다."""
+
+    confirmed_amount: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    """사용자가 입력한 양의 숫자. 확인 전에는 NULL.
+
+    **확인 여부의 센티넬이 이 컬럼이다** — `confirmed_amount_g` 는 환산된 값만 담아
+    "2개" 로 확인한 항목도 NULL 이라, 확인 전과 구분되지 않는다."""
+    confirmed_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    """그 숫자의 단위. `confirmed_amount_g` 는 이걸 환산한 결과다.
+
+    `GET /meals/{mealId}` 의 `amount` · `unit` 은 위 규칙 한 줄로 나온다 — 출처
+    (MODEL/USER)도 수정 이력도 볼 필요가 없다."""
     confirmed_amount_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
-    """사용자 확인 전에는 NULL."""
+    """사용자 확인 양의 g 환산값. 확인 전이거나 환산 불가면 NULL."""
     confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
 
     source: Mapped[MealItemSource] = mapped_column(
@@ -105,6 +136,15 @@ class MealItem(Base):
         server_default=MealItemSource.MODEL.value,
     )
     raw_ai_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    """AI 응답 원본 **전용**. 파싱해서 컬럼에 나눠 담고 난 뒤 버리지 않고 두는 자리다.
+
+    `source=USER` 행은 AI 가 인식한 적이 없으므로 NULL 이다.
+
+    **여기서 양을 읽지 않는다.** 음식명·신뢰도·양은 전부 컬럼에 있고(위 양 규칙 참고),
+    이 JSONB 는 "AI 가 원래 뭐라고 했나" 를 되짚거나 파싱 규칙이 바뀌었을 때 다시
+    읽기 위한 것이다. 키 모양은 AI 응답 스키마를 따라 바뀔 수 있으므로 읽는 쪽이
+    의존해서는 안 된다.
+    """
 
     meal: Mapped["Meal"] = relationship(back_populates="items")
     corrections: Mapped[list["UserCorrection"]] = relationship(
