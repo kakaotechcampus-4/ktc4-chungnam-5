@@ -30,6 +30,7 @@ from typing import Final, NamedTuple
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError, ErrorCode
+from app.core.time import today_kst
 from app.crud import medication as crud
 from app.crud import user as user_crud
 from app.models.enums import DrugName, MedicationStage
@@ -419,7 +420,7 @@ def register(
     if user_crud.get(db, user_id) is None:
         raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
 
-    today = today or date.today()
+    today = today or today_kst()
     # `startedAt` 생략은 '오늘'이 아니라 '건드리지 마라'다. 오늘로 치환하면 용량만
     # 고치는 요청이 가장 오래된 행을 오늘로 밀어 전체 회차가 1 로 리셋된다.
     # 기록이 없을 때만 오늘을 첫 행의 시작일로 쓴다.
@@ -548,7 +549,7 @@ def get_current_view(
     if user_crud.get(db, user_id) is None:
         raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
 
-    today = today or date.today()
+    today = today or today_kst()
     current = crud.get_current(db, user_id)
     if current is None:
         raise ApiError(
@@ -610,7 +611,7 @@ def build_register_view(
     여기서 새로 판정하지 않는다. 단계는 `register()` 가 이미 행에 박아 둔 값을 읽기만 한다 —
     두 번 판정하면 같은 요청에 두 답이 나올 수 있다.
     """
-    today = today or date.today()
+    today = today or today_kst()
     record = result.record
 
     started_at = crud.get_dosing_start_date(db, user_id) or record.effective_from

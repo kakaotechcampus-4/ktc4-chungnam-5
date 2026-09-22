@@ -307,6 +307,31 @@ def test_every_period_stays_ordered(db: Session, user_id: uuid.UUID) -> None:
         assert row.effective_to is None or row.effective_from <= row.effective_to
 
 
+# ── "오늘" 은 KST 다 ───────────────────────────────────────────
+
+
+def test_today_comes_from_kst_not_the_process_timezone(
+    db: Session, user_id: uuid.UUID, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`today` 를 안 넘기면 **KST 날짜**를 쓴다 — `date.today()` 가 아니다.
+
+    컨테이너가 UTC 면(Dockerfile 에 TZ 설정이 없다) `date.today()` 는 KST
+    00:00~08:59 에 전날을 돌려준다. 그 시간대에 회차가 하나 적게 세지고 D-day 가
+    하루 밀린다. 표기(`decidedAt` 의 +09:00)와는 다른 문제다 — 이건 계산 기준이다.
+
+    KST 09-23 00:30 = UTC 09-22 15:30 인 순간을 흉내 낸다.
+    """
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=date(2026, 9, 22))
+    monkeypatch.setattr(service, "today_kst", lambda: date(2026, 9, 23))
+
+    view = service.get_current_view(db, user_id)
+
+    # 09-01 부터 22일 = 3주 + 1일 → 4회차. UTC 날짜(09-22)면 21일이라 그대로 4회차지만
+    # D-day 가 갈린다: 다음 투약일 09-29 까지 KST 는 6일, UTC 는 7일이다.
+    assert view.days_until_next_dose == 6
+    assert view.next_dose_date == date(2026, 9, 29)
+
+
 # ── 단계 전이: 시간이 지나야 일어난다 ──────────────────────────
 
 

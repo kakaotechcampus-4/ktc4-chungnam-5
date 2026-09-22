@@ -80,15 +80,14 @@ class DoseEvent(CamelModel):
 
 
 class MedicationRegisterResponse(CamelModel):
-    """`POST /medications` 응답.
+    """`POST /medications` 응답. 명세의 14필드다.
 
-    **`GET /medications/current` 와 필드가 다르다.** 겹치는 건 현재 상태 5개뿐이고,
-    이쪽은 "이번 요청으로 무엇이 바뀌었는가"(`doseChanged` · `doseEvent` ·
-    `stageChanged` · `decidedAt`)를 함께 내린다. 그래서 스키마를 따로 둔다 —
-    `CurrentMedicationResponse` 를 재사용하면 변경 여부를 실을 자리가 없다.
+    `GET /medications/current` 이 **이걸 상속한다** (명세: "동일 구조"). 그래서 필드가
+    같고, 조회에 대응물이 없는 `doseChanged` · `doseEvent` · `stageChanged` 는
+    그쪽에서 고정값이 된다 (`CurrentMedicationResponse` 참고).
 
-    명세에 없는 `effectiveFrom` 은 여기서 내리지 않는다. 현재 용량으로 바꾼 날은
-    `doseEvent.effectiveFrom` 에 이미 들어 있다.
+    명세에 없는 `effectiveFrom` 은 내리지 않는다. 현재 용량으로 바꾼 날은
+    `GET /medications/dose-events` 와 `doseEvent.effectiveFrom` 에 들어 있다.
     """
 
     medication_id: uuid.UUID = Field(

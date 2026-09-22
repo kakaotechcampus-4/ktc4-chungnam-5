@@ -66,6 +66,11 @@ def register_medication(
     "/medications/current",
     response_model=ApiResponse[CurrentMedicationResponse],
     summary="현재 투약 · 단계 · 회차 · D-day",
+    # 422 를 뺄 수 없다. body · query · path 가 없어서 "낼 일이 없는 코드" 로 보이지만,
+    # FastAPI 는 `X-User-Id` 헤더를 파라미터로 세어 422 응답을 **자동 생성**한다.
+    # 그 응답이 `HTTPValidationError` 를 가리키는데 `main.py` 의 custom_openapi 가
+    # 그 컴포넌트를 지우므로, 명시하지 않으면 openapi.json 에 깨진 $ref 가 남는다
+    # (`test_no_route_references_the_removed_validation_schema` 가 잡는다).
     responses=error_responses(401, 404, 409, 422),
 )
 def get_current_medication(
