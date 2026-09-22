@@ -40,17 +40,24 @@ def _respond(result: evaluation_service.EvaluationResult):
             f"영양정보를 찾지 못한 음식 {result.unmatched_items}개는 합계에서 빠졌어요.",
         )
     if result.items_without_amount:
-        # 성분은 찾았고 **양**을 모른다. "영양정보를 찾지 못했다" 고 안내하면
-        # 사용자가 영양정보 입력 화면으로 가서 아무리 넣어도 안 풀린다.
+        # 성분은 찾았고 **양**이 g 으로 안 잡힌다. 두 경우가 섞여 있다 —
+        # 아무도 양을 말해 주지 않았거나, 사용자가 "2개" 라고 말했는데 g 으로
+        # 환산할 표가 없거나 (`crud/evaluation.py::_eaten_amount_g`).
         #
-        # ⚠️ 명세에 "양을 모른다" 전용 코드가 없다. `NUTRITION_NOT_MATCHED` 를
-        #    그대로 쓰되 메시지로 실제 원인을 말한다 — FE 라우팅이 이 경우엔
-        #    맞지 않으므로 코드 신설을 팀 안건으로 올릴 것.
+        # "양을 모른다" 고 쓰지 않는다. 사용자는 방금 "2개" 라고 **말했다** —
+        # 모르는 건 서버 쪽이다. 그렇게 안내하면 이미 적은 값을 또 적으라는 말이 된다.
+        #
+        # "영양정보를 찾지 못했다" 고도 쓸 수 없다. 그러면 영양정보 입력 화면으로
+        # 가서 아무리 넣어도 안 풀린다.
+        #
+        # ⚠️ 명세에 이 경우 전용 코드가 없다. `NUTRITION_NOT_MATCHED` 를 그대로
+        #    쓰되 메시지로 실제 원인을 말한다 — FE 처리("해당 항목 직접 입력")가
+        #    이 경우엔 맞지 않으므로 코드 신설을 팀 안건으로 올릴 것.
         return ok_with_code(
             result.view,
             ErrorCode.NUTRITION_NOT_MATCHED,
-            f"먹은 양을 알 수 없는 음식 {result.items_without_amount}개는 합계에서 "
-            "빠졌어요. 양을 g 으로 고쳐 주세요.",
+            f"양을 g 으로 환산하지 못한 음식 {result.items_without_amount}개는 "
+            "합계에서 빠졌어요. 양을 g 으로 적어 주세요.",
         )
     return ok(result.view)
 

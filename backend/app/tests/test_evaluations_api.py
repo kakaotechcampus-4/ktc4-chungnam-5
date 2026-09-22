@@ -594,8 +594,10 @@ def test_missing_amount_says_so_instead_of_blaming_nutrition(
         json={"satietyAfterPct": 68},
     ).json()
 
-    assert "먹은 양" in body["error"]["message"]
+    assert "양을 g" in body["error"]["message"]
     assert "영양정보를 찾지 못한" not in body["error"]["message"]
+    # "양을 모른다" 고 쓰지 않는다 — 사용자가 "2개" 라고 말한 경우도 여기로 온다.
+    assert "양을 모" not in body["error"]["message"]
 
 
 def test_unmatched_food_still_says_nutrition_not_found(
