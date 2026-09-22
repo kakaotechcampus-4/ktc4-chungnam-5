@@ -271,6 +271,32 @@ def test_moving_the_start_date_is_409(client: TestClient, user_id: uuid.UUID) ->
     assert res.json()["error"]["code"] == "CONFLICT"
 
 
+def test_moving_the_start_date_is_409_even_when_the_date_is_future(
+    client: TestClient, user_id: uuid.UUID
+) -> None:
+    """기록이 있으면 미래 날짜라도 422 가 아니라 409 다.
+
+    `startedAt` 은 애초에 쓸 수 없는 자리다. 미래 날짜라고 422 를 주면 "날짜만 고치면
+    되겠네" 로 읽히는데, 과거 날짜를 넣어도 여전히 거부된다. 미래 시작일 422 는
+    첫 등록에만 해당한다.
+    """
+    started = (date.today() - timedelta(days=30)).isoformat()
+    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt=started)
+
+    res = client.post(
+        "/api/v1/medications",
+        json={
+            "drugName": "위고비",
+            "doseMg": 0.5,
+            "startedAt": (date.today() + timedelta(days=7)).isoformat(),
+        },
+        headers=_h(user_id),
+    )
+
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "CONFLICT"
+
+
 def test_same_day_re_registration_is_409(client: TestClient, user_id: uuid.UUID) -> None:
     """오늘 등록한 걸 같은 날 다시 등록하면 409 다.
 
