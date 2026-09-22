@@ -140,20 +140,30 @@ def test_candidates_rejects_a_missing_query(client, db):
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_candidates_rejects_a_single_character_query(client, db):
-    """한 글자 검색은 거부한다.
+def test_candidates_accepts_a_single_character_query(client, db):
+    """한 글자 검색을 막지 않는다 — **한글은 한 글자가 단어다.**
 
-    `밥` 한 글자는 33만건 중 수만 건과 일치해 후보 목록으로 쓸모가 없는데, 비용은
-    전체 순차 스캔으로 똑같이 든다. 퍼지 폴백의 두 글자 조각도 만들 수 없다.
+    `밥` · `국` · `떡` 은 완결된 음식 이름이라 영어의 한 글자와 사정이 다르다.
+    수만 건과 일치하는 건 맞지만(공공 DB 에서 `밥` 16,566건), GENERAL·짧은 이름
+    우선 정렬이 쓸 만한 것만 위로 올린다 — 실제 데이터에서 `q=떡` 의 상위 5건은
+    꿀떡·떡국·쑥떡·장떡·호떡 이다.
+
+    거부해도 비용이 줄지 않는다는 점이 결정적이다. 전건 순차 스캔이라 검색어 길이는
+    비용과 무관하고(`밥` 88ms · `김치` 78ms · `김치찌개` 76ms), 막으면 사용자가
+    다른 이름을 다시 칠 뿐이라 같은 스캔이 한 번 더 돈다.
     """
     user = make_user(db)
+    for index, name in enumerate(["김밥", "국밥", "볶음밥", "미역국"]):
+        make_food_ref(db, food_ref_id=f"KFD_RICE_{index}", name=name)
+    db.commit()
 
     response = client.get(
         _PATH, params={"q": "밥"}, headers={"X-User-Id": str(user.id)}
     )
 
-    assert response.status_code == 422, response.text
-    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert response.status_code == 200, response.text
+    names = [candidate["name"] for candidate in response.json()["data"]["candidates"]]
+    assert names == ["국밥", "김밥", "볶음밥"]
 
 
 def test_candidates_rejects_a_limit_beyond_the_cap(client, db):
@@ -168,19 +178,18 @@ def test_candidates_rejects_a_limit_beyond_the_cap(client, db):
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_candidates_rejects_a_query_that_is_only_one_character_after_normalizing(
-    client, db
-):
-    """`" 밥 "` 은 세 글자지만 실제 검색어는 한 글자다.
+def test_candidates_rejects_a_query_that_normalizes_to_nothing(client, db):
+    """`"_ _"` 는 세 글자지만 정규화하면 아무것도 남지 않는다.
 
-    길이 검사를 원문에만 걸면 공백·밑줄로 길이를 채운 요청이 그대로 통과해, 앞
-    테스트가 막으려던 전체 스캔이 뒷문으로 들어온다. 비교는 이름 매칭과 같은
+    검사를 원문 길이에만 걸면 공백·밑줄로 길이를 채운 요청이 통과한다. 그러면 빈
+    조각이 `LIKE '%%'` 가 되어 퍼지 점수에서 모든 행에 1점을 주고, 33만건 전부가
+    후보가 된다(`services.nutrition._tokenize`). 비교는 이름 매칭과 같은
     정규화(`crud.food.normalize_name`) 뒤에 해야 한다.
     """
     user = make_user(db)
 
     response = client.get(
-        _PATH, params={"q": " 밥_"}, headers={"X-User-Id": str(user.id)}
+        _PATH, params={"q": "_ _"}, headers={"X-User-Id": str(user.id)}
     )
 
     assert response.status_code == 422, response.text
@@ -215,20 +224,26 @@ def test_candidates_never_emit_nan(client, db):
     assert candidate["nutrition"]["kcal"] is None
 
 
-def test_candidates_rejects_a_query_of_only_one_character_tokens(client, db):
-    """`"밥 국"` 은 토큰 길이의 합이 2 지만 실제로 검색되는 조각은 전부 한 글자다.
+def test_candidates_put_every_token_matches_before_fuzzy_fill(client, db):
+    """한 글자 토큰이 여럿이어도 두 단계의 순서는 그대로다.
 
-    합으로 재면 `"밥"` 은 막고 `"밥 국"` 은 통과하는데, 뒤쪽이 더 비싸다 — 한 글자
-    조각 둘로 33만건을 두 번 훑는다. 앞 테스트가 막으려던 비용이 뒷문으로 들어온다.
+    `"밥 국"` 은 1단계에서 **둘 다** 담은 `국밥` 만 집는다(AND). 그것만으로 `limit`
+    을 못 채우니 2단계가 한쪽만 겹치는 이름으로 나머지를 채운다. 순서가 곧 관련도라
+    `국밥` 이 언제나 앞이다 — 한 글자 토큰을 허용해도 이 규칙은 느슨해지지 않는다.
     """
     user = make_user(db)
+    for index, name in enumerate(["김밥", "국밥", "볶음밥", "미역국"]):
+        make_food_ref(db, food_ref_id=f"KFD_RICE_{index}", name=name)
+    db.commit()
 
     response = client.get(
         _PATH, params={"q": "밥 국"}, headers={"X-User-Id": str(user.id)}
     )
 
-    assert response.status_code == 422, response.text
-    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert response.status_code == 200, response.text
+    names = [candidate["name"] for candidate in response.json()["data"]["candidates"]]
+    assert names[0] == "국밥"
+    assert sorted(names[1:]) == ["김밥", "미역국", "볶음밥"]
 
 
 def test_candidates_rejects_a_query_with_absurdly_many_words(client, db):
