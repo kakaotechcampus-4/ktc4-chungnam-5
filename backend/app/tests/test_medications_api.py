@@ -158,6 +158,18 @@ def _post(client: TestClient, user_id: uuid.UUID, **body: object) -> dict:
     return client.post("/api/v1/medications", json=body, headers=_h(user_id)).json()["data"]
 
 
+def test_decided_at_is_kst(client: TestClient, user_id: uuid.UUID) -> None:
+    """응답 시각은 `+09:00` 이다 — 규약 "날짜 ISO 8601 (+09:00)".
+
+    `datetime.now()` 도 DB 도 UTC 라 그냥 두면 "…Z" 로 나간다. 값을 만들 때 KST 로
+    바꾸는 방식으로는 부족하다 — DB 에서 읽어온 시각이 그대로 샌다. 직렬화 자리에서
+    바꾸는 `KstDatetime`(`schemas/base.py`)을 쓴다.
+    """
+    data = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    assert data["decidedAt"].endswith("+09:00"), data["decidedAt"]
+
+
 def _history(db: Session, user_id: uuid.UUID, *periods: tuple[str, str]) -> None:
     """지난 구간들을 직접 깔아 둔다.
 
@@ -334,6 +346,18 @@ def test_current_matches_what_post_returned(client: TestClient, user_id: uuid.UU
 
     state = SPEC_FIELDS - {"doseChanged", "doseEvent", "stageChanged", "decidedAt"}
     assert {k: fetched[k] for k in state} == {k: posted[k] for k in state}
+
+
+def test_current_decided_at_is_kst(client: TestClient, user_id: uuid.UUID) -> None:
+    """조회 응답도 `+09:00` 이다.
+
+    `CurrentMedicationResponse` 가 `decided_at` 을 재선언한다(설명을 덮어쓰려고).
+    타입까지 같이 적으므로 부모만 고치면 여기서 다시 `datetime` 으로 덮인다.
+    """
+    _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    data = _current(client, user_id)
+    assert data["decidedAt"].endswith("+09:00"), data["decidedAt"]
 
 
 def test_current_write_result_fields_are_fixed(client: TestClient, user_id: uuid.UUID) -> None:
