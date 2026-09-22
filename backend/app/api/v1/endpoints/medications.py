@@ -16,8 +16,8 @@ from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
 from app.schemas.medication import (
     CurrentMedicationResponse,
-    MedicationUpsertRequest,
-    MedicationUpsertResponse,
+    MedicationRegisterRequest,
+    MedicationRegisterResponse,
 )
 from app.services import medication as medication_service
 
@@ -26,8 +26,8 @@ router = APIRouter()
 
 @router.post(
     "/medications",
-    response_model=ApiResponse[MedicationUpsertResponse],
-    summary="투약 정보 등록·수정",
+    response_model=ApiResponse[MedicationRegisterResponse],
+    summary="투약 정보 등록",
     # 422 를 빠뜨리면 FastAPI 가 자동 생성한 응답이
     # `#/components/schemas/HTTPValidationError` 를 가리키는데, `main.py` 의
     # custom_openapi 가 그 컴포넌트를 지운다 — 모든 라우트가 422 를 ErrorResponse 로
@@ -35,20 +35,22 @@ router = APIRouter()
     # Swagger UI 와 코드 생성기가 죽는다.
     responses=error_responses(401, 404, 409, 422),
 )
-def upsert_medication(
-    payload: MedicationUpsertRequest,
+def register_medication(
+    payload: MedicationRegisterRequest,
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
-) -> ApiResponse[MedicationUpsertResponse]:
+) -> ApiResponse[MedicationRegisterResponse]:
     # 지원하지 않는 약물은 여기 오지 않는다 — DrugName ENUM 이 422 로 막는다.
     #
     # 시작일 오류도 422 다. 명세의 에러 코드 목록에 날짜 전용 코드가 없고,
     # 이건 값이 잘못된 경우라 VALIDATION_ERROR 로 흡수하는 게 맞다.
     # (핸들러가 422 → VALIDATION_ERROR 로 매핑한다)
     #
-    # 미래 시작일과 "첫 용량 변경 이후로 미는 시작일" 둘 다 InvalidStartDateError 다.
+    # **등록 전용이다.** 잘못 넣은 값을 고치는 건 `PATCH /medications/{id}` 다.
+    # 같은 날 다시 등록하거나 전체 시작일을 옮기려 하면 409 로 그쪽을 가리킨다 —
+    # 요청만 봐서는 "정말 용량을 바꿨다" 와 "잘못 쳐서 고친다" 가 구분되지 않는다.
     try:
-        result = medication_service.upsert(db, user_id, payload)
+        result = medication_service.register(db, user_id, payload)
     except medication_service.InvalidStartDateError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -57,7 +59,7 @@ def upsert_medication(
 
     # 응답 스키마가 GET /medications/current 와 다르다 — 이쪽은 현재 상태에 더해
     # 이번 요청으로 무엇이 바뀌었는지까지 내린다 (명세 POST /medications).
-    return ok(medication_service.build_upsert_view(db, user_id, result))
+    return ok(medication_service.build_register_view(db, user_id, result))
 
 
 @router.get(
@@ -82,5 +84,3 @@ def get_current_medication(
     투약 미등록은 409 `STAGE_NOT_SET` 이다 (명세). 없는 사용자는 404 다.
     """
     return ok(medication_service.get_current_view(db, user_id))
-
-

@@ -279,26 +279,42 @@ def test_medication_id_points_at_the_current_row(
     assert uuid.UUID(first["medicationId"]) != uuid.UUID(second["medicationId"])
 
 
-def test_start_date_after_first_change_is_422(client: TestClient, user_id: uuid.UUID) -> None:
-    """시작일을 첫 용량 변경일 뒤로 밀면 422 다.
+def test_moving_the_start_date_is_409(client: TestClient, user_id: uuid.UUID) -> None:
+    """등록한 뒤 전체 시작일을 옮기려 하면 409 다.
 
-    막지 않으면 첫 행의 기간이 뒤집힌다 (effective_from > effective_to).
-    미래 시작일과 같은 이유로 VALIDATION_ERROR 에 흡수한다 —
-    명세의 에러 코드 목록에 날짜 전용 코드가 없다.
+    이미 지나간 날을 다시 쓰는 일이라 등록이 아니라 **정정**이다 —
+    `PATCH /medications/{id}` 의 몫이다. 값이 잘못된 게 아니므로 422 가 아니다.
     """
-    old = (date.today() - timedelta(days=30)).isoformat()
-    changed_today = date.today().isoformat()
-    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt=old)
-    _post(client, user_id, drugName="위고비", doseMg=0.5, startedAt=old)
+    started = (date.today() - timedelta(days=30)).isoformat()
+    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt=started)
 
     res = client.post(
         "/api/v1/medications",
-        json={"drugName": "위고비", "doseMg": 0.5, "startedAt": changed_today},
+        json={"drugName": "위고비", "doseMg": 0.5, "startedAt": date.today().isoformat()},
         headers=_h(user_id),
     )
 
-    assert res.status_code == 422
-    assert res.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "CONFLICT"
+
+
+def test_same_day_re_registration_is_409(client: TestClient, user_id: uuid.UUID) -> None:
+    """오늘 등록한 걸 같은 날 다시 등록하면 409 다.
+
+    "용량을 바꾼 날 새로 맞았다" 와 "방금 잘못 넣어서 고친다" 가 요청만 봐서는
+    구분되지 않는다. 앞은 감량기 판정을 낳고 뒤는 낳으면 안 되므로 엔드포인트로 가른다.
+    """
+    today = date.today().isoformat()
+    _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt=today)
+
+    res = client.post(
+        "/api/v1/medications",
+        json={"drugName": "위고비", "doseMg": 0.5, "startedAt": today},
+        headers=_h(user_id),
+    )
+
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "CONFLICT"
 
 
 def test_typo_field_is_rejected(client: TestClient, user_id: uuid.UUID) -> None:

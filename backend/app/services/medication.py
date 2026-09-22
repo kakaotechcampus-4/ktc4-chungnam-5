@@ -1,10 +1,10 @@
-"""투약 도메인 로직 — 용량 사다리 · 단계 판정 · 등록/수정 유스케이스.
+"""투약 도메인 로직 — 용량 사다리 · 단계 판정 · 등록 유스케이스.
 
 세 덩어리로 나뉜다. 위에서 아래로 의존한다:
 
 1. **용량 사다리** — 약물별 증량 스케줄 상수
 2. **순수 함수** — 단계 판정. DB·네트워크 의존 0
-3. **유스케이스** — DB 를 거치는 등록/수정/조회
+3. **유스케이스** — DB 를 거치는 등록·조회
 
 **행 하나 = 용량 변경 1건이다.** 투약 1회가 아니다 — 같은 용량으로 매주 맞아도 행은
 늘지 않는다. `GET /medications/dose-events` 가 곧 이 행들이다 (명세: "용량 변경 이력").
@@ -38,8 +38,8 @@ from app.schemas.medication import (
     CurrentMedicationResponse,
     DoseDirection,
     DoseEvent,
-    MedicationUpsertRequest,
-    MedicationUpsertResponse,
+    MedicationRegisterRequest,
+    MedicationRegisterResponse,
 )
 
 # ── 1. 용량 사다리 ──────────────────────────────────────────────
@@ -327,34 +327,8 @@ class FutureStartDateError(InvalidStartDateError):
         self.today = today
 
 
-class StartDateAfterFirstChangeError(InvalidStartDateError):
-    """시작일을 첫 용량 변경일 뒤로 밀려는 경우.
-
-    시작일 정정은 **가장 오래된 행의 날짜를 옮기는 것**인데, 그 행이 이미 닫혀 있으면
-    자기 종료일을 넘어설 수 없다. 넘기면 `effective_from > effective_to` 가 되어
-    기간이 뒤집힌다 — 그 행은 어느 날짜에도 걸리지 않는 유령이 된다.
-
-        BEFORE  [(09-01, 09-14, 0.25), (09-15, None, 0.5)]
-        POST    {doseMg: 0.5, startedAt: 09-15}
-        AFTER   [(09-15, 09-14, 0.25), ...]   ← 뒤집힘
-
-    의미상으로도 모순이다. 09-15 에 용량을 바꿨다는 기록이 있는데 투약을 09-15 에
-    시작했다면, 그 변경은 시작 전에 일어난 일이 된다.
-
-    FE 의 회차 스테퍼는 이 상한을 모른다 — 회차를 낮추면 시작일이 뒤로 밀리므로,
-    용량 변경 이력이 있는 사용자는 첫 변경일까지만 내릴 수 있다.
-    """
-
-    def __init__(self, started_at: date, latest_allowed: date) -> None:
-        super().__init__(
-            f"투약 시작일 {started_at} 이 첫 용량 변경 이후다 — {latest_allowed} 까지만 가능하다"
-        )
-        self.started_at = started_at
-        self.latest_allowed = latest_allowed
-
-
-class UpsertResult(NamedTuple):
-    """`upsert()` 가 남기는 것. 행 하나로는 부족하다.
+class RegisterResult(NamedTuple):
+    """`register()` 가 남기는 것. 행 하나로는 부족하다.
 
     명세의 `POST /medications` 응답은 현재 상태뿐 아니라 **이번 요청으로 무엇이
     바뀌었는지**(`doseChanged` · `stageChanged` · `doseEvent`)를 함께 내린다.
@@ -411,30 +385,31 @@ def restage(
     return judge_stage(drug_name, record.dose_mg, **context._asdict())
 
 
-def upsert(
+def register(
     db: Session,
     user_id: uuid.UUID,
-    payload: MedicationUpsertRequest,
+    payload: MedicationRegisterRequest,
     *,
     today: date | None = None,
-) -> UpsertResult:
-    """투약 정보 등록·수정 겸용. 커밋까지 한다.
+) -> RegisterResult:
+    """투약 **등록**. 커밋까지 한다.
 
-    **행은 용량 변경 1건이다.** 같은 약·같은 용량으로 다시 보내면 행을 만들지 않는다 —
-    명세의 `POST /medications` 가 "용량 변경 자동 기록"이라 변경이 없으면 기록할 게 없다.
+    **이 함수는 INSERT 만 한다.** 잘못 넣은 값을 고치는 건 `PATCH /medications/{id}` 다.
+    한 엔드포인트가 등록과 정정을 겸하면 **둘을 구분할 방법이 없다** — 같은 날 들어온
+    0.5 가 "정말 용량을 내렸다" 인지 "1.0 을 잘못 쳐서 고친다" 인지 요청만 봐서는
+    모른다. 앞은 감량기 판정을 낳고 뒤는 낳으면 안 되는데, 시간으로는 갈리지 않는다.
 
-    네 갈래다:
+    세 갈래다:
 
-    1. 기록이 없다              → 첫 행을 연다 (`effective_from` = startedAt, 생략하면 오늘)
-    2. 약·용량이 그대로다        → 행을 안 만든다. `startedAt` 만 반영한다
-    3. 약이나 용량이 바뀌었다     → 현재 행을 어제로 닫고 새 행을 연다
-    4. `startedAt` 이 바뀌었다   → 가장 오래된 행의 날짜를 옮긴다
+    1. 기록이 없다           → 첫 행을 연다 (`effective_from` = startedAt, 생략하면 오늘)
+    2. 약·용량이 그대로다     → 행을 안 만든다. 단계만 오늘 기준으로 다시 판정한다
+    3. 약이나 용량이 바뀌었다  → 현재 행을 어제로 닫고 새 행을 연다
 
-    4번은 FE 의 회차 스테퍼다. 회차를 올리면 시작일이 과거로 밀리고, 그 값이 그대로
-    온다. 회차를 직접 받는 자리가 명세에 없어서 이렇게 들어온다.
+    **3번이 "용량을 바꾼 날 새로 맞는 것"** 이다. 기간 모델이라 새 행 INSERT 이고,
+    등록의 일부다. 정정이 아니다.
 
-    `startedAt` 을 생략하면 4번을 건너뛴다. 이미 기록이 있는데 생략을 오늘로 채우면
-    용량만 바꾸는 요청이 시작일을 오늘로 끌어와 회차가 1 로 리셋된다.
+    `startedAt` 은 **첫 등록에서만** 쓴다. 이미 기록이 있는데 다른 값이 오면 409 다 —
+    전체 시작일을 옮기는 건 정정이라 PATCH 의 몫이다.
     """
     # 없는 사용자를 여기서 막는다. 안 막으면 crud.create 가 users FK 를 위반해
     # IntegrityError -> 500 INTERNAL_ERROR 로 나간다. `core/response.py` 가
@@ -472,16 +447,17 @@ def upsert(
         )
         db.commit()
         # 첫 등록은 PRE_DOSE 에서 넘어온 것이라 단계도 용량도 바뀐 것으로 본다.
-        return UpsertResult(record, dose_changed=True, stage_changed=True)  # 첫 등록
+        return RegisterResult(record, dose_changed=True, stage_changed=True)  # 첫 등록
 
-    # startedAt 정정 — 가장 오래된 행의 날짜가 곧 전체 시작일이다.
+    # 전체 시작일을 옮기는 건 **정정**이다 — 이미 지나간 날을 다시 쓰는 일이라
+    # 등록이 아니다. 여기서 받아 주면 용량만 바꾸는 요청이 회차를 통째로 흔든다.
     first = crud.get_first(db, user_id)
     if started_at is not None and first is not None and first.effective_from != started_at:
-        # 이미 닫힌 행이면 자기 종료일을 넘어설 수 없다. 여기서 막지 않으면
-        # effective_from > effective_to 인 행이 남는다.
-        if first.effective_to is not None and started_at > first.effective_to:
-            raise StartDateAfterFirstChangeError(started_at, first.effective_to)
-        first.effective_from = started_at
+        raise ApiError(
+            ErrorCode.CONFLICT,
+            "투약 시작일은 등록 이후 바꿀 수 없습니다. 정정은 PATCH 를 써 주세요.",
+            409,
+        )
 
     unchanged = current.drug_name == payload.drug_name and current.dose_mg == payload.dose_mg
     if unchanged:
@@ -492,42 +468,33 @@ def upsert(
         stage_changed = restaged != current.stage
         current.stage = restaged
         db.commit()
-        return UpsertResult(current, dose_changed=False, stage_changed=stage_changed)
+        return RegisterResult(current, dose_changed=False, stage_changed=stage_changed)
+
+    # **오늘 연 행을 오늘 또 바꾸는 건 정정이다.** 용량을 바꾼 날 새로 맞는 것과
+    # 구분이 안 된다 — 둘 다 "오늘 다른 값이 왔다" 로 똑같이 보인다. 시간으로는
+    # 갈리지 않으므로 엔드포인트로 가른다.
+    #
+    # 여기서 막지 않으면 기간이 뒤집힌 행이 남는다. 아래 close_current 가
+    # `effective_to = 오늘 - 1일` 로 닫는데, 그 행의 `effective_from` 이 오늘이라
+    # `effective_from > effective_to` 가 된다.
+    if current.effective_from >= today:
+        raise ApiError(
+            ErrorCode.CONFLICT,
+            "오늘 등록한 투약은 같은 날 다시 등록할 수 없습니다. 정정은 PATCH 를 써 주세요.",
+            409,
+        )
 
     # 변경일은 오늘이다 — 명세 body 에 '언제 바꿨는지' 자리가 없다.
-    change_date = max(today, current.effective_from)
-    # 같은 날 다시 보낸 것은 새 변경이 아니라 방금 넣은 값의 정정으로 본다.
-    in_place = change_date == current.effective_from
+    change_date = today
     # 용량이 바뀌면 그 날부터 새 구간이라 streak 은 1 부터 다시 센다.
     context = dose_context(
         payload.drug_name,
         payload.dose_mg,
-        # 정정이면 **고치고 있는 행 자신을 이력에서 뺀다.** 안 빼면 오타로 넣었던
-        # 값이 '직전의 다른 용량'이 되어, 1.0 을 0.5 로 고친 것이 감량으로 잡힌다
-        # (기록이 한 줄뿐인 사용자가 REDUCED 로 분류된다). 새 행을 여는 경우에는
-        # current 가 진짜 직전 용량이므로 빼면 안 된다.
-        crud.list_doses_desc(db, user_id, exclude_id=current.id if in_place else None),
+        crud.list_doses_desc(db, user_id),
         effective_from=change_date,
         today=today,
     )
-    if not in_place:
-        crud.close_current(db, current, effective_to=change_date - timedelta(days=1))
-    else:
-        # 같은 날 두 번 바꾸면 이력이 두 줄이 될 이유가 없다. 현재 행을 고친다.
-        previous_stage = current.stage
-        current.drug_name = payload.drug_name
-        current.dose_mg = payload.dose_mg
-        current.stage = judge_stage(payload.drug_name, payload.dose_mg, **context._asdict())
-        db.commit()
-        return UpsertResult(
-            current,
-            dose_changed=True,
-            stage_changed=current.stage != previous_stage,
-            # 덮어쓰는 값이 아니라 **앞 기록의 용량**이다. 정정으로 지워지는 값은
-            # 한 번도 맞은 적이 없으므로 direction 의 기준이 될 수 없다 —
-            # 오타 1.0 을 0.5 로 고친 것이 감량으로 나간다.
-            previous_dose_mg=context.previous_different_dose_mg,
-        )
+    crud.close_current(db, current, effective_to=change_date - timedelta(days=1))
 
     record = crud.create(
         db,
@@ -539,7 +506,7 @@ def upsert(
         effective_from=change_date,
     )
     db.commit()
-    return UpsertResult(
+    return RegisterResult(
         record,
         dose_changed=True,
         stage_changed=record.stage != current.stage,
@@ -560,7 +527,7 @@ def get_current_view(
     마지막 POST 시점에 멈춘 단계를 내보낸다. `doseCount`·`nextDoseDate` 가 오늘에서
     계산되는 것과 같은 모델이고, `decidedAt` 이 조회 시각인 근거이기도 하다.
 
-    `build_upsert_view` 와 합치지 않는다 — 그쪽은 `upsert()` 가 행에 박아 둔 단계를
+    `build_register_view` 와 합치지 않는다 — 그쪽은 `register()` 가 행에 박아 둔 단계를
     **읽기만** 한다. 같은 요청 안에서 두 번 판정하면 두 답이 나올 수 있어서다.
 
     투약 기록이 없으면 `STAGE_NOT_SET` 이다 (명세).
@@ -572,7 +539,7 @@ def get_current_view(
     raise 한 줄만 고치면 된다.
     """
     # 없는 사용자를 먼저 거른다. 안 그러면 STAGE_NOT_SET 이 나가서 "등록만 하면 된다"
-    # 고 읽히는데, 실제로는 사용자부터 없다. `upsert` · `list_dose_events` 와 같은 처리다.
+    # 고 읽히는데, 실제로는 사용자부터 없다. `register()` 와 같은 처리다.
     if user_crud.get(db, user_id) is None:
         raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
 
@@ -607,8 +574,8 @@ def get_current_view(
     )
 
 
-def _build_dose_event(result: UpsertResult) -> DoseEvent | None:
-    """`UpsertResult` → 명세의 `doseEvent`. 변경이 없으면 None 이다."""
+def _build_dose_event(result: RegisterResult) -> DoseEvent | None:
+    """`RegisterResult` → 명세의 `doseEvent`. 변경이 없으면 None 이다."""
     if not result.dose_changed:
         return None
     record = result.record
@@ -622,20 +589,20 @@ def _build_dose_event(result: UpsertResult) -> DoseEvent | None:
     )
 
 
-def build_upsert_view(
+def build_register_view(
     db: Session,
     user_id: uuid.UUID,
-    result: UpsertResult,
+    result: RegisterResult,
     *,
     today: date | None = None,
-) -> MedicationUpsertResponse:
+) -> MedicationRegisterResponse:
     """`POST /medications` 응답을 조립한다.
 
     `get_current_view()` 를 쓰지 않는다 — 명세의 POST 응답은 현재 상태에 더해
     `doseChanged` · `doseEvent` · `stageChanged` · `decidedAt` 을 요구하고,
-    그 넷은 `UpsertResult` 에만 있다. 반대로 `effectiveFrom` 은 POST 응답에 없다.
+    그 넷은 `RegisterResult` 에만 있다. 반대로 `effectiveFrom` 은 POST 응답에 없다.
 
-    여기서 새로 판정하지 않는다. 단계는 `upsert()` 가 이미 행에 박아 둔 값을 읽기만 한다 —
+    여기서 새로 판정하지 않는다. 단계는 `register()` 가 이미 행에 박아 둔 값을 읽기만 한다 —
     두 번 판정하면 같은 요청에 두 답이 나올 수 있다.
     """
     today = today or date.today()
@@ -644,7 +611,7 @@ def build_upsert_view(
     started_at = crud.get_dosing_start_date(db, user_id) or record.effective_from
     next_dose_date, days_until_next_dose = predict_next_dose(started_at, today=today)
 
-    return MedicationUpsertResponse(
+    return MedicationRegisterResponse(
         medication_id=record.id,
         drug_name=record.drug_name,
         dose_mg=record.dose_mg,
