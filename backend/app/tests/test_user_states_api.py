@@ -445,17 +445,12 @@ def _responses(schema: dict) -> dict:
     return schema["paths"][URL]["post"]["responses"]
 
 
-def test_openapi_declares_401(schema):
-    """A24: 문서의 POST /api/v1/user-states 에 401 이 선언돼 있다.
-
-    FE 는 Swagger 를 계약으로 읽는다 — 문서에 없는 상태코드는 분기를 안 만든다.
-    """
-    assert "401" in _responses(schema)
-
-
 @pytest.mark.parametrize("status", ["404", "422"])
 def test_openapi_declares_404_and_422(schema, status):
-    """A25: 문서의 POST /api/v1/user-states 에 404 · 422 가 선언돼 있다."""
+    """A25: 문서의 POST /api/v1/user-states 에 404 · 422 가 선언돼 있다.
+
+    401 선언은 test_openapi_error_schema.py 의 AUTHENTICATED_ROUTES 가 검사한다 (A24).
+    """
     assert status in _responses(schema)
 
 
