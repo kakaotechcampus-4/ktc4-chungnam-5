@@ -298,6 +298,36 @@ def test_recent_past_recorded_at_is_accepted(client, db):
     assert _count_states(db, user.id) == 1
 
 
+def test_slightly_future_recorded_at_within_tolerance_is_accepted(client, db):
+    """A29: 서버보다 50초 빠른 recordedAt 은 받고 보낸 시각 그대로 저장한다 (D6 허용 오차 1분).
+
+    단말 시계가 서버보다 조금만 빨라도 422 가 나면 사용자는 방금 입력한 기록을 저장할 수 없다.
+    """
+    user = make_user(db)
+    ahead = datetime.now(timezone.utc) + timedelta(seconds=50)
+    response = client.post(
+        URL, json=_body(recordedAt=ahead.isoformat()), headers=_headers(user)
+    )
+
+    assert response.status_code == 201, response.text
+    assert _count_states(db, user.id) == 1
+    assert _states(db, user.id)[0].recorded_at == ahead
+
+
+def test_future_recorded_at_beyond_tolerance_is_rejected(client, db):
+    """A30: 허용 오차(1분)를 넘는 recordedAt(now+70초) 은 422 VALIDATION_ERROR 이고 저장하지 않는다.
+
+    A29 의 짝 — 오차를 과하게 넓히면 미래 기록이 다시 들어온다. 50초/70초로 1분 경계를
+    양쪽 10초 여유를 두고 고정한다.
+    """
+    user = make_user(db)
+    future = datetime.now(timezone.utc) + timedelta(seconds=70)
+    response = client.post(
+        URL, json=_body(recordedAt=future.isoformat()), headers=_headers(user)
+    )
+    _assert_rejected(response, db, user.id)
+
+
 def test_naive_recorded_at_is_rejected(client, db):
     """A26: 시간대 없는 recordedAt 은 422 VALIDATION_ERROR 이고 저장하지 않는다 (D5).
 
