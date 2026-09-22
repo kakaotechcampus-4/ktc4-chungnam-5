@@ -399,6 +399,43 @@ def test_matched_item_without_amount_is_not_counted(
     assert data["evidence"]["nutritionSources"] == []
 
 
+def test_confirmed_amount_never_falls_back_to_the_ai_guess(
+    client: TestClient, db: Session
+) -> None:
+    """사용자가 "2개" 로 고쳤으면 AI 가 말한 250g 으로 계산하지 않는다.
+
+    `confirmed_amount_g` 는 g 으로 환산된 값만 담아서 "2개" 는 NULL 이다.
+    그 NULL 을 "확인 전" 으로 읽고 `estimated_amount_g` 로 폴백하면 **사용자가
+    방금 부정한 값**이 합계에 들어간다 — 그리고 `counted` 가 1 이라 경고도 안 붙어서,
+    사용자는 자기가 고친 값이 반영된 줄 알고 그 숫자를 믿는다.
+
+    빠뜨리는 것보다 나쁘다. 합산에서 빼고 단서를 붙이는 게 맞다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
+    make_food_ref(db, food_ref_id="KFD_A", name="밥")
+    make_meal_item(
+        db,
+        meal_id=meal.id,
+        food_ref_id="KFD_A",
+        estimated_amount=Decimal("250.00"),  # AI 추정은 g 으로 환산된다
+        estimated_unit="g",
+        confirmed_amount=Decimal("2"),  # 사용자가 고친 값은 환산되지 않는다
+        confirmed_unit="개",
+    )
+
+    body = client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
+        json={"satietyAfterPct": 68},
+    ).json()
+
+    assert body["data"]["evidence"]["nutritionSources"] == []
+    for nutrient in body["data"]["nutrients"]:
+        assert nutrient["current"] is None, nutrient
+    assert body["error"]["code"] == "NUTRITION_NOT_MATCHED"
+    assert "양을 모" not in body["error"]["message"]
+
+
 def test_empty_meal_confirms_without_nutrition(
     client: TestClient, db: Session
 ) -> None:

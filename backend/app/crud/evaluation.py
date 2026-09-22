@@ -10,7 +10,7 @@ import uuid
 from decimal import Decimal
 from typing import NamedTuple
 
-from sqlalchemy import Numeric, and_, cast, func, select
+from sqlalchemy import Numeric, and_, case, cast, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -95,14 +95,36 @@ class NutrientTotals(NamedTuple):
         return self.unmatched + self.no_amount
 
 
-def _scaled(column, usable):
+def _eaten_amount_g():
+    """실제 먹은 양(g). 없으면 NULL 이다.
+
+    **확인 여부의 센티넬은 `confirmed_amount` 다** — `confirmed_amount_g` 가 아니다.
+    그쪽은 g 으로 환산된 값만 담아서 "계란 2개" 로 확인한 항목도 NULL 이라,
+    그 NULL 은 "확인 전" 과 "확인했지만 환산 불가" 를 구분하지 못한다.
+
+    그래서 `COALESCE` 를 쓸 수 없다. 사용자가 "2개" 로 **고쳐 놓은** 항목이
+    `confirmed_amount_g IS NULL` 이라는 이유로 AI 추정 g 으로 폴백하면,
+    사용자가 방금 부정한 값이 합계에 들어간다. 그건 빠뜨리는 것보다 나쁘다 —
+    경고도 못 붙고(`no_amount` 가 0 이다) 사용자는 자기가 고친 값이 반영된 줄 안다.
+
+    확인된 항목은 환산에 실패했으면 거기서 끝이다. AI 추정값으로 되돌아가지 않는다.
+
+    🔗 `services/meal.py::_stored_amount` 와 같은 규칙이다. 한쪽만 바꾸면 갈라진다.
+    """
+    return case(
+        (MealItem.confirmed_amount.isnot(None), MealItem.confirmed_amount_g),
+        else_=MealItem.estimated_amount_g,
+    )
+
+
+def _scaled(column, amount, usable):
     """기준량 대비 실제 섭취량으로 환산한 성분값의 합.
 
     `food_refs` 의 성분은 `serving_size`(영양성분함량기준량, 보통 100g) 기준이다.
-    실제 먹은 양은 `meal_items.confirmed_amount_g`(사용자 확인값)가 우선이고
-    없으면 `estimated_amount_g`(AI 추정값)를 쓴다.
+
+    `amount` 를 인자로 받는 건 **호출부와 같은 식을 쓰기 위해서다.** 여기서 따로
+    만들면 합계와 카운터가 서로 다른 양을 보게 되고, 한쪽만 고치는 실수가 난다.
     """
-    amount = func.coalesce(MealItem.confirmed_amount_g, MealItem.estimated_amount_g)
     return func.sum(
         cast(column * amount / FoodRef.serving_size, Numeric(12, 3))
     ).filter(usable)
@@ -116,7 +138,8 @@ def sum_nutrients(db: Session, meal_id: uuid.UUID) -> NutrientTotals:
 
     - `food_ref_id` 가 없다 — 이름 매칭에 실패했다. 0 으로 채우면 "안 먹었다" 가
       되어 합계가 거짓으로 작아진다.
-    - 먹은 양을 모른다 — "2개" 처럼 g 환산이 안 된 단위다.
+    - 먹은 양을 모른다 — 아무도 양을 말해 주지 않았거나, 사용자가 말한 양이
+      "2개" 처럼 g 으로 환산되지 않는다 (`_eaten_amount_g` 참고).
     - 기준량이 없거나 0 이거나 NaN 이다 — 나누면 터지거나 합이 NaN 이 된다.
 
     NaN 은 `> 0` 으로 걸러지지 않는다. Postgres 에서 `NaN > 0` 은 **참**이고
@@ -127,7 +150,7 @@ def sum_nutrients(db: Session, meal_id: uuid.UUID) -> NutrientTotals:
     작업 충돌이 난다 — 그 규약의 목적이 바로 그 충돌 회피다. 평가 전용 집계라 다른
     도메인이 쓸 일도 없다. 옮기려면 두 파일 담당자와 먼저 이야기할 것.
     """
-    amount = func.coalesce(MealItem.confirmed_amount_g, MealItem.estimated_amount_g)
+    amount = _eaten_amount_g()
     # 성분을 쓸 수 있는가 — 매칭됐고 기준량이 멀쩡한가. 양과는 별개다.
     has_nutrition = and_(
         MealItem.food_ref_id.isnot(None),
@@ -138,10 +161,10 @@ def sum_nutrients(db: Session, meal_id: uuid.UUID) -> NutrientTotals:
     usable = and_(has_nutrition, amount.isnot(None))
     stmt = (
         select(
-            _scaled(FoodRef.calories, usable).label("kcal"),
-            _scaled(FoodRef.protein_g, usable).label("protein_g"),
-            _scaled(FoodRef.fiber_g, usable).label("fiber_g"),
-            _scaled(FoodRef.sodium_mg, usable).label("sodium_mg"),
+            _scaled(FoodRef.calories, amount, usable).label("kcal"),
+            _scaled(FoodRef.protein_g, amount, usable).label("protein_g"),
+            _scaled(FoodRef.fiber_g, amount, usable).label("fiber_g"),
+            _scaled(FoodRef.sodium_mg, amount, usable).label("sodium_mg"),
             func.count().filter(usable).label("counted"),
             # 제외 사유를 나눠 센다. 사용자에게 줄 안내가 다르다.
             func.count().filter(~has_nutrition).label("unmatched"),
