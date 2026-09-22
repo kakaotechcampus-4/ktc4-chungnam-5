@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from sqlalchemy import Numeric, String
+from sqlalchemy import Index, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -36,3 +36,17 @@ class FoodRef(Base):
     sodium_mg: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
 
     dataset_version: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+# 이름 매칭은 공백·밑줄을 지운 뒤에 한다(`crud.food.normalize_name`). 표현식 인덱스가
+# 없으면 그 비교가 33만건 순차 스캔이 된다.
+#
+# **식이 `crud.food._normalized_name` 과 글자까지 같아야 인덱스를 탄다.** 한쪽만 고치면
+# 쿼리는 그대로 동작하고 느려지기만 해서 알아채기 어렵다.
+#
+# 클래스 안 `__table_args__` 가 아니라 여기 있는 건, 거기서는 `name` 컬럼이 아직
+# 정의되기 전이라 참조할 수 없기 때문이다.
+Index(
+    "ix_food_refs_name_normalized",
+    func.replace(func.replace(FoodRef.name, " ", ""), "_", ""),
+)

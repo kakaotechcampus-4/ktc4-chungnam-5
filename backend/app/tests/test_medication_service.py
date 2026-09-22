@@ -18,10 +18,11 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
+from app.core.errors import ApiError, ErrorCode
 from app.crud import medication as medication_crud
 from app.crud import user as user_crud
 from app.models.enums import DrugName, MedicationStage
-from app.schemas.medication import DoseDirection, MedicationUpsertRequest
+from app.schemas.medication import DoseDirection, MedicationRegisterRequest
 from app.services import medication as service
 
 TODAY = date(2026, 9, 20)
@@ -41,8 +42,8 @@ def user_id(db: Session) -> uuid.UUID:
 
 def _req(
     dose: str, started_at: date | None = None, drug: DrugName = DrugName.WEGOVY
-) -> MedicationUpsertRequest:
-    return MedicationUpsertRequest(
+) -> MedicationRegisterRequest:
+    return MedicationRegisterRequest(
         drug_name=drug, dose_mg=Decimal(dose), started_at=started_at
     )
 
@@ -55,7 +56,7 @@ def _rows(db: Session, user_id: uuid.UUID) -> int:
 
 
 def test_first_registration_opens_a_record(db: Session, user_id: uuid.UUID) -> None:
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
 
     current = medication_crud.get_current(db, user_id)
     assert current is not None
@@ -70,9 +71,9 @@ def test_same_dose_does_not_create_a_row(db: Session, user_id: uuid.UUID) -> Non
     옛 모델(1회 = 1행)과 갈리는 지점이다. 명세의 `POST /medications` 는
     "용량 변경 자동 기록"이라 변경이 없으면 기록하지 않는다.
     """
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
 
     assert _rows(db, user_id) == 1
 
@@ -80,8 +81,8 @@ def test_same_dose_does_not_create_a_row(db: Session, user_id: uuid.UUID) -> Non
 def test_dose_change_closes_previous_row_the_day_before(
     db: Session, user_id: uuid.UUID
 ) -> None:
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
-    service.upsert(db, user_id, _req("0.5", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("0.5", date(2026, 9, 1)), today=TODAY)
 
     history = medication_crud.list_history(db, user_id)
     assert len(history) == 2
@@ -91,17 +92,23 @@ def test_dose_change_closes_previous_row_the_day_before(
 
 
 def test_only_one_open_record_survives(db: Session, user_id: uuid.UUID) -> None:
-    """부분 UNIQUE 인덱스 위반이면 여기서 죽는다."""
-    for dose in ("0.25", "0.5", "1.0", "1.7"):
-        service.upsert(db, user_id, _req(dose, date(2026, 9, 1)), today=TODAY)
+    """부분 UNIQUE 인덱스 위반이면 여기서 죽는다.
+
+    날짜를 주 단위로 벌리는 건 **등록이 하루에 한 번뿐**이기 때문이다. 같은 날 다시
+    보내면 정정이라 409 다 (`PATCH` 의 몫).
+    """
+    for week, dose in enumerate(("0.25", "0.5", "1.0", "1.7")):
+        service.register(
+            db, user_id, _req(dose, date(2026, 9, 1)), today=TODAY + timedelta(weeks=week)
+        )
 
     open_rows = [r for r in medication_crud.list_history(db, user_id) if r.effective_to is None]
     assert len(open_rows) == 1
 
 
 def test_drug_change_also_creates_a_row(db: Session, user_id: uuid.UUID) -> None:
-    service.upsert(db, user_id, _req("1.0", date(2026, 9, 1)), today=TODAY)
-    service.upsert(
+    service.register(db, user_id, _req("1.0", date(2026, 9, 1)), today=TODAY)
+    service.register(
         db, user_id, _req("5.0", date(2026, 9, 1), DrugName.MOUNJARO), today=TODAY
     )
 
@@ -112,20 +119,6 @@ def test_drug_change_also_creates_a_row(db: Session, user_id: uuid.UUID) -> None
 # ── startedAt: 전체 투약 시작일 ────────────────────────────────
 
 
-def test_started_at_moves_the_first_row(db: Session, user_id: uuid.UUID) -> None:
-    """FE 의 회차 스테퍼는 시작일을 역산해서 보낸다.
-
-    회차를 직접 받는 자리가 명세 body 에 없어서, 시작일 변경이 곧 회차 변경이다.
-    """
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 13)), today=TODAY)
-    assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 9, 13)
-
-    service.upsert(db, user_id, _req("0.25", date(2026, 8, 30)), today=TODAY)
-
-    assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 8, 30)
-    assert _rows(db, user_id) == 1  # 시작일만 옮겼지 변경 이력이 아니다
-
-
 def test_omitted_started_at_keeps_the_existing_start_date(
     db: Session, user_id: uuid.UUID
 ) -> None:
@@ -134,9 +127,9 @@ def test_omitted_started_at_keeps_the_existing_start_date(
     오늘로 채우면 용량만 바꾸는 요청이 가장 오래된 행을 오늘로 밀어 회차가 1 로
     리셋된다 — 클라이언트는 200 을 받고 이력이 멀쩡하다고 믿는다.
     """
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
 
-    service.upsert(db, user_id, _req("1.0"), today=TODAY)
+    service.register(db, user_id, _req("1.0"), today=TODAY)
 
     assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 9, 1)
     assert service.get_current_view(db, user_id, today=TODAY).dose_count == 3
@@ -146,7 +139,7 @@ def test_omitted_started_at_on_first_registration_uses_today(
     db: Session, user_id: uuid.UUID
 ) -> None:
     """기록이 없으면 옮길 시작일도 없다 — 오늘로 연다."""
-    service.upsert(db, user_id, _req("0.25"), today=TODAY)
+    service.register(db, user_id, _req("0.25"), today=TODAY)
 
     assert medication_crud.get_dosing_start_date(db, user_id) == TODAY
 
@@ -157,7 +150,7 @@ def test_omitted_started_at_never_trips_the_boundary_check(
     """첫 변경 이후 용량만 다시 바꿔도 거부되면 안 된다."""
     _open_two_records(db, user_id)
 
-    service.upsert(db, user_id, _req("1.0"), today=TODAY)
+    service.register(db, user_id, _req("1.0"), today=TODAY)
 
     assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 9, 1)
 
@@ -167,7 +160,7 @@ def test_dose_count_is_computed_from_started_at(db: Session, user_id: uuid.UUID)
 
     행을 세지 않는다. 등록을 한 번만 해도 시간이 지나면 회차가 오른다.
     """
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
 
     view = service.get_current_view(db, user_id, today=TODAY)
     assert view.started_at == date(2026, 9, 1)
@@ -178,7 +171,7 @@ def test_dose_count_is_computed_from_started_at(db: Session, user_id: uuid.UUID)
 def test_future_start_date_is_rejected(db: Session, user_id: uuid.UUID) -> None:
     """미래 시작일이면 회차 공식이 0 이나 음수를 낸다."""
     with pytest.raises(service.FutureStartDateError):
-        service.upsert(db, user_id, _req("0.25", date(2026, 12, 25)), today=TODAY)
+        service.register(db, user_id, _req("0.25", date(2026, 12, 25)), today=TODAY)
 
     assert _rows(db, user_id) == 0
 
@@ -193,15 +186,17 @@ def test_stage_moves_with_dose(db: Session, user_id: uuid.UUID) -> None:
         ("1.0", MedicationStage.TITRATION),
         ("2.4", MedicationStage.MAINTENANCE),
     ]
-    for dose, expected in steps:
-        service.upsert(db, user_id, _req(dose, date(2026, 9, 1)), today=TODAY)
+    for week, (dose, expected) in enumerate(steps):
+        service.register(
+            db, user_id, _req(dose, date(2026, 9, 1)), today=TODAY + timedelta(weeks=week)
+        )
         assert medication_crud.get_current(db, user_id).stage is expected
 
 
 def test_dose_reduction_is_marked_reduced(db: Session, user_id: uuid.UUID) -> None:
     """2.4 → 1.7 로 내리면 감량기다. 사다리 위치만 보면 TITRATION 으로 잡혔을 자리다."""
-    service.upsert(db, user_id, _req("2.4", date(2026, 9, 1)), today=TODAY)
-    service.upsert(db, user_id, _req("1.7", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("2.4", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("1.7", date(2026, 9, 1)), today=TODAY)
 
     assert medication_crud.get_current(db, user_id).stage is MedicationStage.REDUCED
 
@@ -219,13 +214,13 @@ def test_no_record_is_pre_dose(db: Session, user_id: uuid.UUID) -> None:
 
 def test_snapshot_freezes_current_medication(db: Session, user_id: uuid.UUID) -> None:
     """스냅샷은 만든 시점의 값을 얼린다. 원본을 고쳐도 따라 변하지 않는다."""
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=TODAY)
     snapshot = service.create_snapshot_for_meal(db, user_id)
 
     assert snapshot.stage is MedicationStage.INITIAL
     assert snapshot.dose_mg == Decimal("0.250")
 
-    service.upsert(db, user_id, _req("2.4", date(2026, 9, 1)), today=TODAY)
+    service.register(db, user_id, _req("2.4", date(2026, 9, 1)), today=TODAY)
     db.refresh(snapshot)
 
     assert medication_crud.get_current(db, user_id).stage is MedicationStage.MAINTENANCE
@@ -248,20 +243,25 @@ def test_snapshot_for_pre_dose_user_is_empty(db: Session, user_id: uuid.UUID) ->
 
 def _open_two_records(db: Session, user_id: uuid.UUID) -> None:
     """[(09-01, 09-14, 0.25), (09-15, None, 0.5)] 을 만든다."""
-    service.upsert(db, user_id, _req("0.25", date(2026, 9, 1)), today=date(2026, 9, 10))
-    service.upsert(db, user_id, _req("0.5", date(2026, 9, 1)), today=date(2026, 9, 15))
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=date(2026, 9, 10))
+    service.register(db, user_id, _req("0.5", date(2026, 9, 1)), today=date(2026, 9, 15))
 
 
-def test_started_at_cannot_pass_the_first_dose_change(db: Session, user_id: uuid.UUID) -> None:
-    """시작일을 첫 용량 변경일 뒤로 밀 수 없다.
+def test_started_at_cannot_be_moved_after_registration(
+    db: Session, user_id: uuid.UUID
+) -> None:
+    """전체 시작일을 옮기는 건 정정이다 — 등록이 아니라 409 다.
 
-    막지 않으면 첫 행이 `effective_from > effective_to` 가 되어 기간이 뒤집힌다 —
-    어느 날짜에도 걸리지 않는 유령 행이 남는다.
+    이미 지나간 날을 다시 쓰는 일이라 INSERT 로 표현되지 않는다. 받아 주면 용량만
+    바꾸는 요청이 회차를 통째로 흔든다. `PATCH /medications/{id}` 의 몫이다.
     """
     _open_two_records(db, user_id)
 
-    with pytest.raises(service.StartDateAfterFirstChangeError):
-        service.upsert(db, user_id, _req("0.5", date(2026, 9, 15)), today=TODAY)
+    with pytest.raises(ApiError) as exc:
+        service.register(db, user_id, _req("0.5", date(2026, 9, 15)), today=TODAY)
+
+    assert exc.value.code is ErrorCode.CONFLICT
+    assert exc.value.http_status == 409
 
 
 def test_rejected_start_date_leaves_history_intact(db: Session, user_id: uuid.UUID) -> None:
@@ -269,8 +269,8 @@ def test_rejected_start_date_leaves_history_intact(db: Session, user_id: uuid.UU
     _open_two_records(db, user_id)
     before = [(r.effective_from, r.effective_to, r.dose_mg) for r in medication_crud.list_history(db, user_id)]
 
-    with pytest.raises(service.StartDateAfterFirstChangeError):
-        service.upsert(db, user_id, _req("0.5", date(2026, 9, 15)), today=TODAY)
+    with pytest.raises(ApiError):
+        service.register(db, user_id, _req("0.5", date(2026, 9, 15)), today=TODAY)
     db.rollback()
 
     after = [(r.effective_from, r.effective_to, r.dose_mg) for r in medication_crud.list_history(db, user_id)]
@@ -278,26 +278,48 @@ def test_rejected_start_date_leaves_history_intact(db: Session, user_id: uuid.UU
 
 
 def test_every_period_stays_ordered(db: Session, user_id: uuid.UUID) -> None:
-    """모든 행이 effective_from <= effective_to 를 지킨다."""
+    """모든 행이 effective_from <= effective_to 를 지킨다.
+
+    등록만 하는 한 이 불변식은 구조적으로 지켜진다 — 새 행은 항상 오늘 열리고,
+    직전 행은 어제로 닫힌다. 깨질 수 있었던 건 **같은 날 두 번째 등록**뿐이고
+    (오늘 연 행을 어제로 닫는다) 그건 이제 409 다.
+    """
     _open_two_records(db, user_id)
-    # 첫 변경일 전날까지는 옮길 수 있다.
-    service.upsert(db, user_id, _req("0.5", date(2026, 9, 14)), today=TODAY)
+    service.register(db, user_id, _req("1.0", date(2026, 9, 1)), today=TODAY)
 
     rows = medication_crud.list_history(db, user_id)
-    assert [(r.effective_from, r.effective_to) for r in rows if r.effective_to is not None] == [
-        (date(2026, 9, 14), date(2026, 9, 14))
+    assert [(r.effective_from, r.effective_to) for r in rows] == [
+        (date(2026, 9, 1), date(2026, 9, 14)),
+        (date(2026, 9, 15), TODAY - timedelta(days=1)),
+        (TODAY, None),
     ]
     for row in rows:
         assert row.effective_to is None or row.effective_from <= row.effective_to
 
 
-def test_started_at_can_still_move_backward(db: Session, user_id: uuid.UUID) -> None:
-    """뒤로 미는 것만 막는다 — 앞으로 당기는 건 회차 스테퍼의 정상 동작이다."""
-    _open_two_records(db, user_id)
+# ── "오늘" 은 KST 다 ───────────────────────────────────────────
 
-    service.upsert(db, user_id, _req("0.5", date(2026, 8, 1)), today=TODAY)
 
-    assert medication_crud.get_dosing_start_date(db, user_id) == date(2026, 8, 1)
+def test_today_comes_from_kst_not_the_process_timezone(
+    db: Session, user_id: uuid.UUID, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`today` 를 안 넘기면 **KST 날짜**를 쓴다 — `date.today()` 가 아니다.
+
+    컨테이너가 UTC 면(Dockerfile 에 TZ 설정이 없다) `date.today()` 는 KST
+    00:00~08:59 에 전날을 돌려준다. 그 시간대에 회차가 하나 적게 세지고 D-day 가
+    하루 밀린다. 표기(`decidedAt` 의 +09:00)와는 다른 문제다 — 이건 계산 기준이다.
+
+    KST 09-23 00:30 = UTC 09-22 15:30 인 순간을 흉내 낸다.
+    """
+    service.register(db, user_id, _req("0.25", date(2026, 9, 1)), today=date(2026, 9, 22))
+    monkeypatch.setattr(service, "today_kst", lambda: date(2026, 9, 23))
+
+    view = service.get_current_view(db, user_id)
+
+    # 09-01 부터 22일 = 3주 + 1일 → 4회차. UTC 날짜(09-22)면 21일이라 그대로 4회차지만
+    # D-day 가 갈린다: 다음 투약일 09-29 까지 KST 는 6일, UTC 는 7일이다.
+    assert view.days_until_next_dose == 6
+    assert view.next_dose_date == date(2026, 9, 29)
 
 
 # ── 단계 전이: 시간이 지나야 일어난다 ──────────────────────────
@@ -313,8 +335,8 @@ def test_middle_dose_settles_into_maintenance_over_time(
     """
     start = date(2026, 3, 2)
     raised = start + timedelta(weeks=4)
-    service.upsert(db, user_id, _req("0.5", start), today=start)
-    service.upsert(db, user_id, _req("1.0"), today=raised)  # 1.0 으로 올린 날
+    service.register(db, user_id, _req("0.5", start), today=start)
+    service.register(db, user_id, _req("1.0"), today=raised)  # 1.0 으로 올린 날
 
     # 올린 당일은 1회차 — 아직 정착 전이다
     assert service.get_current_view(db, user_id, today=raised).stage is MedicationStage.TITRATION
@@ -331,8 +353,8 @@ def test_stage_advances_without_any_write(db: Session, user_id: uuid.UUID) -> No
     """
     start = date(2026, 3, 2)
     raised = start + timedelta(weeks=4)
-    service.upsert(db, user_id, _req("0.5", start), today=start)
-    service.upsert(db, user_id, _req("1.0"), today=raised)
+    service.register(db, user_id, _req("0.5", start), today=start)
+    service.register(db, user_id, _req("1.0"), today=raised)
     stored = medication_crud.get_current(db, user_id).stage
 
     view = service.get_current_view(db, user_id, today=raised + timedelta(weeks=4))
@@ -349,10 +371,10 @@ def test_resending_same_dose_updates_the_stored_stage(
     """같은 용량 재전송은 행을 안 만들지만 단계는 갱신한다."""
     start = date(2026, 3, 2)
     raised = start + timedelta(weeks=4)
-    service.upsert(db, user_id, _req("0.5", start), today=start)
-    service.upsert(db, user_id, _req("1.0"), today=raised)
+    service.register(db, user_id, _req("0.5", start), today=start)
+    service.register(db, user_id, _req("1.0"), today=raised)
 
-    result = service.upsert(db, user_id, _req("1.0"), today=raised + timedelta(weeks=4))
+    result = service.register(db, user_id, _req("1.0"), today=raised + timedelta(weeks=4))
 
     assert result.dose_changed is False
     assert result.stage_changed is True
@@ -370,8 +392,8 @@ def test_reduced_releases_once_the_lower_dose_settles(
     """
     start = date(2026, 3, 2)
     lowered = start + timedelta(weeks=4)
-    service.upsert(db, user_id, _req("1.7", start), today=start)
-    service.upsert(db, user_id, _req("1.0"), today=lowered)  # 감량
+    service.register(db, user_id, _req("1.7", start), today=start)
+    service.register(db, user_id, _req("1.0"), today=lowered)  # 감량
 
     assert service.get_current_view(db, user_id, today=lowered).stage is MedicationStage.REDUCED
     settled = lowered + timedelta(weeks=4)
@@ -385,65 +407,12 @@ def test_reduced_releases_once_the_lower_dose_settles(
 # 잡으면 오타를 고친 것이 감량으로 기록된다 (코드 리뷰 지적).
 
 
-def _upsert_view(
-    db: Session, user_id: uuid.UUID, req: MedicationUpsertRequest, *, today: date
+def _register_view(
+    db: Session, user_id: uuid.UUID, req: MedicationRegisterRequest, *, today: date
 ):
     """POST 응답까지 만들어서 돌려준다 — stage 와 direction 을 함께 봐야 한다."""
-    result = service.upsert(db, user_id, req, today=today)
-    return service.build_upsert_view(db, user_id, result, today=today)
-
-
-def test_same_day_correction_is_not_a_reduction(db: Session, user_id: uuid.UUID) -> None:
-    """첫 등록을 오타 냈다가 같은 날 고치면 감량이 아니다.
-
-    1.0 을 0.5 로 고친 것뿐인데 REDUCED 로 분류되면, 기록이 한 줄뿐인 사용자가
-    "용량을 낮추고 다시 적응하는 구간"이라는 안내를 받는다.
-    """
-    service.upsert(db, user_id, _req("1.0", TODAY), today=TODAY)
-
-    view = _upsert_view(db, user_id, _req("0.5"), today=TODAY)
-
-    assert _rows(db, user_id) == 1  # 정정이라 행이 안 늘었다
-    assert view.stage is not MedicationStage.REDUCED
-    # 비교할 앞 기록이 없다 — 명세 dose-events 예시의 de_001 과 같은 경우다
-    assert view.dose_event.direction is DoseDirection.MAINTAIN
-
-
-def test_same_day_correction_compares_against_the_previous_record(
-    db: Session, user_id: uuid.UUID
-) -> None:
-    """정정의 기준은 덮어쓰는 값이 아니라 **앞 기록**이다.
-
-    0.25 로 지내다 1.0 을 잘못 넣고 같은 날 0.5 로 고쳤다면, 실제 이력은
-    0.25 → 0.5 라 증량이다. 덮어쓴 1.0 을 기준으로 삼으면 감량으로 뒤집힌다.
-
-    ⚠️ 명세의 direction 표는 "새 값 vs 현재 값"인데, 정정에서는 그 '현재 값'이
-    실재하지 않은 오타다. 명세가 정정을 상정하지 않아 생기는 간극이라
-    앞 기록을 기준으로 둔다 (`docs/be-medications-create.md` 참고).
-    """
-    raised = TODAY + timedelta(weeks=4)
-    service.upsert(db, user_id, _req("0.25", TODAY), today=TODAY)
-    service.upsert(db, user_id, _req("1.0"), today=raised)  # 오타
-
-    view = _upsert_view(db, user_id, _req("0.5"), today=raised)
-
-    assert _rows(db, user_id) == 2
-    assert view.dose_event.direction is DoseDirection.INCREASE
-    assert view.stage is MedicationStage.TITRATION
-
-
-def test_correction_makes_post_and_get_agree(db: Session, user_id: uuid.UUID) -> None:
-    """정정 직후 POST 응답과 GET 조회가 같은 단계를 말해야 한다.
-
-    쓰기 경로만 자기 자신을 이력에 포함하던 때는 POST 가 REDUCED, GET 이
-    TITRATION 이었다 — 등록 화면과 상세 화면이 서로 다른 답을 보여 줬다.
-    """
-    service.upsert(db, user_id, _req("1.0", TODAY), today=TODAY)
-
-    post = _upsert_view(db, user_id, _req("0.5"), today=TODAY)
-    get = service.get_current_view(db, user_id, today=TODAY)
-
-    assert post.stage is get.stage
+    result = service.register(db, user_id, req, today=today)
+    return service.build_register_view(db, user_id, result, today=today)
 
 
 def test_reduction_on_a_later_day_is_still_a_reduction(
@@ -454,9 +423,9 @@ def test_reduction_on_a_later_day_is_still_a_reduction(
     새 행을 여는 분기에서는 직전 행이 실제로 맞은 용량이므로 이력에서 빼면 안 된다.
     """
     lowered = TODAY + timedelta(weeks=4)
-    service.upsert(db, user_id, _req("1.7", TODAY), today=TODAY)
+    service.register(db, user_id, _req("1.7", TODAY), today=TODAY)
 
-    view = _upsert_view(db, user_id, _req("1.0"), today=lowered)
+    view = _register_view(db, user_id, _req("1.0"), today=lowered)
 
     assert _rows(db, user_id) == 2
     assert view.stage is MedicationStage.REDUCED
@@ -466,9 +435,9 @@ def test_reduction_on_a_later_day_is_still_a_reduction(
 def test_increase_on_a_later_day_is_unaffected(db: Session, user_id: uuid.UUID) -> None:
     """증량도 그대로여야 한다."""
     raised = TODAY + timedelta(weeks=4)
-    service.upsert(db, user_id, _req("0.5", TODAY), today=TODAY)
+    service.register(db, user_id, _req("0.5", TODAY), today=TODAY)
 
-    view = _upsert_view(db, user_id, _req("1.0"), today=raised)
+    view = _register_view(db, user_id, _req("1.0"), today=raised)
 
     assert view.dose_event.direction is DoseDirection.INCREASE
     assert view.stage is MedicationStage.TITRATION

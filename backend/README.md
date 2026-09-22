@@ -50,7 +50,7 @@ backend/app/
 ├── api/v1/endpoints/      공개 REST — JWT
 ├── internal/v1/       ★  AI Service 전용 REST — 서비스 토큰
 ├── worker/            ★  큐 소비 + 스케줄 배치
-├── infra/             ★  S3 · SQS · FCM · AI HTTP
+├── infra/             ★  S3 · 큐 · FCM · AI HTTP
 └── tests/
 ```
 
@@ -58,7 +58,7 @@ backend/app/
   상태는 `crud/`를 거쳐 DB가 들고, 채점기는 현재 baseline을 인자로 받는 순수 함수다.
 - `infra/`는 `Protocol`(또는 ABC) 뒤에 구현을 숨긴다 (D13):
   - `FileStorage` → `S3Storage`(prod) / `LocalDiskStorage`(로컬 개발)
-  - `TaskQueue` → `SqsQueue`(prod) / `LocalQueue`(로컬 개발)
+  - `TaskQueue` → `DbTaskQueue` (PostgreSQL `task_queue` 테이블. 로컬·프로덕션 같은 구현)
   - 도메인은 어느 구현이 붙는지 모른다.
 
 ---
@@ -97,8 +97,9 @@ alembic upgrade head
 # 공공 영양DB 시드 복원 (336,351건)
 docker exec -i glp1-db pg_restore -U glp1 -d glp1_dev --data-only --no-owner < ../infra/seed/food_refs_20260828.dump
 
-# 큐(ElasticMQ) · AI 스텁 — Worker 가 쓴다. 자세한 건 ../infra/README.md
-cd ../infra && docker compose -f docker-compose.queue.yml -f docker-compose.ai-stub.yml up -d && cd ../backend
+# AI 스텁 — Worker 가 쓴다. 큐는 위 PostgreSQL 의 task_queue 테이블이라 따로 안 띄운다.
+# 자세한 건 ../infra/README.md
+cd ../infra && docker compose -f docker-compose.ai-stub.yml up -d && cd ../backend
 
 # API — http://127.0.0.1:8000/docs
 uvicorn app.main:app --reload
@@ -114,7 +115,7 @@ pytest
 위 절차가 제대로 끝났는지 확인한다. 셋 다 기대값과 같아야 한다.
 
 ```bash
-# 1. 테이블 수 — 18 이 나와야 한다
+# 1. 테이블 수 — 19 가 나와야 한다
 docker exec glp1-db psql -U glp1 -d glp1_dev -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';"
 
 # 2. 시드 건수 — GENERAL 19617 / PROCESSED 316734
@@ -126,7 +127,7 @@ alembic check
 
 | 확인 | 기대값 |
 | --- | --- |
-| 테이블 수 | **18** — 도메인 테이블 17개 + Alembic 이 쓰는 `alembic_version` 1개 |
+| 테이블 수 | **19** — 도메인 테이블 17개 + 작업 큐 `task_queue` 1개 + Alembic 이 쓰는 `alembic_version` 1개 |
 | `food_refs` | GENERAL 19,617 · PROCESSED 316,734 (합 336,351) |
 | `alembic check` | `No new upgrade operations detected.` |
 
@@ -200,79 +201,81 @@ alembic check                               # 모델과 DB 가 어긋났는지 �
 
 ## 큐 사용법
 
-비동기 작업은 SQS 를 거친다. 로컬에서도 같은 `SqsQueue` 구현을 쓴다 —
-SQS API 호환 서버(ElasticMQ)를 컨테이너로 띄우고 `SQS_ENDPOINT_URL` 로 가리킨다.
+비동기 작업은 PostgreSQL 의 `task_queue` 테이블을 거친다. 큐 컨테이너는 없다.
 
-### API 3개
-
-```python
-from app.infra.queue import QueueSettings, build_task_queue
-
-queue = build_task_queue(QueueSettings())              # .env 에서 설정을 읽는다
-
-queue.send({...})                                      # 넣기
-tasks = queue.receive(max_count=1, wait_seconds=5)     # 꺼내기 (롱 폴링)
-queue.delete(task.receipt)                             # 처리 완료를 알리기
-```
-
-`receive` 는 **지우지 않는다.** 60초 동안 다른 소비자에게 안 보이게 할 뿐이고,
-그 안에 `delete` 하지 않으면 다시 나타난다.
-
-### 넣기
+### 넣기 — 도메인과 같은 트랜잭션
 
 ```python
-queue.send({
-    "type": "meal.analyze",       # Worker 가 이걸 보고 분기한다
-    "mealId": "meal_456",
-    "mealType": "LUNCH",
-    "eatenAt": "2026-08-21T12:40:00+09:00",
-    "stage": "MAINTENANCE",
-    "rawText": "김밥 한 줄",
-})
+from app.infra.queue import enqueue
+
+def create_meal(db: Session, ...) -> MealResponse:
+    meal = crud.meal.create(db, ...)
+    enqueue(db, "meal.analyze", {
+        "mealId": str(meal.id),
+        "mealType": "LUNCH",
+        "eatenAt": "2026-08-21T12:40:00+09:00",
+        "stage": "MAINTENANCE",
+        "rawText": "김밥 한 줄",
+    })
+    db.commit()     # 식사와 작업이 한 번에 들어간다
+    return ...
 ```
 
-dict 를 주면 JSON 으로 직렬화된다. `POST /meals` 가 `202` 를 돌려주기 직전에 하는 일이 이것이다.
-**커밋이 먼저다** — `queue.send()` 를 앞에 두면 커밋이 실패했을 때 Worker 가 DB 에 없는
-식사를 처리하려다 DLQ 로 간다.
+`enqueue` 는 **커밋하지 않는다.** 쓰던 세션에 INSERT 만 하므로 도메인 변경과 작업
+등록이 원자적이다 — 커밋이 실패하면 둘 다 없고, 성공하면 둘 다 있다. SQS 를 쓸 때
+지켜야 했던 "커밋이 먼저다" 규칙은 이제 없다.
 
-### 꺼내기
+### 꺼내기 — 잠금을 쥔 채로 처리한다
 
 ```python
-for task in queue.receive(max_count=1, wait_seconds=5):
-    task.body           # dict 로 파싱돼 있다
-    task.receipt        # delete 에 쓰는 손잡이
-    task.receive_count  # 이 메시지가 몇 번째로 배달됐는지
+with queue.claim() as claim:
+    if claim is None:
+        ...          # 빈 큐
+    claim.db         # 이 작업을 잠근 세션. 핸들러가 도메인 쓰기에 그대로 쓴다
+    claim.task.type  # 'meal.analyze'
+    claim.task.payload
+    claim.task.attempts   # 지금까지 실패한 횟수. 첫 시도는 0
+    claim.result = {...}  # 담아 두면 DONE 과 함께 result 컬럼에 들어간다
 ```
 
-`wait_seconds` 는 롱 폴링이다. 큐가 비어 있으면 그만큼 기다렸다 빈 리스트를 준다.
-`0` 으로 두면 즉시 반환하는데, 루프에서 쓰면 빈 큐를 쉬지 않고 때리게 된다.
+`SELECT … FOR UPDATE SKIP LOCKED` 로 한 행을 집고 **블록이 끝날 때까지 잠금을
+유지한다.** 잠긴 행은 다른 워커가 건너뛴다. 워커를 늘리면 그대로 분산된다.
 
-### 지우기 — 여기가 전부다
+### 커밋 시점 — 여기가 전부다
 
-```python
-try:
-    handle(task, ai)
-except Exception:
-    logger.exception(...)        # 지우지 않는다 → 재배달 → 3회 넘으면 DLQ
-else:
-    queue.delete(task.receipt)   # 성공했을 때만
+| 블록이 | 큐가 하는 일 |
+|---|---|
+| 정상 종료 | `status='DONE'`, `result`, `finished_at` 커밋 |
+| 예외 | 롤백 → 별도 트랜잭션에 `attempts+1`·`last_error`·`next_run_at`(30s→60s) → 3회째면 `FAILED` |
+
+**롤백되면 핸들러가 쓴 도메인 변경까지 통째로 되돌아간다.** 그래서 재시도할 때
+이전 시도의 흔적이 없다. 반대로 실패했는데 예외를 삼키면 큐는 성공으로 보고 DONE 을
+커밋한다 — 작업이 조용히 사라진다. `app/worker/loop.py` 의 `run()` 이 이 구조이고,
+`app/tests/test_worker_loop.py` 가 이것만 검증한다.
+
+`FAILED` 는 DLQ 자리다. 자동으로 되살리지 않는다 — 3번 실패한 작업은 대개 코드나
+데이터가 잘못된 것이라 사람이 원인을 보고 다시 넣는다.
+
+```sql
+UPDATE task_queue SET status='PENDING', attempts=0, next_run_at=now() WHERE id='…';
 ```
 
-**실패했는데 지우면 재시도도 DLQ 도 일어나지 않고 작업이 조용히 사라진다.**
-반대로 성공했는데 안 지우면 같은 작업을 3번 더 한다. `app/worker/loop.py` 의 `run()` 이
-이 구조이고, `app/tests/test_worker_loop.py` 가 이것만 검증한다.
-
-실패할 때마다 즉시 반환(visibility 0)하고 싶어지는데, 그러면 재시도가 밀리초 단위로 일어나
-`maxReceiveCount` 를 순식간에 태운다. **visibility timeout 이 곧 백오프다.**
+상태는 `python -m scripts.queue_status` 로 본다. "처리 중" 이라는 상태 컬럼은 없다 —
+워커는 행 잠금을 쥐고 있을 뿐이고 그건 커밋 전이라 다른 세션에 보이지 않는다.
 
 ### 작업을 하나 붙이려면
 
-1. `app/worker/jobs/` 에 파일을 만들고 `run(task, ai)` 를 둔다
+1. `app/worker/jobs/` 에 파일을 만들고 `run(db, task, ai)` 를 둔다
 2. `app/worker/dispatch.py` 의 `_HANDLERS` 에 한 줄 더한다
 3. `_NOT_IMPLEMENTED` 에서 그 타입을 지운다
 
 스켈레톤 마지막 줄의 `raise NotImplementedError` 를 **가장 마지막에** 지운다.
-먼저 지우면 `loop.py` 가 성공으로 보고 메시지를 큐에서 지운다.
+먼저 지우면 `loop.py` 가 성공으로 보고 DONE 을 커밋한다.
+
+**`run(db, task, ai)` 안에서 부르는 `services/`·`crud/` 함수는 커밋하면 안 된다.**
+이 `db` 는 작업을 잠그고 있는 세션이라, 도중에 커밋하는 service 를 그대로 부르면
+AI 호출이 끝나기 전에 행 잠금이 풀려 다른 워커가 같은 작업을 중복 처리한다.
+커밋하는 service 가 있으면 커밋 없는 버전으로 쪼개서 쓴다.
 
 ## 환경변수
 
@@ -290,21 +293,12 @@ else:
 | `AI_STUB_SCENARIO`                        | ai-stub 의 실패 경로를 부르는 손잡이. **로컬 전용, 평소엔 비움**       |
 | `STORAGE_TYPE`                            | `s3` \| `local`                                                        |
 | `S3_BUCKET`                               | **`glp1-team-*` 패턴이어야 함.** 인스턴스 역할 권한이 이 패턴으로 한정 |
-| `QUEUE_TYPE`                              | `sqs`. 로컬에서도 `sqs` 를 쓴다 (ElasticMQ)                            |
-| `SQS_ENDPOINT_URL`                        | 로컬 ElasticMQ 주소. **프로덕션에서는 비운다** → 실제 AWS 로 붙는다    |
-| `SQS_QUEUE_URL` · `SQS_DLQ_URL`           | 비동기 파이프라인                                                      |
-| `AWS_DEFAULT_REGION`                      | 기본 `ap-northeast-2`                                                  |
-| `AWS_ACCESS_KEY_ID` · `AWS_SECRET_ACCESS_KEY` | **로컬 전용.** ElasticMQ 는 값을 검사하지 않는다 (`test` 로 둔다)  |
+| `QUEUE_POLL_INTERVAL_SEC`                 | 빈 큐일 때 쉬는 시간. 기본 1.0                                         |
+| `QUEUE_MAX_ATTEMPTS`                      | 이 횟수만큼 실패하면 FAILED 로 격리. 기본 3                            |
+| `QUEUE_BACKOFF_BASE_SEC`                  | 재시도 지연 기준. 기본 30 (30s → 60s)                                  |
 | `FCM_*`                                   | 푸시 발송                                                              |
 
-> 🚨 AWS 액세스 키는 두지 않는다. 서버는 **인스턴스 역할**로 S3·SQS에 접근한다.
->
-> 로컬의 `AWS_ACCESS_KEY_ID=test` 는 인증용이 아니라 **boto3 가 요청에 서명을 붙이려면
-> 뭔가 값이 있어야 해서**다. 프로덕션 `.env` 에는 `SQS_ENDPOINT_URL` 과 함께 이 둘도 비운다 —
-> 비어 있으면 boto3 가 EC2 메타데이터에서 임시 자격증명을 가져온다.
->
-> boto3 는 `.env` 를 읽지 않는다(실제 환경변수만 본다). 그래서 `QueueSettings` 가 받아
-> `boto3.client()` 에 명시적으로 넘긴다.
+> 🚨 AWS 액세스 키는 두지 않는다. 서버는 **인스턴스 역할**로 S3 에 접근한다.
 
 ---
 
@@ -318,7 +312,8 @@ else:
 | Rule Engine  | **순수 함수 단위 테스트.** 입력→기대 점수 표로 고정(`pytest.mark.parametrize`). 단계를 바꾸면 점수가 실제로 달라지는지 검증(R1) |
 | 레이어 경계  | import-linter — `services/*` 상호 참조 금지 · `services` → `crud` 단방향을 CI에서 강제                                          |
 | API          | `httpx.ASGITransport` + Testcontainers(Postgres)                                                                                |
-| Worker 루프  | 가짜 큐·가짜 AI 로 **삭제 시점**만 검증 — 실패한 작업을 지우지 않는지(`test_worker_loop.py`). 외부 의존 0                        |
+| Worker 루프  | 가짜 큐·가짜 AI 로 **커밋 시점**만 검증 — 실패한 작업을 DONE 으로 커밋하지 않는지(`test_worker_loop.py`). 외부 의존 0 |
+| 작업 큐      | 실제 Postgres 로 SKIP LOCKED·재시도·격리 검증(`test_task_queue.py`). 커넥션 둘로 동시 집기를 확인한다                 |
 | infra 추상화 | 로컬 구현으로 테스트, 외부 의존 0                                                                                               |
 
 ---
@@ -461,6 +456,7 @@ GI 증상이나 피드백 생성 과정에서 의료 판단이 필요한 상황�
 | raw_text | TEXT, NULL | 사용자 입력 원문 |
 | eaten_at | TIMESTAMP | 실제 식사 시각 |
 | status | ENUM, DEFAULT ANALYZING | 식사 처리 상태 |
+| is_recalculation | BOOLEAN, NOT NULL, DEFAULT false | 사용자가 음식을 고쳐 다시 분석 중인지 |
 | created_at | TIMESTAMP | 등록 시각 |
 
 ### Status
@@ -488,11 +484,47 @@ FAILED
 | food_ref_id | VARCHAR FK, NULL | 공공 DB 음식 ID. AI 가 매칭하지 못하면 NULL |
 | original_food_name | VARCHAR | 최초 AI 추정 음식명 |
 | display_name | VARCHAR | 최종 확정 음식명 |
-| estimated_amount_g | DECIMAL | AI 추정 섭취량 |
-| confirmed_amount_g | DECIMAL, NULL | 사용자 확인·수정 섭취량. 확인 전에는 NULL |
-| confidence | DECIMAL | AI 분석 신뢰도. `CHECK (0 ~ 1)` |
+| estimated_amount | DECIMAL, NULL | AI 가 추정한 양의 숫자 |
+| estimated_unit | VARCHAR(32), NULL | 그 숫자의 단위(`g` · `개` · `ml`) |
+| estimated_amount_g | DECIMAL, NULL | 위 둘의 **g 환산값만**. 환산 불가면 NULL |
+| confirmed_amount | DECIMAL, NULL | 사용자가 입력한 양의 숫자. **확인 여부의 센티넬** |
+| confirmed_unit | VARCHAR(32), NULL | 그 숫자의 단위 |
+| confirmed_amount_g | DECIMAL, NULL | 위 둘의 **g 환산값만**. 환산 불가면 확인 후에도 NULL |
+| confidence | DECIMAL, NULL | AI 분석 신뢰도. `CHECK (0 ~ 1)`. 이름을 바꾸면 지운다 |
 | source | ENUM, DEFAULT MODEL | MODEL / USER |
-| raw_ai_result | JSONB | AI 원본 결과 |
+| raw_ai_result | JSONB, NULL | AI 응답 원본 보관 전용. `source=USER` 는 인식된 적이 없으므로 NULL |
+
+양이 **쌍 두 개 + 환산값 두 개**로 나뉜다. 각 쌍은 말한 그대로(숫자 + 단위)를 담고,
+`*_amount_g` 는 그걸 g 으로 환산한 결과다. "2개" 처럼 환산 근거가 없으면 `*_amount_g`
+만 NULL 이 되고 숫자·단위는 남는다.
+
+| 상황 | estimated_amount / _unit | estimated_amount_g | confirmed_amount / _unit | confirmed_amount_g |
+| --- | --- | --- | --- | --- |
+| AI 가 "250g" 인식, 확인 전 | `250` / `g` | `250.00` | NULL / NULL | NULL |
+| AI 가 "2개" 인식, 확인 전 | `2` / `개` | NULL | NULL / NULL | NULL |
+| 사용자가 "220g" 으로 확인 | (그대로) | (그대로) | `220` / `g` | `220.00` |
+| 사용자가 "3개" 로 확인 | (그대로) | (그대로) | `3` / `개` | NULL |
+| 사용자가 직접 추가한 음식 | NULL / NULL | NULL | `200` / `g` | `200.00` |
+
+**읽는 규칙은 한 줄이다:**
+
+```
+확인됐으면(confirmed_amount IS NOT NULL) confirmed_*, 아니면 estimated_*
+```
+
+`GET /meals/{mealId}` 의 `amount` · `unit` 이 여기서 나온다 — 출처(MODEL/USER)도
+수정 이력도 볼 필요가 없다. g 이 필요한 쪽(Q/Q/S 채점)만 `*_amount_g` 를 본다.
+
+**"확인했는가" 를 `confirmed_amount_g IS NULL` 로 판정하면 안 된다** — 확인 전과
+"확인했지만 환산 불가"가 구분되지 않는다. 센티넬은 `confirmed_amount` 다. 이걸 틀리면
+"2개" 로 확인한 항목의 직전 값이 AI 추정값으로 되돌아가, 같은 값을 다시 보내도
+'고쳤다' 로 보인다.
+
+`estimated_*` 는 **어떤 수정에도 덮이지 않는다** — AI 인식 성능 평가의 기준이다.
+다만 덮이지 않을 뿐 **행째 사라질 수는 있다**: `DELETE /meals/{mealId}/items/{itemId}` 가
+hard delete 다(아래 `user_corrections` 절 참고).
+`raw_ai_result` 에서는 양을 읽지 않는다. AI 응답 원본을 되짚기 위한 보관 자리이고,
+키 모양이 AI 응답 스키마를 따라 바뀔 수 있다.
 
 ---
 
@@ -504,9 +536,49 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 | --- | --- | --- |
 | id | UUID PK | 수정 ID |
 | meal_item_id | UUID FK | 대상 음식 |
-| original_value | JSONB | AI 최초 추정값 |
+| original_value | JSONB | 고치기 직전의 값 |
 | corrected_value | JSONB | 사용자 수정값 |
 | corrected_at | TIMESTAMP | 수정 시각 |
+
+`PATCH /meals/{mealId}/items` 가 유일한 기록 지점이고, **`source = MODEL` 항목만** 남긴다 —
+사용자가 직접 넣은 음식(`POST /meals/{mealId}/items`)에는 고칠 AI 인식값이 없다.
+
+⚠️ **이 이력은 대상 음식이 지워지면 함께 사라진다.** `DELETE /meals/{mealId}/items/{itemId}`
+는 hard delete 라(`meal_items` 에 `deleted_at` 이 없다) 그 항목의 `user_corrections` 행과
+바로 위 `meal_items` 절의 `estimated_*` 기준값이 전부 없어진다. 즉 인식 성능을 집계할 때
+**"AI 가 없는 음식을 인식했다" 는 가장 뚜렷한 오인식 신호가 표본에서 빠진다** — 사용자가
+이름·양을 고친 경우는 남는데 통째로 지운 경우만 남지 않는다. 집계 결과를 "AI 가 이만큼
+맞혔다" 로 읽으면 실제보다 후한 수치가 된다.
+
+```json
+// original_value — 고치기 직전의 값. 확인됐으면 confirmed_*, 아니면 estimated_*
+{ "displayName": "김밥", "amountG": "250.00", "confidence": "0.620",
+  "amount": "250.00", "unit": "g" }
+// corrected_value — amount·unit 은 사용자가 입력한 원본 그대로
+{ "displayName": "참치김밥", "amountG": "220.00", "amount": "220", "unit": "g" }
+```
+
+`amount` · `unit` 은 `meal_items` 의 **읽기 규칙 한 줄**로 고른다 — 확인된 항목이면
+`confirmed_*`, 아니면 `estimated_*`. `amountG` 는 그 g 환산값이고 환산이 안 되는
+단위("2개")면 `null` 이지만, **그때도 양이 사라지지는 않는다** — `amount` · `unit` 에
+"2" · "개" 가 그대로 남는다. 숫자를 문자열로 담는 건 자릿수(`250.00`)를 잃지 않기
+위해서다.
+
+`confidence` 는 `original_value` 에만 있다(기록되는 모든 행에 들어가며, 이름을 바꿨는지와
+무관하다). `corrected_value` 에 없는 건 **이름을 바꾸면 그 신뢰도를 항목에서 지우기**
+때문이다 — 사용자가 직접 써 넣은 이름을 FE 가 "AI 가 자신 없어함"(`< 0.8`)으로 강조하면
+거짓말이다. 지운 값이 필요한 곳은 인식 성능 평가뿐이라 여기에만 남긴다.
+
+"고쳤다" 의 판정은 이름과 양이다. 이름은 공백을 무시하고 비교하며(FE 가 화면의 값을 그대로
+돌려보내는 경우), 양은 g 환산값이 있으면 그것으로, 없으면 숫자·단위 쌍으로 비교한다 —
+둘을 섞으면 "2개 → 3개" 가 양쪽 다 `amountG: null` 이라 '안 고쳤다' 가 된다.
+숫자는 **자릿수를 지우고** 비교한다: 저장된 값은 `Numeric(8, 2)` 를 거쳐 `2.00` 이지만
+요청의 `2` 는 `2` 라, 날것으로 비교하면 같은 "2개" 가 매번 '고쳤다' 로 잡힌다.
+
+같은 항목을 두 번 고치면 두 행이 쌓이고, 두 번째 행의 `original_value` 는 AI 인식값이 아니라
+첫 수정의 결과다. **AI 최초 추정값이 기준일 때는 `meal_items.original_food_name` ·
+`estimated_amount` · `estimated_unit` 을 본다** — 그쪽은 어떤 수정에도 덮이지 않는다.
+`estimated_amount_g` 는 환산 불가한 추정("2개")에서 NULL 이라 기준으로 쓸 수 없다.
 
 ---
 

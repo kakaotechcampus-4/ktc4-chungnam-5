@@ -10,17 +10,17 @@ snake_case 를 그대로 쓰고, 직렬화 시점에만 alias 로 바꾼다.
 
 import enum
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 from pydantic import ConfigDict, Field
 
 from app.models.enums import DrugName, MedicationStage
-from app.schemas.base import CamelModel
+from app.schemas.base import CamelModel, KstDatetime
 
 
-class MedicationUpsertRequest(CamelModel):
-    """투약 정보 등록·수정 겸용.
+class MedicationRegisterRequest(CamelModel):
+    """투약 정보 등록. 정정은 `PATCH /medications/{id}` 다.
 
     `startedAt` 은 **이번에 맞은 날이 아니라 전체 투약 시작일**이다. 명세의 서버 계산
     항목이 여기서 나온다 — `doseCount = floor((today - startedAt) / 7) + 1`.
@@ -79,7 +79,7 @@ class DoseEvent(CamelModel):
     effective_from: date = Field(description="이 용량으로 바꾼 날")
 
 
-class MedicationUpsertResponse(CamelModel):
+class MedicationRegisterResponse(CamelModel):
     """`POST /medications` 응답.
 
     **`GET /medications/current` 와 필드가 다르다.** 겹치는 건 현재 상태 5개뿐이고,
@@ -108,7 +108,9 @@ class MedicationUpsertResponse(CamelModel):
         default=None, description="바뀌었다면 그 변경 1건. 아니면 null"
     )
     stage_changed: bool = Field(description="이번 요청으로 단계 판정이 달라졌는지")
-    decided_at: datetime = Field(description="판정 시각")
+    decided_at: KstDatetime = Field(
+        description="판정 시각. `+09:00` 으로 나간다 (규약: ISO 8601 +09:00)."
+    )
 
 
 class CurrentMedicationResponse(CamelModel):

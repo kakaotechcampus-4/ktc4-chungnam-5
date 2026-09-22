@@ -4,52 +4,71 @@ r"""큐 상태 보기.
     .\.venv\Scripts\Activate.ps1
     python -m scripts.queue_status
 
-ElasticMQ 에는 웹 UI 가 없다. 대신 GetQueueAttributes 로 메시지 수를 읽어 온다.
+"처리 중" 이라는 상태 컬럼은 없다. 워커는 행 잠금을 쥐고 있을 뿐이고 그건 커밋 전이라
+다른 세션에 안 보인다. 그래서 대신 **작업 트랜잭션을 열어 둔 커넥션**을 보여 준다.
 """
 
 from __future__ import annotations
 
-import boto3
+from sqlalchemy import text
 
-from app.infra.queue import QueueSettings
+from app.db.session import SessionLocal
 
-_ATTRS = {
-    "ApproximateNumberOfMessages": "대기",
-    "ApproximateNumberOfMessagesNotVisible": "처리중",
-    "ApproximateNumberOfMessagesDelayed": "지연",
-}
+_SUMMARY = text(
+    """
+    SELECT status, count(*) AS n, min(created_at) AS oldest
+      FROM task_queue
+     GROUP BY status
+     ORDER BY status
+    """
+)
+
+# 잠긴 행을 pg_locks 로 되짚는 건 튜플 단위라 실용적이지 않아, task_queue 를 만지며
+# 트랜잭션을 연 채인 커넥션을 센다. 근사라서 **워커가 아닌 세션도 잡힌다** —
+# 누군가 같은 시각에 이 스크립트를 돌리고 있으면 그 세션도 여기 나온다.
+_IN_FLIGHT = text(
+    """
+    SELECT pid, now() - xact_start AS elapsed
+      FROM pg_stat_activity
+     WHERE xact_start IS NOT NULL
+       AND query ILIKE '%task_queue%'
+       AND pid <> pg_backend_pid()
+     ORDER BY xact_start
+    """
+)
+
+_FAILED = text(
+    """
+    SELECT id, type, attempts, updated_at, left(last_error, 80) AS last_error
+      FROM task_queue
+     WHERE status = 'FAILED'
+     ORDER BY updated_at DESC
+     LIMIT 10
+    """
+)
 
 
 def main() -> None:
-    settings = QueueSettings()
-    client = boto3.client(
-        "sqs",
-        endpoint_url=settings.SQS_ENDPOINT_URL or None,
-        region_name=settings.AWS_DEFAULT_REGION,
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
-    )
+    with SessionLocal() as db:
+        print(f"{'상태':<10} {'건수':>6}  가장 오래된 것")
+        print("-" * 48)
+        for status, count, oldest in db.execute(_SUMMARY):
+            print(f"{status:<10} {count:>6}  {oldest}")
 
-    base = settings.SQS_QUEUE_URL.rsplit("/", 1)[0]
-    names = ["glp1-tasks", "glp1-tasks-dlq", "glp1-tasks-test", "glp1-tasks-test-dlq"]
+        in_flight = db.execute(_IN_FLIGHT).all()
+        print(f"\n처리 중(작업 트랜잭션을 연 커넥션): {len(in_flight)}")
+        print("  (근사치 — task_queue 를 만지며 트랜잭션을 연 커넥션을 센다. 워커가 아닌 세션도 잡힐 수 있다)")
+        for pid, elapsed in in_flight:
+            print(f"  pid={pid} 경과={elapsed}")
 
-    print(f"{'큐':<22} {'대기':>6} {'처리중':>7} {'지연':>6}")
-    print("-" * 45)
-    for name in names:
-        try:
-            attrs = client.get_queue_attributes(
-                QueueUrl=f"{base}/{name}",
-                AttributeNames=list(_ATTRS),
-            )["Attributes"]
-        except Exception as exc:
-            print(f"{name:<22} 조회 실패 ({type(exc).__name__})")
-            continue
-
-        counts = [attrs.get(key, "0") for key in _ATTRS]
-        print(f"{name:<22} {counts[0]:>6} {counts[1]:>7} {counts[2]:>6}")
-
-    print("\n대기 = 꺼낼 수 있는 것 · 처리중 = 누가 꺼내갔고 아직 안 지운 것")
-    print("DLQ 에 쌓인 게 있으면 3번 실패한 작업이다.")
+        failed = db.execute(_FAILED).all()
+        if failed:
+            print(f"\nFAILED {len(failed)}건 — 재시도를 다 쓰고 격리된 작업이다")
+            for row in failed:
+                print(f"  {row.type:<16} attempts={row.attempts} {row.updated_at} {row.last_error}")
+            print("\n다시 넣으려면:")
+            print("  UPDATE task_queue SET status='PENDING', attempts=0, next_run_at=now()")
+            print("   WHERE id = '<id>';")
 
 
 if __name__ == "__main__":

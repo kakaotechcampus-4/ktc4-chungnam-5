@@ -4,6 +4,7 @@ FE 가 실제로 보는 모양 — 응답 래퍼 · camelCase · 명세 필드 �
 """
 
 import uuid
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -27,7 +28,9 @@ def _ready_meal(db: Session, *, stage=MedicationStage.MAINTENANCE):
     user = make_user(db)
     meal = make_meal(db, user_id=user.id, stage=stage, status=MealStatus.REVIEW_REQUIRED)
     make_food_ref(db)
-    make_meal_item(db, meal_id=meal.id)
+    # `food_ref_id` 를 명시한다 — 팩토리 기본값이 None(성분 못 구한 항목)이라
+    # 빼면 모든 응답에 NUTRITION_NOT_MATCHED 가 붙는다.
+    make_meal_item(db, meal_id=meal.id, food_ref_id="KFD_TEST_01")
     return user, meal
 
 
@@ -262,8 +265,20 @@ def test_nutrient_totals_are_still_reported(client: TestClient, db: Session) -> 
     """
     user = make_user(db)
     meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
-    make_food_ref(db, serving_size="100", protein_g="9", fiber_g="3", sodium_mg="810")
-    make_meal_item(db, meal_id=meal.id, amount_g="200")
+    make_food_ref(
+        db,
+        serving_size=Decimal("100"),
+        protein_g=Decimal("9"),
+        fiber_g=Decimal("3"),
+        sodium_mg=Decimal("810"),
+    )
+    make_meal_item(
+        db,
+        meal_id=meal.id,
+        food_ref_id="KFD_TEST_01",
+        confirmed_amount=Decimal("200"),
+        confirmed_unit="g",
+    )
 
     rows = client.post(
         f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
@@ -368,7 +383,13 @@ def test_matched_item_without_amount_is_not_counted(
     user = make_user(db)
     meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
     make_food_ref(db, food_ref_id="KFD_A", name="밥")
-    make_meal_item(db, meal_id=meal.id, food_ref_id="KFD_A", amount_g=None)
+    make_meal_item(
+        db,
+        meal_id=meal.id,
+        food_ref_id="KFD_A",
+        estimated_amount=None,
+        estimated_unit=None,
+    )
 
     data = client.post(
         f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
@@ -495,7 +516,13 @@ def test_missing_amount_says_so_instead_of_blaming_nutrition(
     user = make_user(db)
     meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
     make_food_ref(db, food_ref_id="KFD_A", name="밥", protein_g="9")
-    make_meal_item(db, meal_id=meal.id, food_ref_id="KFD_A", amount_g=None)
+    make_meal_item(
+        db,
+        meal_id=meal.id,
+        food_ref_id="KFD_A",
+        estimated_amount=None,
+        estimated_unit=None,
+    )
 
     body = client.post(
         f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
