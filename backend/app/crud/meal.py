@@ -288,6 +288,34 @@ def get_items_by_ids(
     )
 
 
+def get_item(db: Session, *, meal_id: uuid.UUID, item_id: uuid.UUID) -> MealItem | None:
+    """이 식사에 속한 항목 하나를 가져온다. 없으면 None.
+
+    `get_items_by_ids` 와 같은 이유로 `meal_id` 를 WHERE 에 함께 넣는다 — 다른
+    식사의 item_id 를 넣어도 여기서 빠지므로 호출부는 None 하나만 보고 404 를 낼
+    수 있다(소유권은 `get_owned_meal` 이 이미 확인한 뒤다).
+    """
+    stmt = select(MealItem).where(MealItem.meal_id == meal_id, MealItem.id == item_id)
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def delete_item(db: Session, *, item: MealItem) -> None:
+    """항목을 지운다. 커밋하지 않는다.
+
+    `meal_items` 에는 `deleted_at` 이 없다 — hard delete 다. 그 항목의
+    `user_corrections` 도 함께 사라진다(`endpoints/meal_items.py` 의
+    `delete_meal_item` 독스트링 참고).
+
+    지우는 주체는 **ORM 이다.** `MealItem.corrections` 관계의
+    `cascade="all, delete-orphan"` 때문에 자식을 SELECT 해서 한 건씩 DELETE 한 뒤
+    부모를 지운다 — `passive_deletes` 를 주지 않았으므로 FK 의 `ondelete=CASCADE`
+    는 이 경로에서 발화하지 않는다. FK 쪽은 ORM 을 거치지 않는 삭제(raw SQL ·
+    `meals` CASCADE)를 위한 아래층 안전망이다. 둘 중 하나만 있다고 읽으면,
+    `passive_deletes=True` 로 바꾸거나 관계를 떼는 변경의 영향을 잘못 판단한다.
+    """
+    db.delete(item)
+
+
 def update_item(
     db: Session,
     *,

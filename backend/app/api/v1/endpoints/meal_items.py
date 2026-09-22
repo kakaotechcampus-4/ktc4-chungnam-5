@@ -1,7 +1,7 @@
 """식사 구성 음식(meal item) 수정 API.
 
 세 동작(PATCH · POST · DELETE)이 모두 식사를 재계산 대기로 표시한다 — 점수가 더는
-유효하지 않다는 뜻이다. 지금은 PATCH · POST 가 구현돼 있다.
+유효하지 않다는 뜻이다.
 """
 
 import uuid
@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.schemas.meal import (
     MealItemCreateRequest,
     MealItemCreateResponse,
+    MealItemDeleteResponse,
     MealItemsUpdateRequest,
     MealItemsUpdateResponse,
     MealItemUpdate,
@@ -230,6 +231,80 @@ def update_meal_items(
     try:
         response = meal_service.update_items(
             db, user_id=user_id, meal_id=meal_id, resolved=resolved
+        )
+    except (meal_service.MealNotFoundError, meal_service.MealItemNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except meal_service.MealNotEditableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return ok(response)
+
+
+@router.delete(
+    "/meals/{meal_id}/items/{item_id}",
+    response_model=ApiResponse[MealItemDeleteResponse],
+    responses=error_responses(401, 404, 409, 422),
+)
+def delete_meal_item(
+    meal_id: uuid.UUID,
+    item_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[MealItemDeleteResponse]:
+    """사용자가 AI 가 잘못 인식한 음식을 확인 화면에서 뺀다.
+
+    없는 식사 · 남의 식사 · 삭제된 식사 · 이 식사의 것이 아닌 `itemId` 는 전부 404 로
+    같게 응답한다 (`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지). 이미
+    지운 항목을 다시 지우려는 요청도 여기 해당한다 — 멱등이 아니다.
+
+    ⚠️ 다만 **같은 항목에 DELETE 두 건이 동시에 오면 둘 다 200 이다.** 각자 자기
+    트랜잭션에서 `get_item` 을 통과한 뒤 DELETE 를 날리고, 뒤늦은 쪽은 0 행을
+    지우는데 SQLAlchemy 는 이를 경고로만 처리한다(version_id_col 이 없는 DELETE 의
+    rowcount 불일치는 raise 하지 않는다). 즉 "이미 지워진 항목" 요청의 응답이
+    타이밍에 따라 404 도 200 도 된다. 데이터는 안전하고 사용자 영향은 확인 화면
+    더블탭 시 에러 토스트가 뜰까 말까 하는 정도라 지금은 그대로 둔다 — FE 가 404 를
+    보고 버그로 의심하기 전에 여기를 먼저 읽으라고 적어 둔다.
+
+    ## ⚠️ hard delete 다 — 그 항목의 인식 이력이 함께 사라진다
+
+    `meal_items` 에는 `deleted_at` 이 없다. 행을 지우면 `user_corrections` 도 따라
+    사라지고(`MealItem.corrections` 관계의 `cascade="all, delete-orphan"` 이 먼저
+    지운다 — `crud.meal.delete_item` 참고), `original_food_name` · `estimated_*` 에
+    담긴 **AI 최초 추정값도 함께 없어진다.**
+
+    그래서 **"AI 가 없는 음식을 인식했다" 는 오인식 신호는 어디에도 남지 않는다** —
+    사용자가 이름이나 양을 고친 경우(PATCH)는 `user_corrections` 에 남는데, 통째로
+    지운 경우만 증거가 없다. 인식 성능을 집계할 때 이 구멍을 기억해야 한다. 메우려면
+    soft delete 로 바꾸거나 별도 감사 로그를 두어야 하고, 둘 다 이 엔드포인트만의
+    변경으로 끝나지 않는다(모든 조회가 필터를 기억해야 한다).
+
+    ## 응답에 `steps` 가 없다
+
+    명세서(`contracts/API.md`)가 `{ status, isRecalculation }` 만 준다. PATCH 와
+    달리 진행 단계 배열이 없는 건 이 응답의 정직한 모양이다 — 어차피 여기서도 큐에
+    아무것도 넣지 않으므로(`add_meal_item` 독스트링의 "ANALYZING 은 '워커가 도는
+    중' 이 아니다" 참고) 폴링할 작업 자체가 없다.
+
+    ## 마지막 항목도 지울 수 있다 — 항목 0 개 식사가 남는다
+
+    막으면 "잘못 인식된 유일한 항목을 지우고 올바른 걸 넣기" 가 POST 를 먼저 해야
+    하는 순서 제약이 된다. 식사를 통째로 지우는 경로는 `DELETE /meals/{mealId}` 다.
+
+    이 상태를 보는 곳이 둘이다.
+
+    - **`GET /meals`** — 이미 돌고 있다. `crud.get_display_names` 가 항목 없는
+      식사를 넣지 않아 `displayName` 이 `""` 로 나간다. 새 동작은 아니다 —
+      `FAILED` 식사도 항목이 0 개라 목록은 전부터 이 경로를 탄다. 제목 없는 카드가
+      문제라면 고칠 자리는 `services.meal.list_meals` 이지 여기가 아니다
+      (`test_meal_with_no_items_left_still_lists_with_an_empty_name` 이 고정).
+    - 🔗 **`POST /meals/{mealId}/confirm`** — 아직 없다. 항목 0 개 식사로 Q/Q/S 를
+      채점하면 0 kcal 짜리 점수가 나가므로 이 경우를 따로 정해야 한다(거부할지,
+      `FAILED` 로 보낼지). confirm 작업에 이 문단을 함께 전달할 것 —
+      `add_meal_item` 독스트링의 의존성 항목과 같은 자리다.
+    """
+    try:
+        response = meal_service.delete_item(
+            db, user_id=user_id, meal_id=meal_id, item_id=item_id
         )
     except (meal_service.MealNotFoundError, meal_service.MealItemNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

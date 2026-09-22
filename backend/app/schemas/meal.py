@@ -240,6 +240,19 @@ class MealItemsUpdateResponse(CamelModel):
     steps: list[AnalysisStep]
 
 
+class MealItemDeleteResponse(CamelModel):
+    """DELETE /meals/{mealId}/items/{itemId} 응답.
+
+    **`steps` 가 없다.** 명세서(`contracts/API.md`)가 PATCH 응답에만 그 배열을
+    두기 때문이다. 형제라고 `MealItemsUpdateResponse` 를 재사용하면 명세에 없는
+    필드가 따라 나가고, 그 값이 `DB_MATCHING: RUNNING` 이라 FE 는 돌지도 않는
+    작업을 폴링할 근거로 읽는다.
+    """
+
+    status: MealStatus
+    is_recalculation: bool
+
+
 # 최초 분석 중(재분석 아님)일 때의 고정 steps. RECALCULATION_STEPS 와 같은 이유로
 # 고정값이다 — 이 시스템엔 세부 진행상황을 기록하는 컬럼이 없다.
 INITIAL_ANALYSIS_STEPS: tuple[AnalysisStep, ...] = (
