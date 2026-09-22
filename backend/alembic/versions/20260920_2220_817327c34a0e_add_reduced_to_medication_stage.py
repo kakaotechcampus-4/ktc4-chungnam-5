@@ -1,7 +1,7 @@
 """add REDUCED to medication_stage
 
 Revision ID: 817327c34a0e
-Revises: fb9324353300
+Revises: d2a7c5f41e08
 Create Date: 2026-09-20 22:20:00.000000
 
 단계를 5개로 확정한 팀 결정을 반영한다.
@@ -12,8 +12,17 @@ Create Date: 2026-09-20 22:20:00.000000
 
 `PRE_DOSE` 는 init_schema 부터 DB 에 있었다. 실제로 추가되는 건 `REDUCED` 하나다.
 
-**머지 순서 주의.** 팀원 PR 에도 마이그레이션이 있으면 alembic head 가 갈라진다.
-먼저 머지되는 쪽에 맞춰 `down_revision` 을 다시 잡아야 한다.
+**`down_revision` 을 develop 의 head 에 맞춰 다시 잡았다.** 처음엔 `fb9324353300`
+이었는데 그 사이 `task_queue`(#27) · `is_recalculation`(#25) · 양 컬럼 3건(#31·#33)이
+develop 에 들어가 체인이 길어졌다. 옛 값을 두면 head 가 둘로 갈려
+`alembic upgrade head` 가 *Multiple head revisions are present* 로 죽는다.
+
+**git 충돌로는 안 잡힌다.** 머지 버튼까지 그냥 통과하고 팀원이 DB 를 올릴 때 터진다.
+머지 직전에 `origin/develop` 의 head 를 다시 확인할 것 — 이 값은 develop 이 움직일
+때마다 낡는다.
+
+순서를 옮겨도 안전하다. 이 리비전은 `ALTER TYPE ... ADD VALUE` 하나뿐이라 앞선
+리비전들이 만드는 테이블·컬럼과 겹치지 않는다.
 """
 from typing import Sequence, Union
 
@@ -22,7 +31,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '817327c34a0e'
-down_revision: Union[str, Sequence[str], None] = 'fb9324353300'
+down_revision: Union[str, Sequence[str], None] = 'd2a7c5f41e08'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
