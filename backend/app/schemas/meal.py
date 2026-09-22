@@ -238,3 +238,16 @@ class MealItemsUpdateResponse(CamelModel):
     status: MealStatus
     is_recalculation: bool
     steps: list[AnalysisStep]
+
+
+class MealItemDeleteResponse(CamelModel):
+    """DELETE /meals/{mealId}/items/{itemId} 응답.
+
+    **`steps` 가 없다.** 명세서(`contracts/API.md`)가 PATCH 응답에만 그 배열을
+    두기 때문이다. 형제라고 `MealItemsUpdateResponse` 를 재사용하면 명세에 없는
+    필드가 따라 나가고, 그 값이 `DB_MATCHING: RUNNING` 이라 FE 는 돌지도 않는
+    작업을 폴링할 근거로 읽는다.
+    """
+
+    status: MealStatus
+    is_recalculation: bool
