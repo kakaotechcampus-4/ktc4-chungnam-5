@@ -424,10 +424,25 @@ def register(
     # 고치는 요청이 가장 오래된 행을 오늘로 밀어 전체 회차가 1 로 리셋된다.
     # 기록이 없을 때만 오늘을 첫 행의 시작일로 쓴다.
     started_at = payload.started_at
-    if started_at is not None and started_at > today:
-        raise FutureStartDateError(started_at, today)
-
     current = crud.get_current(db, user_id)
+
+    if current is not None:
+        # **기록이 있으면 `startedAt` 은 받지 않는 필드다.** 전체 시작일을 옮기는 건
+        # 이미 지나간 날을 다시 쓰는 일이라 등록이 아니라 정정이다. 받아 주면 용량만
+        # 바꾸는 요청이 회차를 통째로 흔든다.
+        #
+        # 값이 온전한지(미래인지) 따지기 **전에** 이걸 답한다 — 애초에 쓸 수 없는
+        # 자리라, 미래 날짜라고 422 를 주면 "날짜만 고치면 되겠네" 로 읽힌다.
+        # 미래 시작일 422 는 첫 등록에만 해당한다.
+        first = crud.get_first(db, user_id)
+        if started_at is not None and first is not None and first.effective_from != started_at:
+            raise ApiError(
+                ErrorCode.CONFLICT,
+                "투약 시작일은 등록 이후 바꿀 수 없습니다. 정정은 PATCH 를 써 주세요.",
+                409,
+            )
+    elif started_at is not None and started_at > today:
+        raise FutureStartDateError(started_at, today)
 
     if current is None:
         record = crud.create(
@@ -448,16 +463,6 @@ def register(
         db.commit()
         # 첫 등록은 PRE_DOSE 에서 넘어온 것이라 단계도 용량도 바뀐 것으로 본다.
         return RegisterResult(record, dose_changed=True, stage_changed=True)  # 첫 등록
-
-    # 전체 시작일을 옮기는 건 **정정**이다 — 이미 지나간 날을 다시 쓰는 일이라
-    # 등록이 아니다. 여기서 받아 주면 용량만 바꾸는 요청이 회차를 통째로 흔든다.
-    first = crud.get_first(db, user_id)
-    if started_at is not None and first is not None and first.effective_from != started_at:
-        raise ApiError(
-            ErrorCode.CONFLICT,
-            "투약 시작일은 등록 이후 바꿀 수 없습니다. 정정은 PATCH 를 써 주세요.",
-            409,
-        )
 
     unchanged = current.drug_name == payload.drug_name and current.dose_mg == payload.dose_mg
     if unchanged:
