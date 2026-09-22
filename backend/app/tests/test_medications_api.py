@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import medication as medication_crud
 from app.crud import user as user_crud
+from app.models.enums import MedicationStage
 
 
 @pytest.fixture
@@ -157,6 +158,32 @@ def _post(client: TestClient, user_id: uuid.UUID, **body: object) -> dict:
     return client.post("/api/v1/medications", json=body, headers=_h(user_id)).json()["data"]
 
 
+def _history(db: Session, user_id: uuid.UUID, *periods: tuple[str, str]) -> None:
+    """지난 구간들을 직접 깔아 둔다.
+
+    `POST /medications` 로는 못 만든다 — 용량 변경은 언제나 **오늘부터**다
+    (`change_date = max(today, current.effective_from)`). 과거 날짜로 용량을 바꾼 척할
+    방법이 없고, 같은 날 여러 번 보내면 in_place 로 한 줄에 합쳐진다.
+    """
+    previous = None
+    for index, (dose, started) in enumerate(periods):
+        effective_from = date.fromisoformat(started)
+        if previous is not None:
+            medication_crud.close_current(
+                db, previous, effective_to=effective_from - timedelta(days=1)
+            )
+        previous = medication_crud.create(
+            db,
+            user_id=user_id,
+            drug_name="위고비",
+            dose_mg=Decimal(dose),
+            injection_count=index + 1,
+            stage=MedicationStage.TITRATION,
+            effective_from=effective_from,
+        )
+    db.flush()
+
+
 def test_response_has_exactly_the_spec_fields(client: TestClient, user_id: uuid.UUID) -> None:
     """빠진 필드도 남는 필드도 없어야 한다.
 
@@ -276,3 +303,112 @@ def test_typo_field_is_rejected(client: TestClient, user_id: uuid.UUID) -> None:
 
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+# ── GET /medications/current ────────────────────────────────────
+
+
+def _current(client: TestClient, user_id: uuid.UUID) -> dict:
+    res = client.get("/api/v1/medications/current", headers=_h(user_id))
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["success"] is True and body["error"] is None
+    return body["data"]
+
+
+def test_current_has_exactly_the_spec_fields(client: TestClient, user_id: uuid.UUID) -> None:
+    """명세: "POST /medications 응답과 동일 구조". 같은 14필드다.
+
+    `effectiveFrom` 이 여기 있으면 안 된다 — POST 응답에 없는 필드라 "동일 구조"가
+    깨진다. 현재 용량으로 바꾼 날은 `GET /medications/dose-events` 가 갖고 있다.
+    """
+    _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    assert set(_current(client, user_id)) == SPEC_FIELDS
+
+
+def test_current_matches_what_post_returned(client: TestClient, user_id: uuid.UUID) -> None:
+    """같은 날 조회하면 POST 가 준 상태와 같아야 한다 — 쓰기 결과 필드만 빼고."""
+    posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+    fetched = _current(client, user_id)
+
+    state = SPEC_FIELDS - {"doseChanged", "doseEvent", "stageChanged", "decidedAt"}
+    assert {k: fetched[k] for k in state} == {k: posted[k] for k in state}
+
+
+def test_current_write_result_fields_are_fixed(client: TestClient, user_id: uuid.UUID) -> None:
+    """조회는 아무것도 바꾸지 않는다 — 쓰기 결과 자리 셋은 구조상 고정값이다."""
+    _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    data = _current(client, user_id)
+    assert data["doseChanged"] is False
+    assert data["stageChanged"] is False
+    assert data["doseEvent"] is None
+    # decidedAt 은 저장값이 아니라 "방금 판정했다" 는 뜻이라 null 이 아니다.
+    assert data["decidedAt"]
+
+
+def test_current_restages_as_days_pass(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """용량을 안 바꿔도 날짜가 지나면 단계가 옮겨간다.
+
+    저장된 단계를 읽으면 마지막 POST 시점에 멈춘 값이 나간다 — 그 사이에는 쓰기가
+    없어서 갱신할 기회 자체가 없다. 그래서 조회 때마다 다시 판정한다.
+    """
+    long_ago = date.today() - timedelta(weeks=20)
+    _history(db, user_id, ("1.0", long_ago.isoformat()))
+
+    data = _current(client, user_id)
+    assert data["stage"] == "MAINTENANCE"
+    assert data["stageReason"]
+    assert data["doseCount"] == 21
+
+
+def test_current_dday_is_within_a_week(client: TestClient, user_id: uuid.UUID) -> None:
+    """다음 투약일은 7일 간격이라 D-day 는 구조상 1~7 이다."""
+    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt="2026-06-14")
+
+    data = _current(client, user_id)
+    assert 1 <= data["daysUntilNextDose"] <= 7
+    assert data["nextDoseDate"] > date.today().isoformat()
+
+
+def test_current_before_registration_is_409(client: TestClient, user_id: uuid.UUID) -> None:
+    """투약 미등록은 409 STAGE_NOT_SET 이다 (명세).
+
+    ⚠️ 팀 안건 — 200 + stage=PRE_DOSE 가 FE 에 낫다는 반론이 있다. 투약 전 식사
+    평가가 제품 기능(D8)이라 "아직 투약 전"은 정상 상태인데, 에러로 내리면 FE 가
+    정상 화면을 그리려고 에러를 삼켜야 한다. 지금은 명세를 그대로 따른다.
+    """
+    res = client.get("/api/v1/medications/current", headers=_h(user_id))
+
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "STAGE_NOT_SET"
+
+
+def test_current_without_header_is_401(client: TestClient) -> None:
+    assert client.get("/api/v1/medications/current").status_code == 401
+
+
+def test_current_for_unknown_user_is_404_not_409(client: TestClient) -> None:
+    """없는 사용자는 404 다. STAGE_NOT_SET 을 주면 "등록만 하면 된다" 로 읽힌다."""
+    res = client.get("/api/v1/medications/current", headers=_h(uuid.UUID(int=0)))
+
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "USER_NOT_FOUND"
+
+
+def test_current_is_scoped_to_the_caller(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """남의 투약 정보가 보이지 않는다."""
+    other = user_crud.create(
+        db, nickname="남", height_cm=Decimal("160"), baseline_meal_kcal=Decimal("600")
+    )
+    db.flush()
+    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt="2026-06-14")
+
+    res = client.get("/api/v1/medications/current", headers=_h(other.id))
+    assert res.status_code == 409
+
