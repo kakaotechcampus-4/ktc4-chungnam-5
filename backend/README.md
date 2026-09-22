@@ -521,6 +521,8 @@ FAILED
 '고쳤다' 로 보인다.
 
 `estimated_*` 는 **어떤 수정에도 덮이지 않는다** — AI 인식 성능 평가의 기준이다.
+다만 덮이지 않을 뿐 **행째 사라질 수는 있다**: `DELETE /meals/{mealId}/items/{itemId}` 가
+hard delete 다(아래 `user_corrections` 절 참고).
 `raw_ai_result` 에서는 양을 읽지 않는다. AI 응답 원본을 되짚기 위한 보관 자리이고,
 키 모양이 AI 응답 스키마를 따라 바뀔 수 있다.
 
@@ -540,6 +542,13 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 
 `PATCH /meals/{mealId}/items` 가 유일한 기록 지점이고, **`source = MODEL` 항목만** 남긴다 —
 사용자가 직접 넣은 음식(`POST /meals/{mealId}/items`)에는 고칠 AI 인식값이 없다.
+
+⚠️ **이 이력은 대상 음식이 지워지면 함께 사라진다.** `DELETE /meals/{mealId}/items/{itemId}`
+는 hard delete 라(`meal_items` 에 `deleted_at` 이 없다) 그 항목의 `user_corrections` 행과
+바로 위 `meal_items` 절의 `estimated_*` 기준값이 전부 없어진다. 즉 인식 성능을 집계할 때
+**"AI 가 없는 음식을 인식했다" 는 가장 뚜렷한 오인식 신호가 표본에서 빠진다** — 사용자가
+이름·양을 고친 경우는 남는데 통째로 지운 경우만 남지 않는다. 집계 결과를 "AI 가 이만큼
+맞혔다" 로 읽으면 실제보다 후한 수치가 된다.
 
 ```json
 // original_value — 고치기 직전의 값. 확인됐으면 confirmed_*, 아니면 estimated_*

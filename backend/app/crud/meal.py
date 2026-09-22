@@ -276,8 +276,15 @@ def delete_item(db: Session, *, item: MealItem) -> None:
     """항목을 지운다. 커밋하지 않는다.
 
     `meal_items` 에는 `deleted_at` 이 없다 — hard delete 다. 그 항목의
-    `user_corrections` 도 FK 의 `ondelete=CASCADE` 로 함께 사라진다
-    (`endpoints/meal_items.py` 의 `delete_meal_item` 독스트링 참고).
+    `user_corrections` 도 함께 사라진다(`endpoints/meal_items.py` 의
+    `delete_meal_item` 독스트링 참고).
+
+    지우는 주체는 **ORM 이다.** `MealItem.corrections` 관계의
+    `cascade="all, delete-orphan"` 때문에 자식을 SELECT 해서 한 건씩 DELETE 한 뒤
+    부모를 지운다 — `passive_deletes` 를 주지 않았으므로 FK 의 `ondelete=CASCADE`
+    는 이 경로에서 발화하지 않는다. FK 쪽은 ORM 을 거치지 않는 삭제(raw SQL ·
+    `meals` CASCADE)를 위한 아래층 안전망이다. 둘 중 하나만 있다고 읽으면,
+    `passive_deletes=True` 로 바꾸거나 관계를 떼는 변경의 영향을 잘못 판단한다.
     """
     db.delete(item)
 

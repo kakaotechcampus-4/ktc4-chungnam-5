@@ -148,6 +148,33 @@ def test_deleting_the_last_item_is_allowed(client, db):
     assert _items(db, meal.id) == []
 
 
+def test_meal_with_no_items_left_still_lists_with_an_empty_name(client, db):
+    """마지막 항목을 지운 식사가 `GET /meals` 에서 어떻게 보이는지 고정한다.
+
+    `crud.get_display_names` 는 항목이 없는 식사를 dict 에 넣지 않으므로
+    `displayName` 이 `""` 로 나간다(`services.meal.list_meals` 의 `.get(id, "")`).
+    이건 이 엔드포인트가 만든 상태가 아니다 — `FAILED` 식사도 항목이 0 개라 목록은
+    전부터 이 경로를 탄다. 그래도 여기서 못 박는 건, **마지막 항목 삭제를 허용하기로
+    한 결정이 이 표시를 정상 동작으로 받아들인다**는 뜻이기 때문이다. 제목 없는
+    카드가 FE 에서 문제가 되면 고칠 자리는 `list_meals` 이지 이 엔드포인트가 아니다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(db, meal_id=meal.id, display_name="참치김밥")
+    db.commit()
+    headers = {"X-User-Id": str(user.id)}
+
+    deleted = client.delete(f"/api/v1/meals/{meal.id}/items/{item.id}", headers=headers)
+    assert deleted.status_code == 200, deleted.text
+
+    listed = client.get("/api/v1/meals", headers=headers)
+
+    assert listed.status_code == 200, listed.text
+    (row,) = listed.json()["data"]["items"]
+    assert row["mealId"] == str(meal.id)
+    assert row["displayName"] == ""
+
+
 def test_delete_marks_an_evaluated_meal_for_recalculation(client, db):
     """평가가 끝난 식사에서 음식을 빼면 점수가 더는 유효하지 않다."""
     user = make_user(db)
@@ -276,10 +303,17 @@ def test_delete_never_touches_the_task_queue(client, db):
     )
 
 
-def test_delete_of_unknown_item_is_404(client, db):
+def test_delete_of_unknown_item_leaves_the_meal_untouched(client, db):
+    """404 는 부작용 없이 끝나야 한다 — 상태를 먼저 뒤집고 나중에 404 를 내면 안 된다.
+
+    지금은 `get_item` → 404 가 `mark_recalculating` 보다 앞이라 안전하다. 그 **순서**
+    를 잡아 두는 것이 이 테스트다. 누가 "어차피 재계산 표시는 항상 하니까" 하며
+    순서를 바꾸면, 없는 itemId 를 보낸 잘못된 요청 하나가 `EVALUATED` 식사를 조용히
+    `ANALYZING` 으로 되돌려 사용자가 점수를 잃는다 — 404 를 받았는데도.
+    """
     user = make_user(db)
-    meal = make_meal(db, user_id=user.id)
-    make_meal_item(db, meal_id=meal.id)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.EVALUATED)
+    item = make_meal_item(db, meal_id=meal.id)
     db.commit()
 
     response = client.delete(
@@ -288,6 +322,10 @@ def test_delete_of_unknown_item_is_404(client, db):
     )
 
     _assert_not_found(response)
+    db.refresh(meal)
+    assert meal.status is MealStatus.EVALUATED
+    assert meal.is_recalculation is False
+    assert [row.id for row in _items(db, meal.id)] == [item.id]
 
 
 def test_item_belonging_to_another_meal_is_404(client, db):
@@ -401,6 +439,11 @@ def test_delete_is_conflict_while_meal_is_not_editable(client, db, status):
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "CONFLICT"
     assert [row.id for row in _items(db, meal.id)] == [item.id]
+    # 409 도 부작용 없이 끝나야 한다 — 거절해 놓고 상태만 바꾸면 최초 분석 중인
+    # 식사의 `is_recalculation` 이 뒤집혀 워커와 사용자의 해소 주체가 뒤바뀐다.
+    db.refresh(meal)
+    assert meal.status is status
+    assert meal.is_recalculation is False
 
 
 def test_delete_rejects_a_malformed_item_id(client, db):
