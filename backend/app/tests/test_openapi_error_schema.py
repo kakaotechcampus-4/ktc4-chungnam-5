@@ -24,6 +24,7 @@ AUTHENTICATED_ROUTES = [
     ("/api/v1/users/me", "get"),
     ("/api/v1/users/me", "patch"),
     ("/api/v1/user-states", "post"),
+    ("/api/v1/user-states/latest", "get"),
 ]
 
 

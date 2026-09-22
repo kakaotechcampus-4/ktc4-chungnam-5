@@ -87,3 +87,10 @@ def create_user_state(
     response = build_user_state_response(db, state)
     db.commit()
     return response
+
+
+def get_latest_user_state(
+    db: Session, *, user_id: uuid.UUID
+) -> UserStateResponse | None:
+    """가장 최근 컨디션 기록 1건. 기록이 없으면 None (읽기 전용, 커밋하지 않는다)."""
+    raise NotImplementedError("get_latest_user_state 미구현")
