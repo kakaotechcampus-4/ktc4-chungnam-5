@@ -11,9 +11,7 @@ import pytest
 from app.models.enums import MedicationStage
 from app.services.dashboard import (
     _compute_stage_changes,
-    _monthly_range,
     _resolve_period,
-    _shift_month,
     _to_kst_range,
 )
 
@@ -37,26 +35,6 @@ def test_resolve_period(period, expected_from, expected_to):
 def test_resolve_period_rejects_unknown_value():
     with pytest.raises(ValueError):
         _resolve_period("3d", today=date(2026, 9, 21))
-
-
-@pytest.mark.parametrize(
-    ("start", "delta", "expected"),
-    [
-        (date(2026, 9, 15), 0, date(2026, 9, 1)),
-        (date(2026, 9, 15), -1, date(2026, 8, 1)),
-        (date(2026, 1, 15), -1, date(2025, 12, 1)),  # 연도 넘어감 (역방향)
-        (date(2026, 12, 15), 1, date(2027, 1, 1)),  # 연도 넘어감 (정방향)
-    ],
-)
-def test_shift_month(start, delta, expected):
-    assert _shift_month(start, delta) == expected
-
-
-def test_monthly_range_covers_last_n_months_including_current():
-    start, end = _monthly_range(today=date(2026, 9, 21), month_count=2)
-
-    assert start == datetime(2026, 8, 1, tzinfo=_KST)
-    assert end == datetime(2026, 10, 1, tzinfo=_KST)
 
 
 def test_to_kst_range_all_period_has_no_lower_bound():

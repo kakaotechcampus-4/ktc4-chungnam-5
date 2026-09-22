@@ -65,14 +65,12 @@ def get_meal_type_averages(
     return list(db.execute(stmt).all())
 
 
-def get_monthly_averages(
-    db: Session,
-    *,
-    user_id: uuid.UUID,
-    range_start: datetime,
-    range_end: datetime,
-) -> list[Row]:
-    """KST 기준 월별 평균 Q/Q/S. range_start 는 항상 값이 있다 — "최근 N개월" 은 하한이 고정."""
+def get_monthly_averages(db: Session, *, user_id: uuid.UUID) -> list[Row]:
+    """KST 기준 월별 평균 Q/Q/S. 기간 제한 없이 평가된 데이터가 있는 모든 달을 보여준다.
+
+    (리뷰 반영) 처음엔 "최근 N개월"로 고정했었는데, 이규혁님이 "명세 예시는 단순
+    예시일 뿐이고 모든 달이 다 나오는 게 맞다"고 지적해서 상한/하한을 없앴다.
+    """
     month = kst_month(Meal.eaten_at)
     stmt = (
         select(
@@ -83,12 +81,7 @@ def get_monthly_averages(
         )
         .select_from(Meal)
         .join(QQSEvaluation, QQSEvaluation.meal_id == Meal.id)
-        .where(
-            Meal.user_id == user_id,
-            Meal.deleted_at.is_(None),
-            Meal.eaten_at >= range_start,
-            Meal.eaten_at < range_end,
-        )
+        .where(Meal.user_id == user_id, Meal.deleted_at.is_(None))
         .group_by(month)
         .order_by(month)
     )

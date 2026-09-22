@@ -24,29 +24,10 @@ from app.schemas.dashboard import (
 from app.schemas.meal import MealScores
 
 _KST_ZONE = ZoneInfo("Asia/Seoul")
-_MONTHLY_AVERAGES_MONTH_COUNT = 2
 
 
 def _round_or_none(value: Decimal | None) -> int | None:
     return round(value) if value is not None else None
-
-
-def _shift_month(d: date, delta: int) -> date:
-    """d 가 속한 달의 1일 기준으로 delta 개월 이동한 달의 1일을 돌려준다."""
-    total = d.year * 12 + (d.month - 1) + delta
-    year, month0 = divmod(total, 12)
-    return date(year, month0 + 1, 1)
-
-
-def _monthly_range(today: date, month_count: int) -> tuple[datetime, datetime]:
-    """오늘이 속한 달을 포함해 최근 month_count 개월의 [시작, 다음 달 시작) 구간(KST)."""
-    current_month_start = date(today.year, today.month, 1)
-    start = _shift_month(current_month_start, -(month_count - 1))
-    end = _shift_month(current_month_start, 1)
-    return (
-        datetime(start.year, start.month, 1, tzinfo=_KST_ZONE),
-        datetime(end.year, end.month, 1, tzinfo=_KST_ZONE),
-    )
 
 
 def _resolve_period(period: str, today: date) -> tuple[date | None, date]:
@@ -138,7 +119,6 @@ def get_dashboard(db: Session, *, user_id: uuid.UUID, period: str) -> DashboardR
         )
     }
 
-    monthly_start, monthly_end = _monthly_range(today, _MONTHLY_AVERAGES_MONTH_COUNT)
     monthly_averages = [
         MonthlyAverage(
             month=row.month.strftime("%Y-%m"),
@@ -146,9 +126,7 @@ def get_dashboard(db: Session, *, user_id: uuid.UUID, period: str) -> DashboardR
             quality=_round_or_none(row.avg_quality),
             satiety=_round_or_none(row.avg_satiety),
         )
-        for row in dashboard_crud.get_monthly_averages(
-            db, user_id=user_id, range_start=monthly_start, range_end=monthly_end
-        )
+        for row in dashboard_crud.get_monthly_averages(db, user_id=user_id)
     ]
 
     weight_series = [
