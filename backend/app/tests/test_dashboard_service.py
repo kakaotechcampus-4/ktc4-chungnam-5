@@ -82,7 +82,7 @@ def test_compute_stage_changes_ignores_repeated_stage():
         _record(MedicationStage.INITIAL, date(2026, 8, 1)),
         _record(MedicationStage.INITIAL, date(2026, 8, 15)),  # 갱신이지 변경 아님
     ]
-    assert _compute_stage_changes(records, date(2026, 8, 1), date(2026, 9, 21)) == []
+    assert _compute_stage_changes(records, date(2026, 8, 1)) == []
 
 
 def test_compute_stage_changes_detects_transition_within_period():
@@ -90,7 +90,7 @@ def test_compute_stage_changes_detects_transition_within_period():
         _record(MedicationStage.INITIAL, date(2026, 8, 1)),
         _record(MedicationStage.TITRATION, date(2026, 9, 16)),
     ]
-    changes = _compute_stage_changes(records, date(2026, 8, 25), date(2026, 9, 21))
+    changes = _compute_stage_changes(records, date(2026, 8, 25))
 
     assert len(changes) == 1
     assert changes[0].date == date(2026, 9, 16)
@@ -104,16 +104,21 @@ def test_compute_stage_changes_excludes_transition_before_period():
         _record(MedicationStage.INITIAL, date(2026, 7, 1)),
         _record(MedicationStage.TITRATION, date(2026, 8, 1)),  # 기간(8/25~) 이전 변경
     ]
-    changes = _compute_stage_changes(records, date(2026, 8, 25), date(2026, 9, 21))
+    changes = _compute_stage_changes(records, date(2026, 8, 25))
 
     assert changes == []
 
 
-def test_compute_stage_changes_excludes_transition_after_period():
+def test_compute_stage_changes_includes_future_scheduled_change():
+    """명세가 예정된(미래) 단계 변경도 포함하도록 정의돼 있다 — 상한을 두지 않는다.
+
+    (period.to=8/21 인 예시에 8/24 짜리 stageChanges 항목이 나오는 게 근거)
+    """
     records = [
         _record(MedicationStage.INITIAL, date(2026, 8, 1)),
-        _record(MedicationStage.TITRATION, date(2026, 9, 25)),  # 기간(~9/21) 이후 변경
+        _record(MedicationStage.TITRATION, date(2026, 9, 25)),  # period.to(9/21) 이후 예정된 변경
     ]
-    changes = _compute_stage_changes(records, date(2026, 8, 25), date(2026, 9, 21))
+    changes = _compute_stage_changes(records, date(2026, 8, 25))
 
-    assert changes == []
+    assert len(changes) == 1
+    assert changes[0].date == date(2026, 9, 25)

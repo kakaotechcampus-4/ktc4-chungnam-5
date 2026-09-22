@@ -72,13 +72,13 @@ def _to_kst_range(date_from: date | None, date_to: date) -> tuple[datetime | Non
     return range_start, range_end
 
 
-def _compute_stage_changes(
-    records: list[Row], date_from: date | None, date_to: date
-) -> list[StageChange]:
+def _compute_stage_changes(records: list[Row], date_from: date | None) -> list[StageChange]:
     """연속된 투약 기록을 순서대로 비교해 stage 가 바뀐 지점만 뽑는다.
 
     records 는 기간으로 미리 안 잘려있다 — 그래서 기간 시작 직전의 변경도
-    "이전 stage" 로 정확히 알 수 있다. 결과만 [date_from, date_to] 로 거른다.
+    "이전 stage" 로 정확히 알 수 있다. 상한(date_to)은 두지 않는다 — 명세가
+    예정된(미래) 단계 변경도 포함하도록 정의돼 있다 (예: period.to=8/21 인데
+    stageChanges 예시에 8/24 가 나옴). date_from 이전 것만 거른다.
     """
     changes: list[StageChange] = []
     for prev, curr in zip(records, records[1:]):
@@ -86,8 +86,6 @@ def _compute_stage_changes(
             continue
         change_date = curr.effective_from
         if date_from is not None and change_date < date_from:
-            continue
-        if change_date > date_to:
             continue
         changes.append(StageChange(date=change_date, from_=prev.stage, to=curr.stage))
     return changes
@@ -161,7 +159,7 @@ def get_dashboard(db: Session, *, user_id: uuid.UUID, period: str) -> DashboardR
     ]
 
     stage_changes = _compute_stage_changes(
-        dashboard_crud.get_medication_records(db, user_id=user_id), date_from, date_to
+        dashboard_crud.get_medication_records(db, user_id=user_id), date_from
     )
 
     return DashboardResponse(
