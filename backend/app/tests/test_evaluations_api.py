@@ -168,7 +168,11 @@ def test_evaluation_before_confirm_is_409_not_confirmed(
 
 
 def test_analyzing_meal_cannot_be_confirmed(client: TestClient, db: Session) -> None:
-    """최초 분석 중에는 확정할 수 없다 — 워커가 항목을 갈아엎는 중이다."""
+    """**최초** 분석 중에는 확정할 수 없다 — 워커가 항목을 갈아엎는 중이다.
+
+    `is_recalculation` 은 기본값 False 다. 아래 재계산 테스트와 짝이다 — 같은
+    `ANALYZING` 인데 이 플래그 하나로 갈린다.
+    """
     user = make_user(db)
     meal = make_meal(db, user_id=user.id, status=MealStatus.ANALYZING)
 
@@ -178,6 +182,30 @@ def test_analyzing_meal_cannot_be_confirmed(client: TestClient, db: Session) -> 
     )
 
     assert res.status_code == 409
+
+
+def test_recalculating_meal_can_be_confirmed(client: TestClient, db: Session) -> None:
+    """음식을 고친 뒤(`ANALYZING` + `isRecalculation`)에는 확정할 수 있어야 한다.
+
+    `PATCH`·`POST`·`DELETE /meals/{mealId}/items` 가 식사를 이 상태로 되돌린다.
+    여기서 막으면 **음식을 고친 사용자는 영원히 확정하지 못한다** — 재계산을 푸는
+    경로가 확정뿐이라 스피너에서 빠져나올 방법이 없다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.ANALYZING)
+    meal.is_recalculation = True
+    make_food_ref(db)
+    make_meal_item(db, meal_id=meal.id, food_ref_id="KFD_TEST_01")
+    db.flush()
+
+    res = client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
+        json={"satietyAfterPct": 68},
+    )
+
+    assert res.status_code == 200, res.text
+    db.expire_all()
+    assert meal.status is MealStatus.EVALUATED
 
 
 def test_other_users_meal_is_404(client: TestClient, db: Session) -> None:

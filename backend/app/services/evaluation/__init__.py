@@ -80,17 +80,11 @@ WEIGHT_PROFILE_VERSION: Final = "v1"
 """명세 `evidence` 의 상수들. 채점 기준선(`stage_profile`)을 바꾸면 올린다."""
 
 _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATED})
-"""확정 가능한 상태.
+"""상태만 보고 확정 가능한 것들. `_is_confirmable` 이 쓴다.
 
 `EVALUATED` 를 포함하는 건 **재확정**을 허용하기 위해서다 — 사용자가 음식을
 고치면 점수가 다시 매겨져야 하고, `qqs_evaluations` 가 식사당 1행(upsert)인 것도
 그 전제다.
-
-`ANALYZING` 은 빠져 있다. 지금은 "워커가 최초 분석 중" 하나뿐이라 끼어들면 안 된다.
-🔗 `POST /meals/{mealId}/items`(PR #25)가 머지되면 `ANALYZING` 이 두 뜻이 된다 —
-`is_recalculation=True` 는 "사용자가 음식을 고치고 재계산 대기" 라 **확정을 허용해야
-한다.** 그 컬럼이 들어오면 여기에 조건을 더할 것. 안 그러면 사용자가 음식을 고친 뒤
-영원히 확정하지 못한다.
 
 🔗 TODO(`feedbacks.py` 구현 시): **재확정이 `meal_feedbacks` 를 건드리지 않는다.**
 점수는 upsert 로 덮이는데 AI 가 쓴 문장은 옛 점수 기준으로 남아, 확정 응답은
@@ -98,6 +92,25 @@ _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATE
 지금은 `endpoints/feedbacks.py` 가 비어 있어 드러나지 않는다. 무효화 방식(행 삭제 ·
 stale 플래그 · 상태 되돌리기)이 그 엔드포인트 설계에 달려 있어 거기서 함께 정한다.
 """
+
+
+def _is_confirmable(meal: Meal) -> bool:
+    """지금 이 식사를 확정할 수 있는가.
+
+    **`ANALYZING` 은 두 가지 뜻이다.** 상태만 보면 안 되는 이유다:
+
+    - `is_recalculation=False` — 워커가 **최초 분석 중**이다. 끼어들면 아직 만들어지지
+      않은 항목으로 채점한다. 거부한다.
+    - `is_recalculation=True` — 사용자가 음식을 고쳐 **재계산 대기**다
+      (`PATCH`·`POST`·`DELETE /meals/{mealId}/items`). 허용해야 한다. 막으면
+      음식을 고친 사용자가 영원히 확정하지 못한다.
+
+    🔗 `services/meal.py::_is_editable` 과 같은 모양이다 — 그쪽은 "고칠 수 있는가",
+    이쪽은 "확정할 수 있는가" 이고, `ANALYZING` 을 가르는 기준이 같다.
+    """
+    if meal.status in _CONFIRMABLE:
+        return True
+    return meal.status is MealStatus.ANALYZING and meal.is_recalculation
 
 _NUTRIENT_ROWS: Final[tuple[tuple[NutrientCode, str, str, str], ...]] = (
     (NutrientCode.PROTEIN, "protein_g", "단백질", "g"),
@@ -203,7 +216,7 @@ def confirm(
 ) -> EvaluationResult:
     """식사를 확정하고 Q/Q/S 를 매긴다. 커밋까지 한다."""
     meal = _owned_meal(db, user_id, meal_id)
-    if meal.status not in _CONFIRMABLE:
+    if not _is_confirmable(meal):
         raise MealNotConfirmableError(
             f"{meal.status.value} 상태의 식사는 확정할 수 없습니다."
         )
