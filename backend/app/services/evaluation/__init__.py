@@ -30,7 +30,6 @@ from app.models.enums import (
     MedicationStage,
     NutrientCode,
     NutritionSource,
-    ScoreAxis,
 )
 from app.models.meal import Meal
 from app.schemas.evaluation import (
@@ -122,23 +121,6 @@ def _stage_of(db: Session, meal: Meal) -> MedicationStage:
     return snapshot.stage
 
 
-def _emphasis_with_scores(stage: MedicationStage, scores: QqsScores) -> list[ScoreAxis]:
-    """그 단계에서 강조할 축 중 **점수가 실제로 있는 것만.**
-
-    FE 는 이 목록을 보고 어느 게이지를 크게 그릴지 정한다. 점수가 null 인 축을
-    가리키면 화면에 강조할 게 없다 — 지금은 Quantity·Quality 기준선이 미정이라
-    (`rule_engine`) PRE_DOSE·INITIAL·TITRATION 은 강조축이 전부 비어 버린다.
-
-    기준선이 정해져 점수가 채워지면 필터가 저절로 통과하므로 이 함수는 그대로 둔다.
-    """
-    have = {
-        ScoreAxis.QUANTITY: scores.quantity,
-        ScoreAxis.QUALITY: scores.quality,
-        ScoreAxis.SATIETY: scores.satiety,
-    }
-    return [axis for axis in emphasis_for(stage) if have[axis] is not None]
-
-
 def _as_float(value: Decimal | None) -> float | None:
     """명세의 `nutrients[].current` 는 숫자다. Decimal 을 그대로 두면 문자열로 샌다."""
     return None if value is None else float(value)
@@ -166,7 +148,7 @@ def _build_view(
         status=meal.status,
         stage=stage,
         scores=scores,
-        stage_emphasis=_emphasis_with_scores(stage, scores),
+        stage_emphasis=list(emphasis_for(stage)),
         nutrients=[
             NutrientRow(
                 code=code,

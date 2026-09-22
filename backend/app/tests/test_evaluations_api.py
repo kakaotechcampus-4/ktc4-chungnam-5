@@ -116,15 +116,12 @@ def test_nutrients_match_the_spec_shape(client: TestClient, db: Session) -> None
         assert isinstance(row["current"], (int, float))
 
 
-def test_stage_emphasis_only_lists_axes_that_have_a_score(
-    client: TestClient, db: Session
-) -> None:
-    """강조축은 **점수가 있는 것만** 나간다.
+def test_stage_emphasis_follows_the_stage(client: TestClient, db: Session) -> None:
+    """강조축은 **그 단계에서 무엇이 중요한가**다. 명세 예시가 MAINTENANCE 다.
 
-    명세 예시(MAINTENANCE)는 `["SATIETY", "QUALITY"]` 인데, Quality 기준선이
-    미정이라 그 점수가 null 이다. null 인 축을 강조하라고 내보내면 FE 는 비어 있는
-    게이지를 크게 그리게 된다. 기준선이 정해지면 필터가 저절로
-    통과해 명세 예시와 같아진다.
+    오늘 그 축을 매길 수 있는지와는 별개다 — Quantity·Quality 기준선이 미정이라
+    점수가 null 이어도 단계의 의미는 변하지 않는다. 점수가 null 인 축을 어떻게
+    그릴지는 FE 가 정한다.
     """
     user, meal = _ready_meal(db, stage=MedicationStage.MAINTENANCE)
 
@@ -134,22 +131,22 @@ def test_stage_emphasis_only_lists_axes_that_have_a_score(
     ).json()["data"]
 
     assert data["stage"] == "MAINTENANCE"
-    assert data["stageEmphasis"] == ["SATIETY"]
-    assert data["scores"]["quality"] is None  # 그래서 QUALITY 가 빠졌다
+    assert data["stageEmphasis"] == ["SATIETY", "QUALITY"]   # 명세 예시 그대로
+    assert data["scores"]["quality"] is None                 # 점수는 아직 없어도
 
 
-def test_stage_emphasis_is_empty_when_no_emphasized_axis_is_scored(
-    client: TestClient, db: Session
-) -> None:
-    """강조할 축의 점수가 전부 없으면 빈 목록이다 — 없는 걸 가리키지 않는다."""
-    user, meal = _ready_meal(db, stage=MedicationStage.INITIAL)
-
-    data = client.post(
-        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
-        json={"satietyAfterPct": 68},
-    ).json()["data"]
-
-    assert data["stageEmphasis"] == []
+def test_stage_emphasis_is_never_empty(client: TestClient, db: Session) -> None:
+    """어느 단계든 강조할 축이 하나는 있다 — FE 가 기준을 잃으면 안 된다."""
+    for stage in MedicationStage:
+        user = make_user(db)
+        meal = make_meal(
+            db, user_id=user.id, stage=stage, status=MealStatus.REVIEW_REQUIRED
+        )
+        data = client.post(
+            f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
+            json={"satietyAfterPct": 68},
+        ).json()["data"]
+        assert data["stageEmphasis"], stage
 
 
 # ── 에러 ───────────────────────────────────────────────────────
