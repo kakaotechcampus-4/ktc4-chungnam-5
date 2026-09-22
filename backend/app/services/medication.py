@@ -39,6 +39,7 @@ from app.schemas.medication import (
     CurrentMedicationResponse,
     DoseDirection,
     DoseEvent,
+    DoseEventsResponse,
     MedicationRegisterRequest,
     MedicationRegisterResponse,
 )
@@ -578,6 +579,41 @@ def get_current_view(
         stage_changed=False,
         decided_at=datetime.now(timezone.utc),
     )
+
+
+def list_dose_events(db: Session, user_id: uuid.UUID) -> DoseEventsResponse:
+    """`GET /medications/dose-events` 응답. 오래된 순이다.
+
+    **행 하나가 곧 이벤트 1건이다** — 별도 이벤트 테이블이 없다 (`DoseEvent` 독스트링).
+
+    `direction` 은 저장하지 않고 **바로 앞 행과 비교해 매번 계산한다.** 저장하면 같은
+    사실이 행과 이벤트 두 곳에 남아 어긋날 수 있는데, 계산은 앞 행 하나만 보면 된다.
+    첫 행은 비교 대상이 없어 `MAINTAIN` 이다 (명세 예시의 `de_001`).
+
+    **정정은 여기 안 나온다.** `register()` 가 등록만 하므로 한 번도 맞은 적 없는
+    용량은 애초에 행이 되지 않는다. 정정은 `PATCH` 가 맡는다.
+
+    기록이 없으면 `events: []` 다. 404 가 아니다 — "아직 투약 전"은 정상 상태이고
+    빈 목록이 그 사실을 그대로 말한다.
+    """
+    if user_crud.get(db, user_id) is None:
+        raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
+
+    events: list[DoseEvent] = []
+    previous_dose_mg: Decimal | None = None
+    for record in crud.list_history(db, user_id):
+        events.append(
+            DoseEvent(
+                dose_event_id=record.id,
+                dose_mg=record.dose_mg,
+                direction=dose_direction(
+                    record.dose_mg, previous_dose_mg=previous_dose_mg
+                ),
+                effective_from=record.effective_from,
+            )
+        )
+        previous_dose_mg = record.dose_mg
+    return DoseEventsResponse(events=events)
 
 
 def _build_dose_event(result: RegisterResult) -> DoseEvent | None:
