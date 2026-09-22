@@ -12,12 +12,18 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.crud import meal as meal_crud
+from app.models.enums import MealStatus
 from app.schemas.meal import MealScores
+from app.schemas.nutrition import NutritionInfo
 from app.services.meal import (
     MealNotFoundError,
+    _build_feedback,
+    _build_item_detail,
+    _build_satiety,
     _build_scores,
     _build_thumbnail_url,
     _parse_month_range,
+    _resolve_steps,
     decode_cursor,
     delete_meal,
     encode_cursor,
@@ -145,3 +151,117 @@ def test_parse_month_range_rolls_over_year_at_december():
 def test_parse_month_range_rejects_invalid_format(garbage_month):
     with pytest.raises(ValueError):
         _parse_month_range(garbage_month)
+
+
+def _fake_item(
+    *,
+    confirmed_amount=None,
+    confirmed_amount_g=None,
+    confirmed_unit=None,
+    estimated_amount=None,
+    estimated_amount_g=None,
+    estimated_unit=None,
+    confidence=None,
+):
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        display_name="테스트 음식",
+        confidence=confidence,
+        confirmed_amount=confirmed_amount,
+        confirmed_amount_g=confirmed_amount_g,
+        confirmed_unit=confirmed_unit,
+        estimated_amount=estimated_amount,
+        estimated_amount_g=estimated_amount_g,
+        estimated_unit=estimated_unit,
+    )
+
+
+def test_build_item_detail_unconfirmed_uses_estimated_amount():
+    """확인 전(confirmed_amount 없음)이면 estimated_* 로 폴백해야 한다."""
+    item = _fake_item(
+        estimated_amount=Decimal("150"), estimated_unit="g", confidence=Decimal("0.62")
+    )
+
+    detail = _build_item_detail(item, nutrition=None)
+
+    assert detail.amount == 150.0
+    assert detail.unit == "g"
+    assert detail.confidence == 0.62
+    assert detail.matched is False
+    assert detail.nutrition_source is None
+    assert detail.user_confirmed is False
+
+
+def test_build_item_detail_confirmed_with_nutrition():
+    """확인됐고(confirmed_amount 있음) 영양정보도 있으면 matched 가 true 여야 한다."""
+    item = _fake_item(confirmed_amount=Decimal("200"), confirmed_unit="g")
+    nutrition = NutritionInfo(
+        kcal=Decimal("274"), protein_g=None, fat_g=None, carb_g=None, fiber_g=None, sodium_mg=None
+    )
+
+    detail = _build_item_detail(item, nutrition=nutrition)
+
+    assert detail.amount == 200.0
+    assert detail.matched is True
+    assert detail.nutrition_source == "PUBLIC_DB"
+    assert detail.user_confirmed is True
+    assert detail.nutrition is nutrition
+
+
+@pytest.mark.parametrize(
+    ("status", "is_recalculation", "expected"),
+    [
+        (
+            MealStatus.ANALYZING,
+            False,
+            [("FOOD_RECOGNITION", "RUNNING"), ("DB_MATCHING", "PENDING"), ("STAGE_RULE_APPLY", "PENDING")],
+        ),
+        (
+            MealStatus.ANALYZING,
+            True,
+            [("FOOD_RECOGNITION", "DONE"), ("DB_MATCHING", "RUNNING"), ("STAGE_RULE_APPLY", "PENDING")],
+        ),
+        (
+            MealStatus.REVIEW_REQUIRED,
+            False,
+            [("FOOD_RECOGNITION", "DONE"), ("DB_MATCHING", "RUNNING"), ("STAGE_RULE_APPLY", "PENDING")],
+        ),
+        (
+            MealStatus.EVALUATED,
+            False,
+            [("FOOD_RECOGNITION", "DONE"), ("DB_MATCHING", "DONE"), ("STAGE_RULE_APPLY", "DONE")],
+        ),
+        (MealStatus.FAILED, False, []),
+    ],
+)
+def test_resolve_steps(status, is_recalculation, expected):
+    steps = _resolve_steps(status, is_recalculation)
+    assert [(step.key, step.state) for step in steps] == expected
+
+
+def test_build_satiety_none_when_no_log():
+    assert _build_satiety(None) is None
+
+
+def test_build_satiety_maps_fields_and_checkins_always_empty():
+    log = SimpleNamespace(satiety_before=30, satiety_after=75, hunger_return_minutes=90)
+
+    detail = _build_satiety(log)
+
+    assert detail.before_pct == 30
+    assert detail.after_pct == 75
+    assert detail.hunger_return_minutes == 90
+    assert detail.checkins == []
+
+
+def test_build_feedback_none_when_missing():
+    assert _build_feedback(None) is None
+
+
+def test_build_feedback_maps_fields():
+    feedback_row = SimpleNamespace(body="요약", suggestions="제안")
+
+    summary = _build_feedback(feedback_row)
+
+    assert summary.summary == "요약"
+    assert summary.suggestions == "제안"

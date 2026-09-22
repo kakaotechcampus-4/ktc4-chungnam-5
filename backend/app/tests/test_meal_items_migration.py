@@ -16,7 +16,7 @@ from sqlalchemy import text
 
 from app.models.enums import MealItemSource
 from app.models.meal import MealItem
-from app.services.meal import _stored_amount
+from app.services.meal import resolved_amount
 from app.tests.factories import make_meal, make_user
 
 
@@ -53,7 +53,7 @@ def test_legacy_user_row_loses_its_amount_without_the_backfill(db):
     # confirmed_amount 가 NULL 이라 estimated_* 로 폴백하는데 USER 행은 그쪽이 전부
     # NULL 이다 — confirmed_amount_g 에 200.00 이 멀쩡히 있는데도 "모름" 이 된다.
     assert item.confirmed_amount_g == Decimal("200.00")
-    assert _stored_amount(item) == (None, None, None)
+    assert resolved_amount(item) == (None, None, None)
 
 
 def test_backfill_restores_the_amount_from_raw_ai_result(db):
@@ -68,7 +68,7 @@ def test_backfill_restores_the_amount_from_raw_ai_result(db):
 
     assert item.confirmed_amount == Decimal("200.00")
     assert item.confirmed_unit == "g"
-    assert _stored_amount(item) == (Decimal("200.00"), Decimal("200.00"), "g")
+    assert resolved_amount(item) == (Decimal("200.00"), Decimal("200.00"), "g")
 
 
 def test_backfill_leaves_ai_recognised_items_alone(db):

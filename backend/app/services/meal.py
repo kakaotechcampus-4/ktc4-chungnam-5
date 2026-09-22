@@ -17,20 +17,29 @@ from sqlalchemy.orm import Session
 
 from app.crud import meal as meal_crud
 from app.models.enums import MealItemSource, MealStatus
-from app.models.meal import Meal, MealItem
+from app.models.feedback import MealFeedback
+from app.models.meal import Meal, MealItem, SatietyLog
 from app.schemas.meal import (
+    EVALUATED_STEPS,
+    INITIAL_ANALYSIS_STEPS,
     RECALCULATION_STEPS,
+    AnalysisStep,
     CalendarDay,
     CalendarSummary,
     MealCalendarResponse,
     MealDeleteResponse,
+    MealDetailResponse,
+    MealFeedbackSummary,
     MealItemCreateRequest,
     MealItemCreateResponse,
+    MealItemDetail,
     MealItemsUpdateResponse,
     MealItemUpdate,
     MealListItem,
     MealListResponse,
     MealScores,
+    NutrientStatus,
+    SatietyDetail,
 )
 from app.schemas.nutrition import NutritionInfo
 
@@ -351,7 +360,7 @@ def add_item(
     )
 
 
-def _stored_amount(item: MealItem) -> tuple[Decimal | None, Decimal | None, str | None]:
+def resolved_amount(item: MealItem) -> tuple[Decimal | None, Decimal | None, str | None]:
     """고치기 전의 양 — `(g 환산값, 숫자, 단위)`.
 
     **확인 여부의 센티넬은 `confirmed_amount` 다.** `confirmed_amount_g` 가 아니다 —
@@ -484,7 +493,7 @@ def update_items(
 
         # 반영 전 값은 여기서 전부 잡아 둔다 — `update_item` 뒤에 읽으면 방금 쓴
         # 값이라 "안 고쳤다" 가 된다.
-        stored = _stored_amount(item)
+        stored = resolved_amount(item)
         stored_amount_g, stored_amount, stored_unit = stored
         before: dict[str, str | None] = {
             "displayName": item.display_name,
@@ -550,4 +559,109 @@ def update_items(
         status=meal.status,
         is_recalculation=meal.is_recalculation,
         steps=list(RECALCULATION_STEPS),
+    )
+
+
+def get_meal_for_detail(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal:
+    """소유권을 확인한 Meal 을 돌려준다 (`.items`, `.satiety_log` 지연 로딩 가능).
+
+    `GET /meals/{mealId}`는 항목별 영양정보(services/nutrition.py)가 필요한데,
+    services 끼리는 서로 부르지 않으므로(README 절대 규칙 5) 그 계산은 호출부(api
+    레이어)가 한다. 그러려면 api 레이어가 먼저 이 meal 객체를 쥐고 있어야 해서
+    조립 함수(`build_meal_detail`)와 분리했다.
+    """
+    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+    return meal
+
+
+def _resolve_steps(status: MealStatus, is_recalculation: bool) -> list[AnalysisStep]:
+    """상태별 고정 steps. 이 시스템엔 세부 진행상황을 기록하는 컬럼이 없다(RECALCULATION_STEPS 참고)."""
+    if status is MealStatus.FAILED:
+        # FAILED 는 DONE/RUNNING/PENDING 중 어디에도 안 맞는다 — steps 자체가 없다.
+        return []
+    if status is MealStatus.EVALUATED:
+        return list(EVALUATED_STEPS)
+    if status is MealStatus.ANALYZING and not is_recalculation:
+        return list(INITIAL_ANALYSIS_STEPS)
+    # ANALYZING(재분석) 또는 REVIEW_REQUIRED — 확인을 기다리는 중이라 STAGE_RULE_APPLY 만 아직이다.
+    return list(RECALCULATION_STEPS)
+
+
+def _build_item_detail(item: MealItem, nutrition: NutritionInfo | None) -> MealItemDetail:
+    """항목 하나를 응답 모양으로 바꾼다. 영양정보는 이미 계산된 값을 받는다."""
+    _, amount, unit = resolved_amount(item)
+    return MealItemDetail(
+        item_id=item.id,
+        display_name=item.display_name,
+        amount=float(amount) if amount is not None else None,
+        unit=unit,
+        confidence=float(item.confidence) if item.confidence is not None else None,
+        # meal_items.py 와 같은 정의 — "영양정보가 나가는가" 지 "공공 DB 에서 찾았는가" 가 아니다.
+        matched=nutrition is not None,
+        nutrition_source="PUBLIC_DB" if nutrition is not None else None,
+        user_confirmed=item.confirmed_amount is not None,
+        nutrition=nutrition,
+    )
+
+
+def _build_satiety(satiety_log: SatietyLog | None) -> SatietyDetail | None:
+    """satiety_logs 를 응답 모양으로. checkins 는 저장소가 없어 항상 빈 배열."""
+    if satiety_log is None:
+        return None
+    return SatietyDetail(
+        before_pct=satiety_log.satiety_before,
+        after_pct=satiety_log.satiety_after,
+        checkins=[],  # TODO: satiety-checkins 저장소 미구현.
+        hunger_return_minutes=satiety_log.hunger_return_minutes,
+    )
+
+
+def _build_feedback(feedback: MealFeedback | None) -> MealFeedbackSummary | None:
+    if feedback is None:
+        return None
+    return MealFeedbackSummary(summary=feedback.body, suggestions=feedback.suggestions)
+
+
+def build_meal_detail(
+    db: Session,
+    *,
+    meal: Meal,
+    nutrition_by_item: dict[uuid.UUID, NutritionInfo | None],
+) -> MealDetailResponse:
+    """`get_meal_for_detail` 로 얻은 meal 과 미리 계산된 영양정보로 응답을 조립한다."""
+    stage = meal_crud.get_stage(db, meal.medication_snapshot_id)
+    items = [_build_item_detail(item, nutrition_by_item.get(item.id)) for item in meal.items]
+    steps = _resolve_steps(meal.status, meal.is_recalculation)
+
+    scores: MealScores | None = None
+    nutrients: list[NutrientStatus] = []  # TODO: services/evaluation/rule_engine.py 구현 후 채움.
+    satiety: SatietyDetail | None = None
+    feedback: MealFeedbackSummary | None = None
+
+    if meal.status is MealStatus.EVALUATED:
+        evaluation = meal_crud.get_evaluation(db, meal.id)
+        if evaluation is not None:
+            scores = _build_scores(
+                evaluation.quantity_score, evaluation.quality_score, evaluation.satiety_score
+            )
+        satiety = _build_satiety(meal.satiety_log)
+        feedback = _build_feedback(meal_crud.get_feedback(db, meal.id))
+
+    return MealDetailResponse(
+        meal_id=meal.id,
+        status=meal.status,
+        is_recalculation=meal.is_recalculation,
+        stage=stage,
+        meal_type=meal.meal_type,
+        eaten_at=meal.eaten_at,
+        image_url=_build_thumbnail_url(meal.image_key),
+        steps=steps,
+        clarify_question=None,  # TODO: AI 스텁 연동 전까지 항상 None.
+        items=items,
+        scores=scores,
+        nutrients=nutrients,
+        satiety=satiety,
+        feedback=feedback,
     )
