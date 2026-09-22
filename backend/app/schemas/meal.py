@@ -2,10 +2,10 @@
 
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated, Literal
 
-from pydantic import Field, StringConstraints, field_validator
+from pydantic import AfterValidator, Field, StringConstraints, field_validator
 
 from app.models.enums import MealStatus, MealType, MedicationStage
 from app.schemas.base import CamelModel
@@ -80,11 +80,48 @@ class MealCalendarResponse(CamelModel):
     summary: CalendarSummary
 
 
-# meal_items.confirmed_amount_g 는 Numeric(8, 2) 다 — 최대 999999.99.
+# 양이 들어가는 컬럼(`estimated_amount` · `confirmed_amount` · `*_amount_g`)은 전부
+# Numeric(8, 2) 다 — 최대 999999.99.
 # 스키마에서 막지 않으면 큰 값이 두 갈래로 500 이 된다: quantize 가
 # InvalidOperation 을 던지거나, 통과하더라도 INSERT 가 DataError 로 죽는다.
 # 클라이언트 입력 오류는 4xx 여야 한다(core/response.py 의 규칙).
 _MAX_AMOUNT = Decimal("999999.99")
+_AMOUNT_QUANTUM = Decimal("0.01")
+
+
+def _to_column_scale(value: Decimal) -> Decimal:
+    """양을 컬럼 자릿수(`Numeric(8, 2)`)에 맞춰 반올림한다.
+
+    **Postgres 가 어차피 반올림한다.** 요청값을 그대로 들고 다니면 저장된 값과
+    어긋난 채로 남아 두 가지가 깨진다:
+
+    - `PATCH` 의 "고쳤는가" 판정이 `2.005`(요청) 와 `2.01`(DB) 을 다른 양으로 봐서,
+      같은 값을 다시 보낼 때마다 `user_corrections` 에 거짓 행이 쌓인다
+    - `user_corrections.corrected_value` 가 DB 행에 없는 값을 기록해, 인식 오차를
+      계산하는 쪽이 존재하지 않는 값을 기준으로 삼는다
+
+    입력을 거절하지 않고 반올림하는 건 `user_states` 의 체중 처리와 같은 규약이다
+    (`services/user_state.py`) — 클라이언트가 보낸 정밀도를 서버가 트집 잡지 않되,
+    응답과 이력은 **실제 저장된 값**으로 말한다.
+
+    **반올림 방식은 Postgres 와 같아야 한다** — `numeric` 은 0.5 를 0 에서 먼 쪽으로
+    올린다(`2.005 → 2.01`). Python `Decimal` 의 기본값은 은행가 반올림이라
+    `2.005 → 2.00` 으로 갈린다. 다르게 두면 스키마를 거치지 않고 컬럼에 닿는 경로
+    (워커 · 직접 SQL)가 생길 때 같은 값이 두 가지로 저장된다.
+
+    반올림해서 0 이 되는 값(`0.001`)은 거절한다. `gt=0` 은 반올림 **전** 값만 보므로
+    여기서 막지 않으면 "0 보다 커야 한다" 는 제약을 통과한 0 이 저장된다.
+    """
+    scaled = value.quantize(_AMOUNT_QUANTUM, rounding=ROUND_HALF_UP)
+    if scaled <= 0:
+        raise ValueError("amount 는 반올림 후에도 0 보다 커야 합니다.")
+    return scaled
+
+
+# 양 한 건. POST 와 PATCH 가 같은 규칙을 탄다.
+Amount = Annotated[
+    Decimal, Field(gt=0, le=_MAX_AMOUNT), AfterValidator(_to_column_scale)
+]
 
 
 class MealItemCreateRequest(CamelModel):
@@ -97,7 +134,7 @@ class MealItemCreateRequest(CamelModel):
     display_name: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
     ]
-    amount: Annotated[Decimal, Field(gt=0, le=_MAX_AMOUNT)]
+    amount: Amount
     unit: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)
     ]
@@ -129,7 +166,7 @@ class MealItemUpdate(CamelModel):
     display_name: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
     ]
-    amount: Annotated[Decimal, Field(gt=0, le=_MAX_AMOUNT)]
+    amount: Amount
     unit: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)
     ]

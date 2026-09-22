@@ -634,7 +634,6 @@ def test_correcting_an_ai_item_records_the_change(client, db):
         db,
         meal_id=meal.id,
         display_name="김밥",
-        estimated_amount_g=Decimal("250.00"),
     )
     db.commit()
 
@@ -662,8 +661,10 @@ def test_correcting_a_user_added_item_records_nothing(client, db):
         display_name="미역국",
         source=MealItemSource.USER,
         confidence=None,
-        estimated_amount_g=None,
-        confirmed_amount_g=Decimal("200.00"),
+        estimated_amount=None,
+        estimated_unit=None,
+        confirmed_amount=Decimal("200.00"),
+        confirmed_unit="g",
     )
     db.commit()
 
@@ -687,7 +688,6 @@ def test_resending_the_same_values_records_nothing(client, db):
         db,
         meal_id=meal.id,
         display_name="참치김밥",
-        estimated_amount_g=Decimal("250.00"),
     )
     db.commit()
 
@@ -695,6 +695,143 @@ def test_resending_the_same_values_records_nothing(client, db):
         f"/api/v1/meals/{meal.id}/items",
         headers={"X-User-Id": str(user.id)},
         json=_payload(item.id, displayName="참치김밥", amount=250, unit="g"),
+    )
+    assert response.status_code == 200, response.text
+
+    assert _corrections(db, item.id) == []
+
+
+def test_resending_an_amount_with_extra_decimals_records_nothing_the_second_time(client, db):
+    """소수 셋째 자리를 보내도 두 번째부터는 '고쳤다' 가 아니다.
+
+    컬럼이 `Numeric(8, 2)` 라 `2.005` 는 `2.01` 로 저장된다. 요청값을 그대로 들고
+    비교하면 저장된 `2.01` 과 매번 어긋나 거짓 행이 쌓인다 — g 단위는 `to_grams` 가
+    양쪽을 반올림해 줘서 드러나지 않고, **환산 불가 단위에서만** 터진다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(db, meal_id=meal.id, display_name="삶은 계란")
+    db.commit()
+
+    payload = _payload(item.id, displayName="삶은 계란", amount=2.005, unit="개")
+    for _ in range(3):
+        response = client.patch(
+            f"/api/v1/meals/{meal.id}/items",
+            headers={"X-User-Id": str(user.id)},
+            json=payload,
+        )
+        assert response.status_code == 200, response.text
+        # 프로덕션은 요청마다 새 세션이라 다음 요청이 항목을 **DB 에서 다시 읽는다**.
+        # 테스트는 `conftest.py` 가 모든 요청에 같은 세션을 주입하고
+        # `expire_on_commit=False` 라, 비우지 않으면 방금 대입한 파이썬 값
+        # (`Decimal("2.005")`)이 그대로 남아 Numeric(8, 2) 반올림이 가려진다.
+        db.expire_all()
+
+    corrections = _corrections(db, item.id)
+    assert len(corrections) == 1
+
+    # 이력은 **DB 에 실제로 저장된 값**을 적는다. 요청 원본("2.005")을 적으면 인식
+    # 오차를 계산하는 쪽이 행에 없는 값을 기준으로 삼는다.
+    assert corrections[0].corrected_value["amount"] == "2.01"
+    db.refresh(item)
+    assert item.confirmed_amount == Decimal("2.01")
+
+
+def test_amount_that_rounds_away_to_zero_is_rejected(client, db):
+    """`Numeric(8, 2)` 로 반올림하면 0 이 되는 양은 받지 않는다.
+
+    `gt=0` 은 반올림 전 값만 본다 — `0.001` 은 통과해 놓고 `0.00` 으로 저장된다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(db, meal_id=meal.id)
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, amount=0.001, unit="개"),
+    )
+
+    assert response.status_code == 422, response.text
+    assert _corrections(db, item.id) == []
+
+
+def test_correcting_only_the_unit_is_recorded(client, db):
+    """"250ml → 250g" 은 고친 것이다 — 숫자가 같아도 단위가 다르다.
+
+    `to_grams` 가 ml 을 1:1 로 g 에 근사하므로 환산값만 비교하면 양쪽 `250.00` 이라
+    '안 고쳤다' 가 된다. 그런데 `confirmed_unit` 은 DB 에서 실제로 바뀐다 — 단위
+    오인식은 AI 인식 성능 평가의 신호인데 이력에 흔적이 없어진다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="미역국",
+        estimated_amount=Decimal("250.00"),
+        estimated_unit="ml",
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="미역국", amount=250, unit="g"),
+    )
+    assert response.status_code == 200, response.text
+
+    (correction,) = _corrections(db, item.id)
+    assert correction.original_value["unit"] == "ml"
+    assert correction.corrected_value["unit"] == "g"
+
+
+def test_same_unit_spelled_differently_is_not_a_correction(client, db):
+    """`g` 와 `G` 는 같은 단위다 — 표기 차이로 거짓 이력을 남기지 않는다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="참치김밥",
+        estimated_amount=Decimal("250.00"),
+        estimated_unit="G",
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="참치김밥", amount=250, unit="g"),
+    )
+    assert response.status_code == 200, response.text
+
+    assert _corrections(db, item.id) == []
+
+
+def test_padding_in_the_stored_unit_is_not_a_correction(client, db):
+    """저장된 단위의 앞뒤 공백은 고친 게 아니다.
+
+    요청 쪽 단위는 pydantic 이 strip 하지만 저장 쪽은 워커가 쓴 그대로다. 이름은
+    이미 `.strip()` 후 비교하는데(`test_trailing_whitespace_in_the_name_is_not_a_rename`)
+    단위만 빠져 있었다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="삶은 계란",
+        estimated_amount=Decimal("2.00"),
+        estimated_unit="개 ",
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="삶은 계란", amount=2, unit="개"),
     )
     assert response.status_code == 200, response.text
 
@@ -715,7 +852,6 @@ def test_resending_the_ai_estimate_in_an_unconvertible_unit_records_nothing(clie
         db,
         meal_id=meal.id,
         display_name="삶은 계란",
-        estimated_amount_g=None,
         estimated_amount=Decimal("2.00"),
         estimated_unit="개",
     )
@@ -739,7 +875,6 @@ def test_editing_an_unconvertible_ai_estimate_starts_from_what_the_ai_said(clien
         db,
         meal_id=meal.id,
         display_name="삶은 계란",
-        estimated_amount_g=None,
         estimated_amount=Decimal("2.00"),
         estimated_unit="개",
     )
@@ -756,7 +891,7 @@ def test_editing_an_unconvertible_ai_estimate_starts_from_what_the_ai_said(clien
     assert correction.original_value["amountG"] is None
     assert correction.original_value["amount"] == "2.00"
     assert correction.original_value["unit"] == "개"
-    assert correction.corrected_value["amount"] == "3"
+    assert correction.corrected_value["amount"] == "3.00"
     assert correction.corrected_value["unit"] == "개"
 
 
@@ -776,7 +911,6 @@ def test_resending_an_unconvertible_amount_records_nothing_the_second_time(clien
         display_name="삶은 계란",
         estimated_amount=Decimal("100.00"),
         estimated_unit="g",
-        estimated_amount_g=Decimal("100.00"),
     )
     db.commit()
 
@@ -806,7 +940,8 @@ def test_second_edit_of_an_unconvertible_amount_starts_from_what_the_user_said(c
         db,
         meal_id=meal.id,
         display_name="삶은 계란",
-        estimated_amount_g=Decimal("100.00"),
+        estimated_amount=Decimal("100.00"),
+        estimated_unit="g",
         confirmed_amount=Decimal("2.00"),
         confirmed_unit="개",
     )
@@ -824,7 +959,7 @@ def test_second_edit_of_an_unconvertible_amount_starts_from_what_the_user_said(c
     assert correction.original_value["amountG"] is None
     assert correction.original_value["amount"] == "2.00"
     assert correction.original_value["unit"] == "개"
-    assert correction.corrected_value["amount"] == "3"
+    assert correction.corrected_value["amount"] == "3.00"
     assert correction.corrected_value["unit"] == "개"
 
 
@@ -840,7 +975,8 @@ def test_correction_keeps_the_users_raw_unit_when_grams_are_unknown(client, db):
         db,
         meal_id=meal.id,
         display_name="삶은 계란",
-        estimated_amount_g=Decimal("100.00"),
+        estimated_amount=Decimal("100.00"),
+        estimated_unit="g",
         raw_ai_result={"foodName": "삶은 계란", "confidence": 0.96},
     )
     db.commit()
@@ -859,7 +995,7 @@ def test_correction_keeps_the_users_raw_unit_when_grams_are_unknown(client, db):
     assert item.raw_ai_result == {"foodName": "삶은 계란", "confidence": 0.96}
 
     (correction,) = _corrections(db, item.id)
-    assert correction.corrected_value["amount"] == "2"
+    assert correction.corrected_value["amount"] == "2.00"
     assert correction.corrected_value["unit"] == "개"
     assert correction.corrected_value["amountG"] is None
 
@@ -907,7 +1043,8 @@ def test_amount_edit_in_a_countable_unit_is_not_silently_dropped(client, db):
         db,
         meal_id=meal.id,
         display_name="삶은 계란",
-        estimated_amount_g=None,
+        estimated_amount=Decimal("2.00"),
+        estimated_unit="개",
         raw_ai_result={"foodName": "삶은 계란", "amount": 2, "unit": "개"},
     )
     db.commit()
@@ -925,7 +1062,14 @@ def test_amount_edit_in_a_countable_unit_is_not_silently_dropped(client, db):
     assert item.raw_ai_result == {"foodName": "삶은 계란", "amount": 2, "unit": "개"}
 
     (correction,) = _corrections(db, item.id)
-    assert correction.corrected_value["amount"] == "3"
+    # 직전 값은 AI 가 말한 "2개" 다. g 환산값이 양쪽 다 NULL 이라, 이 쌍이 없으면
+    # "2개 → 3개" 가 '안 고쳤다' 로 묻힌다.
+    assert correction.original_value["amountG"] is None
+    assert (correction.original_value["amount"], correction.original_value["unit"]) == (
+        "2.00",
+        "개",
+    )
+    assert correction.corrected_value["amount"] == "3.00"
     assert correction.corrected_value["unit"] == "개"
 
 
@@ -942,10 +1086,10 @@ def test_user_added_item_keeps_its_raw_input_in_sync(client, db):
         display_name="미역국",
         source=MealItemSource.USER,
         confidence=None,
-        estimated_amount_g=None,
+        estimated_amount=None,
+        estimated_unit=None,
         confirmed_amount=Decimal("200"),
         confirmed_unit="g",
-        confirmed_amount_g=Decimal("200.00"),
     )
     db.commit()
 
@@ -1049,7 +1193,7 @@ def test_editing_the_same_item_twice_chains_the_corrections(client, db):
     user = make_user(db)
     meal = make_meal(db, user_id=user.id)
     item = make_meal_item(
-        db, meal_id=meal.id, display_name="김밥", estimated_amount_g=Decimal("250.00")
+        db, meal_id=meal.id, display_name="김밥"
     )
     db.commit()
     headers = {"X-User-Id": str(user.id)}
@@ -1152,7 +1296,8 @@ def test_user_input_amount_and_unit_land_in_their_own_columns(client, db):
         db,
         meal_id=meal.id,
         display_name="삶은 계란",
-        estimated_amount_g=None,
+        estimated_amount=Decimal("2.00"),
+        estimated_unit="개",
         raw_ai_result={"foodName": "삶은 계란", "confidence": 0.96},
     )
     db.commit()

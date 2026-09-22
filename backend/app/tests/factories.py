@@ -23,6 +23,7 @@ from app.models.food import FoodRef
 from app.models.meal import Meal, MealItem
 from app.models.medication import MedicationSnapshot
 from app.models.user import User
+from app.services.meal import to_grams
 
 EATEN_AT = datetime(2026, 8, 22, 12, 30, tzinfo=UTC)
 
@@ -114,10 +115,8 @@ def make_meal_item(
     food_ref_id: str | None = None,
     estimated_amount: Decimal | None = Decimal("250.00"),
     estimated_unit: str | None = "g",
-    estimated_amount_g: Decimal | None = Decimal("250.00"),
     confirmed_amount: Decimal | None = None,
     confirmed_unit: str | None = None,
-    confirmed_amount_g: Decimal | None = None,
     confidence: Decimal | None = Decimal("0.620"),
     source: MealItemSource = MealItemSource.MODEL,
     raw_ai_result: dict | None = None,
@@ -128,12 +127,17 @@ def make_meal_item(
     `estimated_*` 에만 있고 `confirmed_*` 는 전부 NULL(사용자 확인 전). `PATCH` 가
     고치는 것이 주로 이 모양이라 기본값으로 뒀다.
 
-    환산되지 않는 AI 추정("계란 2개")을 만들려면 `estimated_amount_g=None` 과 함께
-    `estimated_amount` · `estimated_unit` 을 넘긴다 — 셋이 서로 맞아야 실제 워커가
-    쓰는 모양이 된다. 사용자가 직접 넣은 항목은
-    `source=MealItemSource.USER, confidence=None, estimated_amount=None,
-    estimated_unit=None, estimated_amount_g=None` 이다 — AI 가 추정한 적이 없다.
+    **`*_amount_g` 는 인자로 받지 않고 `to_grams` 로 유도한다.** 프로덕션이 그
+    함수로만 채우는 값이라, 따로 받으면 "단위는 `개` 인데 g 이 250" 같은 실재하지
+    않는 행을 만들 수 있다. 그런 행은 테스트를 초록색으로 두면서 단언의 근거만
+    조용히 없앤다.
+
+    - 환산되지 않는 AI 추정("계란 2개") → `estimated_amount=2, estimated_unit="개"`
+    - 사용자가 직접 넣은 항목 → `source=MealItemSource.USER, confidence=None,
+      estimated_amount=None, estimated_unit=None` (AI 가 추정한 적이 없다)
     """
+    estimated_amount_g = to_grams(estimated_amount, estimated_unit)
+    confirmed_amount_g = to_grams(confirmed_amount, confirmed_unit)
     item = MealItem(
         meal_id=meal_id,
         food_ref_id=food_ref_id,

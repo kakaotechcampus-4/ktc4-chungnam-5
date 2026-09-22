@@ -100,7 +100,7 @@ class MealItem(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     """최종 확정 음식명."""
 
-    # 양은 네 컬럼이다. 규칙 하나로 읽는다:
+    # 양은 여섯 컬럼이다 — 쌍 두 개 + 각 쌍의 g 환산값. 규칙 하나로 읽는다:
     #
     #     확인됐으면(`confirmed_amount is not None`) confirmed_*, 아니면 estimated_*
     #

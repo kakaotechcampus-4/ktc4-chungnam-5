@@ -62,9 +62,11 @@ class ResolvedItemUpdate:
     food_ref_id: str | None
 
 
-# 그대로 g 으로 볼 수 있는 단위.
+# 그대로 g 으로 볼 수 있는 단위. 표기만 다른 같은 단위를 한 묶음으로 둔다.
 # ml 은 물 기준 1ml ≈ 1g 로 근사한다. 국·음료가 대부분이라 오차를 감수할 만하다.
-_GRAM_EQUIVALENT_UNITS = {"g", "G", "그램", "ml", "mL", "ML", "밀리리터"}
+_GRAM_UNITS = {"g", "G", "그램"}
+_MILLILITRE_UNITS = {"ml", "mL", "ML", "밀리리터"}
+_GRAM_EQUIVALENT_UNITS = _GRAM_UNITS | _MILLILITRE_UNITS
 
 _CURSOR_SEPARATOR = "|"
 
@@ -381,8 +383,31 @@ def _amount_key(
     "2개" 가 매번 '고쳤다' 로 잡힌다.
     """
     if amount_g is not None:
-        return ("g", _compare_text(amount_g))
-    return ("raw", _compare_text(amount), unit)
+        return ("g", _compare_text(amount_g), _canonical_unit(unit))
+    return ("raw", _compare_text(amount), _canonical_unit(unit))
+
+
+def _canonical_unit(unit: str | None) -> str | None:
+    """비교용 단위. 같은 단위의 표기 차이와 앞뒤 공백을 지운다.
+
+    `g` · `G` · `그램` 은 같은 단위이고 `ml` · `mL` · `밀리리터` 도 그렇다 — 표기가
+    다르다고 '고쳤다' 로 잡으면 거짓 이력이 쌓인다.
+
+    **`ml → g` 은 반대로 고친 것이다.** `to_grams` 가 1ml ≈ 1g 로 근사하는 탓에 환산값이
+    양쪽 `250.00` 으로 같아지는데, 단위 오인식은 AI 인식 성능 평가의 신호라 이력에
+    남아야 한다. 그래서 g 분기에서도 단위를 키에 넣는다.
+
+    저장된 단위는 워커가 쓴 그대로라 공백이 붙어 올 수 있다(요청 쪽은 pydantic 이 이미
+    strip 한다) — 이름을 `.strip()` 후 비교하는 것과 같은 이유다.
+    """
+    if unit is None:
+        return None
+    stripped = unit.strip()
+    if stripped in _GRAM_UNITS:
+        return "g"
+    if stripped in _MILLILITRE_UNITS:
+        return "ml"
+    return stripped
 
 
 def _compare_text(value: Decimal | None) -> str | None:

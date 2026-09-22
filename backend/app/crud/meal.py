@@ -306,7 +306,8 @@ def add_correction(
 
     같은 항목을 두 번 고치면 두 행이 쌓인다 — 두 번째 행의 `original_value` 는 AI
     인식값이 아니라 첫 수정의 결과다. AI 최초 추정값은 항상
-    `meal_items.original_food_name` · `estimated_amount_g` 에 그대로 있으므로,
+    `meal_items.original_food_name` · `estimated_amount` · `estimated_unit` 에 그대로
+    있으므로,
     인식 성능을 볼 때는 그쪽을 기준으로 삼는다.
     """
     correction = UserCorrection(

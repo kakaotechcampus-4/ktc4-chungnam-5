@@ -568,7 +568,8 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 
 같은 항목을 두 번 고치면 두 행이 쌓이고, 두 번째 행의 `original_value` 는 AI 인식값이 아니라
 첫 수정의 결과다. **AI 최초 추정값이 기준일 때는 `meal_items.original_food_name` ·
-`estimated_amount_g` 를 본다** — 그쪽은 어떤 수정에도 덮이지 않는다.
+`estimated_amount` · `estimated_unit` 을 본다** — 그쪽은 어떤 수정에도 덮이지 않는다.
+`estimated_amount_g` 는 환산 불가한 추정("2개")에서 NULL 이라 기준으로 쓸 수 없다.
 
 ---
 
