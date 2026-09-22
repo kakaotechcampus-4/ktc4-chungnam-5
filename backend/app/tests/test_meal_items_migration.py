@@ -1,4 +1,4 @@
-"""`36301603847a` 의 백필 SQL 검증.
+"""`d2a7c5f41e08` 의 백필 SQL 검증.
 
 이 컬럼들이 생기기 전의 `POST /meals/{mealId}/items` 는 사용자 입력을
 `confirmed_amount_g`(환산값)와 `raw_ai_result`(원본 숫자·단위)에 나눠 썼다. 그 행을
@@ -26,7 +26,7 @@ def _backfill_sql() -> str:
     복사해 두면 마이그레이션만 고쳤을 때 테스트가 옛 SQL 을 통과시킨다.
     """
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    return script.get_revision("36301603847a").module.BACKFILL_USER_AMOUNTS
+    return script.get_revision("d2a7c5f41e08").module.BACKFILL_USER_AMOUNTS
 
 
 def _legacy_user_item(db, meal_id) -> MealItem:
