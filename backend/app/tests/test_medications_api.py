@@ -170,15 +170,17 @@ def test_decided_at_is_kst(client: TestClient, user_id: uuid.UUID) -> None:
     assert data["decidedAt"].endswith("+09:00"), data["decidedAt"]
 
 
-def _history(db: Session, user_id: uuid.UUID, *periods: tuple[str, str]) -> None:
-    """지난 구간들을 직접 깔아 둔다.
+def _history(db: Session, user_id: uuid.UUID, *periods: tuple[str, ...]) -> None:
+    """지난 구간들을 직접 깔아 둔다. `(용량, 시작일)` 또는 `(용량, 시작일, 약물)`.
 
-    `POST /medications` 로는 못 만든다 — 용량 변경은 언제나 **오늘부터**다
-    (`change_date = max(today, current.effective_from)`). 과거 날짜로 용량을 바꾼 척할
-    방법이 없고, 같은 날 여러 번 보내면 in_place 로 한 줄에 합쳐진다.
+    `POST /medications` 로는 못 만든다 — 용량 변경은 언제나 **오늘부터**라
+    (`change_date = today`) 과거 날짜로 바꾼 척할 방법이 없고, 같은 날 두 번째 등록은
+    정정으로 보아 409 다.
     """
     previous = None
-    for index, (dose, started) in enumerate(periods):
+    for index, period in enumerate(periods):
+        dose, started = period[0], period[1]
+        drug_name = period[2] if len(period) > 2 else "위고비"
         effective_from = date.fromisoformat(started)
         if previous is not None:
             medication_crud.close_current(
@@ -187,7 +189,7 @@ def _history(db: Session, user_id: uuid.UUID, *periods: tuple[str, str]) -> None
         previous = medication_crud.create(
             db,
             user_id=user_id,
-            drug_name="위고비",
+            drug_name=drug_name,
             dose_mg=Decimal(dose),
             injection_count=index + 1,
             stage=MedicationStage.TITRATION,
@@ -543,6 +545,51 @@ def test_dose_events_are_oldest_first_with_directions(
     assert [e["direction"] for e in events] == [
         "MAINTAIN", "INCREASE", "INCREASE", "DECREASE",
     ]
+
+
+def test_drug_change_has_no_comparison_basis(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """약을 바꾸면 앞 행과 비교하지 않는다 — 사다리가 다르다.
+
+    위고비 2.4 → 마운자로 2.5 는 mg 만 보면 증량이지만 증량이 아니다. 사다리가
+    통째로 달라 나란히 둘 수 없다. 비교 기준이 없으므로 `MAINTAIN` 이다.
+
+    `previous_different_dose()` 가 단계 판정에서 같은 판단을 하고 `POST` 의
+    `doseEvent` 도 그 경로를 탄다 — 여기만 다르면 같은 사실에 두 답이 나온다.
+    """
+    _history(
+        db,
+        user_id,
+        ("1.7", "2026-06-14"),
+        ("2.4", "2026-07-12"),
+        ("2.5", "2026-08-09", "마운자로"),
+    )
+
+    directions = [e["direction"] for e in _events(client, user_id)]
+
+    assert directions == ["MAINTAIN", "INCREASE", "MAINTAIN"]
+
+
+def test_drug_change_downward_is_not_a_decrease(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """반대 방향도 같다 — 마운자로 15 → 위고비 2.4 는 감량이 아니다.
+
+    감량으로 잡히면 `REDUCED` 와 같은 사실을 말하는 것처럼 보이는데, 단계 판정은
+    약물이 바뀌면 이력을 끊어 그렇게 보지 않는다.
+    """
+    _history(
+        db,
+        user_id,
+        ("10.0", "2026-06-14", "마운자로"),
+        ("15.0", "2026-07-12", "마운자로"),
+        ("2.4", "2026-08-09"),
+    )
+
+    directions = [e["direction"] for e in _events(client, user_id)]
+
+    assert directions == ["MAINTAIN", "INCREASE", "MAINTAIN"]
 
 
 def test_same_dose_adds_no_event(client: TestClient, user_id: uuid.UUID) -> None:

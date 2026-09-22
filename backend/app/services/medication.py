@@ -590,6 +590,14 @@ def list_dose_events(db: Session, user_id: uuid.UUID) -> DoseEventsResponse:
     사실이 행과 이벤트 두 곳에 남아 어긋날 수 있는데, 계산은 앞 행 하나만 보면 된다.
     첫 행은 비교 대상이 없어 `MAINTAIN` 이다 (명세 예시의 `de_001`).
 
+    **약물이 바뀌면 앞 행과 비교하지 않는다.** 사다리가 통째로 달라 mg 를 나란히 둘 수
+    없다 — 위고비 2.4 다음 마운자로 2.5 는 증량이 아니고, 마운자로 15 다음 위고비 2.4 도
+    감량이 아니다. 비교 기준이 없는 것이므로 `MAINTAIN` 이다(그 값의 뜻이 "유지"가 아니라
+    **"비교할 이전 용량이 없다"** 이다 — `DoseDirection.MAINTAIN` 독스트링).
+
+    `previous_different_dose()` 가 단계 판정에서 같은 판단을 한다. `POST /medications` 의
+    `doseEvent` 도 그 경로를 타므로, 여기만 다르게 세면 같은 사실에 두 답이 나온다.
+
     **정정은 여기 안 나온다.** `register()` 가 등록만 하므로 한 번도 맞은 적 없는
     용량은 애초에 행이 되지 않는다. 정정은 `PATCH` 가 맡는다.
 
@@ -600,19 +608,21 @@ def list_dose_events(db: Session, user_id: uuid.UUID) -> DoseEventsResponse:
         raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
 
     events: list[DoseEvent] = []
-    previous_dose_mg: Decimal | None = None
+    previous: tuple[str, Decimal] | None = None
     for record in crud.list_history(db, user_id):
+        same_drug = previous is not None and previous[0] == record.drug_name
         events.append(
             DoseEvent(
                 dose_event_id=record.id,
                 dose_mg=record.dose_mg,
                 direction=dose_direction(
-                    record.dose_mg, previous_dose_mg=previous_dose_mg
+                    record.dose_mg,
+                    previous_dose_mg=previous[1] if same_drug else None,
                 ),
                 effective_from=record.effective_from,
             )
         )
-        previous_dose_mg = record.dose_mg
+        previous = (record.drug_name, record.dose_mg)
     return DoseEventsResponse(events=events)
 
 
