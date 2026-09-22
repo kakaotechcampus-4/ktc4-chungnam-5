@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -48,6 +49,11 @@ class Meal(Base):
         nullable=False,
         server_default=MealStatus.ANALYZING.value,
     )
+    is_recalculation: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    """사용자가 음식을 고쳐서 다시 분석 중인지. FE 는 최초 분석과 재분석의 문구를 다르게 띄운다."""
+
     created_at: Mapped[datetime] = created_at()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     """NULL 이면 살아있는 식사. soft delete — 값이 채워지면 삭제된 것으로 취급한다."""
@@ -105,6 +111,13 @@ class MealItem(Base):
         server_default=MealItemSource.MODEL.value,
     )
     raw_ai_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    """AI 응답 원본.
+
+    **`source=USER` 행에서는 사용자가 입력한 원본(`{"amount", "unit"}`)이 들어간다.**
+    컬럼명과 달리 AI 결과만 있는 게 아니다 — g 으로 환산되지 않는 단위("2개")는
+    여기 말고는 보존되는 곳이 없기 때문이다(`services.meal.to_grams` 참고).
+    `GET /meals/{mealId}` 가 amount·unit 을 렌더하려면 이 키 모양에 의존하게 된다.
+    """
 
     meal: Mapped["Meal"] = relationship(back_populates="items")
     corrections: Mapped[list["UserCorrection"]] = relationship(

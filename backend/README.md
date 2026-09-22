@@ -456,6 +456,7 @@ GI 증상이나 피드백 생성 과정에서 의료 판단이 필요한 상황�
 | raw_text | TEXT, NULL | 사용자 입력 원문 |
 | eaten_at | TIMESTAMP | 실제 식사 시각 |
 | status | ENUM, DEFAULT ANALYZING | 식사 처리 상태 |
+| is_recalculation | BOOLEAN, NOT NULL, DEFAULT false | 사용자가 음식을 고쳐 다시 분석 중인지 |
 | created_at | TIMESTAMP | 등록 시각 |
 
 ### Status

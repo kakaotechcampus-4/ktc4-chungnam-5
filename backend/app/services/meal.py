@@ -15,15 +15,20 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.crud import meal as meal_crud
+from app.models.enums import MealStatus
+from app.models.meal import Meal
 from app.schemas.meal import (
     CalendarDay,
     CalendarSummary,
     MealCalendarResponse,
     MealDeleteResponse,
+    MealItemCreateRequest,
+    MealItemCreateResponse,
     MealListItem,
     MealListResponse,
     MealScores,
 )
+from app.schemas.nutrition import NutritionInfo
 
 _KST_ZONE = ZoneInfo("Asia/Seoul")
 
@@ -31,15 +36,49 @@ _KST_ZONE = ZoneInfo("Asia/Seoul")
 class MealNotFoundError(Exception):
     """존재하지 않거나, 남의 것이거나, 이미 삭제된 식사를 가리킬 때."""
 
+
+class MealNotEditableError(Exception):
+    """지금 상태로는 음식을 고칠 수 없는 식사를 가리킬 때."""
+
+
 # 그대로 g 으로 볼 수 있는 단위.
 # ml 은 물 기준 1ml ≈ 1g 로 근사한다. 국·음료가 대부분이라 오차를 감수할 만하다.
 _GRAM_EQUIVALENT_UNITS = {"g", "G", "그램", "ml", "mL", "ML", "밀리리터"}
 
 _CURSOR_SEPARATOR = "|"
 
+# 사용자가 음식을 고칠 수 있는 상태.
+# FAILED 는 인식된 음식이 하나도 없는 상태라 "고친다" 는 말이 성립하지 않는다.
+_EDITABLE_STATUSES = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATED})
+
+
+def _is_editable(meal: Meal) -> bool:
+    """지금 이 식사의 음식을 고칠 수 있는가.
+
+    **`ANALYZING` 은 뜻이 두 개다.** `is_recalculation` 이 가른다:
+
+    - `False` — 최초 분석 중. Worker 가 `source=MODEL` 항목을 지우고 다시 넣는
+      중이라(`jobs/analyze_meal.py` 6단계) 끼어들면 무엇이 남을지 알 수 없다.
+      애초에 사용자에게는 "분석 중" 화면이라 고칠 수단도 없다 → **금지**
+    - `True` — 사용자가 확인 화면에서 음식을 고쳐 재분석을 기다리는 중.
+      사용자는 여전히 그 확인 화면에 있고 음식을 더 고치는 게 정상 흐름이다
+      → **허용**
+
+    둘을 구분하지 않고 `ANALYZING` 을 통째로 막으면 **음식을 하나밖에 못 넣는다** —
+    첫 추가가 상태를 `ANALYZING` 으로 바꾸고, 그 상태가 두 번째 추가를 409 로
+    막는다. 스스로 문을 잠그는 셈이다.
+    """
+    if meal.status in _EDITABLE_STATUSES:
+        return True
+    return meal.status is MealStatus.ANALYZING and meal.is_recalculation
+
 
 def to_grams(amount: float | Decimal | None, unit: str | None) -> Decimal | None:
-    """AI 가 준 `amount` + `unit` 을 g 으로 옮긴다. 옮길 수 없으면 None.
+    """`amount` + `unit` 을 g 으로 옮긴다. 옮길 수 없으면 None.
+
+    AI 가 추정한 값(`jobs/analyze_meal.py` 7단계)과 사용자가 직접 입력한 값
+    (`POST /meals/{mealId}/items`)이 **같은 규칙을 탄다** — 어느 쪽에서 왔든
+    "2개" 는 g 이 아니다.
 
     **환산표가 없다.** `food_refs.serving_size` 는 "영양성분함량기준량"(성분값이
     어느 양 기준인지, 보통 100g)이지 "1개 = 50g" 이 아니다. 즉 "계란 2개" 를 g 으로
@@ -223,3 +262,67 @@ def get_calendar(db: Session, *, user_id: uuid.UUID, month: str) -> MealCalendar
     )
 
     return MealCalendarResponse(month=month, days=days, summary=summary)
+
+
+def add_item(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_id: uuid.UUID,
+    request: MealItemCreateRequest,
+    amount_g: Decimal | None,
+    food_ref_id: str | None,
+    nutrition: NutritionInfo | None,
+) -> MealItemCreateResponse:
+    """사용자가 직접 입력한 음식을 식사에 더하고 재계산 대기로 표시한다.
+
+    `amount_g` · `food_ref_id` · `nutrition` 은 이미 결정된 값으로 들어온다.
+    공공 DB 매칭은 `services/nutrition.py` 의 일이고 그 결과를 여기로 옮기는 건
+    호출부(api 레이어)다 — services 끼리는 서로 참조하지 않는다(README 절대 규칙 5).
+
+    ## 여기서 비동기 작업을 만들지 않는다
+
+    사용자가 음식명과 양을 직접 알려줬으므로 AI 에게 물을 것이 없다. 다시 계산할
+    Q/Q/S 는 순수 함수라 0.01 초면 끝나고(README 절대 규칙 2), 애초에 확인 화면은
+    **[확인] 을 누르기 전까지 점수를 보여 주지 않는다** — 편집 중에는 계산할
+    필요조차 없다.
+
+    `ANALYZING` 은 "워커가 도는 중" 이 아니라 **"점수가 아직 유효하지 않다"** 는
+    표시다. 해소는 사용자가 [확인] 을 누를 때 `POST /meals/{mealId}/confirm` 이
+    한다 — `add_meal_item` 독스트링의 의존성 항목 참고.
+    """
+    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+
+    if not _is_editable(meal):
+        raise MealNotEditableError(
+            f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
+        )
+
+    item = meal_crud.add_item(
+        db,
+        meal_id=meal.id,
+        display_name=request.display_name,
+        amount_g=amount_g,
+        food_ref_id=food_ref_id,
+        # 환산이 안 된 단위("2개")는 여기에만 남는다 — 사용자가 실제로 무엇을
+        # 입력했는지가 유일하게 보존되는 자리다 (`to_grams` 독스트링 참고).
+        raw_input={"amount": str(request.amount), "unit": request.unit},
+    )
+    meal_crud.mark_recalculating(db, meal)
+
+    # 트랜잭션 경계는 services 가 정한다(README 절대 규칙 5).
+    db.commit()
+
+    return MealItemCreateResponse(
+        item_id=item.id,
+        # API 명세서(필드표)가 `matched` 를 "영양정보 유무" 로 정의한다 — "공공 DB
+        # 에서 음식을 찾았는가" 가 아니다. 음식은 찾았지만 g 환산이 안 돼 성분을
+        # 못 만든 경우도 false 여야 FE 가 직접 입력으로 유도한다. DB 의
+        # food_ref_id 링크는 그대로 남는다(둘은 별개다).
+        matched=nutrition is not None,
+        nutrition=nutrition,
+        status=meal.status,
+        is_recalculation=meal.is_recalculation,
+    )

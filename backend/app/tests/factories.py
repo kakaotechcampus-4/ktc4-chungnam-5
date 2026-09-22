@@ -12,7 +12,8 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.crud import user as user_crud
-from app.models.enums import MealType, MedicationStage
+from app.models.enums import FoodCategory, MealStatus, MealType, MedicationStage
+from app.models.food import FoodRef
 from app.models.meal import Meal
 from app.models.medication import MedicationSnapshot
 from app.models.user import User
@@ -29,8 +30,21 @@ def make_user(db: Session, nickname: str = "종호") -> User:
     )
 
 
-def make_meal(db: Session, *, user_id: uuid.UUID, eaten_at: datetime = EATEN_AT) -> Meal:
-    """식사 하나와 거기 딸린 투약 스냅샷을 만든다. flush 까지만 하고 커밋하지 않는다."""
+def make_meal(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    eaten_at: datetime = EATEN_AT,
+    status: MealStatus | None = MealStatus.REVIEW_REQUIRED,
+) -> Meal:
+    """식사 하나와 거기 딸린 투약 스냅샷을 만든다. flush 까지만 하고 커밋하지 않는다.
+
+    기본값이 `REVIEW_REQUIRED` 인 건 확인 화면(사용자가 실제로 식사를 만지는 상태)이
+    대부분의 테스트가 필요로 하는 출발점이기 때문이다.
+
+    `status=None` 이면 INSERT 에서 컬럼을 빼 DB 의 server_default 를 태운다 —
+    기본값 자체를 검증하는 테스트가 쓴다.
+    """
     snapshot = MedicationSnapshot(user_id=user_id, stage=MedicationStage.MAINTENANCE)
     db.add(snapshot)
     db.flush()
@@ -41,7 +55,46 @@ def make_meal(db: Session, *, user_id: uuid.UUID, eaten_at: datetime = EATEN_AT)
         meal_type=MealType.LUNCH,
         raw_text="김치찌개",
         eaten_at=eaten_at,
+        **({} if status is None else {"status": status}),
     )
     db.add(meal)
     db.flush()
     return meal
+
+
+def make_food_ref(
+    db: Session,
+    *,
+    food_ref_id: str = "KFD_TEST_01",
+    name: str = "미역국",
+    category: FoodCategory | None = FoodCategory.GENERAL,
+    serving_size: Decimal | None = Decimal("100.000"),
+    calories: Decimal | None = Decimal("50.000"),
+    protein_g: Decimal | None = Decimal("3.000"),
+    fat_g: Decimal | None = Decimal("1.500"),
+    carbohydrate_g: Decimal | None = Decimal("4.000"),
+    fiber_g: Decimal | None = Decimal("0.500"),
+    sodium_mg: Decimal | None = Decimal("600.000"),
+) -> FoodRef:
+    """공공 영양 DB 음식 1건. flush 까지만 하고 커밋하지 않는다.
+
+    `category` 기본값이 `GENERAL` 인 건 이름 매칭이 GENERAL 을 먼저 보기 때문이다
+    (`crud.food.find_unique_by_name`). 기본값을 NULL 로 두면 대부분의 테스트가
+    폴백 경로만 타게 되어 정작 주 경로를 검증하지 못한다.
+    """
+    food_ref = FoodRef(
+        id=food_ref_id,
+        name=name,
+        category=category,
+        serving_size=serving_size,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbohydrate_g=carbohydrate_g,
+        fiber_g=fiber_g,
+        sodium_mg=sodium_mg,
+        dataset_version="test",
+    )
+    db.add(food_ref)
+    db.flush()
+    return food_ref
