@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
-from app.core.response import ApiResponse, ok
+from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
 from app.schemas.medication import (
     MedicationUpsertRequest,
@@ -27,6 +27,12 @@ router = APIRouter()
     "/medications",
     response_model=ApiResponse[MedicationUpsertResponse],
     summary="투약 정보 등록·수정",
+    # 422 를 빠뜨리면 FastAPI 가 자동 생성한 응답이
+    # `#/components/schemas/HTTPValidationError` 를 가리키는데, `main.py` 의
+    # custom_openapi 가 그 컴포넌트를 지운다 — 모든 라우트가 422 를 ErrorResponse 로
+    # 명시한다는 전제여서다. 명시하지 않으면 openapi.json 에 깨진 $ref 가 남아
+    # Swagger UI 와 코드 생성기가 죽는다.
+    responses=error_responses(401, 404, 409, 422),
 )
 def upsert_medication(
     payload: MedicationUpsertRequest,
