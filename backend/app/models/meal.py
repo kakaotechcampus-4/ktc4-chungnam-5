@@ -110,9 +110,14 @@ class MealItem(Base):
     confirmed_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
     """그 숫자의 단위("g" · "개" · "ml"). `confirmed_amount_g` 는 이걸 환산한 결과다.
 
-    `GET /meals/{mealId}` 의 `amount` · `unit` 이 그대로 여기서 나온다. 사용자 입력을
-    `raw_ai_result` 에 섞어 두면 읽는 쪽이 출처(MODEL/USER)와 수정 이력에 따라 다른
-    자리를 뒤져야 해서 컬럼으로 뺐다 — `raw_ai_result` 는 AI 원본 전용이다."""
+    **확인 여부의 센티넬은 `confirmed_amount` 다** — `confirmed_amount_g` 는 환산된
+    값만 담아 "2개" 로 확인한 항목도 NULL 이라, 확인 전과 구분되지 않는다.
+
+    사용자 입력을 `raw_ai_result` 에 섞어 두면 읽는 쪽이 출처(MODEL/USER)와 수정
+    이력에 따라 다른 자리를 뒤져야 해서 컬럼으로 뺐다. `GET /meals/{mealId}` 의
+    `amount` · `unit` 은 **확인된 항목이면** 여기서 나온다. 확인 전 `source=MODEL`
+    항목은 아직 `estimated_amount_g`(g 환산) 또는 `raw_ai_result`(환산 불가)를
+    봐야 한다 — 그 갈래는 워커 구현 시 정리 대상이다(`raw_ai_result` 참고)."""
     confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
 
     source: Mapped[MealItemSource] = mapped_column(
@@ -121,12 +126,17 @@ class MealItem(Base):
         server_default=MealItemSource.MODEL.value,
     )
     raw_ai_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    """AI 응답 원본.
+    """AI 응답 원본 **전용**. 사용자 입력은 절대 섞지 않는다.
 
-    **`source=USER` 행에서는 사용자가 입력한 원본(`{"amount", "unit"}`)이 들어간다.**
-    컬럼명과 달리 AI 결과만 있는 게 아니다 — g 으로 환산되지 않는 단위("2개")는
-    여기 말고는 보존되는 곳이 없기 때문이다(`services.meal.to_grams` 참고).
-    `GET /meals/{mealId}` 가 amount·unit 을 렌더하려면 이 키 모양에 의존하게 된다.
+    `source=USER` 행은 AI 가 인식한 적이 없으므로 NULL 이다. 사용자가 입력한 양은
+    출처와 무관하게 `confirmed_amount` · `confirmed_unit` 에 들어간다 — 읽는 쪽이
+    출처와 수정 이력에 따라 다른 자리를 뒤지지 않게 하려는 것이다.
+
+    아직 확인되지 않은 `source=MODEL` 항목의 AI 추정 양은 예외다: g 으로 환산되면
+    `estimated_amount_g` 에, 환산이 안 되면("2개") 여기 말고 갈 곳이 없어 워커가
+    이 JSONB 에 남긴다(`worker/jobs/analyze_meal.py` 7단계). 그 규약은 워커를
+    구현할 때 확정한다 — `estimated_amount` · `estimated_unit` 컬럼으로 빼면
+    읽기가 한 갈래로 줄지만, 워커가 붙은 뒤에 바꾸면 백필이 필요하다.
     """
 
     meal: Mapped["Meal"] = relationship(back_populates="items")

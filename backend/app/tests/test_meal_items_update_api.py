@@ -96,6 +96,54 @@ def test_changing_only_the_amount_keeps_the_public_db_link(client, db):
     assert item.confirmed_amount_g == Decimal("220.00")
 
 
+def test_amount_only_edit_fills_a_link_the_item_never_had(client, db):
+    """지킬 링크가 없으면 방금 찾아 온 매칭 결과를 버릴 이유가 없다.
+
+    `food_ref_id IS NULL` 은 AI 가 `candidateFoodRefId` 를 주지 못했다는 뜻이다.
+    이름 매칭은 워커가 쓰지 않는 별개의 신호라 여기서 처음 좁혀질 수 있고, 그걸
+    버리면 이제 g 으로 환산되는 수정인데도 영양정보를 영영 못 얻는다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    make_food_ref(db, food_ref_id="KFD_MIYEOK", name="미역국")
+    item = make_meal_item(
+        db, meal_id=meal.id, display_name="미역국", food_ref_id=None
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="미역국", amount=200, unit="g"),
+    )
+
+    assert response.status_code == 200, response.text
+    db.refresh(item)
+    assert item.food_ref_id == "KFD_MIYEOK"
+
+
+def test_amount_only_edit_leaves_an_unmatchable_item_unlinked(client, db):
+    """이름으로도 못 좁히면 NULL 그대로다 — 아무거나 붙이지 않는다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    make_food_ref(db, food_ref_id="KFD_JJIGAE_1", name="김치찌개")
+    make_food_ref(db, food_ref_id="KFD_JJIGAE_2", name="김치찌개")
+    item = make_meal_item(
+        db, meal_id=meal.id, display_name="김치찌개", food_ref_id=None
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="김치찌개", amount=220, unit="g"),
+    )
+
+    assert response.status_code == 200, response.text
+    db.refresh(item)
+    assert item.food_ref_id is None
+
+
 def test_changing_the_name_rematches_the_public_db(client, db):
     """이름이 바뀌면 다른 음식이다 — 링크도 새 이름 기준으로 다시 잡는다."""
     user = make_user(db)
@@ -651,6 +699,72 @@ def test_resending_the_same_values_records_nothing(client, db):
     assert response.status_code == 200, response.text
 
     assert _corrections(db, item.id) == []
+
+
+def test_resending_an_unconvertible_amount_records_nothing_the_second_time(client, db):
+    """"2개" 를 두 번 보내도 두 번째는 '고쳤다' 가 아니다.
+
+    `confirmed_amount_g` 는 환산된 값만 담아 "2개" 로 확인한 뒤에도 NULL 이다. 그
+    NULL 을 "확인 전" 으로 읽고 `estimated_amount_g`(100g)로 폴백하면, 직전 값이
+    `100g` 으로 되돌아가 매번 `100g → 2개` 라는 거짓 행이 쌓인다. 확인 화면이 고치지
+    않은 항목까지 보내는 게 정상 경로라(엔드포인트 독스트링) 이건 예외가 아니다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="삶은 계란",
+        estimated_amount_g=Decimal("100.00"),
+    )
+    db.commit()
+
+    payload = _payload(item.id, displayName="삶은 계란", amount=2, unit="개")
+    for _ in range(3):
+        response = client.patch(
+            f"/api/v1/meals/{meal.id}/items",
+            headers={"X-User-Id": str(user.id)},
+            json=payload,
+        )
+        assert response.status_code == 200, response.text
+
+    corrections = _corrections(db, item.id)
+    assert len(corrections) == 1
+
+    # 유일한 행은 진짜 첫 수정이다 — AI 추정값에서 사용자 입력으로.
+    assert corrections[0].original_value["amountG"] == "100.00"
+    assert corrections[0].original_value["amount"] is None
+    assert corrections[0].original_value["unit"] is None
+
+
+def test_second_edit_of_an_unconvertible_amount_starts_from_what_the_user_said(client, db):
+    """"2개 → 3개" 의 직전 값은 AI 추정값이 아니라 사용자가 말한 "2개" 다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="삶은 계란",
+        estimated_amount_g=Decimal("100.00"),
+        confirmed_amount=Decimal("2.00"),
+        confirmed_unit="개",
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="삶은 계란", amount=3, unit="개"),
+    )
+    assert response.status_code == 200, response.text
+
+    (correction,) = _corrections(db, item.id)
+    # `amountG` 가 "100.00" 이면 일어나지 않은 `100g → null` 변화를 기록한 것이다.
+    assert correction.original_value["amountG"] is None
+    assert correction.original_value["amount"] == "2.00"
+    assert correction.original_value["unit"] == "개"
+    assert correction.corrected_value["amount"] == "3"
+    assert correction.corrected_value["unit"] == "개"
 
 
 def test_correction_keeps_the_users_raw_unit_when_grams_are_unknown(client, db):

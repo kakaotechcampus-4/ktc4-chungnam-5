@@ -349,13 +349,21 @@ def add_item(
     )
 
 
-def _stored_amount_g(item: MealItem) -> Decimal | None:
-    """고치기 전의 양. 사용자 확인값이 있으면 그걸, 없으면 AI 추정값이다."""
-    return (
-        item.confirmed_amount_g
-        if item.confirmed_amount_g is not None
-        else item.estimated_amount_g
-    )
+def _stored_amount(item: MealItem) -> tuple[Decimal | None, Decimal | None, str | None]:
+    """고치기 전의 양 — `(g 환산값, 숫자, 단위)`.
+
+    **확인 여부의 센티넬은 `confirmed_amount` 다.** `confirmed_amount_g` 가 아니다 —
+    그쪽은 g 으로 환산된 값만 담아서 "2개" 로 확인한 항목도 NULL 이라, 그 NULL 은
+    "확인 전" 과 "환산 불가" 를 구분하지 못한다. `estimated_amount_g` 로 폴백하면 이미
+    확인된 "2개" 가 AI 추정값(100g)으로 되돌아가, 같은 "2개" 를 다시 보내도 `100g →
+    2개` 로 보여 `user_corrections` 에 거짓 행이 매번 쌓인다. 확인 화면이 고치지 않은
+    항목까지 보내는 게 정상 경로라(엔드포인트 독스트링) 이건 예외가 아니다.
+
+    확인값이 하나라도 있으면 `confirmed_*` 가 그 항목 양의 전부다.
+    """
+    if item.confirmed_amount is not None:
+        return (item.confirmed_amount_g, item.confirmed_amount, item.confirmed_unit)
+    return (item.estimated_amount_g, None, None)
 
 
 def _amount_key(
@@ -435,14 +443,14 @@ def update_items(
 
         # 반영 전 값은 여기서 전부 잡아 둔다 — `update_item` 뒤에 읽으면 방금 쓴
         # 값이라 "안 고쳤다" 가 된다.
-        stored = (_stored_amount_g(item), item.confirmed_amount, item.confirmed_unit)
-        stored_amount_g = stored[0]
+        stored = _stored_amount(item)
+        stored_amount_g, stored_amount, stored_unit = stored
         before: dict[str, str | None] = {
             "displayName": item.display_name,
             "amountG": _as_text(stored_amount_g),
             "confidence": _as_text(item.confidence),
-            "amount": _as_text(item.confirmed_amount),
-            "unit": item.confirmed_unit,
+            "amount": _as_text(stored_amount),
+            "unit": stored_unit,
         }
         # 고친 값은 요청에서 만든다. 항목을 다시 읽으면 안 된다 — 환산이 안 된
         # 단위("2개")는 `confirmed_amount_g` 가 NULL 이라 고치기 전 값(AI 추정값)으로
@@ -464,7 +472,15 @@ def update_items(
             # 이름이 그대로면 기존 링크를 지킨다. 다시 찾으면 AI 가 정확히 연결해 둔
             # 항목이 끊길 수 있다 — 이름 매칭은 흔한 음식에 None 을 주기 때문이다
             # (`endpoints/meal_items.py` 의 update_meal_items 독스트링 참고).
-            food_ref_id=update.food_ref_id if renamed else item.food_ref_id,
+            # 지킬 링크가 없을 때(`food_ref_id IS NULL`)는 얘기가 다르다. AI 가
+            # `candidateFoodRefId` 를 못 줬다는 뜻이고 이름 매칭은 워커가 쓰지 않는
+            # 별개의 신호라, 방금 찾아 온 결과를 버리면 "미역국 2개 → 200g" 처럼
+            # 이제 환산이 되는 수정도 영양정보를 영영 못 얻는다. 끊을 링크가 없으니
+            # 보수적으로 굴 이유도 없다 — POST 가 이름 매칭만으로 링크를 거는 것과
+            # 같은 신호다.
+            food_ref_id=(
+                update.food_ref_id if renamed or item.food_ref_id is None else item.food_ref_id
+            ),
             # 이름을 바꿨으면 그 신뢰도는 더는 이 항목의 것이 아니다. 남겨 두면
             # 사용자가 직접 써 넣은 이름이 FE 에서 "AI 가 자신 없어함"(`< 0.8`)으로
             # 강조된다. 값은 바로 위 `before` 에 담겨 user_corrections 로 간다.
