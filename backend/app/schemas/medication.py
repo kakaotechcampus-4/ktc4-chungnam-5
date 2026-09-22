@@ -19,7 +19,7 @@ from app.models.enums import DrugName, MedicationStage
 from app.schemas.base import CamelModel, KstDatetime
 
 
-class MedicationUpsertRequest(CamelModel):
+class MedicationRegisterRequest(CamelModel):
     """투약 정보 등록. 정정은 `PATCH /medications/{id}` 다.
 
     `startedAt` 은 **이번에 맞은 날이 아니라 전체 투약 시작일**이다. 명세의 서버 계산
@@ -79,7 +79,7 @@ class DoseEvent(CamelModel):
     effective_from: date = Field(description="이 용량으로 바꾼 날")
 
 
-class MedicationUpsertResponse(CamelModel):
+class MedicationRegisterResponse(CamelModel):
     """`POST /medications` 응답.
 
     **`GET /medications/current` 와 필드가 다르다.** 겹치는 건 현재 상태 5개뿐이고,

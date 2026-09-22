@@ -38,8 +38,8 @@ from app.schemas.medication import (
     CurrentMedicationResponse,
     DoseDirection,
     DoseEvent,
-    MedicationUpsertRequest,
-    MedicationUpsertResponse,
+    MedicationRegisterRequest,
+    MedicationRegisterResponse,
 )
 
 # ── 1. 용량 사다리 ──────────────────────────────────────────────
@@ -327,8 +327,8 @@ class FutureStartDateError(InvalidStartDateError):
         self.today = today
 
 
-class UpsertResult(NamedTuple):
-    """`upsert()` 가 남기는 것. 행 하나로는 부족하다.
+class RegisterResult(NamedTuple):
+    """`register()` 가 남기는 것. 행 하나로는 부족하다.
 
     명세의 `POST /medications` 응답은 현재 상태뿐 아니라 **이번 요청으로 무엇이
     바뀌었는지**(`doseChanged` · `stageChanged` · `doseEvent`)를 함께 내린다.
@@ -385,13 +385,13 @@ def restage(
     return judge_stage(drug_name, record.dose_mg, **context._asdict())
 
 
-def upsert(
+def register(
     db: Session,
     user_id: uuid.UUID,
-    payload: MedicationUpsertRequest,
+    payload: MedicationRegisterRequest,
     *,
     today: date | None = None,
-) -> UpsertResult:
+) -> RegisterResult:
     """투약 **등록**. 커밋까지 한다.
 
     **이 함수는 INSERT 만 한다.** 잘못 넣은 값을 고치는 건 `PATCH /medications/{id}` 다.
@@ -447,7 +447,7 @@ def upsert(
         )
         db.commit()
         # 첫 등록은 PRE_DOSE 에서 넘어온 것이라 단계도 용량도 바뀐 것으로 본다.
-        return UpsertResult(record, dose_changed=True, stage_changed=True)  # 첫 등록
+        return RegisterResult(record, dose_changed=True, stage_changed=True)  # 첫 등록
 
     # 전체 시작일을 옮기는 건 **정정**이다 — 이미 지나간 날을 다시 쓰는 일이라
     # 등록이 아니다. 여기서 받아 주면 용량만 바꾸는 요청이 회차를 통째로 흔든다.
@@ -468,7 +468,7 @@ def upsert(
         stage_changed = restaged != current.stage
         current.stage = restaged
         db.commit()
-        return UpsertResult(current, dose_changed=False, stage_changed=stage_changed)
+        return RegisterResult(current, dose_changed=False, stage_changed=stage_changed)
 
     # **오늘 연 행을 오늘 또 바꾸는 건 정정이다.** 용량을 바꾼 날 새로 맞는 것과
     # 구분이 안 된다 — 둘 다 "오늘 다른 값이 왔다" 로 똑같이 보인다. 시간으로는
@@ -506,7 +506,7 @@ def upsert(
         effective_from=change_date,
     )
     db.commit()
-    return UpsertResult(
+    return RegisterResult(
         record,
         dose_changed=True,
         stage_changed=record.stage != current.stage,
@@ -546,8 +546,8 @@ def get_current_view(
     )
 
 
-def _build_dose_event(result: UpsertResult) -> DoseEvent | None:
-    """`UpsertResult` → 명세의 `doseEvent`. 변경이 없으면 None 이다."""
+def _build_dose_event(result: RegisterResult) -> DoseEvent | None:
+    """`RegisterResult` → 명세의 `doseEvent`. 변경이 없으면 None 이다."""
     if not result.dose_changed:
         return None
     record = result.record
@@ -561,20 +561,20 @@ def _build_dose_event(result: UpsertResult) -> DoseEvent | None:
     )
 
 
-def build_upsert_view(
+def build_register_view(
     db: Session,
     user_id: uuid.UUID,
-    result: UpsertResult,
+    result: RegisterResult,
     *,
     today: date | None = None,
-) -> MedicationUpsertResponse:
+) -> MedicationRegisterResponse:
     """`POST /medications` 응답을 조립한다.
 
     `get_current_view()` 를 쓰지 않는다 — 명세의 POST 응답은 현재 상태에 더해
     `doseChanged` · `doseEvent` · `stageChanged` · `decidedAt` 을 요구하고,
-    그 넷은 `UpsertResult` 에만 있다. 반대로 `effectiveFrom` 은 POST 응답에 없다.
+    그 넷은 `RegisterResult` 에만 있다. 반대로 `effectiveFrom` 은 POST 응답에 없다.
 
-    여기서 새로 판정하지 않는다. 단계는 `upsert()` 가 이미 행에 박아 둔 값을 읽기만 한다 —
+    여기서 새로 판정하지 않는다. 단계는 `register()` 가 이미 행에 박아 둔 값을 읽기만 한다 —
     두 번 판정하면 같은 요청에 두 답이 나올 수 있다.
     """
     today = today or date.today()
@@ -583,7 +583,7 @@ def build_upsert_view(
     started_at = crud.get_dosing_start_date(db, user_id) or record.effective_from
     next_dose_date, days_until_next_dose = predict_next_dose(started_at, today=today)
 
-    return MedicationUpsertResponse(
+    return MedicationRegisterResponse(
         medication_id=record.id,
         drug_name=record.drug_name,
         dose_mg=record.dose_mg,
