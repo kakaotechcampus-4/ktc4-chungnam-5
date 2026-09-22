@@ -484,35 +484,45 @@ FAILED
 | food_ref_id | VARCHAR FK, NULL | 공공 DB 음식 ID. AI 가 매칭하지 못하면 NULL |
 | original_food_name | VARCHAR | 최초 AI 추정 음식명 |
 | display_name | VARCHAR | 최종 확정 음식명 |
-| estimated_amount_g | DECIMAL | AI 추정 섭취량 |
-| confirmed_amount_g | DECIMAL, NULL | 사용자 확인·수정 섭취량의 **g 환산값만**. 환산 불가면 확인 후에도 NULL |
+| estimated_amount | DECIMAL, NULL | AI 가 추정한 양의 숫자 |
+| estimated_unit | VARCHAR(32), NULL | 그 숫자의 단위(`g` · `개` · `ml`) |
+| estimated_amount_g | DECIMAL, NULL | 위 둘의 **g 환산값만**. 환산 불가면 NULL |
 | confirmed_amount | DECIMAL, NULL | 사용자가 입력한 양의 숫자. **확인 여부의 센티넬** |
-| confirmed_unit | VARCHAR(32), NULL | 그 숫자의 단위(`g` · `개` · `ml`) |
+| confirmed_unit | VARCHAR(32), NULL | 그 숫자의 단위 |
+| confirmed_amount_g | DECIMAL, NULL | 위 둘의 **g 환산값만**. 환산 불가면 확인 후에도 NULL |
 | confidence | DECIMAL, NULL | AI 분석 신뢰도. `CHECK (0 ~ 1)`. 이름을 바꾸면 지운다 |
 | source | ENUM, DEFAULT MODEL | MODEL / USER |
-| raw_ai_result | JSONB, NULL | AI 원본 결과. `source=USER` 는 인식된 적이 없으므로 NULL |
+| raw_ai_result | JSONB, NULL | AI 응답 원본 보관 전용. `source=USER` 는 인식된 적이 없으므로 NULL |
 
-양이 세 컬럼으로 나뉜다. **`confirmed_amount_g` 는 g 으로 환산된 값만 담는다** — "2개"
-처럼 환산 근거가 없는 단위면 사용자가 확인했어도 NULL 이다. 사용자가 말한 값 자체는
-`confirmed_amount` · `confirmed_unit` 에 언제나 남는다.
+양이 **쌍 두 개 + 환산값 두 개**로 나뉜다. 각 쌍은 말한 그대로(숫자 + 단위)를 담고,
+`*_amount_g` 는 그걸 g 으로 환산한 결과다. "2개" 처럼 환산 근거가 없으면 `*_amount_g`
+만 NULL 이 되고 숫자·단위는 남는다.
 
-| 상황 | confirmed_amount / _unit | confirmed_amount_g |
-| --- | --- | --- |
-| 사용자가 "220g" 으로 확인 | `220` / `g` | `220.00` |
-| 사용자가 "2개" 로 확인 | `2` / `개` | NULL (환산 불가) |
-| 아직 확인 전 (AI 인식만) | NULL / NULL | NULL — 양은 `estimated_amount_g` |
+| 상황 | estimated_amount / _unit | estimated_amount_g | confirmed_amount / _unit | confirmed_amount_g |
+| --- | --- | --- | --- | --- |
+| AI 가 "250g" 인식, 확인 전 | `250` / `g` | `250.00` | NULL / NULL | NULL |
+| AI 가 "2개" 인식, 확인 전 | `2` / `개` | NULL | NULL / NULL | NULL |
+| 사용자가 "220g" 으로 확인 | (그대로) | (그대로) | `220` / `g` | `220.00` |
+| 사용자가 "3개" 로 확인 | (그대로) | (그대로) | `3` / `개` | NULL |
+| 사용자가 직접 추가한 음식 | NULL / NULL | NULL | `200` / `g` | `200.00` |
 
-**"확인했는가" 를 `confirmed_amount_g IS NULL` 로 판정하면 안 된다** — 2행과 3행이
-구분되지 않는다. 센티넬은 `confirmed_amount` 다. 이걸 틀리면 "2개" 로 확인한 항목의
-직전 값이 AI 추정값으로 되돌아가, 같은 값을 다시 보내도 '고쳤다' 로 보인다.
+**읽는 규칙은 한 줄이다:**
 
-`raw_ai_result` 에는 사용자 입력을 섞지 않는다. 섞으면 읽는 쪽이 출처(MODEL/USER)와
-수정 이력에 따라 다른 자리를 뒤져야 한다.
+```
+확인됐으면(confirmed_amount IS NOT NULL) confirmed_*, 아니면 estimated_*
+```
 
-`GET /meals/{mealId}` 의 `amount` · `unit` 은 **확인된 항목이면** 위 두 컬럼에서
-그대로 나온다. 아직 확인 전인 `source=MODEL` 항목은 한 갈래가 더 남아 있다 — 환산되면
-`estimated_amount_g`, 환산이 안 되면 `raw_ai_result`(워커가 남긴다). 그 갈래를
-없앨지는 워커(`worker/jobs/analyze_meal.py` 7단계) 구현 시 정한다.
+`GET /meals/{mealId}` 의 `amount` · `unit` 이 여기서 나온다 — 출처(MODEL/USER)도
+수정 이력도 볼 필요가 없다. g 이 필요한 쪽(Q/Q/S 채점)만 `*_amount_g` 를 본다.
+
+**"확인했는가" 를 `confirmed_amount_g IS NULL` 로 판정하면 안 된다** — 확인 전과
+"확인했지만 환산 불가"가 구분되지 않는다. 센티넬은 `confirmed_amount` 다. 이걸 틀리면
+"2개" 로 확인한 항목의 직전 값이 AI 추정값으로 되돌아가, 같은 값을 다시 보내도
+'고쳤다' 로 보인다.
+
+`estimated_*` 는 **어떤 수정에도 덮이지 않는다** — AI 인식 성능 평가의 기준이다.
+`raw_ai_result` 에서는 양을 읽지 않는다. AI 응답 원본을 되짚기 위한 보관 자리이고,
+키 모양이 AI 응답 스키마를 따라 바뀔 수 있다.
 
 ---
 
@@ -532,17 +542,18 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 사용자가 직접 넣은 음식(`POST /meals/{mealId}/items`)에는 고칠 AI 인식값이 없다.
 
 ```json
-// original_value — 고치기 직전의 값. amount·unit 은 직전에 들어온 사용자 입력(없으면 null)
+// original_value — 고치기 직전의 값. 확인됐으면 confirmed_*, 아니면 estimated_*
 { "displayName": "김밥", "amountG": "250.00", "confidence": "0.620",
-  "amount": null, "unit": null }
+  "amount": "250.00", "unit": "g" }
 // corrected_value — amount·unit 은 사용자가 입력한 원본 그대로
 { "displayName": "참치김밥", "amountG": "220.00", "amount": "220", "unit": "g" }
 ```
 
-`amountG` 는 g 환산값이고 환산이 안 되는 단위("2개")면 `null` 이다. **그때도 사용자 입력이
-사라지지는 않는다** — 값 자체는 `meal_items.confirmed_amount` · `confirmed_unit` 에 남고,
-여기에는 `amount` · `unit` 으로 바뀐 이력이 함께 적힌다. 숫자를 문자열로 담는 건
-자릿수(`250.00`)를 잃지 않기 위해서다.
+`amount` · `unit` 은 `meal_items` 의 **읽기 규칙 한 줄**로 고른다 — 확인된 항목이면
+`confirmed_*`, 아니면 `estimated_*`. `amountG` 는 그 g 환산값이고 환산이 안 되는
+단위("2개")면 `null` 이지만, **그때도 양이 사라지지는 않는다** — `amount` · `unit` 에
+"2" · "개" 가 그대로 남는다. 숫자를 문자열로 담는 건 자릿수(`250.00`)를 잃지 않기
+위해서다.
 
 `confidence` 는 `original_value` 에만 있다(기록되는 모든 행에 들어가며, 이름을 바꿨는지와
 무관하다). `corrected_value` 에 없는 건 **이름을 바꾸면 그 신뢰도를 항목에서 지우기**
@@ -550,8 +561,10 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 거짓말이다. 지운 값이 필요한 곳은 인식 성능 평가뿐이라 여기에만 남긴다.
 
 "고쳤다" 의 판정은 이름과 양이다. 이름은 공백을 무시하고 비교하며(FE 가 화면의 값을 그대로
-돌려보내는 경우), 양은 g 환산값이 있으면 그것으로, 없으면 사용자가 입력한 숫자·단위 쌍으로
-비교한다 — 둘을 섞으면 "2개 → 3개" 가 양쪽 다 `amountG: null` 이라 '안 고쳤다' 가 된다.
+돌려보내는 경우), 양은 g 환산값이 있으면 그것으로, 없으면 숫자·단위 쌍으로 비교한다 —
+둘을 섞으면 "2개 → 3개" 가 양쪽 다 `amountG: null` 이라 '안 고쳤다' 가 된다.
+숫자는 **자릿수를 지우고** 비교한다: 저장된 값은 `Numeric(8, 2)` 를 거쳐 `2.00` 이지만
+요청의 `2` 는 `2` 라, 날것으로 비교하면 같은 "2개" 가 매번 '고쳤다' 로 잡힌다.
 
 같은 항목을 두 번 고치면 두 행이 쌓이고, 두 번째 행의 `original_value` 는 AI 인식값이 아니라
 첫 수정의 결과다. **AI 최초 추정값이 기준일 때는 `meal_items.original_food_name` ·

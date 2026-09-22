@@ -112,6 +112,8 @@ def make_meal_item(
     meal_id: uuid.UUID,
     display_name: str = "참치김밥",
     food_ref_id: str | None = None,
+    estimated_amount: Decimal | None = Decimal("250.00"),
+    estimated_unit: str | None = "g",
     estimated_amount_g: Decimal | None = Decimal("250.00"),
     confirmed_amount: Decimal | None = None,
     confirmed_unit: str | None = None,
@@ -122,17 +124,23 @@ def make_meal_item(
 ) -> MealItem:
     """식사에 딸린 음식 1건. flush 까지만 하고 커밋하지 않는다.
 
-    기본값은 **AI 가 인식한 항목**이다 — `source=MODEL`, 양은 `estimated_amount_g`
-    에만 있고 `confirmed_amount_g` 는 NULL(사용자 확인 전). `PATCH` 가 고치는 것이
-    주로 이 모양이라 기본값으로 뒀다. 사용자가 직접 넣은 항목을 만들려면
-    `source=MealItemSource.USER, confidence=None` 을 넘긴다 — 신뢰도는 AI 인식값에만
-    있는 개념이다(`crud.meal.add_item` 참고).
+    기본값은 **AI 가 "참치김밥 250g" 으로 인식한 항목**이다 — `source=MODEL`, 양은
+    `estimated_*` 에만 있고 `confirmed_*` 는 전부 NULL(사용자 확인 전). `PATCH` 가
+    고치는 것이 주로 이 모양이라 기본값으로 뒀다.
+
+    환산되지 않는 AI 추정("계란 2개")을 만들려면 `estimated_amount_g=None` 과 함께
+    `estimated_amount` · `estimated_unit` 을 넘긴다 — 셋이 서로 맞아야 실제 워커가
+    쓰는 모양이 된다. 사용자가 직접 넣은 항목은
+    `source=MealItemSource.USER, confidence=None, estimated_amount=None,
+    estimated_unit=None, estimated_amount_g=None` 이다 — AI 가 추정한 적이 없다.
     """
     item = MealItem(
         meal_id=meal_id,
         food_ref_id=food_ref_id,
         original_food_name=display_name,
         display_name=display_name,
+        estimated_amount=estimated_amount,
+        estimated_unit=estimated_unit,
         estimated_amount_g=estimated_amount_g,
         confirmed_amount=confirmed_amount,
         confirmed_unit=confirmed_unit,

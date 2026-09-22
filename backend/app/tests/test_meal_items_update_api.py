@@ -701,6 +701,65 @@ def test_resending_the_same_values_records_nothing(client, db):
     assert _corrections(db, item.id) == []
 
 
+def test_resending_the_ai_estimate_in_an_unconvertible_unit_records_nothing(client, db):
+    """AI 가 "2개" 로 인식한 항목에 그대로 "2개" 를 보내면 고친 게 아니다.
+
+    확인 전 항목이라 `confirmed_*` 는 비어 있고, "2개" 는 g 으로 환산되지 않아
+    `estimated_amount_g` 도 NULL 이다. AI 추정 양이 `estimated_amount` ·
+    `estimated_unit` 에 없으면 직전 값이 "양을 모른다" 가 되어, 사용자가 아무것도
+    안 고쳐도 `user_corrections` 에 거짓 행이 쌓인다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="삶은 계란",
+        estimated_amount_g=None,
+        estimated_amount=Decimal("2.00"),
+        estimated_unit="개",
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="삶은 계란", amount=2, unit="개"),
+    )
+    assert response.status_code == 200, response.text
+
+    assert _corrections(db, item.id) == []
+
+
+def test_editing_an_unconvertible_ai_estimate_starts_from_what_the_ai_said(client, db):
+    """"2개 → 3개" 의 직전 값은 AI 가 인식한 "2개" 다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(
+        db,
+        meal_id=meal.id,
+        display_name="삶은 계란",
+        estimated_amount_g=None,
+        estimated_amount=Decimal("2.00"),
+        estimated_unit="개",
+    )
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/meals/{meal.id}/items",
+        headers={"X-User-Id": str(user.id)},
+        json=_payload(item.id, displayName="삶은 계란", amount=3, unit="개"),
+    )
+    assert response.status_code == 200, response.text
+
+    (correction,) = _corrections(db, item.id)
+    assert correction.original_value["amountG"] is None
+    assert correction.original_value["amount"] == "2.00"
+    assert correction.original_value["unit"] == "개"
+    assert correction.corrected_value["amount"] == "3"
+    assert correction.corrected_value["unit"] == "개"
+
+
 def test_resending_an_unconvertible_amount_records_nothing_the_second_time(client, db):
     """"2개" 를 두 번 보내도 두 번째는 '고쳤다' 가 아니다.
 
@@ -715,6 +774,8 @@ def test_resending_an_unconvertible_amount_records_nothing_the_second_time(clien
         db,
         meal_id=meal.id,
         display_name="삶은 계란",
+        estimated_amount=Decimal("100.00"),
+        estimated_unit="g",
         estimated_amount_g=Decimal("100.00"),
     )
     db.commit()
@@ -731,10 +792,10 @@ def test_resending_an_unconvertible_amount_records_nothing_the_second_time(clien
     corrections = _corrections(db, item.id)
     assert len(corrections) == 1
 
-    # 유일한 행은 진짜 첫 수정이다 — AI 추정값에서 사용자 입력으로.
+    # 유일한 행은 진짜 첫 수정이다 — AI 추정값(100g)에서 사용자 입력("2개")으로.
     assert corrections[0].original_value["amountG"] == "100.00"
-    assert corrections[0].original_value["amount"] is None
-    assert corrections[0].original_value["unit"] is None
+    assert corrections[0].original_value["amount"] == "100.00"
+    assert corrections[0].original_value["unit"] == "g"
 
 
 def test_second_edit_of_an_unconvertible_amount_starts_from_what_the_user_said(client, db):

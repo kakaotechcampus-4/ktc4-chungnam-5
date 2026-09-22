@@ -38,8 +38,11 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
          (`POST /meals/{mealId}/items`). 지우면 사용자 입력이 조용히 사라진다.
          반대로 같은 음식을 AI 가 또 인식해 중복될 수 있다 — 중복 판정 규칙은
          이 작업에서 정한다
-      7. `unit` 을 g 으로 환산한다 — `app.services.meal.to_grams`.
-         환산이 안 되면 None 을 넣고 원본 단위는 `raw_ai_result` 에 남긴다
+      7. AI 가 말한 양을 `estimated_amount` · `estimated_unit` 에 **그대로** 넣고,
+         `app.services.meal.to_grams` 로 환산한 값을 `estimated_amount_g` 에 넣는다.
+         환산이 안 되면("2개") `estimated_amount_g` 만 None 이고 숫자·단위는 남는다.
+         **`raw_ai_result` 에 양을 남기지 않는다** — 읽는 쪽이 JSON 키 모양에
+         의존하게 된다. 그 컬럼은 AI 응답 원본 보관 전용이다
       8. `status` 를 REVIEW_REQUIRED 로 옮긴다.
          **`is_recalculation` 을 어떻게 할지도 이 작업에서 정한다** — 지금은
          `crud.meal.mark_recalculating` 이 true 로 올리기만 하고 되돌리는 곳이

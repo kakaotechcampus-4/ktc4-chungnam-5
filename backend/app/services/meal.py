@@ -359,11 +359,12 @@ def _stored_amount(item: MealItem) -> tuple[Decimal | None, Decimal | None, str 
     2개` 로 보여 `user_corrections` 에 거짓 행이 매번 쌓인다. 확인 화면이 고치지 않은
     항목까지 보내는 게 정상 경로라(엔드포인트 독스트링) 이건 예외가 아니다.
 
-    확인값이 하나라도 있으면 `confirmed_*` 가 그 항목 양의 전부다.
+    모델의 읽기 규칙 그대로다 — 확인됐으면 `confirmed_*`, 아니면 `estimated_*`.
+    두 쌍이 같은 모양이라 폴백이 한 줄로 끝난다.
     """
     if item.confirmed_amount is not None:
         return (item.confirmed_amount_g, item.confirmed_amount, item.confirmed_unit)
-    return (item.estimated_amount_g, None, None)
+    return (item.estimated_amount_g, item.estimated_amount, item.estimated_unit)
 
 
 def _amount_key(
@@ -374,10 +375,25 @@ def _amount_key(
     g 으로 환산된 값이 있으면 그것이 곧 양이다. 없으면("2개") 사용자가 입력한
     숫자·단위 쌍이 그 양의 유일한 표현이다 — 둘을 섞어 비교하면 "2개 → 3개" 가 둘 다
     g 이 NULL 이라 '안 고쳤다' 로 보인다.
+
+    숫자는 **자릿수를 지우고** 비교한다. 저장된 값은 `Numeric(8, 2)` 를 거쳐 와서
+    `Decimal("2.00")` 이지만 요청의 `2` 는 `Decimal("2")` 라, 날것으로 비교하면 같은
+    "2개" 가 매번 '고쳤다' 로 잡힌다.
     """
     if amount_g is not None:
-        return ("g", str(amount_g))
-    return ("raw", _as_text(amount), unit)
+        return ("g", _compare_text(amount_g))
+    return ("raw", _compare_text(amount), unit)
+
+
+def _compare_text(value: Decimal | None) -> str | None:
+    """자릿수를 지운 비교용 문자열. `2.00` 과 `2` 가 같은 값이 된다.
+
+    `normalize()` 만 쓰면 `250.00` 이 `2.5E+2` 가 되어 `250` 과 또 어긋난다 —
+    지수 표기를 `f` 포맷으로 되돌린다.
+    """
+    if value is None:
+        return None
+    return format(value.normalize(), "f")
 
 
 def _as_text(value: Decimal | None) -> str | None:

@@ -100,24 +100,34 @@ class MealItem(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     """최종 확정 음식명."""
 
+    # 양은 네 컬럼이다. 규칙 하나로 읽는다:
+    #
+    #     확인됐으면(`confirmed_amount is not None`) confirmed_*, 아니면 estimated_*
+    #
+    # 각 쌍은 **사용자·AI 가 말한 그대로(숫자 + 단위)** 를 담고, `*_amount_g` 는 그걸
+    # g 으로 환산한 결과다. "2개" 처럼 환산 근거가 없으면 `*_amount_g` 만 NULL 이 되고
+    # 숫자·단위는 남는다 — 그래서 `*_amount_g` 는 "양이 있는가" 의 기준이 될 수 없다.
+    estimated_amount: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    """AI 가 추정한 양의 숫자."""
+    estimated_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    """그 숫자의 단위("g" · "개" · "ml"). `estimated_amount_g` 는 이걸 환산한 결과다.
+
+    `source=USER` 행은 AI 가 추정한 적이 없으므로 NULL 이다."""
     estimated_amount_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
-    confirmed_amount_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
-    """사용자 확인 전에는 NULL. **g 으로 환산된 값만 담는다** — "2개" 처럼 환산 근거가
-    없는 단위면 사용자가 확인했어도 NULL 이다. 그 경우 양의 진실은 아래 두 컬럼이다."""
+    """AI 추정 양의 g 환산값. **사용자 수정에 덮이지 않는다** — 인식 성능 평가의 기준이다."""
 
     confirmed_amount: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
-    """사용자가 입력한 양의 숫자. 확인 전에는 NULL."""
+    """사용자가 입력한 양의 숫자. 확인 전에는 NULL.
+
+    **확인 여부의 센티넬이 이 컬럼이다** — `confirmed_amount_g` 는 환산된 값만 담아
+    "2개" 로 확인한 항목도 NULL 이라, 확인 전과 구분되지 않는다."""
     confirmed_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    """그 숫자의 단위("g" · "개" · "ml"). `confirmed_amount_g` 는 이걸 환산한 결과다.
+    """그 숫자의 단위. `confirmed_amount_g` 는 이걸 환산한 결과다.
 
-    **확인 여부의 센티넬은 `confirmed_amount` 다** — `confirmed_amount_g` 는 환산된
-    값만 담아 "2개" 로 확인한 항목도 NULL 이라, 확인 전과 구분되지 않는다.
-
-    사용자 입력을 `raw_ai_result` 에 섞어 두면 읽는 쪽이 출처(MODEL/USER)와 수정
-    이력에 따라 다른 자리를 뒤져야 해서 컬럼으로 뺐다. `GET /meals/{mealId}` 의
-    `amount` · `unit` 은 **확인된 항목이면** 여기서 나온다. 확인 전 `source=MODEL`
-    항목은 아직 `estimated_amount_g`(g 환산) 또는 `raw_ai_result`(환산 불가)를
-    봐야 한다 — 그 갈래는 워커 구현 시 정리 대상이다(`raw_ai_result` 참고)."""
+    `GET /meals/{mealId}` 의 `amount` · `unit` 은 위 규칙 한 줄로 나온다 — 출처
+    (MODEL/USER)도 수정 이력도 볼 필요가 없다."""
+    confirmed_amount_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    """사용자 확인 양의 g 환산값. 확인 전이거나 환산 불가면 NULL."""
     confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
 
     source: Mapped[MealItemSource] = mapped_column(
@@ -126,17 +136,14 @@ class MealItem(Base):
         server_default=MealItemSource.MODEL.value,
     )
     raw_ai_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    """AI 응답 원본 **전용**. 사용자 입력은 절대 섞지 않는다.
+    """AI 응답 원본 **전용**. 파싱해서 컬럼에 나눠 담고 난 뒤 버리지 않고 두는 자리다.
 
-    `source=USER` 행은 AI 가 인식한 적이 없으므로 NULL 이다. 사용자가 입력한 양은
-    출처와 무관하게 `confirmed_amount` · `confirmed_unit` 에 들어간다 — 읽는 쪽이
-    출처와 수정 이력에 따라 다른 자리를 뒤지지 않게 하려는 것이다.
+    `source=USER` 행은 AI 가 인식한 적이 없으므로 NULL 이다.
 
-    아직 확인되지 않은 `source=MODEL` 항목의 AI 추정 양은 예외다: g 으로 환산되면
-    `estimated_amount_g` 에, 환산이 안 되면("2개") 여기 말고 갈 곳이 없어 워커가
-    이 JSONB 에 남긴다(`worker/jobs/analyze_meal.py` 7단계). 그 규약은 워커를
-    구현할 때 확정한다 — `estimated_amount` · `estimated_unit` 컬럼으로 빼면
-    읽기가 한 갈래로 줄지만, 워커가 붙은 뒤에 바꾸면 백필이 필요하다.
+    **여기서 양을 읽지 않는다.** 음식명·신뢰도·양은 전부 컬럼에 있고(위 양 규칙 참고),
+    이 JSONB 는 "AI 가 원래 뭐라고 했나" 를 되짚거나 파싱 규칙이 바뀌었을 때 다시
+    읽기 위한 것이다. 키 모양은 AI 응답 스키마를 따라 바뀔 수 있으므로 읽는 쪽이
+    의존해서는 안 된다.
     """
 
     meal: Mapped["Meal"] = relationship(back_populates="items")

@@ -209,11 +209,11 @@ def add_item(
     개념 자체가 없다(0 이나 1 을 넣으면 인식 성능 통계가 오염된다).
 
     양은 `confirmed_*` 로 들어간다. 사용자가 직접 말한 값이라 확인이 끝난 것으로
-    본다 — `estimated_amount_g` 는 AI 추정값 자리다. `confirmed_amount_g` 는 g 으로
-    환산된 값만 담으므로 "2개" 면 NULL 이고, 그때도 `confirmed_amount` ·
-    `confirmed_unit` 에는 사용자가 말한 그대로 남는다.
+    본다. `confirmed_amount_g` 는 g 으로 환산된 값만 담으므로 "2개" 면 NULL 이고,
+    그때도 `confirmed_amount` · `confirmed_unit` 에는 사용자가 말한 그대로 남는다.
 
-    `raw_ai_result` 는 NULL 이다 — AI 가 인식한 적이 없는 항목이다.
+    `estimated_*` 세 컬럼과 `raw_ai_result` 는 전부 NULL 이다 — AI 가 이 항목을
+    추정한 적이 없다.
     """
     item = MealItem(
         meal_id=meal_id,
@@ -278,7 +278,7 @@ def update_item(
     나간다. 시그니처를 맞춰 두는 건 "행을 바꾸는 일은 crud 를 거친다" 는 규칙을
     호출부에서 눈에 보이게 하려는 것이다(`mark_recalculating` 과 같다).
 
-    `original_food_name` · `estimated_amount_g` 는 건드리지 않는다 — AI 최초 추정값
+    `original_food_name` 과 `estimated_*` 는 건드리지 않는다 — AI 최초 추정값
     자리이고, 사용자 수정으로 덮으면 인식 성능 평가의 기준이 사라진다.
 
     양은 `confirmed_*` 로 들어간다 — `add_item` 과 같은 규칙이다. `confirmed_amount_g`
