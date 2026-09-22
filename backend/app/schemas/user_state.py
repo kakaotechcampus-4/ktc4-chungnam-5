@@ -9,13 +9,16 @@
 
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Literal
 
 from pydantic import AwareDatetime, ConfigDict, Field, field_validator
 
 from app.schemas.base import CamelModel, KstDatetime
+
+_FUTURE_TOLERANCE = timedelta(minutes=1)
+"""미래 판정 허용 오차 (D6). 단말 시계가 서버보다 조금 빠른 경우를 흡수한다."""
 
 
 class GiSymptomCode(str, enum.Enum):
@@ -80,8 +83,8 @@ class UserStateCreateRequest(CamelModel):
     @field_validator("recorded_at")
     @classmethod
     def _reject_future(cls, value: datetime | None) -> datetime | None:
-        # 허용 오차 0 (D6). 지금 시각이 필요하면 FE 는 필드를 생략한다.
-        if value is not None and value > datetime.now(timezone.utc):
+        # 단말 시계가 서버보다 조금 빠른 경우를 흡수한다 — 허용 오차 1분 (D6).
+        if value is not None and value > datetime.now(timezone.utc) + _FUTURE_TOLERANCE:
             raise ValueError("기록 시각이 미래입니다.")
         return value
 
