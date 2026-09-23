@@ -276,21 +276,14 @@ def get_view(
     # 대기로 돌아가는데(`mark_recalculating`) 옛 `qqs_evaluations` 행은 남는다.
     # 행만 보면 무효가 된 점수를 그대로 내보낸다.
     #
-    # 🔗 TODO(`crud/meal.py` 담당자와 공유): **이 가드가 여기에만 있다.**
-    # `list_meals`(`crud/meal.py:49`) 와 `get_calendar_summary`(`:193`) 는 상태 필터
-    # 없이 `qqs_evaluations` 를 outer join 하므로, 같은 식사가 `GET /meals` 목록·달력
-    # 에는 옛 점수를 보이고 여기서는 409 를 낸다. 달력 월 평균도 무효 점수를 포함한다.
+    # 🔗 이 가드에 기대는 건 여기뿐이다. 목록 · 달력 · dashboard 는 상태를 안 보고
+    # `qqs_evaluations` 를 join 하므로, 무효가 된 점수는 **행 자체를 없애서** 막는다
+    # (`crud/meal.py::mark_recalculating` → `crud/evaluation.py::delete_by_meal`).
+    # 그래서 여기 도달할 때 `row` 는 이미 없다 — 상태 검사는 그 뒤를 받치는 것이다.
     #
-    # 고치는 길이 둘이다.
-    #   (1) 읽는 쪽에 `Meal.status == EVALUATED` 를 더한다 — 읽는 곳이 계속 는다
-    #       (목록 · 달력 · 상세 · dashboard · insights · home). 한 곳만 빠뜨려도 샌다.
-    #   (2) `mark_recalculating` 에서 행을 지운다 — 한 곳이고 새 경로가 생겨도
-    #       따라오지만, `crud/__init__.py` 의 "한 파일 한 엔티티" 를 넘고 그 함수의
-    #       이름이 파괴적이라는 걸 숨긴다.
-    # 둘 다 `crud/meal.py` 담당 영역이라 여기서 정하지 않는다. 지우는 쪽으로 가면
-    # `crud/evaluation.py` 에 `delete_by_meal` 을 만들어 주면 된다.
-    #
-    # 오늘은 도달 불가다 — FE 의 `meal_evaluation_screen` 에 수정 진입점이 없다.
+    # ⚠️ 남는 위험: `deleted_at` 이 있는 식사의 점수는 그대로 남는다. `crud/__init__.py`
+    # 가 적어 둔 대로 soft delete 라 자식 행이 살아 있고, 자식을 집계할 때 `meals` 를
+    # join 해 거르는 건 읽는 쪽 책임이다. 이번 변경은 그 문제를 건드리지 않는다.
     if row is None or meal.status is not MealStatus.EVALUATED:
         raise EvaluationNotFoundError(f"meal {meal_id} 는 아직 확정되지 않았습니다.")
 
