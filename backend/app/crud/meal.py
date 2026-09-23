@@ -352,3 +352,61 @@ def add_correction(
     db.add(correction)
     db.flush()
     return correction
+
+
+def has_new_meals_since(
+    db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
+) -> bool:
+    """[range_start, range_end) 안에서 since 이후에 기록된(살아있는) 식사가 있는지.
+
+    장기 피드백이 그 뒤로 낡았는지(stale) 판단하는 데 쓴다 — GET /insights/long-term.
+    """
+    stmt = (
+        select(Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+            Meal.created_at > since,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
+def has_deleted_meals_since(
+    db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
+) -> bool:
+    """[range_start, range_end) 안의 식사 중 since 이후에 soft delete 된 것이 있는지."""
+    stmt = (
+        select(Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_not(None),
+            Meal.deleted_at > since,
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
+def has_edited_items_since(
+    db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
+) -> bool:
+    """[range_start, range_end) 안의 식사 항목 중 since 이후에 사용자가 고친 것이 있는지."""
+    stmt = (
+        select(UserCorrection.meal_item_id)
+        .join(MealItem, MealItem.id == UserCorrection.meal_item_id)
+        .join(Meal, Meal.id == MealItem.meal_id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+            UserCorrection.corrected_at > since,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
