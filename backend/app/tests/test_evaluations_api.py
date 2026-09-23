@@ -427,6 +427,55 @@ def test_matched_item_without_amount_is_not_counted(
     assert data["evidence"]["nutritionSources"] == []
 
 
+def test_missing_nutrient_column_is_not_a_partial_sum(
+    client: TestClient, db: Session
+) -> None:
+    """성분 값이 비어 있는 음식이 섞이면 그 성분은 합계를 내보내지 않는다.
+
+    `food_refs` 의 성분 컬럼은 전부 nullable 이고, 공공 DB 에 식이섬유·나트륨이
+    비어 있는 행이 흔하다(시드 로더가 파싱 실패를 NULL 로 넣는다).
+
+    SQL 의 `SUM` 은 NULL 입력 행을 조용히 건너뛴다. 항목 단위로는 둘 다 "계산됨"
+    (`counted=2`)이라 경고가 안 붙는데, 단백질만 한 항목 몫이 빠진다 — **같은 응답
+    안에서 단백질은 부분합이고 식이섬유는 완전한** 상태가 되고 겉으로는 구분이 안 된다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
+    make_food_ref(
+        db,
+        food_ref_id="KFD_RICE",
+        name="밥",
+        serving_size=Decimal("100"),
+        protein_g=Decimal("9"),
+        fiber_g=Decimal("3"),
+    )
+    make_food_ref(
+        db,
+        food_ref_id="KFD_GIM",
+        name="김",
+        serving_size=Decimal("100"),
+        protein_g=None,  # 공공 DB 결측
+        fiber_g=Decimal("1"),
+    )
+    for food_ref_id in ("KFD_RICE", "KFD_GIM"):
+        make_meal_item(
+            db,
+            meal_id=meal.id,
+            food_ref_id=food_ref_id,
+            confirmed_amount=Decimal("100"),
+            confirmed_unit="g",
+        )
+
+    data = client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
+        json={"satietyAfterPct": 68},
+    ).json()["data"]
+    current = {row["code"]: row["current"] for row in data["nutrients"]}
+
+    assert current["PROTEIN"] is None, "결측이 있으면 부분합(9)을 내보내면 안 된다"
+    assert current["FIBER"] == 4.0, "둘 다 값이 있는 성분은 그대로 합산한다"
+
+
 def test_confirmed_amount_never_falls_back_to_the_ai_guess(
     client: TestClient, db: Session
 ) -> None:

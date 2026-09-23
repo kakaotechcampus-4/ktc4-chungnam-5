@@ -7,8 +7,10 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import NamedTuple
+from types import MappingProxyType
+from typing import Final, NamedTuple
 
 from sqlalchemy import Numeric, and_, case, cast, func, select
 from sqlalchemy.dialects.postgresql import insert
@@ -88,11 +90,35 @@ class NutrientTotals(NamedTuple):
     """성분은 구했는데 **먹은 양을 모르는** 항목 수. "2개" 처럼 g 환산이 안 된 단위다.
     영양정보를 넣어도 안 풀린다 — 양을 g 으로 고쳐야 한다. `unmatched` 와 섞으면
     사용자를 못 고치는 화면으로 보내게 된다."""
+    missing: Mapping[str, int] = MappingProxyType({})
+    """**성분별로** 값이 비어 있던 항목 수. 키는 위 합계 필드 이름이다.
+
+    항목 단위 제외(`unmatched` · `no_amount`)와 다른 축이다. 매칭도 됐고 양도 아는
+    항목인데 `food_refs` 의 그 **컬럼만** NULL 인 경우가 있다 — 공공 DB 에 식이섬유나
+    나트륨이 비어 있는 행이 흔하고, 시드 로더가 파싱 실패를 NULL 로 넣는다.
+
+    SQL 의 `SUM` 은 NULL 입력 행을 조용히 건너뛴다. 그래서 이걸 안 세면 **같은 응답
+    안에서 단백질만 부분합이고 식이섬유는 완전한** 상태가 되는데, 겉으로는 구분이
+    안 된다. 0 이 아닌 성분은 합계를 내보내지 않는다 (`services/evaluation`).
+    """
 
     @property
     def excluded(self) -> int:
         """합산에서 빠진 항목 수 전체."""
         return self.unmatched + self.no_amount
+
+
+_NUTRIENT_COLUMNS: Final = {
+    "kcal": FoodRef.calories,
+    "protein_g": FoodRef.protein_g,
+    "fiber_g": FoodRef.fiber_g,
+    "sodium_mg": FoodRef.sodium_mg,
+}
+"""`NutrientTotals` 의 합계 필드 ↔ `food_refs` 컬럼.
+
+합계와 결측 카운터가 **같은 목록에서 나와야** 한다. 따로 적으면 성분을 하나 더할 때
+합계만 늘고 카운터를 빠뜨려서, 그 성분만 조용히 부분합이 된다.
+"""
 
 
 def _eaten_amount_g():
@@ -161,10 +187,17 @@ def sum_nutrients(db: Session, meal_id: uuid.UUID) -> NutrientTotals:
     usable = and_(has_nutrition, amount.isnot(None))
     stmt = (
         select(
-            _scaled(FoodRef.calories, amount, usable).label("kcal"),
-            _scaled(FoodRef.protein_g, amount, usable).label("protein_g"),
-            _scaled(FoodRef.fiber_g, amount, usable).label("fiber_g"),
-            _scaled(FoodRef.sodium_mg, amount, usable).label("sodium_mg"),
+            *(
+                _scaled(column, amount, usable).label(key)
+                for key, column in _NUTRIENT_COLUMNS.items()
+            ),
+            # **성분별 결측을 따로 센다.** 합산 대상인 항목인데 그 컬럼만 NULL 인
+            # 경우가 있고, SQL 의 SUM 은 그런 행을 조용히 건너뛴다. 안 세면 부분합이
+            # 완전한 값처럼 나간다.
+            *(
+                func.count().filter(and_(usable, column.is_(None))).label(f"{key}_missing")
+                for key, column in _NUTRIENT_COLUMNS.items()
+            ),
             func.count().filter(usable).label("counted"),
             # 제외 사유를 나눠 센다. 사용자에게 줄 안내가 다르다.
             func.count().filter(~has_nutrition).label("unmatched"),
@@ -183,4 +216,7 @@ def sum_nutrients(db: Session, meal_id: uuid.UUID) -> NutrientTotals:
         counted=row.counted,
         unmatched=row.unmatched,
         no_amount=row.no_amount,
+        missing=MappingProxyType(
+            {key: getattr(row, f"{key}_missing") for key in _NUTRIENT_COLUMNS}
+        ),
     )

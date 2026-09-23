@@ -166,7 +166,15 @@ def _build_view(
             NutrientRow(
                 code=code,
                 label=label,
-                current=_as_float(getattr(totals, key)),
+                # **결측이 있으면 합계를 안 내보낸다.** 그 성분값이 비어 있던 항목은
+                # SUM 이 조용히 건너뛰어서, 숫자를 주면 부분합이 완전한 값으로 읽힌다.
+                # 같은 응답 안에서 단백질만 부분합이고 식이섬유는 완전한 상태가 되는데
+                # 겉으로는 구분이 안 된다 (`NutrientTotals.missing`).
+                current=(
+                    None
+                    if totals.missing.get(key)
+                    else _as_float(getattr(totals, key))
+                ),
                 # 단계별 목표치가 팀 확정 전이라 null 이다.
                 # 명세: "target · state 는 null 허용. 미확정 시 게이지 미표시."
                 target=None,
