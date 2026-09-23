@@ -793,7 +793,6 @@ def create_meal(
     meal_type: MealType,
     eaten_at: datetime,
     image_key: str | None,
-    image_url: str | None,
     raw_text: str | None,
     satiety_before_pct: int | None,
 ) -> MealCreateResponse:
@@ -804,9 +803,12 @@ def create_meal(
     막힌 건 services 끼리의 참조이지, 다른 도메인의 crud 호출이 아니다
     (`services.medication.create_snapshot_for_meal` 독스트링 참고).
 
-    `image_url` 은 저장하지 않는다 — AI 에게 이번 한 번만 넘길 presigned URL 이라
-    큐 payload 에만 실린다. DB 에는 `image_key` 만 남고, 실제 URL 은 조회 때마다
-    `_build_thumbnail_url` 이 새로 만든다.
+    큐에는 presigned URL 이 아니라 `image_key` 만 싣는다(PR #42 리뷰 반영).
+    presigned URL 은 발급 후 몇 분 안에 만료되는데, 워커가 이 작업을 실제로
+    집는 시점은 큐 적체·재시도 backoff 로 훨씬 늦을 수 있어 미리 만든 URL을
+    실으면 워커가 열어볼 때 이미 죽어 있을 위험이 있다. URL 은 실제로 필요한
+    시점(워커가 AI 를 부르기 직전)에 `image_key` 로 새로 발급해야 한다 —
+    `worker/jobs/analyze_meal.py` 구현 시 반영 필요.
     """
     current_record = medication_crud.get_current(db, user_id)
     snapshot = medication_crud.add_snapshot(db, user_id=user_id, source=current_record)
@@ -837,7 +839,7 @@ def create_meal(
             "mealType": meal_type.value,
             "eatenAt": eaten_at.isoformat(),
             "stage": snapshot.stage.value,
-            "imageUrl": image_url,
+            "imageKey": image_key,
             "rawText": raw_text,
         },
     )
