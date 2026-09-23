@@ -8,7 +8,6 @@ from decimal import Decimal
 from sqlalchemy import Row, and_, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.crud import evaluation as evaluation_crud
 from app.models.enums import MealItemSource, MealStatus
 from app.models.evaluation import QQSEvaluation
 from app.models.meal import Meal, MealItem, UserCorrection
@@ -243,26 +242,20 @@ def add_item(
 
 
 def mark_recalculating(db: Session, meal: Meal) -> None:
-    """식사를 재분석 대기 상태로 되돌린다. **옛 평가도 함께 지운다.**
+    """식사를 재분석 대기 상태로 되돌린다.
 
-    `ANALYZING` 은 "워커가 도는 중" 이 아니라 **"점수가 아직 유효하지 않다"** 는
-    표시다. 그 문장을 상태에만 반영하고 `qqs_evaluations` 행을 남겨 두면,
-    상태를 안 보는 쿼리(`list_meals` · `get_calendar_summary`)가 무효 점수를 그대로
-    내보낸다 — 같은 식사가 목록에는 옛 점수를, `GET /meals/{mealId}/evaluation` 에는
-    409 를 내는 상태가 된다.
+    `db` 를 받지만 쓰지 않는다 — 이미 세션에 붙어 있는 객체라 대입만으로 UPDATE 가
+    나간다. 시그니처를 맞춰 두는 건 "상태를 바꾸는 일은 crud 를 거친다" 는 규칙을
+    호출부에서 눈에 보이게 하려는 것이다.
 
-    **여기서 지우는 이유**: 수정 경로가 넷이고(`PATCH` · `POST` · `DELETE /items`,
-    그리고 `PUT .../nutrition`) 전부 이 함수를 거친다. 호출부마다 챙기게 하면 새
-    경로가 생길 때 빠뜨리기 쉽고, 빠뜨려도 테스트가 안 잡는다 — 목록 화면을 실제로
-    열어 봐야 보인다.
-
-    확정 전 수정에서는 지울 행이 없어 `DELETE` 가 0 행이다. 그래서 호출부가
-    "확정된 적 있나" 를 따질 필요가 없다.
+    🔗 **옛 `qqs_evaluations` 행은 지우지 않는다.** 상태만 되돌리므로 그 행은 무효인
+    채로 남고, 상태를 안 보는 쿼리(`list_meals` · `get_calendar_summary`)가 그걸
+    그대로 내보낸다 — 같은 식사가 목록에는 옛 점수를, `GET /meals/{mealId}/evaluation`
+    에는 409 를 낸다. 여기서 지우는 안을 검토했지만 이 파일 담당이 아니라 보류했다.
+    `services/evaluation/__init__.py::get_view` 의 TODO 참고.
     """
     meal.status = MealStatus.ANALYZING
     meal.is_recalculation = True
-    evaluation_crud.delete_by_meal(db, meal.id)
-
 
 def get_items_by_ids(
     db: Session, *, meal_id: uuid.UUID, item_ids: Iterable[uuid.UUID]

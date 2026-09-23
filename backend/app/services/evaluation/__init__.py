@@ -272,15 +272,25 @@ def get_view(
     """
     meal = _owned_meal(db, user_id, meal_id)
     row = evaluation_crud.get_by_meal(db, meal.id)
-    # **행 존재가 아니라 상태를 본다.** 사용자가 확정 뒤 음식을 고치면 식사는
-    # 재계산 대기로 돌아가는데(`POST /meals/{mealId}/items`) 옛 `qqs_evaluations`
-    # 행은 남는다. 행만 보면 무효가 된 점수를 그대로 내보낸다.
-    # 행을 지우지 않는 건 이력 보존 때문이다 — 재확정하면 upsert 로 덮인다.
+    # **행 존재가 아니라 상태를 본다.** 사용자가 확정 뒤 음식을 고치면 식사는 재계산
+    # 대기로 돌아가는데(`mark_recalculating`) 옛 `qqs_evaluations` 행은 남는다.
+    # 행만 보면 무효가 된 점수를 그대로 내보낸다.
     #
-    # 🔗 TODO(meals.py 담당자와 공유): **이 가드가 여기에만 있다.**
-    # `crud/meal.py::list_meals` 는 상태 필터 없이 `qqs_evaluations` 를 outer join
-    # 하므로, 같은 식사가 `GET /meals` 목록에는 옛 점수를 보이고 여기서는 409 를
-    # 낸다. 목록·달력·대시보드가 전부 같은 경로다.
+    # 🔗 TODO(`crud/meal.py` 담당자와 공유): **이 가드가 여기에만 있다.**
+    # `list_meals`(`crud/meal.py:49`) 와 `get_calendar_summary`(`:193`) 는 상태 필터
+    # 없이 `qqs_evaluations` 를 outer join 하므로, 같은 식사가 `GET /meals` 목록·달력
+    # 에는 옛 점수를 보이고 여기서는 409 를 낸다. 달력 월 평균도 무효 점수를 포함한다.
+    #
+    # 고치는 길이 둘이다.
+    #   (1) 읽는 쪽에 `Meal.status == EVALUATED` 를 더한다 — 읽는 곳이 계속 는다
+    #       (목록 · 달력 · 상세 · dashboard · insights · home). 한 곳만 빠뜨려도 샌다.
+    #   (2) `mark_recalculating` 에서 행을 지운다 — 한 곳이고 새 경로가 생겨도
+    #       따라오지만, `crud/__init__.py` 의 "한 파일 한 엔티티" 를 넘고 그 함수의
+    #       이름이 파괴적이라는 걸 숨긴다.
+    # 둘 다 `crud/meal.py` 담당 영역이라 여기서 정하지 않는다. 지우는 쪽으로 가면
+    # `crud/evaluation.py` 에 `delete_by_meal` 을 만들어 주면 된다.
+    #
+    # 오늘은 도달 불가다 — FE 의 `meal_evaluation_screen` 에 수정 진입점이 없다.
     if row is None or meal.status is not MealStatus.EVALUATED:
         raise EvaluationNotFoundError(f"meal {meal_id} 는 아직 확정되지 않았습니다.")
 

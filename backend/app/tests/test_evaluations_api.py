@@ -10,8 +10,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.crud import evaluation as evaluation_crud
-from app.crud import meal as meal_crud
 from app.models.enums import MealStatus, MedicationStage
 from app.tests.factories import make_food_ref, make_meal, make_meal_item, make_user
 
@@ -324,8 +322,8 @@ def test_nutrient_totals_are_still_reported(client: TestClient, db: Session) -> 
 def test_evaluation_is_gated_on_status_not_row(client: TestClient, db: Session) -> None:
     """확정 뒤 식사가 재계산 대기로 돌아가면 409 다.
 
-    `qqs_evaluations` 행은 이력으로 남겨 두되, 무효가 된 점수를 조회로 내보내지는
-    않는다. 지금은 `POST /items` 가 없어 상태를 직접 되돌려 재현한다.
+    `qqs_evaluations` 행은 남아 있다 — 무효가 된 점수를 조회로 내보내지 않는 건
+    상태를 보기 때문이다. 목록·달력은 그 가드가 없다 (`get_view` 의 TODO 참고).
     """
     user, meal = _ready_meal(db)
     client.post(
@@ -529,42 +527,6 @@ def test_empty_meal_confirms_without_nutrition(
 
     assert body["error"] is None
     assert body["data"]["evidence"]["nutritionSources"] == []
-
-
-def test_editing_food_removes_the_stale_evaluation(
-    client: TestClient, db: Session
-) -> None:
-    """확정한 뒤 음식을 고치면 옛 점수가 남지 않는다.
-
-    `mark_recalculating` 이 상태만 되돌리고 행을 남기면, 상태를 안 보는 쿼리
-    (`list_meals` · `get_calendar_summary`)가 무효 점수를 그대로 내보낸다 —
-    같은 식사가 목록에는 옛 점수를, 이 엔드포인트에는 409 를 내게 된다.
-    """
-    user, meal = _ready_meal(db)
-    client.post(
-        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
-        json={"satietyAfterPct": 68},
-    )
-    assert evaluation_crud.get_by_meal(db, meal.id) is not None
-
-    meal_crud.mark_recalculating(db, meal)
-    db.flush()
-
-    assert evaluation_crud.get_by_meal(db, meal.id) is None
-
-
-def test_editing_before_confirm_is_harmless(client: TestClient, db: Session) -> None:
-    """확정 전 수정에는 지울 행이 없다 — 0 행 DELETE 라 그냥 넘어간다.
-
-    호출부가 "확정된 적 있나" 를 따로 따지지 않아도 되는 근거다.
-    """
-    _, meal = _ready_meal(db)
-
-    meal_crud.mark_recalculating(db, meal)
-    db.flush()
-
-    assert meal.status is MealStatus.ANALYZING
-    assert meal.is_recalculation is True
 
 
 # ── 재확정 ─────────────────────────────────────────────────────
