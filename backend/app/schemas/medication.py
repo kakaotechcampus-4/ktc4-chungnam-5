@@ -80,15 +80,14 @@ class DoseEvent(CamelModel):
 
 
 class MedicationRegisterResponse(CamelModel):
-    """`POST /medications` 응답.
+    """`POST /medications` 응답. 명세의 14필드다.
 
-    **`GET /medications/current` 와 필드가 다르다.** 겹치는 건 현재 상태 5개뿐이고,
-    이쪽은 "이번 요청으로 무엇이 바뀌었는가"(`doseChanged` · `doseEvent` ·
-    `stageChanged` · `decidedAt`)를 함께 내린다. 그래서 스키마를 따로 둔다 —
-    `CurrentMedicationResponse` 를 재사용하면 변경 여부를 실을 자리가 없다.
+    `GET /medications/current` 이 **이걸 상속한다** (명세: "동일 구조"). 그래서 필드가
+    같고, 조회에 대응물이 없는 `doseChanged` · `doseEvent` · `stageChanged` 는
+    그쪽에서 고정값이 된다 (`CurrentMedicationResponse` 참고).
 
-    명세에 없는 `effectiveFrom` 은 여기서 내리지 않는다. 현재 용량으로 바꾼 날은
-    `doseEvent.effectiveFrom` 에 이미 들어 있다.
+    명세에 없는 `effectiveFrom` 은 내리지 않는다. 현재 용량으로 바꾼 날은
+    `GET /medications/dose-events` 와 `doseEvent.effectiveFrom` 에 들어 있다.
     """
 
     medication_id: uuid.UUID = Field(
@@ -113,27 +112,38 @@ class MedicationRegisterResponse(CamelModel):
     )
 
 
-class CurrentMedicationResponse(CamelModel):
+class CurrentMedicationResponse(MedicationRegisterResponse):
     """`GET /medications/current`.
 
-    투약 기록이 없는 사용자도 200 이다 — stage=PRE_DOSE 에 나머지가 전부 null.
-    404 로 내리면 FE 가 "아직 투약 전"과 "에러"를 구분하지 못한다.
+    명세가 한 줄로 끝낸다 — **"`POST /medications` 응답과 동일 구조."** 그래서 필드를
+    새로 적지 않고 **상속한다.** 따로 나열하면 두 스키마가 조용히 갈라진다. 실제로
+    갈라져 있었다 — 이쪽만 `effectiveFrom` 을 들고 있었고 명세 14필드 중 7개가 없었다.
+
+    `medicationId` 가 필수라 **투약 기록이 있어야 만들 수 있다.** 기록이 없는 사용자는
+    이 응답을 만들 수 없고 `STAGE_NOT_SET` 으로 나간다 (명세 `GET /medications/current`).
+
+    아래 넷은 **구조상 늘 같은 값이다.** 쓰기 결과를 담는 자리라 조회에는 대응물이
+    없다. 빼지 않는 건 FE 가 파서를 하나만 쓰게 하려고 명세가 같은 모양을 요구해서다.
+    설명을 덮어써 두는 건 상속한 문구("이번 요청으로 …")가 조회에서는 거짓이라
+    openapi.json 이 FE 에게 잘못 말하기 때문이다.
+
+    **기본값을 주지 않는다.** 값이 정해져 있다고 `= False` 를 달면 openapi 의
+    `required` 에서 빠져 FE 코드 생성기가 선택 필드로 만든다 — 늘 실려 나가는데
+    FE 만 `undefined` 분기를 떠안는다. 서비스가 매번 명시적으로 채운다.
     """
 
-    stage: MedicationStage
-    drug_name: DrugName | None = None
-    dose_mg: float | None = None
-    dose_count: int | None = Field(
-        default=None, description="투약 회차 = floor((today - startedAt) / 7) + 1"
+    dose_changed: bool = Field(
+        description="조회는 아무것도 바꾸지 않는다 — 늘 false 다."
     )
-    started_at: date | None = Field(default=None, description="전체 투약 시작일")
-    effective_from: date | None = Field(
-        default=None, description="현재 용량으로 바꾼 날"
+    dose_event: DoseEvent | None = Field(
+        description="이번 요청으로 생긴 변경이 없다 — 늘 null 이다."
     )
-    next_dose_date: date | None = Field(
-        default=None,
-        description="다음 투약 예정일 = startedAt + 7 x doseCount. **예정이지 사실이 아니다.**",
+    stage_changed: bool = Field(
+        description="조회는 아무것도 바꾸지 않는다 — 늘 false 다."
     )
-    days_until_next_dose: int | None = Field(
-        default=None, description="D-day = nextDoseDate - today. 구조상 1~7 이다."
+    decided_at: KstDatetime = Field(
+        description=(
+            "단계를 판정한 시각 = 조회 시각. 저장된 단계를 읽는 게 아니라 **매 조회마다"
+            " 오늘 기준으로 다시 판정**하기 때문에 지금이 맞다 (`get_current_view`)."
+        )
     )
