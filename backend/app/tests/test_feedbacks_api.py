@@ -9,9 +9,11 @@ FE 가 실제로 보는 모양 — 응답 래퍼 · camelCase · 명세 필드 �
 import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.crud import meal as meal_crud
 from app.models.enums import MealStatus, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.tests.factories import make_food_ref, make_meal, make_user
@@ -82,6 +84,58 @@ def test_missing_feedback_is_pending_not_404(client: TestClient, db: Session) ->
     assert data["summary"] is None
     assert data["suggestions"] == []
     assert data["safetyStatus"] is None
+
+
+def test_editing_after_evaluation_hides_the_stale_feedback(
+    client: TestClient, db: Session
+) -> None:
+    """음식을 고치면 옛 문장을 내보내지 않는다.
+
+    문장은 고치기 전 끼니를 보고 쓴 것이라 이미 사실이 아니다 — "단백질이 부족했어요"
+    가 단백질을 더한 뒤에도 그대로 나간다. 확정 응답이 이때 `PENDING` 이므로 여기서
+    `READY` 를 내면 같은 끼니에 두 답이 된다.
+
+    실제 수정 경로가 부르는 `mark_recalculating` 을 그대로 쓴다 — 상태 상수를 손으로
+    넣으면 그 함수가 바뀌었을 때 이 테스트가 따라오지 못한다.
+    """
+    user, meal = _meal(db)
+    _add_feedback(db, meal)
+
+    meal_crud.mark_recalculating(db, meal)
+    db.flush()
+
+    data = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+    assert data["summary"] is None
+    assert data["reasoning"] is None
+    assert data["suggestions"] == []
+
+
+@pytest.mark.parametrize(
+    "status", [MealStatus.ANALYZING, MealStatus.REVIEW_REQUIRED, MealStatus.FAILED]
+)
+def test_only_evaluated_meals_serve_feedback(
+    client: TestClient, db: Session, status: MealStatus
+) -> None:
+    """확정 상태가 아닌 나머지 셋도 모두 막는다.
+
+    `ANALYZING` 만 막으면 남은 둘로 샌다. `EVALUATED` 를 통과 조건으로 두면 상태가
+    늘어도 기본값이 "안 내보낸다" 쪽이다.
+    """
+    user, meal = _meal(db)
+    _add_feedback(db, meal)
+    meal.status = status
+    db.flush()
+
+    data = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+    assert data["summary"] is None
 
 
 def test_ready_feedback_carries_the_text(client: TestClient, db: Session) -> None:

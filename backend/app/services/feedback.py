@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
+from app.models.enums import MealStatus
 from app.models.meal import Meal
 from app.schemas.feedback import (
     FeedbackSuggestion,
@@ -82,6 +83,24 @@ def get_feedback(
     정하고 가야 한다 — 장기 피드백은 `POST /insights/long-term/refresh` 가 따로 있다.
     """
     meal = _owned_meal(db, user_id, meal_id)
+
+    # **확정 상태가 아니면 저장된 문장을 내보내지 않는다.**
+    # 음식을 고치면 `crud/meal.py::mark_recalculating` 이 상태를 `ANALYZING` 으로
+    # 되돌리는데 `meal_feedbacks` 행은 남는다. 그 문장은 고치기 전 끼니를 보고 쓴
+    # 것이라 이미 사실이 아니다 — "단백질이 부족했어요" 가 단백질을 더한 뒤에도
+    # 그대로 나간다. `POST /meals/{mealId}/confirm` 은 이때 `PENDING` 을 내므로,
+    # 여기서 `READY` 를 내면 같은 끼니에 두 답이 된다.
+    #
+    # 🔗 점수(`qqs_evaluations`)는 같은 증상을 **행 삭제**로 막는다
+    # (`crud/meal.py::mark_recalculating`). 여기서 같은 방법을 쓰지 않는 이유는
+    # `daily_feedback_sources.meal_feedback_id` 가 `ON DELETE CASCADE` 라서다 —
+    # 행을 지우면 일일 피드백의 출처 링크가 조용히 사라지고 문장만 남는다.
+    # 점수 테이블에는 그런 자식이 없어 지워도 잃을 게 없었다.
+    #
+    # 🔗 명세상 `GET /meals/{mealId}` 상세도 같은 행을 싣는다(담당 박준혁, 미구현).
+    # 그쪽도 `status: EVALUATED` 일 때만 `feedback` 을 내보내야 한다.
+    if meal.status is not MealStatus.EVALUATED:
+        return MealFeedbackResponse.pending()
 
     row = feedback_crud.get_by_meal(db, meal.id)
     if row is None:
