@@ -12,7 +12,7 @@ from decimal import Decimal
 from types import MappingProxyType
 from typing import Final, NamedTuple
 
-from sqlalchemy import Numeric, and_, case, cast, func, select
+from sqlalchemy import Numeric, and_, case, cast, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -60,6 +60,23 @@ def upsert(
     row = db.execute(stmt).scalar_one()
     db.flush()
     return row
+
+
+def delete_by_meal(db: Session, meal_id: uuid.UUID) -> None:
+    """이 식사의 평가를 지운다. add/flush 까지만 — 커밋은 services 가 한다.
+
+    **음식이 바뀌면 그 점수는 무효다.** 상태를 `ANALYZING` 으로 되돌리는 것만으로는
+    부족하다 — `crud/meal.py` 의 `list_meals` · `get_calendar_summary` 처럼 상태를
+    안 보고 `qqs_evaluations` 를 join 하는 곳이 있어서, 같은 식사가 목록에는 옛 점수를
+    `GET /meals/{mealId}/evaluation` 에는 409 를 내는 상태가 된다.
+
+    읽는 쪽마다 필터를 다는 방법도 있지만 읽는 곳이 계속 는다(목록 · 달력 · 상세 ·
+    dashboard · insights · home). 한 곳만 빠뜨려도 조용히 새고, 테스트도 안 잡는다.
+
+    행이 없으면 아무 일도 일어나지 않는다 — `DELETE` 는 멱등이라 확정 전 수정에서도
+    그냥 0 행이다. 그래서 호출부가 "확정된 적 있나" 를 따질 필요가 없다.
+    """
+    db.execute(delete(QQSEvaluation).where(QQSEvaluation.meal_id == meal_id))
 
 
 # ── 채점 입력: 한 끼 영양 합계 ────────────────────────────────
