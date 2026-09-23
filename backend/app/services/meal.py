@@ -281,8 +281,8 @@ def get_calendar(db: Session, *, user_id: uuid.UUID, month: str) -> MealCalendar
     )
     stage_by_day = {
         row.day.date(): row.stage
-        for row in meal_crud.get_calendar_day_stages(
-            db, user_id=user_id, month_start=month_start, month_end=month_end
+        for row in meal_crud.get_day_stages(
+            db, user_id=user_id, range_start=month_start, range_end=month_end
         )
     }
 
