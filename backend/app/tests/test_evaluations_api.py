@@ -649,6 +649,37 @@ def test_missing_amount_says_so_instead_of_blaming_nutrition(
     assert "양을 모" not in body["error"]["message"]
 
 
+def test_both_exclusion_reasons_are_reported_together(
+    client: TestClient, db: Session
+) -> None:
+    """제외 사유가 둘이면 한 메시지에 둘 다 담는다.
+
+    먼저 걸리는 하나만 내보내면, 사용자가 영양정보를 다 채우고 다시 확정해야
+    비로소 양 안내를 본다 — 고칠 게 둘인 걸 모른 채 왕복하게 된다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
+    make_food_ref(db, food_ref_id="KFD_A", name="밥")
+    # 성분을 못 구한 항목
+    make_meal_item(db, meal_id=meal.id, food_ref_id=None, display_name="김치찌개")
+    # 성분은 구했는데 양이 g 으로 안 잡히는 항목
+    make_meal_item(
+        db,
+        meal_id=meal.id,
+        food_ref_id="KFD_A",
+        estimated_amount=None,
+        estimated_unit=None,
+    )
+
+    error = client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
+        json={"satietyAfterPct": 68},
+    ).json()["error"]
+
+    assert "영양정보를 찾지 못한" in error["message"]
+    assert "양을 g 으로 환산하지 못한" in error["message"]
+
+
 def test_unmatched_food_still_says_nutrition_not_found(
     client: TestClient, db: Session
 ) -> None:

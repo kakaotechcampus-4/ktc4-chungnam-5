@@ -33,31 +33,31 @@ def _respond(result: evaluation_service.EvaluationResult):
 
     실패가 아니라 단서다. `success` 는 참이고 `data` 도 그대로 있다.
     """
+    # 두 사유를 **한 메시지에 담는다.** 먼저 걸리는 하나만 내보내면, 사용자가
+    # 영양정보를 다 채우고 다시 확정해야 비로소 양 안내를 본다 — 고칠 게 둘인 걸
+    # 모른 채 왕복하게 된다.
+    #
+    # ⚠️ 코드는 하나뿐이다. 명세에 양 환산 실패 전용 코드가 없어서 둘 다
+    #    `NUTRITION_NOT_MATCHED` 로 나간다. FE 처리("해당 항목 직접 입력")가 양
+    #    문제에는 맞지 않으므로 코드 신설을 팀 안건으로 올릴 것.
+    reasons: list[str] = []
     if result.unmatched_items:
-        return ok_with_code(
-            result.view,
-            ErrorCode.NUTRITION_NOT_MATCHED,
-            f"영양정보를 찾지 못한 음식 {result.unmatched_items}개는 합계에서 빠졌어요.",
+        reasons.append(
+            f"영양정보를 찾지 못한 음식 {result.unmatched_items}개"
         )
     if result.items_without_amount:
-        # 성분은 찾았고 **양**이 g 으로 안 잡힌다. 두 경우가 섞여 있다 —
-        # 아무도 양을 말해 주지 않았거나, 사용자가 "2개" 라고 말했는데 g 으로
-        # 환산할 표가 없거나 (`crud/evaluation.py::_eaten_amount_g`).
-        #
-        # "양을 모른다" 고 쓰지 않는다. 사용자는 방금 "2개" 라고 **말했다** —
-        # 모르는 건 서버 쪽이다. 그렇게 안내하면 이미 적은 값을 또 적으라는 말이 된다.
-        #
-        # "영양정보를 찾지 못했다" 고도 쓸 수 없다. 그러면 영양정보 입력 화면으로
-        # 가서 아무리 넣어도 안 풀린다.
-        #
-        # ⚠️ 명세에 이 경우 전용 코드가 없다. `NUTRITION_NOT_MATCHED` 를 그대로
-        #    쓰되 메시지로 실제 원인을 말한다 — FE 처리("해당 항목 직접 입력")가
-        #    이 경우엔 맞지 않으므로 코드 신설을 팀 안건으로 올릴 것.
+        # 성분은 찾았고 **양**이 g 으로 안 잡힌다. "양을 모른다" 고 쓰지 않는다 —
+        # 사용자는 방금 "2개" 라고 말했고 모르는 건 서버 쪽이다. 그렇게 안내하면
+        # 이미 적은 값을 또 적으라는 말이 된다. "영양정보를 찾지 못했다" 고도 쓸 수
+        # 없다 — 그러면 영양정보 입력 화면에서 아무리 넣어도 안 풀린다.
+        reasons.append(
+            f"양을 g 으로 환산하지 못한 음식 {result.items_without_amount}개"
+        )
+    if reasons:
         return ok_with_code(
             result.view,
             ErrorCode.NUTRITION_NOT_MATCHED,
-            f"양을 g 으로 환산하지 못한 음식 {result.items_without_amount}개는 "
-            "합계에서 빠졌어요. 양을 g 으로 적어 주세요.",
+            f"{', '.join(reasons)}는 합계에서 빠졌어요.",
         )
     return ok(result.view)
 
