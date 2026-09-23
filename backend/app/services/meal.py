@@ -26,6 +26,7 @@ from app.schemas.meal import (
     MealDeleteResponse,
     MealItemCreateRequest,
     MealItemCreateResponse,
+    MealItemDeleteResponse,
     MealItemsUpdateResponse,
     MealItemUpdate,
     MealListItem,
@@ -94,6 +95,28 @@ def _is_editable(meal: Meal) -> bool:
     if meal.status in _EDITABLE_STATUSES:
         return True
     return meal.status is MealStatus.ANALYZING and meal.is_recalculation
+
+
+def _editable_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal:
+    """지금 음식을 고칠 수 있는 식사를 가져오거나 예외를 던진다.
+
+    음식을 더하고·고치고·빼는 세 경로가 똑같은 관문을 지난다 — 어느 하나만
+    느슨해지면 그 경로로만 남의 식사가 새거나, 워커가 `meal_items` 를 갈아엎는
+    중간에 끼어든다. 그래서 복사본을 두지 않고 여기서만 판단한다.
+
+    없는 식사·남의 식사·삭제된 식사는 전부 `MealNotFoundError` 로 같다
+    (`crud.meal.get_owned_meal` 의 단일 WHERE — 소유권 누출 방지).
+    고칠 수 없는 상태라면 `MealNotEditableError` 다(`_is_editable` 참고).
+    """
+    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+
+    if not _is_editable(meal):
+        raise MealNotEditableError(
+            f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
+        )
+    return meal
 
 
 def to_grams(amount: float | Decimal | None, unit: str | None) -> Decimal | None:
@@ -315,14 +338,7 @@ def add_item(
     표시다. 해소는 사용자가 [확인] 을 누를 때 `POST /meals/{mealId}/confirm` 이
     한다 — `add_meal_item` 독스트링의 의존성 항목 참고.
     """
-    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
-    if meal is None:
-        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
-
-    if not _is_editable(meal):
-        raise MealNotEditableError(
-            f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
-        )
+    meal = _editable_meal(db, user_id=user_id, meal_id=meal_id)
 
     item = meal_crud.add_item(
         db,
@@ -448,14 +464,7 @@ def update_items(
     **아무것도 반영하지 않는다.** 확인 화면은 여러 항목을 한 번에 보내므로, 절반만
     반영되면 사용자는 화면과 서버 중 어느 쪽이 맞는지 알 수 없다.
     """
-    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
-    if meal is None:
-        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
-
-    if not _is_editable(meal):
-        raise MealNotEditableError(
-            f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
-        )
+    meal = _editable_meal(db, user_id=user_id, meal_id=meal_id)
 
     items = meal_crud.get_items_by_ids(
         db, meal_id=meal.id, item_ids=[update.request.item_id for update in resolved]
@@ -550,4 +559,44 @@ def update_items(
         status=meal.status,
         is_recalculation=meal.is_recalculation,
         steps=list(RECALCULATION_STEPS),
+    )
+
+
+def delete_item(
+    db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID, item_id: uuid.UUID
+) -> MealItemDeleteResponse:
+    """사용자가 확인 화면에서 뺀 음식을 지우고 재계산 대기로 표시한다.
+
+    `add_item` · `update_items` 와 같은 순서를 따른다 — 식사를 소유권째 확인하고,
+    지금 고칠 수 있는 상태인지 보고, 바꾼 뒤 커밋한다(README 절대 규칙 5).
+
+    ## 마지막 항목도 지울 수 있다
+
+    항목이 0 개인 식사가 남는다. 막으면 "AI 가 잘못 인식한 유일한 항목을 지우고
+    올바른 걸 넣기" 가 POST 를 먼저 해야 하는 순서 제약이 되고, 사용자는 왜 그
+    순서여야 하는지 알 길이 없다. 식사를 통째로 지우는 경로는
+    `DELETE /meals/{mealId}` 로 이미 따로 있다.
+
+    ## 여기서 비동기 작업을 만들지 않는다
+
+    사용자가 뺀 음식이라 AI 에게 물을 것이 없고, 다시 계산할 Q/Q/S 는 순수 함수라
+    0.01 초면 끝난다(README 절대 규칙 2). `ANALYZING` 은 "워커가 도는 중" 이 아니라
+    **"점수가 아직 유효하지 않다"** 는 표시이며, 해소는 사용자가 [확인] 을 누를 때
+    불리는 `POST /meals/{mealId}/confirm` 이 한다 — `add_item` 과 같다.
+    """
+    meal = _editable_meal(db, user_id=user_id, meal_id=meal_id)
+
+    item = meal_crud.get_item(db, meal_id=meal.id, item_id=item_id)
+    if item is None:
+        raise MealItemNotFoundError(f"item {item_id} 는 이 식사의 항목이 아닙니다.")
+
+    meal_crud.delete_item(db, item=item)
+    meal_crud.mark_recalculating(db, meal)
+
+    # 트랜잭션 경계는 services 가 정한다(README 절대 규칙 5).
+    db.commit()
+
+    return MealItemDeleteResponse(
+        status=meal.status,
+        is_recalculation=meal.is_recalculation,
     )
