@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.crud import meal as meal_crud
-from app.models.enums import MealStatus
+from app.models.enums import MealStatus, SafetyStatus
 from app.schemas.meal import MealScores
 from app.schemas.nutrition import NutritionInfo
 from app.services.meal import (
@@ -259,9 +259,19 @@ def test_build_feedback_none_when_missing():
 
 
 def test_build_feedback_maps_fields():
-    feedback_row = SimpleNamespace(body="요약", suggestions="제안")
+    feedback_row = SimpleNamespace(
+        body="요약", suggestions="제안", safety_status=SafetyStatus.SAFE
+    )
 
     summary = _build_feedback(feedback_row)
 
     assert summary.summary == "요약"
     assert summary.suggestions == "제안"
+
+
+def test_build_feedback_none_when_blocked():
+    feedback_row = SimpleNamespace(
+        body="요약", suggestions="제안", safety_status=SafetyStatus.BLOCKED
+    )
+
+    assert _build_feedback(feedback_row) is None

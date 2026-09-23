@@ -1,14 +1,14 @@
 """식사(meal) 관련 API 요청/응답 스키마."""
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, Field, StringConstraints, field_validator
 
 from app.models.enums import MealStatus, MealType, MedicationStage
-from app.schemas.base import CamelModel
+from app.schemas.base import CamelModel, KstDatetime
 from app.schemas.nutrition import NutritionInfo
 
 
@@ -25,7 +25,7 @@ class MealListItem(CamelModel):
 
     meal_id: uuid.UUID
     meal_type: MealType
-    eaten_at: datetime
+    eaten_at: KstDatetime
     stage: MedicationStage
     display_name: str
     thumbnail_url: str | None
@@ -52,7 +52,7 @@ class MealDeleteResponse(CamelModel):
     """DELETE /meals/{mealId} 응답."""
 
     meal_id: uuid.UUID
-    deleted_at: datetime
+    deleted_at: KstDatetime
     affected_insights: list[AffectedInsight]
 
 
@@ -326,7 +326,7 @@ class MealDetailResponse(CamelModel):
     is_recalculation: bool
     stage: MedicationStage
     meal_type: MealType
-    eaten_at: datetime
+    eaten_at: KstDatetime
     image_url: str | None
     steps: list[AnalysisStep]
     clarify_question: str | None

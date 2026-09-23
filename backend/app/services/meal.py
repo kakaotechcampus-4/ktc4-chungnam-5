@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.crud import meal as meal_crud
-from app.models.enums import MealItemSource, MealStatus
+from app.models.enums import MealItemSource, MealStatus, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.models.meal import Meal, MealItem, SatietyLog
 from app.schemas.meal import (
@@ -628,7 +628,7 @@ def _build_satiety(satiety_log: SatietyLog | None) -> SatietyDetail | None:
 
 
 def _build_feedback(feedback: MealFeedback | None) -> MealFeedbackSummary | None:
-    if feedback is None:
+    if feedback is None or feedback.safety_status == SafetyStatus.BLOCKED:
         return None
     return MealFeedbackSummary(summary=feedback.body, suggestions=feedback.suggestions)
 
