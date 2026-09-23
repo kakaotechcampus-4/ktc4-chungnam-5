@@ -4,6 +4,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'next_meal_suggestion_screen.dart';
 
 /// 식사 평가 (Q·Q·S) — Figma `hOxrHBitBpjwIBBg2GO49y` node `60:270`.
 ///
@@ -27,9 +28,15 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
 
   double _afterSatiety = 75;
 
+  /// 다음 끼니 제안 보기 → 다음 끼니 제안 화면(7번)으로 교체 이동.
   void _viewNextMealSuggestion() {
-    // TODO: feedback.meal 큐 등록 API 호출 후 "다음 끼니 제안" 화면(7번)으로 교체 이동.
+    // TODO: 이동 전에 feedback.meal 큐 등록 API 를 호출한다.
     //   (backend/app/worker/jobs/feedback_meal.py 주석: 이 버튼을 눌렀을 때 큐에 넣는다)
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => NextMealSuggestionScreen(mealId: widget.mealId),
+      ),
+    );
   }
 
   @override

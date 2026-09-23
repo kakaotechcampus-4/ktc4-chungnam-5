@@ -170,15 +170,17 @@ def test_decided_at_is_kst(client: TestClient, user_id: uuid.UUID) -> None:
     assert data["decidedAt"].endswith("+09:00"), data["decidedAt"]
 
 
-def _history(db: Session, user_id: uuid.UUID, *periods: tuple[str, str]) -> None:
-    """지난 구간들을 직접 깔아 둔다.
+def _history(db: Session, user_id: uuid.UUID, *periods: tuple[str, ...]) -> None:
+    """지난 구간들을 직접 깔아 둔다. `(용량, 시작일)` 또는 `(용량, 시작일, 약물)`.
 
-    `POST /medications` 로는 못 만든다 — 용량 변경은 언제나 **오늘부터**다
-    (`change_date = max(today, current.effective_from)`). 과거 날짜로 용량을 바꾼 척할
-    방법이 없고, 같은 날 여러 번 보내면 in_place 로 한 줄에 합쳐진다.
+    `POST /medications` 로는 못 만든다 — 용량 변경은 언제나 **오늘부터**라
+    (`change_date = today`) 과거 날짜로 바꾼 척할 방법이 없고, 같은 날 두 번째 등록은
+    정정으로 보아 409 다.
     """
     previous = None
-    for index, (dose, started) in enumerate(periods):
+    for index, period in enumerate(periods):
+        dose, started = period[0], period[1]
+        drug_name = period[2] if len(period) > 2 else "위고비"
         effective_from = date.fromisoformat(started)
         if previous is not None:
             medication_crud.close_current(
@@ -187,7 +189,7 @@ def _history(db: Session, user_id: uuid.UUID, *periods: tuple[str, str]) -> None
         previous = medication_crud.create(
             db,
             user_id=user_id,
-            drug_name="위고비",
+            drug_name=drug_name,
             dose_mg=Decimal(dose),
             injection_count=index + 1,
             stage=MedicationStage.TITRATION,
@@ -478,3 +480,214 @@ def test_current_is_scoped_to_the_caller(
     res = client.get("/api/v1/medications/current", headers=_h(other.id))
     assert res.status_code == 409
 
+
+
+# ── GET /medications/dose-events ────────────────────────────────
+
+
+def _events(client: TestClient, user_id: uuid.UUID) -> list[dict]:
+    res = client.get("/api/v1/medications/dose-events", headers=_h(user_id))
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["success"] is True and body["error"] is None
+    return body["data"]["events"]
+
+
+def test_dose_events_is_empty_before_any_registration(
+    client: TestClient, user_id: uuid.UUID
+) -> None:
+    """투약 전 사용자도 200 이다 — 빈 목록이 "아직 없다" 를 그대로 말한다.
+
+    404 로 내리면 FE 가 "아직 투약 전" 과 "에러" 를 구분하지 못한다.
+    """
+    assert _events(client, user_id) == []
+
+
+def test_dose_events_follow_the_spec_shape(client: TestClient, user_id: uuid.UUID) -> None:
+    """명세 `dose-events` 예시의 4필드. 초과도 누락도 없다."""
+    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt="2026-06-14")
+
+    (event,) = _events(client, user_id)
+    assert set(event) == {"doseEventId", "doseMg", "direction", "effectiveFrom"}
+    assert event["doseMg"] == 0.25
+    assert event["effectiveFrom"] == "2026-06-14"
+
+
+def test_first_event_is_maintain(client: TestClient, user_id: uuid.UUID) -> None:
+    """첫 등록은 비교할 이전 용량이 없다 — 명세 예시의 `de_001` 이 MAINTAIN 이다."""
+    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt="2026-06-14")
+
+    assert _events(client, user_id)[0]["direction"] == "MAINTAIN"
+
+
+def test_dose_events_are_oldest_first_with_directions(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """명세 예시 그대로 — 오래된 순, 앞 행 대비 방향.
+
+    0.25 → 0.5 → 1.0 → 0.5 로 올렸다 내린다. 마지막이 DECREASE 로 잡혀야
+    감량기 판정과 이력이 같은 사실을 말한다.
+    """
+    _history(
+        db,
+        user_id,
+        ("0.25", "2026-06-14"),
+        ("0.5", "2026-07-12"),
+        ("1.0", "2026-08-09"),
+        ("0.5", "2026-09-06"),
+    )
+
+    events = _events(client, user_id)
+    assert [e["effectiveFrom"] for e in events] == [
+        "2026-06-14", "2026-07-12", "2026-08-09", "2026-09-06",
+    ]
+    assert [e["doseMg"] for e in events] == [0.25, 0.5, 1.0, 0.5]
+    assert [e["direction"] for e in events] == [
+        "MAINTAIN", "INCREASE", "INCREASE", "DECREASE",
+    ]
+
+
+def test_drug_change_has_no_comparison_basis(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """약을 바꾸면 앞 행과 비교하지 않는다 — 사다리가 다르다.
+
+    위고비 2.4 → 마운자로 2.5 는 mg 만 보면 증량이지만 증량이 아니다. 사다리가
+    통째로 달라 나란히 둘 수 없다. 비교 기준이 없으므로 `MAINTAIN` 이다.
+
+    `previous_different_dose()` 가 단계 판정에서 같은 판단을 하고 `POST` 의
+    `doseEvent` 도 그 경로를 탄다 — 여기만 다르면 같은 사실에 두 답이 나온다.
+    """
+    _history(
+        db,
+        user_id,
+        ("1.7", "2026-06-14"),
+        ("2.4", "2026-07-12"),
+        ("2.5", "2026-08-09", "마운자로"),
+    )
+
+    directions = [e["direction"] for e in _events(client, user_id)]
+
+    assert directions == ["MAINTAIN", "INCREASE", "MAINTAIN"]
+
+
+def test_drug_change_downward_is_not_a_decrease(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """반대 방향도 같다 — 마운자로 15 → 위고비 2.4 는 감량이 아니다.
+
+    감량으로 잡히면 `REDUCED` 와 같은 사실을 말하는 것처럼 보이는데, 단계 판정은
+    약물이 바뀌면 이력을 끊어 그렇게 보지 않는다.
+    """
+    _history(
+        db,
+        user_id,
+        ("10.0", "2026-06-14", "마운자로"),
+        ("15.0", "2026-07-12", "마운자로"),
+        ("2.4", "2026-08-09"),
+    )
+
+    directions = [e["direction"] for e in _events(client, user_id)]
+
+    assert directions == ["MAINTAIN", "INCREASE", "MAINTAIN"]
+
+
+def _direction_from_both(
+    client: TestClient, user_id: uuid.UUID, **body: object
+) -> tuple[str, str]:
+    """방금 등록한 그 한 행을 `POST` 응답과 `GET` 목록 양쪽에서 읽어 방향만 꺼낸다.
+
+    `doseEventId` 로 짝지어 **같은 행**임을 못박는다 — 마지막 원소끼리 비교하면
+    정렬이 어긋났을 때도 통과해 버린다.
+    """
+    posted = _post(client, user_id, **body)["doseEvent"]
+    listed = {e["doseEventId"]: e for e in _events(client, user_id)}
+    assert posted["doseEventId"] in listed, (posted, listed)
+    return posted["direction"], listed[posted["doseEventId"]]["direction"]
+
+
+def test_post_and_dose_events_agree_across_a_drug_change(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """위 두 테스트가 `GET` 에서 확인한 규칙을 `POST` 도 지키는지 본다.
+
+    `register()` 가 직전 행의 용량(`current.dose_mg`)을 그대로 넘기던 때에는 위고비
+    2.4 → 마운자로 2.5 가 `POST` 에서 `INCREASE`, `GET` 에서 `MAINTAIN` 이었다 —
+    **같은 `doseEventId` 에 두 답**이다. 넘겨야 하는 값은 `previous_different_dose()`
+    가 계산해 둔 `context.previous_different_dose_mg` 이고, 그 함수는 약물이 바뀌면
+    None 을 준다.
+    """
+    _history(db, user_id, ("1.7", "2026-06-14"), ("2.4", "2026-07-12"))
+
+    posted, listed = _direction_from_both(
+        client, user_id, drugName="마운자로", doseMg=2.5
+    )
+
+    assert (posted, listed) == ("MAINTAIN", "MAINTAIN")
+
+
+def test_post_and_dose_events_agree_within_one_drug(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """약이 그대로면 증량은 여전히 증량이다 — 비교를 통째로 끊어 버린 게 아니다."""
+    _history(db, user_id, ("1.7", "2026-06-14"), ("2.4", "2026-07-12"))
+
+    posted, listed = _direction_from_both(
+        client, user_id, drugName="위고비", doseMg=5.0
+    )
+
+    assert (posted, listed) == ("INCREASE", "INCREASE")
+
+
+def test_same_dose_adds_no_event(client: TestClient, user_id: uuid.UUID) -> None:
+    """같은 값으로 다시 보내도 이력이 늘지 않는다 — 변경이 없으면 행도 안 생긴다."""
+    body = {"drugName": "위고비", "doseMg": 0.25, "startedAt": "2026-06-14"}
+    _post(client, user_id, **body)
+    _post(client, user_id, **body)
+
+    assert len(_events(client, user_id)) == 1
+
+
+def test_rejected_same_day_registration_adds_no_event(
+    client: TestClient, user_id: uuid.UUID
+) -> None:
+    """같은 날 재등록은 409 로 막히므로 이력이 늘지 않는다.
+
+    한 번도 맞은 적 없는 용량이 이력에 남으면 **감량 이력이 있는 것처럼 보인다** —
+    그건 사실이 아니다. 정정은 `PATCH` 가 맡는다.
+    """
+    today = date.today().isoformat()
+    _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt=today)
+    client.post(
+        "/api/v1/medications",
+        json={"drugName": "위고비", "doseMg": 0.5, "startedAt": today},
+        headers=_h(user_id),
+    )
+
+    (event,) = _events(client, user_id)
+    assert event["doseMg"] == 1.0
+
+
+def test_dose_events_are_scoped_to_the_caller(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """남의 이력이 섞이지 않는다."""
+    other = user_crud.create(
+        db, nickname="남", height_cm=Decimal("160"), baseline_meal_kcal=Decimal("600")
+    )
+    db.flush()
+    _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt="2026-06-14")
+
+    assert _events(client, other.id) == []
+
+
+def test_dose_events_without_header_is_401(client: TestClient) -> None:
+    assert client.get("/api/v1/medications/dose-events").status_code == 401
+
+
+def test_dose_events_for_unknown_user_is_404(client: TestClient) -> None:
+    """UUID 형식은 맞지만 없는 사용자는 404 다. 500 이 아니다."""
+    res = client.get("/api/v1/medications/dose-events", headers=_h(uuid.UUID(int=0)))
+
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "USER_NOT_FOUND"

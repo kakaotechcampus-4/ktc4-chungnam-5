@@ -16,6 +16,7 @@ from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
 from app.schemas.medication import (
     CurrentMedicationResponse,
+    DoseEventsResponse,
     MedicationRegisterRequest,
     MedicationRegisterResponse,
 )
@@ -89,3 +90,26 @@ def get_current_medication(
     투약 미등록은 409 `STAGE_NOT_SET` 이다 (명세). 없는 사용자는 404 다.
     """
     return ok(medication_service.get_current_view(db, user_id))
+
+
+@router.get(
+    "/medications/dose-events",
+    response_model=ApiResponse[DoseEventsResponse],
+    summary="용량 변경 이력",
+    # 422 는 GET /medications/current 와 같은 이유로 남긴다 — FastAPI 가
+    # `X-User-Id` 헤더를 파라미터로 세어 자동 생성한다.
+    responses=error_responses(401, 404, 422),
+)
+def list_dose_events(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[DoseEventsResponse]:
+    """용량을 바꿔 온 이력 전체. 오래된 순이다.
+
+    **기록이 없어도 200 이다** — `events: []`. "아직 투약 전"은 에러가 아니고,
+    빈 목록이 그 사실을 그대로 말한다. 없는 사용자만 404 다.
+
+    페이지네이션이 없다 — 명세에 커서가 없고, 한 사용자의 용량 변경은 주 단위라
+    수십 줄을 넘지 않는다. 필요해지면 `DoseEventsResponse` 에 커서를 더한다.
+    """
+    return ok(medication_service.list_dose_events(db, user_id))
