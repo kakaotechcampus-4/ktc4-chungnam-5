@@ -21,8 +21,10 @@ AUTHENTICATED_ROUTES = [
     ("/api/v1/meals/{meal_id}/items", "post"),
     ("/api/v1/meals/{meal_id}/items", "patch"),
     ("/api/v1/meals/{meal_id}/items/{item_id}", "delete"),
+    ("/api/v1/nutrition/candidates", "get"),
     ("/api/v1/users/me", "get"),
     ("/api/v1/users/me", "patch"),
+    ("/api/v1/dashboard", "get"),
     ("/api/v1/user-states", "post"),
     ("/api/v1/user-states/latest", "get"),
 ]
@@ -75,24 +77,32 @@ def test_default_validation_error_schema_is_removed(schema):
     assert "HTTPValidationError" not in schema["components"]["schemas"]
 
 
-def test_no_response_references_a_removed_schema(schema):
-    """문서의 모든 응답 $ref 가 components 에 실제로 있어야 한다.
+def test_no_route_references_the_removed_validation_schema(schema):
+    """지워진 `HTTPValidationError` 를 가리키는 `$ref` 가 남으면 안 된다.
 
-    custom_openapi 는 HTTPValidationError 정의를 지운다 — "라우트마다 422 를
-    ErrorResponse 로 명시해 두었으니 아무도 참조하지 않는다"는 전제다. 라우트가
-    422 선언을 빠뜨리면 FastAPI 가 넣은 기본 422 만 남아 그 전제가 깨지고,
-    정의가 없는 $ref 를 가리킨다 (FE 코드 생성기가 거기서 깨진다).
+    위 테스트는 컴포넌트가 **없는지**만 본다. 참조까지 보지 않으면, 라우트에
+    `responses=` 를 빠뜨렸을 때 FastAPI 가 자동 생성한 422 가 지워진 스키마를
+    가리킨 채로 통과한다. 그 문서는 Swagger UI 에서 에러가 나고
+    `openapi-generator` · `orval` 같은 코드 생성기가 죽는다 — FE 가 계약으로
+    읽는 문서다.
+
+    라우트를 새로 추가하면서 `responses` 를 빠뜨리는 **같은 실수를 전부** 잡는다.
     """
-    defined = set(schema["components"]["schemas"])
+    dangling = []
 
-    dangling = [
-        (path, method, status, content["schema"]["$ref"])
-        for path, methods in schema["paths"].items()
-        for method, operation in methods.items()
-        for status, response in operation["responses"].items()
-        for content in response.get("content", {}).values()
-        if "$ref" in content.get("schema", {})
-        and content["schema"]["$ref"].rsplit("/", 1)[-1] not in defined
-    ]
+    def walk(node, path=""):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "$ref" and "HTTPValidationError" in str(value):
+                    dangling.append(path)
+                walk(value, f"{path}/{key}")
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, f"{path}[{i}]")
 
-    assert dangling == []
+    walk(schema.get("paths", {}))
+
+    assert dangling == [], (
+        "지워진 스키마를 가리키는 $ref 가 있다. 해당 라우트에 "
+        "responses=error_responses(..., 422) 를 명시할 것: " + ", ".join(dangling)
+    )
