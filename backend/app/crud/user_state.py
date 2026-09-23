@@ -70,3 +70,22 @@ def get_latest_weight_before(
         .limit(1)
     )
     return db.execute(stmt).scalar_one_or_none()
+
+
+def get_latest(db: Session, *, user_id: uuid.UUID) -> UserState | None:
+    """recorded_at 이 가장 늦은 내 기록 1건. 없으면 None.
+
+    체중으로 거르지 않는다 (get_latest_weight 와 다르다). recorded_at 동률이면
+    created_at 이 늦은 것, 그래도 같으면 id 순으로 결정성만 확보한다.
+    """
+    stmt = (
+        select(UserState)
+        .where(UserState.user_id == user_id)
+        .order_by(
+            UserState.recorded_at.desc(),
+            UserState.created_at.desc(),
+            UserState.id.desc(),
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none()

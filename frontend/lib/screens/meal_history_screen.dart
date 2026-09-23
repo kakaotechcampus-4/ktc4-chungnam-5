@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../common/api_format.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_evaluation_screen.dart';
+import 'meal_input_screen.dart';
 import 'shared_meal_widgets.dart';
 
 // ── 모델 ────────────────────────────────────────────────────
@@ -143,36 +146,8 @@ class HistoryMeal {
   );
 }
 
-// ── 표시 문구 ────────────────────────────────────────────────
-// 열거형 → 한글 변환. 지금은 화면마다 갖고 있는데, 공용 모델 폴더가 생기면
-// 한곳으로 모아야 한다. 화면마다 다른 말이 되면 바로 티가 난다.
-
-String stageLabel(String stage) => switch (stage) {
-  'INITIAL' => '도입기',
-  'TITRATION' => '증량기',
-  'MAINTENANCE' => '유지기',
-  _ => stage,
-};
-
-String mealTypeLabel(String mealType) => switch (mealType) {
-  'BREAKFAST' => '아침',
-  'LUNCH' => '점심',
-  'DINNER' => '저녁',
-  'SNACK' => '간식',
-  _ => mealType,
-};
-
-/// 날짜만 있는 값(`2026-08-21`). 시간대 변환 없이 그대로 읽는다.
-DateTime parseApiDate(String value) => DateTime.parse(value);
-
-/// 시각이 붙은 값(`2026-08-21T08:20:00+09:00`).
-///
-/// `DateTime.parse` 는 오프셋을 UTC 로 접어 버려서 `.hour` 가 9시간 어긋난다.
-/// 명세상 모든 시각이 +09:00 이므로, 기기 시간대와 무관하게 그 벽시계 값을
-/// 그대로 보여 주려고 UTC 로 바꾼 뒤 9시간을 더한다.
-/// `toLocal()` 은 기기 설정에 휘둘려서 쓰지 않는다.
-DateTime parseApiDateTime(String value) =>
-    DateTime.parse(value).toUtc().add(const Duration(hours: 9));
+// 표시 문구·날짜 파싱(stageLabel · mealTypeLabel · parseApiDate*)은
+// `common/api_format.dart` 에 있다.
 
 /// `2026-08` 형식. 요청 쿼리에 쓴다.
 String formatApiMonth(DateTime d) =>
@@ -384,12 +359,27 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     _loadMeals();
   }
 
-  void _openMealInput() {
-    // TODO: 식사 입력 화면(3번)이 머지되면 연결한다.
+  /// 식사 기록 버튼 → 식사 입력 화면(3번). 돌아오면 끼니가 새로 기록됐을 수
+  /// 있으니 달력과 선택한 날의 목록을 다시 불러온다.
+  Future<void> _openMealInput() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const MealInputScreen()),
+    );
+    if (!mounted) return;
+    _loadCalendar();
+    _loadMeals();
   }
 
-  void _openEvaluation(HistoryMeal meal) {
-    // TODO: 식사 평가 화면(6번)이 머지되면 연결한다. meal.mealId 를 넘긴다.
+  /// 끼니 카드 탭 → 식사 평가 화면(6번). 돌아오면 목록을 다시 불러온다.
+  Future<void> _openEvaluation(HistoryMeal meal) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MealEvaluationScreen(mealId: meal.mealId),
+      ),
+    );
+    if (!mounted) return;
+    _loadCalendar();
+    _loadMeals();
   }
 
   static const List<String> _weekdayLabels = [
