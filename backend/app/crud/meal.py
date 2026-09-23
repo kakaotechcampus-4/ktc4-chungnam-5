@@ -272,6 +272,7 @@ def mark_recalculating(db: Session, meal: Meal) -> None:
     meal.is_recalculation = True
     evaluation_crud.delete_by_meal(db, meal.id)
 
+
 def get_items_by_ids(
     db: Session, *, meal_id: uuid.UUID, item_ids: Iterable[uuid.UUID]
 ) -> list[MealItem]:
