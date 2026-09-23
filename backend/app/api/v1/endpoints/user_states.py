@@ -37,7 +37,7 @@ def create_user_state(
 @router.get(
     "/user-states/latest",
     response_model=ApiResponse[UserStateResponse],
-    responses=error_responses(401, 404),
+    responses=error_responses(401, 404, 422),
 )
 def get_latest_user_state(
     user_id: uuid.UUID = Depends(get_current_user_id),

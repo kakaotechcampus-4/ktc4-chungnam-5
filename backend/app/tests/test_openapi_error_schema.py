@@ -73,3 +73,26 @@ def test_default_validation_error_schema_is_removed(schema):
     (`register_exception_handlers` 의 RequestValidationError 핸들러).
     """
     assert "HTTPValidationError" not in schema["components"]["schemas"]
+
+
+def test_no_response_references_a_removed_schema(schema):
+    """문서의 모든 응답 $ref 가 components 에 실제로 있어야 한다.
+
+    custom_openapi 는 HTTPValidationError 정의를 지운다 — "라우트마다 422 를
+    ErrorResponse 로 명시해 두었으니 아무도 참조하지 않는다"는 전제다. 라우트가
+    422 선언을 빠뜨리면 FastAPI 가 넣은 기본 422 만 남아 그 전제가 깨지고,
+    정의가 없는 $ref 를 가리킨다 (FE 코드 생성기가 거기서 깨진다).
+    """
+    defined = set(schema["components"]["schemas"])
+
+    dangling = [
+        (path, method, status, content["schema"]["$ref"])
+        for path, methods in schema["paths"].items()
+        for method, operation in methods.items()
+        for status, response in operation["responses"].items()
+        for content in response.get("content", {}).values()
+        if "$ref" in content.get("schema", {})
+        and content["schema"]["$ref"].rsplit("/", 1)[-1] not in defined
+    ]
+
+    assert dangling == []
