@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     evaluations,
+    feedbacks,
     meal_items,
     meals,
     medications,
@@ -18,3 +19,4 @@ api_router.include_router(users.router, tags=["users"])
 api_router.include_router(user_states.router, tags=["user-states"])
 api_router.include_router(medications.router, tags=["medications"])
 api_router.include_router(evaluations.router, tags=["evaluations"])
+api_router.include_router(feedbacks.router, tags=["feedbacks"])
