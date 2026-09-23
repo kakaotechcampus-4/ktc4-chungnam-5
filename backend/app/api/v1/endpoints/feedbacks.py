@@ -6,14 +6,18 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
 from app.core.errors import ApiError, ErrorCode
 from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
-from app.schemas.feedback import MealFeedbackResponse
+from app.schemas.feedback import (
+    MealFeedbackResponse,
+    SatietyCheckinRequest,
+    SatietyCheckinResponse,
+)
 from app.services import feedback as feedback_service
 
 router = APIRouter()
@@ -48,6 +52,38 @@ def get_meal_feedback(
     try:
         return ok(
             feedback_service.get_feedback(db, user_id=user_id, meal_id=meal_id)
+        )
+    except feedback_service.MealNotFoundError as exc:
+        raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None
+
+
+@router.post(
+    "/meals/{meal_id}/satiety-checkins",
+    response_model=ApiResponse[SatietyCheckinResponse],
+    status_code=status.HTTP_201_CREATED,
+    summary="사후 포만감",
+    responses=error_responses(401, 404, 422),
+)
+def add_satiety_checkin(
+    meal_id: uuid.UUID,
+    request: SatietyCheckinRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[SatietyCheckinResponse]:
+    """식후 몇 시간 뒤의 포만감을 남긴다.
+
+    **같은 시점을 다시 보내면 덮는다.** "식후 3시간 포만감" 은 하나이고, 더블탭이
+    그래프에 점 두 개를 만들면 안 된다. 그래서 새로 만들든 고치든 201 이다 —
+    사용자에게는 "이 시점의 기록이 생겼다" 로 같다.
+
+    **상태를 보지 않는다.** 포만감은 확정 여부와 무관하게 실제로 겪는 일이고,
+    명세에도 상태 조건이 없다.
+    """
+    try:
+        return ok(
+            feedback_service.add_checkin(
+                db, user_id=user_id, meal_id=meal_id, request=request
+            )
         )
     except feedback_service.MealNotFoundError as exc:
         raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None

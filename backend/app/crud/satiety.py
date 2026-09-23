@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models.meal import SatietyLog
+from app.models.satiety import SatietyCheckin
 
 
 def get_by_meal(db: Session, meal_id: uuid.UUID) -> SatietyLog | None:
@@ -45,6 +46,82 @@ def set_satiety_after(db: Session, *, meal_id: uuid.UUID, pct: int) -> SatietyLo
         index_elements=[SatietyLog.meal_id],
         set_={"satiety_after": pct},
     ).returning(SatietyLog)
+    row = db.execute(stmt).scalar_one()
+    db.flush()
+    return row
+
+
+def set_hunger_return(
+    db: Session, *, meal_id: uuid.UUID, minutes: int | None, comment: str | None
+) -> SatietyLog:
+    """체크인이 함께 보낸 "다시 배고파진 시각" 과 한마디를 기록한다.
+
+    체크인 행이 아니라 **`satiety_logs`** 에 넣는다. 명세의 `GET /meals/{mealId}` 가
+    이 둘을 `checkins[]` **바깥**에 두기 때문이다 — 식사당 하나다.
+
+        "satiety": { "beforePct": …, "afterPct": …,
+                     "checkins": [ … ],
+                     "hungerReturnMinutes": 60 }
+
+    **`satiety_before` · `satiety_after` 는 건드리지 않는다.** 식사 등록과 확정이
+    쓰는 칸이라, 체크인이 덮으면 그 기록이 사라진다 (`set_satiety_after` 와 같은 이유).
+
+    **`None` 은 덮지 않는다.** 체크인마다 두 값을 다 보내지는 않는데, 안 보낸 것을
+    NULL 로 쓰면 앞서 적어 둔 값이 지워진다. "안 보냈다" 와 "지워 달라" 는 다르다.
+    """
+    now = datetime.now(UTC)
+    values = {"meal_id": meal_id, "logged_at": now}
+    updates: dict[str, object] = {}
+    if minutes is not None:
+        values["hunger_return_minutes"] = minutes
+        updates["hunger_return_minutes"] = minutes
+    if comment is not None:
+        values["user_comment"] = comment
+        updates["user_comment"] = comment
+
+    stmt = insert(SatietyLog).values(**values)
+    if updates:
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[SatietyLog.meal_id], set_=updates
+        )
+    else:
+        # 둘 다 안 보냈다. 행이 없으면 만들기만 하고, 있으면 그대로 둔다.
+        stmt = stmt.on_conflict_do_nothing(index_elements=[SatietyLog.meal_id])
+    db.execute(stmt)
+    db.flush()
+
+    row = get_by_meal(db, meal_id)
+    assert row is not None  # 방금 만들었거나 이미 있었다
+    return row
+
+
+def upsert_checkin(
+    db: Session, *, meal_id: uuid.UUID, offset_hours: int, pct: int
+) -> SatietyCheckin:
+    """사후 포만감 한 건. add/flush 까지만 — 커밋은 services 가 한다.
+
+    **같은 시점을 다시 보내면 덮는다** (`UNIQUE (meal_id, checkin_offset_hours)`).
+    "식후 3시간 포만감" 은 하나이고, 더블탭이나 오입력이 그래프에 점 두 개를 만들면
+    안 된다.
+
+    **`ON CONFLICT` 한 문장이다.** 읽고 나서 넣으면 두 요청이 겹칠 때 두 번째가
+    UNIQUE 위반으로 죽는다 (`crud/evaluation.py::upsert` 와 같은 이유).
+
+    덮어써도 `id` 는 유지된다 — `ON CONFLICT DO UPDATE` 는 기존 행을 고치므로,
+    같은 시점의 체크인은 늘 같은 `checkinId` 를 갖는다.
+    """
+    stmt = (
+        insert(SatietyCheckin)
+        .values(meal_id=meal_id, checkin_offset_hours=offset_hours, satiety_pct=pct)
+        .on_conflict_do_update(
+            index_elements=[
+                SatietyCheckin.meal_id,
+                SatietyCheckin.checkin_offset_hours,
+            ],
+            set_={"satiety_pct": pct},
+        )
+        .returning(SatietyCheckin)
+    )
     row = db.execute(stmt).scalar_one()
     db.flush()
     return row

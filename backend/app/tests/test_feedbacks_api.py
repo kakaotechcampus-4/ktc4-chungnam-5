@@ -209,3 +209,120 @@ def test_feedback_without_header_is_401(client: TestClient, db: Session) -> None
     _, meal = _meal(db)
 
     assert client.get(f"/api/v1/meals/{meal.id}/feedback").status_code == 401
+
+
+# ── POST /meals/{mealId}/satiety-checkins ───────────────────────
+
+
+def _checkin(client: TestClient, user_id: uuid.UUID, meal_id: uuid.UUID, **body):
+    payload = {"checkinOffsetHours": 3, "satietyPct": 40} | body
+    return client.post(
+        f"/api/v1/meals/{meal_id}/satiety-checkins",
+        headers=_h(user_id),
+        json=payload,
+    )
+
+
+def test_checkin_returns_exactly_the_spec_fields(client: TestClient, db: Session) -> None:
+    """명세 5필드. `comment` 는 응답에 없다 — 방금 보낸 값이라 돌려줄 이유가 없다."""
+    user, meal = _meal(db)
+
+    res = _checkin(client, user.id, meal.id, hungerReturnMinutes=60, comment="배고팠어요")
+
+    assert res.status_code == 201, res.text
+    data = res.json()["data"]
+    assert set(data) == {
+        "checkinId", "mealId", "checkinOffsetHours", "satietyPct", "hungerReturnMinutes",
+    }
+    assert data["checkinOffsetHours"] == 3
+    assert data["satietyPct"] == 40
+    assert data["hungerReturnMinutes"] == 60
+
+
+def test_same_offset_overwrites_instead_of_stacking(
+    client: TestClient, db: Session
+) -> None:
+    """같은 시점을 다시 보내면 덮는다 — 그래프에 점 두 개가 생기면 안 된다.
+
+    `id` 도 유지된다. `ON CONFLICT DO UPDATE` 가 기존 행을 고치기 때문이다.
+    """
+    user, meal = _meal(db)
+
+    first = _checkin(client, user.id, meal.id, satietyPct=40).json()["data"]
+    second = _checkin(client, user.id, meal.id, satietyPct=25).json()["data"]
+
+    assert second["checkinId"] == first["checkinId"]
+    assert second["satietyPct"] == 25
+    rows = db.execute(
+        __import__("sqlalchemy").text(
+            "SELECT count(*) FROM satiety_checkins WHERE meal_id = :m"
+        ),
+        {"m": meal.id},
+    ).scalar_one()
+    assert rows == 1
+
+
+def test_different_offsets_are_separate_rows(client: TestClient, db: Session) -> None:
+    """시점이 다르면 각각 남는다 — 포만감이 시간에 따라 떨어지는 걸 보는 게 목적이다."""
+    user, meal = _meal(db)
+
+    a = _checkin(client, user.id, meal.id, checkinOffsetHours=1, satietyPct=80)
+    b = _checkin(client, user.id, meal.id, checkinOffsetHours=4, satietyPct=30)
+
+    assert a.json()["data"]["checkinId"] != b.json()["data"]["checkinId"]
+
+
+def test_checkin_does_not_touch_confirm_columns(client: TestClient, db: Session) -> None:
+    """`satiety_before` · `satiety_after` 는 식사 등록·확정이 쓰는 칸이다.
+
+    체크인이 덮으면 "먹기 전" 과 "먹은 직후" 기록이 사라진다.
+    """
+    from app.crud import satiety as satiety_crud
+
+    user, meal = _meal(db)
+    satiety_crud.set_satiety_after(db, meal_id=meal.id, pct=68)
+    db.flush()
+
+    _checkin(client, user.id, meal.id, hungerReturnMinutes=90)
+
+    db.expire_all()
+    log = satiety_crud.get_by_meal(db, meal.id)
+    assert log.satiety_after == 68
+    assert log.hunger_return_minutes == 90
+
+
+def test_omitted_hunger_return_does_not_erase_it(client: TestClient, db: Session) -> None:
+    """안 보낸 것과 지워 달라는 건 다르다."""
+    user, meal = _meal(db)
+    _checkin(client, user.id, meal.id, checkinOffsetHours=1, hungerReturnMinutes=60)
+
+    data = _checkin(client, user.id, meal.id, checkinOffsetHours=4).json()["data"]
+
+    assert data["hungerReturnMinutes"] == 60
+
+
+def test_checkin_on_other_users_meal_is_404(client: TestClient, db: Session) -> None:
+    _, meal = _meal(db)
+    other = make_user(db, nickname="남")
+
+    assert _checkin(client, other.id, meal.id).status_code == 404
+
+
+def test_out_of_range_checkin_is_422(client: TestClient, db: Session) -> None:
+    user, meal = _meal(db)
+
+    assert _checkin(client, user.id, meal.id, satietyPct=101).status_code == 422
+    assert _checkin(client, user.id, meal.id, checkinOffsetHours=100).status_code == 422
+
+
+def test_typo_field_is_rejected(client: TestClient, db: Session) -> None:
+    """extra="forbid" — 오타난 필드를 조용히 무시하면 그 값이 통째로 사라진다."""
+    user, meal = _meal(db)
+
+    res = client.post(
+        f"/api/v1/meals/{meal.id}/satiety-checkins",
+        headers=_h(user.id),
+        json={"checkinOffsetHours": 3, "satietyPct": 40, "hungerReturnMinute": 60},
+    )
+
+    assert res.status_code == 422

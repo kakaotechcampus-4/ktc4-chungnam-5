@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
+from pydantic import ConfigDict, Field
 
 from app.models.enums import FeedbackStatus, NutrientCode, SafetyStatus
 from app.schemas.base import CamelModel
@@ -99,3 +100,35 @@ class MealFeedbackResponse(CamelModel):
             expected_satiety_pct=None,
             safety_status=row.safety_status,
         )
+
+
+class SatietyCheckinRequest(CamelModel):
+    """`POST /meals/{mealId}/satiety-checkins` 요청.
+
+    extra="forbid": 오타난 필드를 조용히 무시하지 않는다. 이 요청은 선택 필드가 둘이라
+    `hungerReturnMinute` 같은 오타가 나면 그 값이 통째로 사라진다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    checkin_offset_hours: int = Field(ge=0, le=48)
+    """식후 몇 시간 뒤인지. 상한 48 은 명세에 근거가 없는 방어값이다 — 한 끼의
+    포만감을 이틀 뒤에 보고하는 건 입력 실수에 가깝다."""
+
+    satiety_pct: int = Field(ge=0, le=100)
+    hunger_return_minutes: int | None = Field(default=None, ge=0)
+    comment: str | None = None
+
+
+class SatietyCheckinResponse(CamelModel):
+    """명세 5필드.
+
+    `comment` 는 응답에 없다 — 명세 예시가 그렇고, 사용자가 방금 보낸 값이라
+    돌려줄 이유가 없다. `satiety_logs` 에는 저장된다.
+    """
+
+    checkin_id: uuid.UUID
+    meal_id: uuid.UUID
+    checkin_offset_hours: int
+    satiety_pct: int
+    hunger_return_minutes: int | None
