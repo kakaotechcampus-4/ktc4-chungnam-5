@@ -31,7 +31,19 @@ class MealFeedback(Base):
     )
 
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
-    suggestions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    suggestions: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
+    """다음 끼니 제안. **AI 계약(`ai-stub/schemas.py::Suggestion`) 모양 그대로** 담는다.
+
+        [{"foodName": "두부 반 모", "advice": "단백질을 10g 더 채워요",
+          "candidateFoodRefId": "KFD_01023"}]
+
+    `nutrients` 는 **여기 없다.** AI 계약이 "BE 가 food_refs 에서 채운다" 고 적어
+    두었고, 저장해 두면 `food_refs` 가 갱신될 때 낡는다. 읽을 때
+    `candidateFoodRefId` 로 조회해 채운다.
+
+    TEXT 가 아니라 JSONB 인 이유: 명세 응답이 객체 배열이고 AI 도 배열로 준다.
+    문자열로 담으면 컬럼 타입이 내용을 안 말해 주고, 깨진 JSON 이 들어가도 DB 가
+    안 막는다. `raw_ai_result` 가 이미 JSONB 라 선례도 있다."""
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     model_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
