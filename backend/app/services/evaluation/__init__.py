@@ -303,7 +303,12 @@ def get_view(
     return EvaluationResult(
         _build_view(
             meal,
-            stage=_stage_of(db, meal),
+            # **저장된 단계를 읽는다.** 스냅샷을 다시 보면 같은 사실에 진실이 둘이
+            # 된다 — 지금은 스냅샷이 식사당 불변이라 값이 같지만, 그 불변이 깨지는
+            # 순간 `confirm` 응답과 재조회가 다른 단계를 말하게 된다. 채점이 무엇을
+            # 기준으로 매겨졌는지는 `qqs_evaluations` 가 들고 있는 사실이다.
+            # 조회도 하나 줄어든다.
+            stage=row.stage_at_evaluation,
             totals=totals,
             scores=QqsScores(
                 quantity=_int(row.quantity_score),
