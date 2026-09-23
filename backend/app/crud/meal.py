@@ -323,6 +323,58 @@ def update_item(
     item.confidence = confidence
 
 
+def clear_item_manual_nutrition(db: Session, *, item: MealItem) -> None:
+    """직접 입력한 영양성분만 지운다. 커밋하지 않는다.
+
+    `food_ref_id` 는 건드리지 않는다 — 공공 DB 링크는 이름 규칙이 따로 정한다
+    (`services.meal.update_items`).
+    """
+    item.manual_kcal = None
+    item.manual_protein_g = None
+    item.manual_fat_g = None
+    item.manual_carb_g = None
+    item.manual_fiber_g = None
+    item.manual_sodium_mg = None
+
+
+def set_item_food_ref(db: Session, *, item: MealItem, food_ref_id: str | None) -> None:
+    """항목이 가리키는 공공 DB 음식을 바꾼다. 커밋하지 않는다.
+
+    `db` 를 받지만 쓰지 않는다 — `update_item` · `mark_recalculating` 과 같은 이유다.
+
+    양(`confirmed_*`)은 건드리지 않는다. 사용자가 고친 건 "이 음식이 무엇인가" 이지
+    "얼마나 먹었는가" 가 아니다.
+    """
+    item.food_ref_id = food_ref_id
+
+
+def set_item_manual_nutrition(
+    db: Session,
+    *,
+    item: MealItem,
+    kcal: Decimal | None,
+    protein_g: Decimal | None,
+    fat_g: Decimal | None,
+    carb_g: Decimal | None,
+    fiber_g: Decimal | None,
+    sodium_mg: Decimal | None,
+) -> None:
+    """사용자가 직접 적은 영양성분을 항목에 쓴다. 커밋하지 않는다.
+
+    **섭취량 기준 총량이다** — 기준량이 아니므로 읽을 때 환산하지 않는다
+    (`MealItem` 의 컬럼 주석).
+
+    여섯 값을 각각 받는 건 `crud/` 가 `schemas/` 를 모르기 때문이다 — 이 레이어는
+    DB 접근만 한다.
+    """
+    item.manual_kcal = kcal
+    item.manual_protein_g = protein_g
+    item.manual_fat_g = fat_g
+    item.manual_carb_g = carb_g
+    item.manual_fiber_g = fiber_g
+    item.manual_sodium_mg = sodium_mg
+
+
 def add_correction(
     db: Session,
     *,
