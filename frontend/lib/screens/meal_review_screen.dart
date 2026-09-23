@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_evaluation_screen.dart';
 
 class Nutrition {
   final int kcal;
@@ -257,12 +258,19 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
   Future<void> _confirmAndEvaluate() async {
     setState(() => isConfirming = true);
     try {
-      final result = await _api.confirmMeal(widget.mealId);
+      await _api.confirmMeal(widget.mealId);
       if (!mounted) return;
+      // 확정 완료 → 식사 평가 화면(6번)으로 교체 이동.
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => MealEvaluationScreen(mealId: widget.mealId),
+        ),
+      );
     } catch (e) {
+      if (!mounted) return;
       setState(() => errorMessage = '확정 실패: $e');
     } finally {
-      setState(() => isConfirming = false);
+      if (mounted) setState(() => isConfirming = false);
     }
   }
 

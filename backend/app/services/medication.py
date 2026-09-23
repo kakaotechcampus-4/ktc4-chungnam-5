@@ -39,6 +39,7 @@ from app.schemas.medication import (
     CurrentMedicationResponse,
     DoseDirection,
     DoseEvent,
+    DoseEventsResponse,
     MedicationRegisterRequest,
     MedicationRegisterResponse,
 )
@@ -516,7 +517,14 @@ def register(
         record,
         dose_changed=True,
         stage_changed=record.stage != current.stage,
-        previous_dose_mg=current.dose_mg,
+        # **직전 행의 용량이 아니라 `previous_different_dose()` 의 답이다.**
+        # 약물이 바뀌면 그 함수가 None 을 준다 — 사다리가 통째로 달라 mg 를 나란히
+        # 둘 수 없어서다(위고비 2.4 다음 마운자로 2.5 는 증량이 아니다).
+        #
+        # `current.dose_mg` 를 그냥 넘기면 약물 경계에서 INCREASE 가 나가고,
+        # 같은 이벤트를 `GET /medications/dose-events` 는 MAINTAIN 으로 센다 —
+        # 같은 doseEventId 에 두 답이 나온다.
+        previous_dose_mg=context.previous_different_dose_mg,
     )
 
 
@@ -578,6 +586,51 @@ def get_current_view(
         stage_changed=False,
         decided_at=datetime.now(timezone.utc),
     )
+
+
+def list_dose_events(db: Session, user_id: uuid.UUID) -> DoseEventsResponse:
+    """`GET /medications/dose-events` 응답. 오래된 순이다.
+
+    **행 하나가 곧 이벤트 1건이다** — 별도 이벤트 테이블이 없다 (`DoseEvent` 독스트링).
+
+    `direction` 은 저장하지 않고 **바로 앞 행과 비교해 매번 계산한다.** 저장하면 같은
+    사실이 행과 이벤트 두 곳에 남아 어긋날 수 있는데, 계산은 앞 행 하나만 보면 된다.
+    첫 행은 비교 대상이 없어 `MAINTAIN` 이다 (명세 예시의 `de_001`).
+
+    **약물이 바뀌면 앞 행과 비교하지 않는다.** 사다리가 통째로 달라 mg 를 나란히 둘 수
+    없다 — 위고비 2.4 다음 마운자로 2.5 는 증량이 아니고, 마운자로 15 다음 위고비 2.4 도
+    감량이 아니다. 비교 기준이 없는 것이므로 `MAINTAIN` 이다(그 값의 뜻이 "유지"가 아니라
+    **"비교할 이전 용량이 없다"** 이다 — `DoseDirection.MAINTAIN` 독스트링).
+
+    `previous_different_dose()` 가 단계 판정에서 같은 판단을 한다. `POST /medications` 의
+    `doseEvent` 도 그 경로를 타므로, 여기만 다르게 세면 같은 사실에 두 답이 나온다.
+
+    **정정은 여기 안 나온다.** `register()` 가 등록만 하므로 한 번도 맞은 적 없는
+    용량은 애초에 행이 되지 않는다. 정정은 `PATCH` 가 맡는다.
+
+    기록이 없으면 `events: []` 다. 404 가 아니다 — "아직 투약 전"은 정상 상태이고
+    빈 목록이 그 사실을 그대로 말한다.
+    """
+    if user_crud.get(db, user_id) is None:
+        raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
+
+    events: list[DoseEvent] = []
+    previous: tuple[str, Decimal] | None = None
+    for record in crud.list_history(db, user_id):
+        same_drug = previous is not None and previous[0] == record.drug_name
+        events.append(
+            DoseEvent(
+                dose_event_id=record.id,
+                dose_mg=record.dose_mg,
+                direction=dose_direction(
+                    record.dose_mg,
+                    previous_dose_mg=previous[1] if same_drug else None,
+                ),
+                effective_from=record.effective_from,
+            )
+        )
+        previous = (record.drug_name, record.dose_mg)
+    return DoseEventsResponse(events=events)
 
 
 def _build_dose_event(result: RegisterResult) -> DoseEvent | None:
