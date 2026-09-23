@@ -517,7 +517,14 @@ def register(
         record,
         dose_changed=True,
         stage_changed=record.stage != current.stage,
-        previous_dose_mg=current.dose_mg,
+        # **직전 행의 용량이 아니라 `previous_different_dose()` 의 답이다.**
+        # 약물이 바뀌면 그 함수가 None 을 준다 — 사다리가 통째로 달라 mg 를 나란히
+        # 둘 수 없어서다(위고비 2.4 다음 마운자로 2.5 는 증량이 아니다).
+        #
+        # `current.dose_mg` 를 그냥 넘기면 약물 경계에서 INCREASE 가 나가고,
+        # 같은 이벤트를 `GET /medications/dose-events` 는 MAINTAIN 으로 센다 —
+        # 같은 doseEventId 에 두 답이 나온다.
+        previous_dose_mg=context.previous_different_dose_mg,
     )
 
 

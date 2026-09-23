@@ -592,6 +592,53 @@ def test_drug_change_downward_is_not_a_decrease(
     assert directions == ["MAINTAIN", "INCREASE", "MAINTAIN"]
 
 
+def _direction_from_both(
+    client: TestClient, user_id: uuid.UUID, **body: object
+) -> tuple[str, str]:
+    """방금 등록한 그 한 행을 `POST` 응답과 `GET` 목록 양쪽에서 읽어 방향만 꺼낸다.
+
+    `doseEventId` 로 짝지어 **같은 행**임을 못박는다 — 마지막 원소끼리 비교하면
+    정렬이 어긋났을 때도 통과해 버린다.
+    """
+    posted = _post(client, user_id, **body)["doseEvent"]
+    listed = {e["doseEventId"]: e for e in _events(client, user_id)}
+    assert posted["doseEventId"] in listed, (posted, listed)
+    return posted["direction"], listed[posted["doseEventId"]]["direction"]
+
+
+def test_post_and_dose_events_agree_across_a_drug_change(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """위 두 테스트가 `GET` 에서 확인한 규칙을 `POST` 도 지키는지 본다.
+
+    `register()` 가 직전 행의 용량(`current.dose_mg`)을 그대로 넘기던 때에는 위고비
+    2.4 → 마운자로 2.5 가 `POST` 에서 `INCREASE`, `GET` 에서 `MAINTAIN` 이었다 —
+    **같은 `doseEventId` 에 두 답**이다. 넘겨야 하는 값은 `previous_different_dose()`
+    가 계산해 둔 `context.previous_different_dose_mg` 이고, 그 함수는 약물이 바뀌면
+    None 을 준다.
+    """
+    _history(db, user_id, ("1.7", "2026-06-14"), ("2.4", "2026-07-12"))
+
+    posted, listed = _direction_from_both(
+        client, user_id, drugName="마운자로", doseMg=2.5
+    )
+
+    assert (posted, listed) == ("MAINTAIN", "MAINTAIN")
+
+
+def test_post_and_dose_events_agree_within_one_drug(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """약이 그대로면 증량은 여전히 증량이다 — 비교를 통째로 끊어 버린 게 아니다."""
+    _history(db, user_id, ("1.7", "2026-06-14"), ("2.4", "2026-07-12"))
+
+    posted, listed = _direction_from_both(
+        client, user_id, drugName="위고비", doseMg=5.0
+    )
+
+    assert (posted, listed) == ("INCREASE", "INCREASE")
+
+
 def test_same_dose_adds_no_event(client: TestClient, user_id: uuid.UUID) -> None:
     """같은 값으로 다시 보내도 이력이 늘지 않는다 — 변경이 없으면 행도 안 생긴다."""
     body = {"drugName": "위고비", "doseMg": 0.25, "startedAt": "2026-06-14"}
