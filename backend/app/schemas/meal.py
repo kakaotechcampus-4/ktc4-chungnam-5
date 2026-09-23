@@ -251,3 +251,27 @@ class MealItemDeleteResponse(CamelModel):
 
     status: MealStatus
     is_recalculation: bool
+
+
+# 최초 분석 중일 때의 고정 steps. RECALCULATION_STEPS 와 같은 이유로 고정값이다 —
+# 이 시스템엔 세부 진행상황을 기록하는 컬럼이 없다.
+INITIAL_ANALYSIS_STEPS: tuple[AnalysisStep, ...] = (
+    AnalysisStep(key="FOOD_RECOGNITION", state="RUNNING"),
+    AnalysisStep(key="DB_MATCHING", state="PENDING"),
+    AnalysisStep(key="STAGE_RULE_APPLY", state="PENDING"),
+)
+
+# POST /meals 202 응답의 고정값. 진짜 진행률이 아니다 — FE 가 이 주기로 GET
+# /meals/{mealId} 를 폴링하라는 안내일 뿐, 서버가 이 시간 안에 끝낸다는 보장이 아니다.
+MEAL_ANALYSIS_POLL_INTERVAL_MS = 1500
+MEAL_ANALYSIS_TIMEOUT_MS = 30000
+
+
+class MealCreateResponse(CamelModel):
+    """POST /meals 응답 (202)."""
+
+    meal_id: uuid.UUID
+    status: MealStatus
+    steps: list[AnalysisStep]
+    poll_interval_ms: int
+    timeout_ms: int

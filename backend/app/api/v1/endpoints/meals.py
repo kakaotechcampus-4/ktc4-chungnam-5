@@ -1,17 +1,174 @@
 """식사(meal) 관련 공개 API."""
 
 import uuid
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
 from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
-from app.schemas.meal import MealCalendarResponse, MealDeleteResponse, MealListResponse
+from app.infra.storage import FileStorage, get_file_storage
+from app.models.enums import MealType
+from app.schemas.meal import (
+    MealCalendarResponse,
+    MealCreateResponse,
+    MealDeleteResponse,
+    MealListResponse,
+)
 from app.services import meal as meal_service
 
 router = APIRouter()
+
+
+@dataclass
+class _ParsedMealInput:
+    """멀티파트(사진)·JSON(텍스트) 두 형식을 같은 모양으로 정리한 결과."""
+
+    meal_type: MealType
+    eaten_at: datetime
+    raw_text: str | None
+    image_bytes: bytes | None
+    image_filename: str | None
+    satiety_before_pct: int | None
+
+
+def _parse_meal_type(value: object) -> MealType:
+    if value is None:
+        raise HTTPException(status_code=422, detail="mealType 은 필수입니다.")
+    try:
+        return MealType(value)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail=f"알 수 없는 mealType 입니다: {value!r}"
+        ) from exc
+
+
+def _parse_eaten_at(value: object) -> datetime:
+    if value is None:
+        raise HTTPException(status_code=422, detail="eatenAt 은 필수입니다.")
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail=f"eatenAt 형식이 올바르지 않습니다: {value!r}"
+        ) from exc
+
+
+def _parse_satiety_before_pct(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        pct = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=422, detail="satietyBeforePct 는 정수여야 합니다."
+        ) from exc
+    if not (0 <= pct <= 100):
+        raise HTTPException(
+            status_code=422, detail="satietyBeforePct 는 0~100 사이여야 합니다."
+        )
+    return pct
+
+
+async def _parse_multipart_input(request: Request) -> _ParsedMealInput:
+    """사진 입력. `image` 파일 하나 + 폼 필드들."""
+    form = await request.form()
+    image = form.get("image")
+    if image is None or isinstance(image, str):
+        raise HTTPException(status_code=422, detail="image 파일이 필요합니다.")
+
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(status_code=422, detail="빈 이미지 파일입니다.")
+
+    return _ParsedMealInput(
+        meal_type=_parse_meal_type(form.get("mealType")),
+        eaten_at=_parse_eaten_at(form.get("eatenAt")),
+        raw_text=None,
+        image_bytes=image_bytes,
+        image_filename=image.filename,
+        satiety_before_pct=_parse_satiety_before_pct(form.get("satietyBeforePct")),
+    )
+
+
+async def _parse_json_input(request: Request) -> _ParsedMealInput:
+    """텍스트 입력. AI 가 인식할 게 없으니 `rawText` 가 필수다."""
+    try:
+        body = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="잘못된 JSON 입니다.") from exc
+
+    raw_text = body.get("rawText")
+    if not raw_text or not str(raw_text).strip():
+        raise HTTPException(status_code=422, detail="rawText 는 필수입니다.")
+
+    return _ParsedMealInput(
+        meal_type=_parse_meal_type(body.get("mealType")),
+        eaten_at=_parse_eaten_at(body.get("eatenAt")),
+        raw_text=str(raw_text).strip(),
+        image_bytes=None,
+        image_filename=None,
+        satiety_before_pct=_parse_satiety_before_pct(body.get("satietyBeforePct")),
+    )
+
+
+@router.post(
+    "/meals",
+    status_code=202,
+    response_model=ApiResponse[MealCreateResponse],
+    responses=error_responses(401, 422),
+)
+async def create_meal(
+    request: Request,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    storage: FileStorage = Depends(get_file_storage),
+) -> ApiResponse[MealCreateResponse]:
+    """사진 또는 텍스트로 식사를 등록한다. 실제 분석은 워커가 비동기로 한다 (202).
+
+    `Content-Type` 으로 두 형식을 나눈다 — multipart 면 사진, JSON 이면 텍스트다.
+    FastAPI 는 `Form` 과 `Body`(JSON) 를 같은 라우트에 동시에 선언할 수 없어서,
+    `Request` 를 직접 받아 수동으로 분기한다.
+
+    사진 인식·`meal_items` 채우기(`worker/jobs/analyze_meal.py`)는 이번 범위 밖이다
+    — 큐에 작업만 넣고, 실제 AI 연동 로직은 아직 스켈레톤(TODO) 상태로 남겨둔다.
+    """
+    content_type = request.headers.get("content-type", "")
+
+    if content_type.startswith("multipart/form-data"):
+        parsed = await _parse_multipart_input(request)
+    elif content_type.startswith("application/json"):
+        parsed = await _parse_json_input(request)
+    else:
+        raise HTTPException(
+            status_code=422,
+            detail=f"지원하지 않는 Content-Type 입니다: {content_type!r}",
+        )
+
+    image_key: str | None = None
+    image_url: str | None = None
+    if parsed.image_bytes is not None:
+        ext = Path(parsed.image_filename or "").suffix or ".jpg"
+        image_key = f"meals/{uuid.uuid4()}{ext}"
+        storage.save(image_key, parsed.image_bytes)
+        image_url = storage.url(image_key)
+
+    return ok(
+        meal_service.create_meal(
+            db,
+            user_id=user_id,
+            meal_type=parsed.meal_type,
+            eaten_at=parsed.eaten_at,
+            image_key=image_key,
+            image_url=image_url,
+            raw_text=parsed.raw_text,
+            satiety_before_pct=parsed.satiety_before_pct,
+        )
+    )
 
 
 @router.get(
