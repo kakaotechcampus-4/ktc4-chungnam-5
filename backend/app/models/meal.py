@@ -146,6 +146,29 @@ class MealItem(Base):
     의존해서는 안 된다.
     """
 
+    # 사용자가 직접 적어 넣은 영양성분(`PUT /meals/{mealId}/items/{itemId}/nutrition`
+    # 의 `manual`). 여섯 컬럼이 `food_refs` 와 같은 타입·정밀도다 — 두 출처를 Q/Q/S
+    # 채점기가 한 규칙으로 합산해야 하기 때문이다.
+    #
+    # ⚠️ **기준량이 아니라 섭취량 기준 총량이다.** `food_refs` 의 성분값은
+    # `serving_size` 기준이라 먹은 양만큼 환산해야 하지만, 이쪽은 사용자가 "내가
+    # 먹은 만큼" 을 적은 값이라 그대로 쓴다. 그래서 **양이 바뀌면 거짓이 된다** —
+    # `services.meal.update_items` 가 이름·양이 실제로 바뀌면 여기를 NULL 로 되돌린다.
+    #
+    # 영양정보 출처(`nutritionSource`)는 저장하지 않고 이 컬럼들로 유도한다:
+    # 하나라도 차 있으면 USER_INPUT, 아니면 `food_ref_id` 환산이 되면 PUBLIC_DB.
+    #
+    # ⚠️ **그 유도를 직접 하지 말 것.** 출처 컬럼을 두지 않는 이 설계는 유도하는
+    # 코드가 한 곳일 때만 성립한다 — `services.meal.item_nutrition` 이 그 한 곳이고,
+    # 이 필드를 내보내는 응답은 전부 거기를 거쳐야 한다. 두 곳이 각자 계산하면 같은
+    # 항목이 화면마다 다른 출처로 보인다.
+    manual_kcal: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    manual_protein_g: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    manual_fat_g: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    manual_carb_g: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    manual_fiber_g: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    manual_sodium_mg: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+
     meal: Mapped["Meal"] = relationship(back_populates="items")
     corrections: Mapped[list["UserCorrection"]] = relationship(
         back_populates="meal_item", cascade="all, delete-orphan"
@@ -153,6 +176,20 @@ class MealItem(Base):
 
     __table_args__ = (
         CheckConstraint("confidence IS NULL OR confidence BETWEEN 0 AND 1", name="confidence_range"),
+        CheckConstraint(
+            " AND ".join(
+                f"({name} IS NULL OR {name} >= 0)"
+                for name in (
+                    "manual_kcal",
+                    "manual_protein_g",
+                    "manual_fat_g",
+                    "manual_carb_g",
+                    "manual_fiber_g",
+                    "manual_sodium_mg",
+                )
+            ),
+            name="manual_nutrition_non_negative",
+        ),
     )
 
 
