@@ -27,6 +27,26 @@ _MAX_IMAGE_BYTES = 10 * 1024 * 1024
 """업로드 이미지 최대 크기. `await image.read()` 가 파일 전체를 메모리에 올리므로
 크기 제한이 없으면 큰 파일 하나로 서버 메모리를 고갈시킬 수 있다."""
 
+_ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+def _has_known_image_signature(data: bytes) -> bool:
+    """매직 바이트로 실제 이미지 파일인지 확인한다.
+
+    `Content-Type` 헤더는 클라이언트가 마음대로 적어 보내는 값이라 그것만 믿으면
+    안 된다 — 실행 파일에 `Content-Type: image/jpeg` 를 붙여 보내도 헤더 검사는
+    통과한다. 파일 앞부분의 실제 바이트 시그니처를 봐야 진짜 그 형식인지 알 수
+    있다. `/media` 로 그대로 서빙되는 파일이라 여기서 막지 않으면 아무 파일이나
+    올려서 내려받는 통로가 된다.
+    """
+    if data.startswith(b"\xff\xd8\xff"):  # JPEG
+        return True
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):  # PNG
+        return True
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":  # WEBP
+        return True
+    return False
+
 
 @dataclass
 class _ParsedMealInput:
@@ -55,11 +75,18 @@ def _parse_eaten_at(value: object) -> datetime:
     if value is None:
         raise HTTPException(status_code=422, detail="eatenAt 은 필수입니다.")
     try:
-        return datetime.fromisoformat(str(value))
+        eaten_at = datetime.fromisoformat(str(value))
     except ValueError as exc:
         raise HTTPException(
             status_code=422, detail=f"eatenAt 형식이 올바르지 않습니다: {value!r}"
         ) from exc
+    # 시간대 없는 값은 KST 인지 UTC 인지 추측하지 않고 거부한다 (schemas/base.py 와 같은 규칙).
+    if eaten_at.tzinfo is None:
+        raise HTTPException(
+            status_code=422,
+            detail="eatenAt 에 시간대가 필요합니다. 예: 2026-09-23T12:30:00+09:00",
+        )
+    return eaten_at
 
 
 def _parse_satiety_before_pct(value: object) -> int | None:
@@ -84,6 +111,11 @@ async def _parse_multipart_input(request: Request) -> _ParsedMealInput:
     image = form.get("image")
     if image is None or isinstance(image, str):
         raise HTTPException(status_code=422, detail="image 파일이 필요합니다.")
+    if image.content_type not in _ALLOWED_IMAGE_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"지원하지 않는 이미지 형식입니다: {image.content_type!r}",
+        )
 
     image_bytes = await image.read(_MAX_IMAGE_BYTES + 1)
     if not image_bytes:
@@ -93,6 +125,8 @@ async def _parse_multipart_input(request: Request) -> _ParsedMealInput:
             status_code=422,
             detail=f"이미지 파일은 {_MAX_IMAGE_BYTES // (1024 * 1024)}MB 를 넘을 수 없습니다.",
         )
+    if not _has_known_image_signature(image_bytes):
+        raise HTTPException(status_code=422, detail="이미지 파일 형식이 올바르지 않습니다.")
 
     return _ParsedMealInput(
         meal_type=_parse_meal_type(form.get("mealType")),
