@@ -301,10 +301,15 @@ class SatietyDetail(CamelModel):
 
 
 class MealFeedbackSummary(CamelModel):
-    """status: EVALUATED 일 때만 채워지는 단기 피드백 요약."""
+    """status: EVALUATED 일 때만 채워지는 단기 피드백 요약.
+
+    `suggestions` 는 명세상 배열이다. DB(`meal_feedbacks.suggestions`)는 아직
+    Text 컬럼 하나라 실제로는 문장 하나뿐이지만, 응답 모양은 명세를 따른다 —
+    AI 가 여러 개의 제안을 실제로 만들게 되면 그때 DB 구조도 같이 정리한다.
+    """
 
     summary: str | None
-    suggestions: str | None
+    suggestions: list[str]
 
 
 class NutrientStatus(CamelModel):

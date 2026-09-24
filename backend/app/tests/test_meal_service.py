@@ -296,7 +296,18 @@ def test_build_feedback_maps_fields():
     summary = _build_feedback(feedback_row)
 
     assert summary.summary == "요약"
-    assert summary.suggestions == "제안"
+    assert summary.suggestions == ["제안"]
+
+
+def test_build_feedback_suggestions_empty_list_when_absent():
+    """DB 에 suggestions 가 없으면 null 이 아니라 빈 배열이어야 한다 (명세는 배열 타입)."""
+    feedback_row = SimpleNamespace(
+        body="요약", suggestions=None, safety_status=SafetyStatus.SAFE
+    )
+
+    summary = _build_feedback(feedback_row)
+
+    assert summary.suggestions == []
 
 
 def test_build_feedback_none_when_blocked():

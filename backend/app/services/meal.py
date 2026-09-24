@@ -698,7 +698,10 @@ def _build_feedback(feedback: MealFeedback | None) -> MealFeedbackSummary | None
     # SAFE 만 노출한다 — REVIEW_REQUIRED(가드레일 전)도 BLOCKED 와 똑같이 숨긴다.
     if feedback is None or feedback.safety_status is not SafetyStatus.SAFE:
         return None
-    return MealFeedbackSummary(summary=feedback.body, suggestions=feedback.suggestions)
+    # DB 는 아직 문장 하나(Text)뿐이라 배열로 감싼다 — 명세는 배열을 요구한다
+    # (PR #36 리뷰). 값이 없으면 다른 배열 필드들과 같이 빈 배열이지 null 이 아니다.
+    suggestions = [feedback.suggestions] if feedback.suggestions else []
+    return MealFeedbackSummary(summary=feedback.body, suggestions=suggestions)
 
 
 def build_meal_detail(
