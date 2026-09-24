@@ -101,8 +101,23 @@ class MealFeedbackResponse(CamelModel):
         """
         safe = row.safety_status is SafetyStatus.SAFE
         return cls(
-            # 생성은 끝났다. 내용을 보여줄 수 있는지는 safetyStatus 가 말한다.
-            feedback_status=FeedbackStatus.READY,
+            # `REVIEW_REQUIRED` 는 **아직**이다 — `PENDING` 을 낸다.
+            #
+            # 셋을 갈라서 본다. `READY` + `summary: null` 은 FE 에 빈 카드를 그리게
+            # 하는데, 그게 `body is None` 가드가 막으려던 바로 그 모양이다.
+            #   SAFE            내용을 싣는다                      → READY
+            #   BLOCKED         생성은 끝났고 영영 못 보여 준다.
+            #                   FE 는 상담 안내로 바꾼다
+            #                   (`MEDICAL_QUESTION_DETECTED` 동반) → READY
+            #   REVIEW_REQUIRED 검수를 통과하면 보일 수도 있다     → PENDING
+            #
+            # `safety_status` 의 `server_default` 가 `REVIEW_REQUIRED` 라 워커가
+            # 막 쓴 행이 전부 여기 걸린다 — 기본값이 "아직" 쪽이어야 맞다.
+            feedback_status=(
+                FeedbackStatus.READY
+                if safe or row.safety_status is SafetyStatus.BLOCKED
+                else FeedbackStatus.PENDING
+            ),
             summary=row.body if safe else None,
             reasoning=row.reasoning if safe else None,
             suggestions=suggestions if safe else [],

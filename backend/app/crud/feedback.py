@@ -105,8 +105,13 @@ def nutrients_by_food_ref(
     if not food_ref_ids:
         return {}
 
+    # 폭을 넉넉히 잡는다. 성분과 `serving_size` 가 둘 다 `Numeric(10, 3)` 이라
+    # 최악이 `9999999.999 * 100 / 0.001` = 약 1e12 인데, `Numeric(12, 3)` 은
+    # 999999999.999 까지라 **넘치면 500** 이 난다. `food_refs` 는 외부 DB 에서 온
+    # 값이라 그런 행이 없다고 장담할 수 없고, 그 한 행 때문에 끼니 피드백 전체를
+    # 못 읽게 된다 — NaN · 0 기준량을 거른 것과 같은 이유다.
     columns = [
-        cast(getattr(FoodRef, field) * 100 / FoodRef.serving_size, Numeric(12, 3))
+        cast(getattr(FoodRef, field) * 100 / FoodRef.serving_size, Numeric(18, 3))
         for _, field in _SUGGESTION_NUTRIENTS
     ]
     stmt = select(FoodRef.id, *columns).where(
