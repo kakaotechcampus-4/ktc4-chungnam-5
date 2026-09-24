@@ -1,15 +1,28 @@
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1 import api_router
 from app.core.response import register_exception_handlers
+from app.infra.storage import StorageSettings
 
 app = FastAPI(title="GLP-1 Meal Coach API", version="0.1.0")
 
 register_exception_handlers(app)
 app.include_router(api_router)
+
+# LocalDiskStorage 가 저장한 파일을 서빙한다. 실제 S3Storage 로 교체되면 이 마운트는
+# 필요 없어진다 — presigned URL 이 S3 를 직접 가리키게 된다.
+_storage_settings = StorageSettings()
+Path(_storage_settings.LOCAL_STORAGE_DIR).mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media",
+    StaticFiles(directory=_storage_settings.LOCAL_STORAGE_DIR),
+    name="media",
+)
 
 
 def custom_openapi() -> dict[str, Any]:

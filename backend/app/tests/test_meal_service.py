@@ -7,15 +7,25 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from app.crud import meal as meal_crud
+from app.crud.evaluation import NutrientTotals
+from app.models.enums import MealStatus, SafetyStatus
 from app.schemas.meal import MealScores
+from app.schemas.nutrition import NutritionInfo
 from app.services.meal import (
     MealNotFoundError,
+    _build_feedback,
+    _build_item_detail,
+    _build_nutrients,
+    _build_satiety,
     _build_scores,
     _build_thumbnail_url,
+    _parse_month_range,
+    _resolve_steps,
     decode_cursor,
     delete_meal,
     encode_cursor,
@@ -120,3 +130,230 @@ def test_delete_meal_builds_response_when_found(monkeypatch):
     assert response.meal_id == meal_id
     assert response.deleted_at == deleted_at
     assert response.affected_insights == []
+
+
+def test_parse_month_range_returns_kst_boundaries():
+    start, end = _parse_month_range("2026-08")
+
+    assert start == datetime(2026, 8, 1, tzinfo=ZoneInfo("Asia/Seoul"))
+    assert end == datetime(2026, 9, 1, tzinfo=ZoneInfo("Asia/Seoul"))
+
+
+def test_parse_month_range_rolls_over_year_at_december():
+    """12월이면 다음 달 시작이 해가 넘어가야 한다."""
+    _, end = _parse_month_range("2026-12")
+
+    assert end == datetime(2027, 1, 1, tzinfo=ZoneInfo("Asia/Seoul"))
+
+
+@pytest.mark.parametrize(
+    "garbage_month",
+    ["2026-13", "2026-00", "not-a-month", "2026", "2026-08-01"],
+)
+def test_parse_month_range_rejects_invalid_format(garbage_month):
+    with pytest.raises(ValueError):
+        _parse_month_range(garbage_month)
+
+
+def _fake_item(
+    *,
+    confirmed_amount=None,
+    confirmed_amount_g=None,
+    confirmed_unit=None,
+    estimated_amount=None,
+    estimated_amount_g=None,
+    estimated_unit=None,
+    confidence=None,
+    manual_kcal=None,
+    manual_protein_g=None,
+    manual_fat_g=None,
+    manual_carb_g=None,
+    manual_fiber_g=None,
+    manual_sodium_mg=None,
+):
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        display_name="테스트 음식",
+        confidence=confidence,
+        confirmed_amount=confirmed_amount,
+        confirmed_amount_g=confirmed_amount_g,
+        confirmed_unit=confirmed_unit,
+        estimated_amount=estimated_amount,
+        estimated_amount_g=estimated_amount_g,
+        estimated_unit=estimated_unit,
+        manual_kcal=manual_kcal,
+        manual_protein_g=manual_protein_g,
+        manual_fat_g=manual_fat_g,
+        manual_carb_g=manual_carb_g,
+        manual_fiber_g=manual_fiber_g,
+        manual_sodium_mg=manual_sodium_mg,
+    )
+
+
+def test_build_item_detail_unconfirmed_uses_estimated_amount():
+    """확인 전(confirmed_amount 없음)이면 estimated_* 로 폴백해야 한다."""
+    item = _fake_item(
+        estimated_amount=Decimal("150"), estimated_unit="g", confidence=Decimal("0.62")
+    )
+
+    detail = _build_item_detail(item, public_db_nutrition=None)
+
+    assert detail.amount == 150.0
+    assert detail.unit == "g"
+    assert detail.confidence == 0.62
+    assert detail.matched is False
+    assert detail.nutrition_source is None
+    assert detail.user_confirmed is False
+
+
+def test_build_item_detail_confirmed_with_nutrition():
+    """확인됐고(confirmed_amount 있음) 영양정보도 있으면 matched 가 true 여야 한다."""
+    item = _fake_item(confirmed_amount=Decimal("200"), confirmed_unit="g")
+    nutrition = NutritionInfo(
+        kcal=Decimal("274"), protein_g=None, fat_g=None, carb_g=None, fiber_g=None, sodium_mg=None
+    )
+
+    detail = _build_item_detail(item, public_db_nutrition=nutrition)
+
+    assert detail.amount == 200.0
+    assert detail.matched is True
+    assert detail.nutrition_source == "PUBLIC_DB"
+    assert detail.user_confirmed is True
+    assert detail.nutrition is nutrition
+
+
+def test_build_item_detail_prefers_manual_nutrition_over_public_db():
+    """직접 입력이 있으면 공공 DB 값이 같이 있어도 직접 입력이 우선이어야 한다 (PR #36 리뷰)."""
+    item = _fake_item(
+        confirmed_amount=Decimal("200"), confirmed_unit="g", manual_kcal=Decimal("300")
+    )
+    public_db_nutrition = NutritionInfo(
+        kcal=Decimal("274"), protein_g=None, fat_g=None, carb_g=None, fiber_g=None, sodium_mg=None
+    )
+
+    detail = _build_item_detail(item, public_db_nutrition=public_db_nutrition)
+
+    assert detail.matched is True
+    assert detail.nutrition_source == "USER_INPUT"
+    assert detail.nutrition.kcal == Decimal("300")
+
+
+@pytest.mark.parametrize(
+    ("status", "is_recalculation", "expected"),
+    [
+        (
+            MealStatus.ANALYZING,
+            False,
+            [("FOOD_RECOGNITION", "RUNNING"), ("DB_MATCHING", "PENDING"), ("STAGE_RULE_APPLY", "PENDING")],
+        ),
+        (
+            MealStatus.ANALYZING,
+            True,
+            [("FOOD_RECOGNITION", "DONE"), ("DB_MATCHING", "RUNNING"), ("STAGE_RULE_APPLY", "PENDING")],
+        ),
+        (
+            MealStatus.REVIEW_REQUIRED,
+            False,
+            [("FOOD_RECOGNITION", "DONE"), ("DB_MATCHING", "RUNNING"), ("STAGE_RULE_APPLY", "PENDING")],
+        ),
+        (
+            MealStatus.EVALUATED,
+            False,
+            [("FOOD_RECOGNITION", "DONE"), ("DB_MATCHING", "DONE"), ("STAGE_RULE_APPLY", "DONE")],
+        ),
+        (MealStatus.FAILED, False, []),
+    ],
+)
+def test_resolve_steps(status, is_recalculation, expected):
+    steps = _resolve_steps(status, is_recalculation)
+    assert [(step.key, step.state) for step in steps] == expected
+
+
+def test_build_satiety_none_when_no_log():
+    assert _build_satiety(None) is None
+
+
+def test_build_satiety_maps_fields_and_checkins_always_empty():
+    log = SimpleNamespace(satiety_before=30, satiety_after=75, hunger_return_minutes=90)
+
+    detail = _build_satiety(log)
+
+    assert detail.before_pct == 30
+    assert detail.after_pct == 75
+    assert detail.hunger_return_minutes == 90
+    assert detail.checkins == []
+
+
+def test_build_feedback_none_when_missing():
+    assert _build_feedback(None) is None
+
+
+def test_build_feedback_maps_fields():
+    feedback_row = SimpleNamespace(
+        body="요약", suggestions="제안", safety_status=SafetyStatus.SAFE
+    )
+
+    summary = _build_feedback(feedback_row)
+
+    assert summary.summary == "요약"
+    assert summary.suggestions == ["제안"]
+
+
+def test_build_feedback_suggestions_empty_list_when_absent():
+    """DB 에 suggestions 가 없으면 null 이 아니라 빈 배열이어야 한다 (명세는 배열 타입)."""
+    feedback_row = SimpleNamespace(
+        body="요약", suggestions=None, safety_status=SafetyStatus.SAFE
+    )
+
+    summary = _build_feedback(feedback_row)
+
+    assert summary.suggestions == []
+
+
+def test_build_feedback_none_when_blocked():
+    feedback_row = SimpleNamespace(
+        body="요약", suggestions="제안", safety_status=SafetyStatus.BLOCKED
+    )
+
+    assert _build_feedback(feedback_row) is None
+
+
+def test_build_feedback_none_when_review_required():
+    """가드레일 검사 전(기본값)도 SAFE 가 아니므로 BLOCKED 와 똑같이 숨겨야 한다."""
+    feedback_row = SimpleNamespace(
+        body="요약", suggestions="제안", safety_status=SafetyStatus.REVIEW_REQUIRED
+    )
+
+    assert _build_feedback(feedback_row) is None
+
+
+def test_build_nutrients_reports_full_sums():
+    totals = NutrientTotals(
+        protein_g=Decimal("20.5"), fiber_g=Decimal("3.2"), sodium_mg=Decimal("450"), counted=2
+    )
+
+    nutrients = _build_nutrients(totals)
+
+    assert [n.code for n in nutrients] == ["PROTEIN", "FIBER", "SODIUM"]
+    protein = nutrients[0]
+    assert protein.label == "단백질"
+    assert protein.current == 20.5
+    assert protein.unit == "g"
+    assert protein.target is None
+    assert protein.state is None
+
+
+def test_build_nutrients_hides_partial_sum_when_missing():
+    """성분별 결측(missing)이 있으면 그 성분은 부분합이라 current 를 None 으로 감춘다."""
+    totals = NutrientTotals(
+        protein_g=Decimal("20.5"),
+        fiber_g=None,
+        sodium_mg=Decimal("450"),
+        counted=2,
+        missing={"fiber_g": 1},
+    )
+
+    nutrients = _build_nutrients(totals)
+
+    fiber = next(n for n in nutrients if n.code == "FIBER")
+    assert fiber.current is None

@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>식사 사진을 찍어 영양 분석에 사용합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>갤러리의 식사 사진을 영양 분석에 사용합니다.</string>
 </dict>
 </plist>
