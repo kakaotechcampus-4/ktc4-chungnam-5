@@ -137,6 +137,15 @@ def create(
     return record
 
 
+def get_snapshot(db: Session, snapshot_id: uuid.UUID) -> MedicationSnapshot | None:
+    """스냅샷 한 건. 식사 평가가 **그 식사 시점의 단계**를 읽는 자리다.
+
+    지금 단계(`get_current`)가 아니다 — 나중에 용량이 바뀌어도 과거 평가가
+    흔들리면 안 되므로 얼려 둔 값을 본다.
+    """
+    return db.get(MedicationSnapshot, snapshot_id)
+
+
 def add_snapshot(
     db: Session,
     *,

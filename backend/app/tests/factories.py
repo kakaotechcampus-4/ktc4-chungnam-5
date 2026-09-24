@@ -42,6 +42,7 @@ def make_meal(
     *,
     user_id: uuid.UUID,
     eaten_at: datetime = EATEN_AT,
+    stage: MedicationStage = MedicationStage.MAINTENANCE,
     status: MealStatus | None = MealStatus.REVIEW_REQUIRED,
 ) -> Meal:
     """식사 하나와 거기 딸린 투약 스냅샷을 만든다. flush 까지만 하고 커밋하지 않는다.
@@ -52,7 +53,7 @@ def make_meal(
     `status=None` 이면 INSERT 에서 컬럼을 빼 DB 의 server_default 를 태운다 —
     기본값 자체를 검증하는 테스트가 쓴다.
     """
-    snapshot = MedicationSnapshot(user_id=user_id, stage=MedicationStage.MAINTENANCE)
+    snapshot = MedicationSnapshot(user_id=user_id, stage=stage)
     db.add(snapshot)
     db.flush()
 
