@@ -15,6 +15,9 @@ openpyxl==3.1.5
 # AI Service HTTP 클라이언트
 httpx==0.28.1
 
+# POST /meals 멀티파트(사진 업로드) 파싱
+python-multipart==0.0.20
+
 # 테스트
 pytest==9.1.1
 testcontainers[postgres]==4.15.0

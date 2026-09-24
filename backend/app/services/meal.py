@@ -9,7 +9,7 @@ from __future__ import annotations
 import base64
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Final
 from zoneinfo import ZoneInfo
@@ -17,19 +17,24 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
+from app.crud import medication as medication_crud
 from app.crud import meal as meal_crud
 from app.crud.evaluation import NutrientTotals
-from app.models.enums import MealItemSource, MealStatus, NutrientCode, SafetyStatus
+from app.infra.queue import enqueue
+from app.models.enums import MealItemSource, MealStatus, MealType, NutrientCode, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.models.meal import Meal, MealItem, SatietyLog
 from app.schemas.meal import (
     EVALUATED_STEPS,
     INITIAL_ANALYSIS_STEPS,
+    MEAL_ANALYSIS_POLL_INTERVAL_MS,
+    MEAL_ANALYSIS_TIMEOUT_MS,
     RECALCULATION_STEPS,
     AnalysisStep,
     CalendarDay,
     CalendarSummary,
     MealCalendarResponse,
+    MealCreateResponse,
     MealDeleteResponse,
     MealDetailResponse,
     MealFeedbackSummary,
@@ -946,4 +951,75 @@ def delete_item(
     return MealItemDeleteResponse(
         status=meal.status,
         is_recalculation=meal.is_recalculation,
+    )
+
+
+def create_meal(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_type: MealType,
+    eaten_at: datetime,
+    image_key: str | None,
+    raw_text: str | None,
+    satiety_before_pct: int | None,
+) -> MealCreateResponse:
+    """새 식사를 등록하고 분석 작업을 큐에 넣는다.
+
+    `crud/__init__.py` 의 "커밋은 부르는 쪽이 한다" 절에 있는 POST /meals 예시를
+    그대로 따른다. `crud.medication` 을 직접 부르는 건 규칙 5 위반이 아니다 —
+    막힌 건 services 끼리의 참조이지, 다른 도메인의 crud 호출이 아니다
+    (`services.medication.create_snapshot_for_meal` 독스트링 참고).
+
+    큐에는 presigned URL 이 아니라 `image_key` 만 싣는다(PR #42 리뷰 반영).
+    presigned URL 은 발급 후 몇 분 안에 만료되는데, 워커가 이 작업을 실제로
+    집는 시점은 큐 적체·재시도 backoff 로 훨씬 늦을 수 있어 미리 만든 URL을
+    실으면 워커가 열어볼 때 이미 죽어 있을 위험이 있다. URL 은 실제로 필요한
+    시점(워커가 AI 를 부르기 직전)에 `image_key` 로 새로 발급해야 한다 —
+    `worker/jobs/analyze_meal.py` 구현 시 반영 필요.
+    """
+    current_record = medication_crud.get_current(db, user_id)
+    snapshot = medication_crud.add_snapshot(db, user_id=user_id, source=current_record)
+
+    meal = meal_crud.create_meal(
+        db,
+        user_id=user_id,
+        medication_snapshot_id=snapshot.id,
+        meal_type=meal_type,
+        eaten_at=eaten_at,
+        image_key=image_key,
+        raw_text=raw_text,
+    )
+
+    if satiety_before_pct is not None:
+        meal_crud.create_satiety_log(
+            db,
+            meal_id=meal.id,
+            satiety_before=satiety_before_pct,
+            logged_at=datetime.now(UTC),
+        )
+
+    enqueue(
+        db,
+        "meal.analyze",
+        {
+            "mealId": str(meal.id),
+            "mealType": meal_type.value,
+            "eatenAt": eaten_at.isoformat(),
+            "stage": snapshot.stage.value,
+            "imageKey": image_key,
+            "rawText": raw_text,
+        },
+    )
+
+    # 도메인 쓰기(meal·satiety_log)와 작업 등록이 한 트랜잭션 — 커밋이 실패하면
+    # 둘 다 사라진다. get_db 는 더 이상 commit 하지 않는다.
+    db.commit()
+
+    return MealCreateResponse(
+        meal_id=meal.id,
+        status=meal.status,
+        steps=list(INITIAL_ANALYSIS_STEPS),
+        poll_interval_ms=MEAL_ANALYSIS_POLL_INTERVAL_MS,
+        timeout_ms=MEAL_ANALYSIS_TIMEOUT_MS,
     )

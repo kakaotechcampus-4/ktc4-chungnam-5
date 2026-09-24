@@ -9,10 +9,10 @@ from sqlalchemy import Row, and_, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
-from app.models.enums import MealItemSource, MealStatus, MedicationStage
+from app.models.enums import MealItemSource, MealStatus, MealType, MedicationStage
 from app.models.evaluation import QQSEvaluation
 from app.models.feedback import MealFeedback
-from app.models.meal import Meal, MealItem, UserCorrection
+from app.models.meal import Meal, MealItem, SatietyLog, UserCorrection
 from app.models.medication import MedicationSnapshot
 
 _KST = "Asia/Seoul"
@@ -457,3 +457,44 @@ def add_correction(
     db.add(correction)
     db.flush()
     return correction
+
+
+def create_meal(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    medication_snapshot_id: uuid.UUID,
+    meal_type: MealType,
+    eaten_at: datetime,
+    image_key: str | None,
+    raw_text: str | None,
+) -> Meal:
+    """새 식사를 만든다. add + flush 까지만 하고 커밋하지 않는다.
+
+    `status` 는 컬럼 기본값(ANALYZING)에 맡긴다 — 방금 등록된 식사는 항상 그 상태다.
+    """
+    meal = Meal(
+        user_id=user_id,
+        medication_snapshot_id=medication_snapshot_id,
+        meal_type=meal_type,
+        eaten_at=eaten_at,
+        image_key=image_key,
+        raw_text=raw_text,
+    )
+    db.add(meal)
+    db.flush()  # meal.id 가 필요하다 — 큐 payload · satiety_log 양쪽에 쓴다
+    return meal
+
+
+def create_satiety_log(
+    db: Session, *, meal_id: uuid.UUID, satiety_before: int, logged_at: datetime
+) -> SatietyLog:
+    """식전 포만감을 기록한다. `satiety_after`는 아직 모르므로 NULL.
+
+    `meal_id` 가 UNIQUE 라 이 식사에 대해 딱 한 번만 불러야 한다 — 방금 만든 식사라
+    행이 없는 게 보장되므로 upsert 가 아니라 단순 INSERT 다.
+    """
+    log = SatietyLog(meal_id=meal_id, satiety_before=satiety_before, logged_at=logged_at)
+    db.add(log)
+    db.flush()
+    return log

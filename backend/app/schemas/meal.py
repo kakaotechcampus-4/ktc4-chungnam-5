@@ -342,3 +342,19 @@ class MealDetailResponse(CamelModel):
     nutrients: list[NutrientStatus]
     satiety: SatietyDetail | None
     feedback: MealFeedbackSummary | None
+
+
+# POST /meals 202 응답의 고정값. 진짜 진행률이 아니다 — FE 가 이 주기로 GET
+# /meals/{mealId} 를 폴링하라는 안내일 뿐, 서버가 이 시간 안에 끝낸다는 보장이 아니다.
+MEAL_ANALYSIS_POLL_INTERVAL_MS = 1500
+MEAL_ANALYSIS_TIMEOUT_MS = 30000
+
+
+class MealCreateResponse(CamelModel):
+    """POST /meals 응답 (202)."""
+
+    meal_id: uuid.UUID
+    status: MealStatus
+    steps: list[AnalysisStep]
+    poll_interval_ms: int
+    timeout_ms: int
