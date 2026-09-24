@@ -8,6 +8,7 @@ from decimal import Decimal
 from sqlalchemy import Row, and_, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.crud import evaluation as evaluation_crud
 from app.models.enums import MealItemSource, MealStatus
 from app.models.evaluation import QQSEvaluation
 from app.models.meal import Meal, MealItem, UserCorrection
@@ -16,12 +17,18 @@ from app.models.medication import MedicationSnapshot
 _KST = "Asia/Seoul"
 
 
-def _kst_day(column):
+def kst_day(column):
     """eaten_at(UTC 로 저장됨)을 KST 기준 '그 날' 로 자른다.
 
     UTC 기준으로 자르면 밤 11시(KST)에 먹은 야식이 다음날로 잘못 집계된다.
+    calendar 뿐 아니라 dashboard 등 날짜별 집계가 필요한 곳이면 어디서든 쓴다.
     """
     return func.date_trunc("day", func.timezone(_KST, column))
+
+
+def kst_month(column):
+    """eaten_at(UTC 로 저장됨)을 KST 기준 '그 달' 로 자른다. 월별 집계용."""
+    return func.date_trunc("month", func.timezone(_KST, column))
 
 
 def list_meals(
@@ -133,7 +140,7 @@ def get_calendar_days(
     month_end: datetime,
 ) -> list[Row]:
     """KST 기준 날짜별 (day, count, meal_types) 를 조회한다."""
-    day = _kst_day(Meal.eaten_at)
+    day = kst_day(Meal.eaten_at)
     stmt = (
         select(
             day.label("day"),
@@ -152,27 +159,27 @@ def get_calendar_days(
     return list(db.execute(stmt).all())
 
 
-def get_calendar_day_stages(
+def get_day_stages(
     db: Session,
     *,
     user_id: uuid.UUID,
-    month_start: datetime,
-    month_end: datetime,
+    range_start: datetime | None,
+    range_end: datetime,
 ) -> list[Row]:
-    """날짜별 대표 stage — 그날 가장 마지막(eaten_at 최신)에 먹은 식사 기준."""
-    day = _kst_day(Meal.eaten_at)
+    """날짜 범위 안에서 날짜별 대표 stage — 그날 가장 마지막(eaten_at 최신)에 먹은 식사 기준.
+
+    calendar·dashboard 등 "하루당 대표 stage 하나"가 필요한 곳에서 공통으로 쓴다.
+    """
+    day = kst_day(Meal.eaten_at)
     stmt = (
         select(day.label("day"), MedicationSnapshot.stage)
         .join(MedicationSnapshot, Meal.medication_snapshot_id == MedicationSnapshot.id)
-        .where(
-            Meal.user_id == user_id,
-            Meal.deleted_at.is_(None),
-            Meal.eaten_at >= month_start,
-            Meal.eaten_at < month_end,
-        )
+        .where(Meal.user_id == user_id, Meal.deleted_at.is_(None), Meal.eaten_at < range_end)
         .distinct(day)
         .order_by(day, Meal.eaten_at.desc())
     )
+    if range_start is not None:
+        stmt = stmt.where(Meal.eaten_at >= range_start)
     return list(db.execute(stmt).all())
 
 
@@ -248,14 +255,23 @@ def mark_recalculating(db: Session, meal: Meal) -> None:
     나간다. 시그니처를 맞춰 두는 건 "상태를 바꾸는 일은 crud 를 거친다" 는 규칙을
     호출부에서 눈에 보이게 하려는 것이다.
 
-    🔗 **옛 `qqs_evaluations` 행은 지우지 않는다.** 상태만 되돌리므로 그 행은 무효인
-    채로 남고, 상태를 안 보는 쿼리(`list_meals` · `get_calendar_summary`)가 그걸
-    그대로 내보낸다 — 같은 식사가 목록에는 옛 점수를, `GET /meals/{mealId}/evaluation`
-    에는 409 를 낸다. 여기서 지우는 안을 검토했지만 이 파일 담당이 아니라 보류했다.
-    `services/evaluation/__init__.py::get_view` 의 TODO 참고.
+    ⚠️ **옛 `qqs_evaluations` 행도 함께 지운다** — 이름만 보면 상태 표시 같지만
+    파괴적이다. `ANALYZING` 은 "워커가 도는 중" 이 아니라 **"점수가 아직 유효하지
+    않다"** 는 표시이고, 그 문장을 상태에만 반영하면 상태를 안 보는 쿼리가 무효
+    점수를 그대로 내보낸다 — `list_meals` · `get_calendar_summary` 와
+    `crud/dashboard.py` 의 집계 넷, 모두 여섯 곳이다.
+
+    **호출부마다 챙기지 않고 여기서 지우는 이유**: 수정 경로가 넷인데
+    (`POST` · `PATCH` · `DELETE /items`, `PUT .../nutrition`) 전부 이 함수를 거친다.
+    호출부에 맡기면 새 경로가 생길 때 빠뜨리기 쉽고, 빠뜨려도 테스트가 안 잡는다 —
+    목록 화면을 실제로 열어 봐야 보인다.
+
+    확정 전 수정에서는 지울 행이 없어 0 행 `DELETE` 다.
     """
     meal.status = MealStatus.ANALYZING
     meal.is_recalculation = True
+    evaluation_crud.delete_by_meal(db, meal.id)
+
 
 def get_items_by_ids(
     db: Session, *, meal_id: uuid.UUID, item_ids: Iterable[uuid.UUID]
@@ -337,6 +353,58 @@ def update_item(
     item.confirmed_amount_g = amount_g
     item.food_ref_id = food_ref_id
     item.confidence = confidence
+
+
+def clear_item_manual_nutrition(db: Session, *, item: MealItem) -> None:
+    """직접 입력한 영양성분만 지운다. 커밋하지 않는다.
+
+    `food_ref_id` 는 건드리지 않는다 — 공공 DB 링크는 이름 규칙이 따로 정한다
+    (`services.meal.update_items`).
+    """
+    item.manual_kcal = None
+    item.manual_protein_g = None
+    item.manual_fat_g = None
+    item.manual_carb_g = None
+    item.manual_fiber_g = None
+    item.manual_sodium_mg = None
+
+
+def set_item_food_ref(db: Session, *, item: MealItem, food_ref_id: str | None) -> None:
+    """항목이 가리키는 공공 DB 음식을 바꾼다. 커밋하지 않는다.
+
+    `db` 를 받지만 쓰지 않는다 — `update_item` · `mark_recalculating` 과 같은 이유다.
+
+    양(`confirmed_*`)은 건드리지 않는다. 사용자가 고친 건 "이 음식이 무엇인가" 이지
+    "얼마나 먹었는가" 가 아니다.
+    """
+    item.food_ref_id = food_ref_id
+
+
+def set_item_manual_nutrition(
+    db: Session,
+    *,
+    item: MealItem,
+    kcal: Decimal | None,
+    protein_g: Decimal | None,
+    fat_g: Decimal | None,
+    carb_g: Decimal | None,
+    fiber_g: Decimal | None,
+    sodium_mg: Decimal | None,
+) -> None:
+    """사용자가 직접 적은 영양성분을 항목에 쓴다. 커밋하지 않는다.
+
+    **섭취량 기준 총량이다** — 기준량이 아니므로 읽을 때 환산하지 않는다
+    (`MealItem` 의 컬럼 주석).
+
+    여섯 값을 각각 받는 건 `crud/` 가 `schemas/` 를 모르기 때문이다 — 이 레이어는
+    DB 접근만 한다.
+    """
+    item.manual_kcal = kcal
+    item.manual_protein_g = protein_g
+    item.manual_fat_g = fat_g
+    item.manual_carb_g = carb_g
+    item.manual_fiber_g = fiber_g
+    item.manual_sodium_mg = sodium_mg
 
 
 def add_correction(

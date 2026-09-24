@@ -4,12 +4,15 @@ FE 가 실제로 보는 모양 — 응답 래퍼 · camelCase · 명세 필드 �
 """
 
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.crud import evaluation as evaluation_crud
+from app.crud import meal as meal_crud
 from app.models.enums import MealStatus, MedicationStage
 from app.tests.factories import make_food_ref, make_meal, make_meal_item, make_user
 
@@ -322,8 +325,8 @@ def test_nutrient_totals_are_still_reported(client: TestClient, db: Session) -> 
 def test_evaluation_is_gated_on_status_not_row(client: TestClient, db: Session) -> None:
     """확정 뒤 식사가 재계산 대기로 돌아가면 409 다.
 
-    `qqs_evaluations` 행은 남아 있다 — 무효가 된 점수를 조회로 내보내지 않는 건
-    상태를 보기 때문이다. 목록·달력은 그 가드가 없다 (`get_view` 의 TODO 참고).
+    행은 `mark_recalculating` 이 이미 지웠으므로 `row is None` 으로도 409 다. 상태
+    검사는 그 뒤를 받친다 — 행이 어떤 이유로 남아도 여기서는 안 나간다.
     """
     user, meal = _ready_meal(db)
     client.post(
@@ -527,6 +530,84 @@ def test_empty_meal_confirms_without_nutrition(
 
     assert body["error"] is None
     assert body["data"]["evidence"]["nutritionSources"] == []
+
+
+def test_editing_food_removes_the_stale_evaluation(
+    client: TestClient, db: Session
+) -> None:
+    """확정한 뒤 음식을 고치면 옛 점수가 남지 않는다.
+
+    상태만 되돌리고 행을 남기면 상태를 안 보는 쿼리가 무효 점수를 그대로 내보낸다 —
+    `list_meals` · `get_calendar_summary` 와 `crud/dashboard.py` 의 집계 넷, 여섯
+    곳이다. 같은 식사가 목록에는 옛 점수를, 이 엔드포인트에는 409 를 내게 된다.
+    """
+    user, meal = _ready_meal(db)
+    client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
+        json={"satietyAfterPct": 68},
+    )
+    assert evaluation_crud.get_by_meal(db, meal.id) is not None
+
+    meal_crud.mark_recalculating(db, meal)
+    db.flush()
+
+    assert evaluation_crud.get_by_meal(db, meal.id) is None
+
+
+def test_editing_before_confirm_is_harmless(client: TestClient, db: Session) -> None:
+    """확정 전 수정에는 지울 행이 없다 — 0 행 DELETE 라 그냥 넘어간다.
+
+    호출부가 "확정된 적 있나" 를 따로 따지지 않아도 되는 근거다.
+    """
+    _, meal = _ready_meal(db)
+
+    meal_crud.mark_recalculating(db, meal)
+    db.flush()
+
+    assert meal.status is MealStatus.ANALYZING
+    assert meal.is_recalculation is True
+
+
+def test_list_and_calendar_stop_showing_the_stale_score(
+    client: TestClient, db: Session
+) -> None:
+    """리뷰에서 지적된 증상 자체를 본다 — 목록·달력이 옛 점수를 더 이상 안 보인다.
+
+    `get_by_meal` 만 확인하면 "행이 지워졌다" 는 사실은 알아도 **그게 화면에 닿는지**
+    는 모른다. 이 둘은 상태를 안 보고 `qqs_evaluations` 를 join 하는 쪽이라, 여기서
+    사라져야 고쳐진 것이다.
+
+    `crud/dashboard.py` 의 집계 넷도 같은 모양이지만 그 파일은 이 브랜치에 아직
+    없다 — 같은 행을 join 하므로 행이 없으면 같이 비어야 맞다.
+    """
+    user, meal = _ready_meal(db)
+    client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
+        json={"satietyAfterPct": 68},
+    )
+    before = meal_crud.list_meals(db, user_id=user.id, limit=10)[0]
+    # `satiety_score` 로 본다 — 이 픽스처는 영양 매칭이 없어 `quantity_score` 가
+    # 확정 직후에도 NULL 이라, 그걸 기준으로 삼으면 지워졌는지 구분되지 않는다.
+    assert before.satiety_score is not None
+
+    meal_crud.mark_recalculating(db, meal)
+    db.flush()
+
+    after = meal_crud.list_meals(db, user_id=user.id, limit=10)[0]
+    assert (after.quantity_score, after.quality_score, after.satiety_score) == (
+        None, None, None,
+    )
+
+    month = meal.eaten_at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    summary = meal_crud.get_calendar_summary(
+        db,
+        user_id=user.id,
+        month_start=month,
+        month_end=month + timedelta(days=40),
+    )
+    # 식사는 그대로 세고(총 1끼) 평균에서만 빠진다 — 끼니를 먹은 사실은 유효하다.
+    assert summary.total_meals == 1
+    assert summary.avg_satiety is None
 
 
 # ── 재확정 ─────────────────────────────────────────────────────

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -253,10 +255,15 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
     try {
       await _api.saveSuggestion(widget.mealId);
       if (!mounted) return;
+      // 저장 완료 → 식사 기록 흐름을 모두 닫고 홈 탭(RootShell 0번)으로 돌아간다.
+      // 기록 탭에서 시작했어도 홈으로 간다.
+      context.read<TabState>().setIndex(0);
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
+      if (!mounted) return;
       setState(() => errorMessage = '저장 실패: $e');
     } finally {
-      setState(() => isSaving = false);
+      if (mounted) setState(() => isSaving = false);
     }
   }
 

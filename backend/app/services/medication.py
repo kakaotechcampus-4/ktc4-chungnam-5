@@ -39,6 +39,7 @@ from app.schemas.medication import (
     CurrentMedicationResponse,
     DoseDirection,
     DoseEvent,
+    DoseEventsResponse,
     MedicationRegisterRequest,
     MedicationRegisterResponse,
 )
@@ -516,7 +517,14 @@ def register(
         record,
         dose_changed=True,
         stage_changed=record.stage != current.stage,
-        previous_dose_mg=current.dose_mg,
+        # **직전 행의 용량이 아니라 `previous_different_dose()` 의 답이다.**
+        # 약물이 바뀌면 그 함수가 None 을 준다 — 사다리가 통째로 달라 mg 를 나란히
+        # 둘 수 없어서다(위고비 2.4 다음 마운자로 2.5 는 증량이 아니다).
+        #
+        # `current.dose_mg` 를 그냥 넘기면 약물 경계에서 INCREASE 가 나가고,
+        # 같은 이벤트를 `GET /medications/dose-events` 는 MAINTAIN 으로 센다 —
+        # 같은 doseEventId 에 두 답이 나온다.
+        previous_dose_mg=context.previous_different_dose_mg,
     )
 
 
@@ -526,30 +534,103 @@ def get_current_view(
     *,
     today: date | None = None,
 ) -> CurrentMedicationResponse:
-    """`GET /medications/current` 응답.
+    """`GET /medications/current` 응답. 명세의 POST 응답과 같은 14필드다.
 
-    투약 기록이 없으면 stage=PRE_DOSE 에 나머지가 전부 null 이다. 에러가 아니다 —
-    "아직 투약 전"은 정상 상태이고, 투약 전 식사 평가가 제품 기능이다 (D8).
+    **단계를 저장값에서 읽지 않고 오늘 기준으로 다시 판정한다** (`restage`).
+    시간만 지나도 단계는 바뀌는데 그 순간에는 쓰기 이벤트가 없어서, 저장값을 읽으면
+    마지막 POST 시점에 멈춘 단계를 내보낸다. `doseCount`·`nextDoseDate` 가 오늘에서
+    계산되는 것과 같은 모델이고, `decidedAt` 이 조회 시각인 근거이기도 하다.
+
+    `build_register_view` 와 합치지 않는다 — 그쪽은 `register()` 가 행에 박아 둔 단계를
+    **읽기만** 한다. 같은 요청 안에서 두 번 판정하면 두 답이 나올 수 있어서다.
+
+    투약 기록이 없으면 `STAGE_NOT_SET` 이다 (명세).
+
+    ⚠️ **팀 안건.** 투약 전 사용자도 200 + `stage: PRE_DOSE` 로 내리는 편이 FE 에는
+    낫다 — 에러로 내리면 "아직 투약 전"과 "진짜 에러"를 구분하지 못하고, 투약 전
+    식사 평가가 제품 기능(D8)이라 PRE_DOSE 는 비정상이 아니다. `MedicationStage` 에
+    그 값이 있는 것도 그래서다. 지금은 명세를 그대로 따르고, 바꾸기로 하면 아래
+    raise 한 줄만 고치면 된다.
     """
+    # 없는 사용자를 먼저 거른다. 안 그러면 STAGE_NOT_SET 이 나가서 "등록만 하면 된다"
+    # 고 읽히는데, 실제로는 사용자부터 없다. `register()` 와 같은 처리다.
+    if user_crud.get(db, user_id) is None:
+        raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
+
     today = today or today_kst()
     current = crud.get_current(db, user_id)
     if current is None:
-        return CurrentMedicationResponse(stage=MedicationStage.PRE_DOSE)
+        raise ApiError(
+            ErrorCode.STAGE_NOT_SET, "투약 정보가 아직 등록되지 않았습니다.", 409
+        )
 
     started_at = crud.get_dosing_start_date(db, user_id) or current.effective_from
     next_dose_date, days_until_next_dose = predict_next_dose(started_at, today=today)
-    # 단계는 저장값을 읽지 않고 오늘 기준으로 다시 판정한다 — 시간만 지나도 바뀌는데
-    # 그 순간에는 쓰기 이벤트가 없다. doseCount·nextDoseDate 와 같은 모델이다.
+    stage = restage(db, user_id, current, today=today)
+
     return CurrentMedicationResponse(
-        stage=restage(db, user_id, current, today=today),
+        medication_id=current.id,
         drug_name=current.drug_name,
         dose_mg=current.dose_mg,
-        dose_count=count_doses(started_at, today=today),
         started_at=started_at,
-        effective_from=current.effective_from,
+        dose_count=count_doses(started_at, today=today),
         next_dose_date=next_dose_date,
         days_until_next_dose=days_until_next_dose,
+        stage=stage,
+        stage_reason=STAGE_REASONS[stage],
+        rule_version=RULE_VERSION,
+        # 아래 넷은 쓰기 결과를 담는 자리라 조회에는 대응물이 없다. 값이 거짓말은
+        # 아니다 — 조회는 정말 아무것도 바꾸지 않고, 단계는 방금 판정했다.
+        dose_changed=False,
+        dose_event=None,
+        stage_changed=False,
+        decided_at=datetime.now(timezone.utc),
     )
+
+
+def list_dose_events(db: Session, user_id: uuid.UUID) -> DoseEventsResponse:
+    """`GET /medications/dose-events` 응답. 오래된 순이다.
+
+    **행 하나가 곧 이벤트 1건이다** — 별도 이벤트 테이블이 없다 (`DoseEvent` 독스트링).
+
+    `direction` 은 저장하지 않고 **바로 앞 행과 비교해 매번 계산한다.** 저장하면 같은
+    사실이 행과 이벤트 두 곳에 남아 어긋날 수 있는데, 계산은 앞 행 하나만 보면 된다.
+    첫 행은 비교 대상이 없어 `MAINTAIN` 이다 (명세 예시의 `de_001`).
+
+    **약물이 바뀌면 앞 행과 비교하지 않는다.** 사다리가 통째로 달라 mg 를 나란히 둘 수
+    없다 — 위고비 2.4 다음 마운자로 2.5 는 증량이 아니고, 마운자로 15 다음 위고비 2.4 도
+    감량이 아니다. 비교 기준이 없는 것이므로 `MAINTAIN` 이다(그 값의 뜻이 "유지"가 아니라
+    **"비교할 이전 용량이 없다"** 이다 — `DoseDirection.MAINTAIN` 독스트링).
+
+    `previous_different_dose()` 가 단계 판정에서 같은 판단을 한다. `POST /medications` 의
+    `doseEvent` 도 그 경로를 타므로, 여기만 다르게 세면 같은 사실에 두 답이 나온다.
+
+    **정정은 여기 안 나온다.** `register()` 가 등록만 하므로 한 번도 맞은 적 없는
+    용량은 애초에 행이 되지 않는다. 정정은 `PATCH` 가 맡는다.
+
+    기록이 없으면 `events: []` 다. 404 가 아니다 — "아직 투약 전"은 정상 상태이고
+    빈 목록이 그 사실을 그대로 말한다.
+    """
+    if user_crud.get(db, user_id) is None:
+        raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
+
+    events: list[DoseEvent] = []
+    previous: tuple[str, Decimal] | None = None
+    for record in crud.list_history(db, user_id):
+        same_drug = previous is not None and previous[0] == record.drug_name
+        events.append(
+            DoseEvent(
+                dose_event_id=record.id,
+                dose_mg=record.dose_mg,
+                direction=dose_direction(
+                    record.dose_mg,
+                    previous_dose_mg=previous[1] if same_drug else None,
+                ),
+                effective_from=record.effective_from,
+            )
+        )
+        previous = (record.drug_name, record.dose_mg)
+    return DoseEventsResponse(events=events)
 
 
 def _build_dose_event(result: RegisterResult) -> DoseEvent | None:

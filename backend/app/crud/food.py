@@ -1,10 +1,15 @@
 """food_refs 테이블 접근. 여기 말고는 아무도 FoodRef 를 직접 쿼리하지 않는다."""
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, literal, select
 from sqlalchemy.orm import Session
 
 from app.models.enums import FoodCategory
 from app.models.food import FoodRef
+
+
+def get_by_id(db: Session, food_ref_id: str) -> FoodRef | None:
+    """이미 연결된 food_ref_id 로 바로 조회한다. 이름 검색이 필요 없을 때 쓴다."""
+    return db.execute(select(FoodRef).where(FoodRef.id == food_ref_id)).scalar_one_or_none()
 
 
 def normalize_name(name: str) -> str:
@@ -78,3 +83,117 @@ def find_unique_by_name(db: Session, name: str) -> FoodRef | None:
 
     every = _only()
     return every[0] if len(every) == 1 else None
+
+
+def _contains(fragment: str):
+    """이름 안에 `fragment` 가 들어 있는가. **와일드카드는 글자로 취급한다.**
+
+    `%` 와 `_` 는 LIKE 의 메타문자다. 그대로 넘기면 사용자가 친 `%` 하나가
+    "아무 글자나" 가 되어 33만건이 전부 후보로 올라온다. 역슬래시는 아래에서 지정한
+    이스케이프 문자 자신이라 함께 막는다 — **순서가 중요하다.** 역슬래시를 나중에
+    치환하면 방금 붙인 이스케이프까지 한 번 더 escape 되어 패턴이 어긋난다.
+
+    (`normalize_name` 이 `_` 를 이미 지우지만 여기서 한 번 더 막는다 — 이 함수가
+    정규화를 거치지 않은 문자열에 불려도 안전해야 한다.)
+    """
+    escaped = (
+        fragment.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    )
+    return _normalized_name().like(f"%{escaped}%", escape="\\")
+
+
+def search_by_tokens(db: Session, *, tokens: list[str], limit: int) -> list[FoodRef]:
+    """토큰이 **전부** 들어간 이름을 찾는다. 사용자가 후보 목록에서 고를 때 쓴다.
+
+    `find_unique_by_name` 과 정반대의 판단이다 — 저쪽은 하나로 좁혀지지 않으면
+    포기하지만(틀린 값이 박제되므로), 여기서는 고르는 주체가 사람이라 여러 건을
+    그대로 보여주는 것이 맞다.
+
+    `LIKE '%…%'` 는 `ix_food_refs_name_normalized` 를 타지 못한다 — 33만건 순차
+    스캔이다. 앞뒤 와일드카드를 지우면 인덱스를 타지만 `김밥_계란` 처럼 뒤집힌
+    이름을 통째로 놓친다.
+
+    비용은 **조각 수에 비례한다.** 개발용 컨테이너(`postgres:17-alpine`, 기본
+    설정, 병렬 워커 2개, 캐시 워밍 후)에서 토큰 1~3개 검색이 90~300ms 였다.
+    절대값은 장비·캐시 상태에 따라 쉽게 2~3배 흔들리니 "조각 하나 = 33만건 평가
+    한 번" 이라는 비례 관계만 믿을 것.
+    """
+    matches_every_token = [_contains(token) for token in tokens]
+    stmt = (
+        select(FoodRef)
+        .where(*matches_every_token)
+        .order_by(*_candidate_order())
+        .limit(limit)
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def _candidate_order():
+    """후보 정렬 — GENERAL 먼저, 짧은 이름 먼저, 그다음은 결정적으로.
+
+    GENERAL 을 먼저 두는 이유는 `find_unique_by_name` 과 같다: 사용자가 "배추김치"
+    라 치면 브랜드 제품(PROCESSED 31.6만건)이 아니라 그 음식을 뜻한다.
+
+    짧은 이름을 먼저 두는 건 검색어에 군더더기가 적게 붙은 쪽이 사용자가 친 것에
+    가깝기 때문이다 — `계란` 에 `계란빵` 이 `부추넣은 계란말이` 보다 먼저 온다.
+
+    마지막 `id` 는 동점일 때 순서를 고정한다. 없으면 같은 질의가 호출마다 다른
+    후보를 보여준다 — 공공 DB 에는 이름·성분이 같은 행이 실제로 여럿 있다.
+    """
+    return (
+        (FoodRef.category == FoodCategory.GENERAL).desc(),
+        func.length(FoodRef.name),
+        FoodRef.name,
+        FoodRef.id,
+    )
+
+
+def search_by_bigrams(
+    db: Session,
+    *,
+    bigrams: list[str],
+    min_score: int,
+    limit: int,
+    exclude_ids: list[str],
+) -> list[FoodRef]:
+    """이름에 겹치는 두 글자가 많은 순으로 찾는다 — 오타를 구제하는 퍼지 검색.
+
+    `김치찌게`(오타)의 두 글자 조각 `김치`·`치찌`·`찌게` 중 둘이 `김치찌개` 에
+    들어 있어 후보로 올라온다. 부분일치가 0건일 때만 부르는 경로다.
+
+    ## 왜 `pg_trgm` 이 아닌가
+
+    **이 DB 에서 `pg_trgm` 은 한글에 아무 값도 내지 않는다.** 데이터베이스가
+    `LC_COLLATE=C` · `LC_CTYPE=C` 로 만들어져 있어 pg_trgm 이 한글 바이트를
+    alnum 으로 보지 않고 전부 버린다 — `show_trgm('계란')` 이 `{}` 이고
+    `similarity('김치찌게','김치찌개')` 가 `0` 이다. 고치려면 DB 를 UTF-8 로케일로
+    **재생성**해야 한다(마이그레이션으로는 안 된다). CJK 용 `pg_bigm` 은
+    `postgres:17-alpine` 에 들어 있지 않다.
+
+    그래서 두 글자 조각 비교를 SQL 로 직접 적는다. 확장 기능도 인덱스도 필요
+    없지만 33만건 순차 스캔이고, 조각 수에 비례해 비싸진다 — 같은 컨테이너에서
+    조각 3개 300ms, 8개 580ms, (상한을 걸기 전) 41개가 4.2초였다. 부분일치가
+    후보를 채우면 이 쿼리는 아예 돌지 않는다.
+
+    `exclude_ids` 는 부분일치가 이미 집은 행이다 — 빼지 않으면 같은 음식이 목록에
+    두 번 나온다.
+
+    `min_score` 는 "조각이 몇 개나 겹쳐야 후보로 치는가" 다. 기준을 정하는 건
+    호출부이고(`services.nutrition.search_candidates`), 여기서는 세기만 한다.
+    """
+    hits = [_contains(bigram) for bigram in bigrams]
+    # 맞은 조각 수가 곧 점수다. bool 을 그대로 더하지 않는 건 Postgres 가 boolean
+    # 덧셈을 지원하지 않기 때문이다.
+    score = sum((case((hit, 1), else_=0) for hit in hits), start=literal(0))
+
+    # `min_score` 로 거른다 — 조각 하나가 우연히 겹친 이름은 후보가 아니다.
+    # `OR` 로만 거르면 `존재하지않는음식` 이 `굳지않는송편` 을 데려온다(실측).
+    # 조건이 곧 "겹친 조각 수" 라 OR 는 따로 두지 않는다(점수가 1 이상이면 포함이다).
+    not_already_found = [FoodRef.id.notin_(exclude_ids)] if exclude_ids else []
+    stmt = (
+        select(FoodRef)
+        .where(score >= min_score, *not_already_found)
+        .order_by(score.desc(), *_candidate_order())
+        .limit(limit)
+    )
+    return list(db.execute(stmt).scalars().all())
