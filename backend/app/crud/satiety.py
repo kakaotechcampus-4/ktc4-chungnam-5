@@ -32,7 +32,7 @@ def set_satiety_after(db: Session, *, meal_id: uuid.UUID, pct: int) -> SatietyLo
     `logged_at` 은 서버 기본값이 없는 NOT NULL 이라 **처음 만들 때만** 채운다.
     충돌 시에는 건드리지 않는다 — 한 행에 식전·식후 두 값이 들어 있어 타임스탬프
     하나가 둘 다를 뜻할 수 없다. 덮으면 식전 기록 시각이 사라진다.
-    식후 시각이 따로 필요해지면 컬럼을 나눈다 (satiety-checkins 티켓).
+    식후 시각이 따로 필요해지면 컬럼을 나눈다 — 아직 읽는 곳이 없어 미뤄 둔다.
 
     **`ON CONFLICT` 한 문장이다.** 읽고 나서 넣으면 `(meal_id)` UNIQUE 경합에서
     두 번째 요청이 죽는다 (`crud/evaluation.py::upsert` 와 같은 이유).
@@ -72,7 +72,10 @@ def set_hunger_return(
     updates: dict[str, object] = {}
     if minutes is not None:
         updates["hunger_return_minutes"] = minutes
-    if comment is not None:
+    # 빈 문자열은 안 보낸 것과 같다 — FE 의 텍스트 입력이 비면 `""` 를 보내는 게
+    # 흔하다. `is not None` 으로 보면 `updates` 가 비지 않아 아래 가드를 통과하고,
+    # 내용 없는 `satiety_logs` 행이 그대로 생긴다.
+    if comment and comment.strip():
         updates["user_comment"] = comment
 
     # **쓸 게 없으면 행을 만들지 않는다.** 둘 다 안 보내는 게 체크인의 기본 흐름인데,

@@ -142,9 +142,16 @@ def get_feedback(
 ) -> MealFeedbackResponse:
     """끼니 피드백을 읽는다. 없으면 "아직" 이지 에러가 아니다.
 
-    지금은 행이 있고 내용이 차 있으면 `READY`, 아니면 `PENDING` 이다. 명세가 주는
-    것은 값 목록(`:46`)과 예시 둘(`POST /confirm` → `PENDING`, 여기 → `READY`)뿐이고
-    **유도 규칙은 없다.** 그 둘은 이미 만족한다.
+    `READY` 는 **보여 줄 판정이 끝났다**는 뜻이지 "내용이 있다" 가 아니다.
+
+        SAFE            내용을 싣는다                          → READY
+        BLOCKED         영영 못 보여 준다. FE 는 상담 안내로
+                        바꾼다(`MEDICAL_QUESTION_DETECTED`)    → READY
+        REVIEW_REQUIRED 검수를 통과하면 보일 수도 있다         → PENDING
+        내용 없음 · 확정 전                                    → PENDING
+
+    명세가 주는 것은 값 목록(`:46`)과 예시 둘(`POST /confirm` → `PENDING`, 여기 →
+    `READY`)뿐이고 **유도 규칙은 없다.** 그 둘은 이미 만족한다.
 
     🔗 TODO(`worker/` 담당 @leekh2002 · FE 와 합의 후): **큐 등록과
     `GENERATING`/`FAILED` 를 여기서 맡는다.** 방향은 정해졌고 구현만 남았다.
@@ -201,8 +208,14 @@ def get_feedback(
     # `body is None` 은 **행이 있지만 내용이 무효**라는 뜻이다 — 재확정이
     # `invalidate_by_meal` 로 비운 상태다. 행 존재만 보고 `READY` 를 내면
     # `summary: null` 인 READY 가 나가서, FE 가 빈 카드를 그린다.
+    # `body` 가 비었으면 **내용이 없는 것**이다 — NULL 이든 빈 문자열이든 같다.
+    # NULL 만 보면 `READY` + `summary: ""` 가 나가 FE 가 빈 카드를 그리고 폴링까지
+    # 멈춘다. AI 계약(`ai-stub/schemas.py::ShortFeedbackResponse.body`)에 `min_length`
+    # 가 없어 가드레일이 본문을 지우거나 부분 응답이 오면 실제로 빈 문자열이 온다 —
+    # 같은 브랜치의 JSONB 마이그레이션이 `suggestions` 의 빈 문자열을 NULL 로
+    # 흡수하는 것과 같은 이유다.
     row = feedback_crud.get_by_meal(db, meal.id)
-    if row is None or row.body is None:
+    if row is None or not (row.body or "").strip():
         return MealFeedbackResponse.pending()
 
     # 마스킹은 스키마 팩토리가 한다 — `GET /meals/{mealId}` 도 같은 행을 읽으므로

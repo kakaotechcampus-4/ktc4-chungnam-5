@@ -88,11 +88,10 @@ _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATE
 고치면 점수가 다시 매겨져야 하고, `qqs_evaluations` 가 식사당 1행(upsert)인 것도
 그 전제다.
 
-🔗 TODO(`feedbacks.py` 구현 시): **재확정이 `meal_feedbacks` 를 건드리지 않는다.**
-점수는 upsert 로 덮이는데 AI 가 쓴 문장은 옛 점수 기준으로 남아, 확정 응답은
-`feedbackStatus: PENDING` 인데 `GET /meals/{mealId}/feedback` 은 낡은 문장을 준다.
-지금은 `endpoints/feedbacks.py` 가 비어 있어 드러나지 않는다. 무효화 방식(행 삭제 ·
-stale 플래그 · 상태 되돌리기)이 그 엔드포인트 설계에 달려 있어 거기서 함께 정한다.
+🔗 **재확정은 `meal_feedbacks` 도 무효화한다** — `_is_stale_feedback`(아래) 이 판정하고
+`crud/feedback.py::invalidate_by_meal` 이 내용을 비운다. 점수는 upsert 로 덮이는데 AI 가
+쓴 문장은 아무도 안 건드려서, 그냥 두면 닭가슴살을 더해 재확정해도 "단백질 비중이
+낮았어요" 가 그대로 나갔다. **여기서 또 구현하지 말 것.**
 """
 
 
