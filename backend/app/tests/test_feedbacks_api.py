@@ -126,6 +126,29 @@ def test_reconfirming_does_not_bring_the_stale_feedback_back(
     assert data["suggestions"] == []
 
 
+@pytest.mark.parametrize("body", ["", "   ", "\n"], ids=["빈 문자열", "공백", "줄바꿈"])
+def test_blank_body_is_pending_not_an_empty_ready(
+    client: TestClient, db: Session, body: str
+) -> None:
+    """본문이 비면 `PENDING` 이다 — NULL 이든 빈 문자열이든 내용이 없는 건 같다.
+
+    AI 계약(`ai-stub/schemas.py::ShortFeedbackResponse.body`)에 `min_length` 가 없어
+    가드레일이 본문을 지우거나 부분 응답이 오면 실제로 빈 문자열이 온다. NULL 만
+    보면 `READY` + `summary: ""` 가 나가 FE 가 빈 카드를 그리고 **폴링까지 멈춘다.**
+    """
+    user, meal = _meal(db)
+    row = _add_feedback(db, meal)
+    row.body = body
+    db.flush()
+
+    data = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+    assert data["summary"] is None
+
+
 def test_confirming_twice_without_editing_keeps_the_feedback(
     client: TestClient, db: Session
 ) -> None:
@@ -208,8 +231,19 @@ def test_invalidated_row_is_pending_not_an_empty_ready(
 
     assert data["feedbackStatus"] == "PENDING"
     assert data["summary"] is None
+
+    # **DB 를 직접 본다.** 응답만 보면 `body` 만 비워도 통과한다 — `get_feedback` 이
+    # `body` 가 비었으면 곧장 `pending()` 으로 빠지고, 그 팩토리가 나머지를
+    # 하드코딩하기 때문이다. 그러면 낡은 근거 문장과 제안이 행에 남아, 같은 행을
+    # 읽기로 되어 있는 `GET /meals/{mealId}` 가 그걸 그대로 싣는다.
+    row = feedback_crud.get_by_meal(db, meal.id)
     # 행은 남아 있어야 한다 — 일일 피드백이 이 행을 출처로 물고 있을 수 있다.
-    assert feedback_crud.get_by_meal(db, meal.id) is not None
+    assert row is not None
+    assert (row.body, row.reasoning, row.suggestions) == (None, None, None)
+    # 판정도 되돌아간다 — 내용에 붙은 판정이라 내용이 무효면 같이 무효다.
+    assert row.safety_status is SafetyStatus.REVIEW_REQUIRED
+    # 어느 모델이 썼었나는 지운 뒤에도 사실이다.
+    assert row.model_version == "stub-1"
 
 
 @pytest.mark.parametrize(
@@ -437,6 +471,34 @@ def test_fractional_score_is_rounded_not_truncated(
     ).json()["data"]
 
     assert data["expectedSatietyPct"] == {"current": 69, "after": 69}
+
+
+@pytest.mark.parametrize(
+    ("score", "expected"),
+    [("68.5", 68), ("69.5", 70), ("68.4", 68), ("68.6", 69)],
+)
+def test_half_cases_use_bankers_rounding(
+    client: TestClient, db: Session, score: str, expected: int
+) -> None:
+    """`.5` 는 **짝수 쪽**으로 간다 — 파이썬 `round` 가 half-even 이다.
+
+    68.5 → 68, 69.5 → 70. 올림을 기대하면 틀린다. 지금은 `score_satiety` 가 정수만
+    만들어 도달 불가지만, 이 코드는 소수가 들어올 미래를 위한 것이라 어느 방식인지
+    못박아 둔다. 다른 화면이 half-up 으로 반올림하면 68.5 에서 68/69 로 갈린다.
+    """
+    user, meal = _meal(db)
+    _add_feedback(db, meal)
+    evaluation_crud.upsert(
+        db, meal_id=meal.id, stage=MedicationStage.MAINTENANCE,
+        quantity_score=None, quality_score=None, satiety_score=Decimal(score),
+    )
+    db.flush()
+
+    data = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]
+
+    assert data["expectedSatietyPct"]["current"] == expected
 
 
 @pytest.mark.parametrize(

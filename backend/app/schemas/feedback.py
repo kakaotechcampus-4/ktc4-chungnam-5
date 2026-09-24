@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from app.models.enums import FeedbackStatus, NutrientCode, SafetyStatus
 from app.schemas.base import CamelModel
 
-if TYPE_CHECKING:  # 런타임 import 를 피한다 — 스키마가 모델에 의존하지 않게.
+if TYPE_CHECKING:  # ORM 모델만 피한다 — 열거형은 응답 값이라 런타임에 필요하다.
     from app.models.feedback import MealFeedback
 
 
@@ -68,7 +68,8 @@ class MealFeedbackResponse(CamelModel):
 
     @classmethod
     def pending(cls) -> MealFeedbackResponse:
-        """아직 피드백이 없다. 행이 안 생겼을 때."""
+        """아직 보여 줄 게 없다. 세 경우가 여기로 온다 — 행이 없다 / 행은 있지만
+        내용이 비었다(재확정이 무효화했다) / 식사가 확정 상태가 아니다."""
         return cls(
             feedback_status=FeedbackStatus.PENDING,
             summary=None,

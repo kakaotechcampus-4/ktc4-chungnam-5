@@ -1,6 +1,7 @@
 """meal_feedbacks 접근 + 제안 음식의 성분 조회.
 
-`meal_feedbacks` 는 `(meal_id)` UNIQUE 라 식사당 1행이다. 지금은 읽기만 한다 —
+`meal_feedbacks` 는 `(meal_id)` UNIQUE 라 식사당 1행이다. 여기서는 읽기와 무효화만
+한다. 내용을 **채우는** 쪽은 워커다 —
 쓰는 쪽은 워커(`worker/jobs/feedback_meal.py`)이고 아직 스텁이다.
 """
 
@@ -13,7 +14,7 @@ from typing import Final, NamedTuple
 from sqlalchemy import Numeric, and_, cast, select, update
 from sqlalchemy.orm import Session
 
-from app.models.enums import NutrientCode
+from app.models.enums import NutrientCode, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.models.food import FoodRef
 
@@ -53,7 +54,7 @@ def invalidate_by_meal(db: Session, meal_id: uuid.UUID) -> None:
     음식을 고쳐 다시 확정하면 점수는 `evaluation_crud.upsert` 가 덮지만 AI 가 쓴
     문장은 아무도 안 건드린다. 닭가슴살을 더해 재확정해도 "단백질 비중이 낮았어요"
     가 그대로 나가는 이유다. 상태 가드(`services/feedback.py::get_feedback`)는
-    `ANALYZING` 구간만 막아서, 재확정으로 `EVALUATED` 가 되는 순간 풀린다.
+    확정 상태가 아닌 동안만 막아서, 재확정으로 `EVALUATED` 가 되는 순간 풀린다.
 
     **행은 지우지 않는다.** `daily_feedback_sources.meal_feedback_id` 가
     `ON DELETE CASCADE` 라, 지우면 일일 피드백의 출처 링크가 조용히 사라지고 문장만
@@ -63,6 +64,8 @@ def invalidate_by_meal(db: Session, meal_id: uuid.UUID) -> None:
     내용을 비우면 `get_feedback` 이 `body is None` 을 보고 `PENDING` 을 낸다.
     워커가 새 문장을 채우면 다시 `READY` 가 된다.
 
+    `safety_status` 는 `REVIEW_REQUIRED` 로 되돌린다 — 판정이 내용에 붙은 것이라서다.
+
     `model_version` 은 남긴다 — 어느 모델이 쓴 문장이었는지는 지운 뒤에도 쓸모가
     있고, 무효 여부는 `body` 가 말한다.
 
@@ -71,7 +74,19 @@ def invalidate_by_meal(db: Session, meal_id: uuid.UUID) -> None:
     db.execute(
         update(MealFeedback)
         .where(MealFeedback.meal_id == meal_id)
-        .values(body=None, reasoning=None, suggestions=None)
+        .values(
+            body=None,
+            reasoning=None,
+            suggestions=None,
+            # **판정도 함께 되돌린다.** `safety_status` 는 내용에 붙은 판정이라
+            # 내용이 무효면 같이 무효다. 모델이 `server_default` 를
+            # `REVIEW_REQUIRED` 로 두고 "가드레일을 통과해야만 SAFE" 라는
+            # fail-closed 를 약속하는데, 내용만 비우면 `body = NULL` 인데
+            # `SAFE` 인 어긋난 상태가 남는다 — 워커가 나중에 upsert 할 때
+            # `safety_status` 를 빠뜨리면 검수 안 된 문장이 옛 `SAFE` 를
+            # 물려받아 그대로 노출된다 (절대 규칙 1).
+            safety_status=SafetyStatus.REVIEW_REQUIRED,
+        )
     )
 
 
