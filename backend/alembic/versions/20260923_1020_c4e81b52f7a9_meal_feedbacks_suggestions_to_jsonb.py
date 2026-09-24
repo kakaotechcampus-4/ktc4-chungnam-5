@@ -1,7 +1,7 @@
 """meal_feedbacks.suggestions to jsonb
 
 Revision ID: c4e81b52f7a9
-Revises: 817327c34a0e
+Revises: c5e1a37b92d4
 Create Date: 2026-09-23 10:20:00.000000
 
 명세의 `feedback.suggestions` 는 `{foodName, nutrients, advice}` 객체 배열이고 AI 도

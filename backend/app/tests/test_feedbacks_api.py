@@ -126,6 +126,68 @@ def test_reconfirming_does_not_bring_the_stale_feedback_back(
     assert data["suggestions"] == []
 
 
+def test_confirming_twice_without_editing_keeps_the_feedback(
+    client: TestClient, db: Session
+) -> None:
+    """**아무것도 안 고친 재확정은 문장을 지우지 않는다.**
+
+    `_CONFIRMABLE` 에 `EVALUATED` 가 있어 확정 버튼 더블탭 · FE 타임아웃 재시도 ·
+    같은 값 재전송이 전부 여기로 온다. 무조건 비우면 멀쩡한 문장이 날아가고,
+    되살릴 길이 없다 — `feedback.meal` 을 큐에 넣는 코드가 아직 없고 워커도 스텁이라
+    `PENDING` 에 고착된다.
+    """
+    user, meal = _meal(db)
+    make_food_ref(db)
+    make_meal_item(db, meal_id=meal.id, food_ref_id="KFD_TEST_01")
+    body = {"satietyAfterPct": 68}
+    client.post(f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id), json=body)
+    _add_feedback(db, meal)  # 워커가 문장을 채운 상태를 흉내 낸다
+
+    # 같은 값으로 한 번 더 — 바뀐 게 없다.
+    res = client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id), json=body
+    )
+    assert res.status_code == 200, res.text
+
+    data = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]
+
+    assert data["feedbackStatus"] == "READY"
+    assert data["summary"] == "유지기 기준 포만감이 부족한 식사예요."
+
+
+def test_reconfirming_with_a_different_satiety_invalidates(
+    client: TestClient, db: Session
+) -> None:
+    """포만감만 고쳐 재확정해도 문장은 낡는다 — 상태만 봐서는 못 잡는다.
+
+    음식을 안 고쳤으니 상태는 `EVALUATED` 그대로 들어온다. Satiety 는 지금 유일하게
+    값이 있는 점수이고 요청값을 그대로 쓰므로, 점수 비교가 이 경로의 유일한 단서다.
+    """
+    user, meal = _meal(db)
+    make_food_ref(db)
+    make_meal_item(db, meal_id=meal.id, food_ref_id="KFD_TEST_01")
+    client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
+        json={"satietyAfterPct": 68},
+    )
+    _add_feedback(db, meal)
+
+    res = client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id),
+        json={"satietyAfterPct": 20},
+    )
+    assert res.status_code == 200, res.text
+
+    data = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+    assert data["summary"] is None
+
+
 def test_invalidated_row_is_pending_not_an_empty_ready(
     client: TestClient, db: Session
 ) -> None:
@@ -298,8 +360,11 @@ def test_blocked_feedback_hides_the_text(client: TestClient, db: Session) -> Non
     assert data["summary"] is None
     assert data["reasoning"] is None
     assert data["suggestions"] == []
+    assert data["expectedSatietyPct"] is None
     assert data["safetyStatus"] == "BLOCKED"
-    assert data["feedbackStatus"] == "READY"  # 생성은 끝났다
+    # 생성은 끝났고 **영영 못 보여 준다** — `REVIEW_REQUIRED` 와 달리 `READY` 다.
+    # FE 는 폴링을 멈추고 상담 안내로 바꾼다(`MEDICAL_QUESTION_DETECTED` 동반).
+    assert data["feedbackStatus"] == "READY"
 
 
 def test_blocked_carries_the_spec_error_code(client: TestClient, db: Session) -> None:
@@ -346,6 +411,56 @@ def test_unreviewed_feedback_is_hidden_too(client: TestClient, db: Session) -> N
 
     assert data["summary"] is None
     assert data["safetyStatus"] == "REVIEW_REQUIRED"
+    # **`READY` 가 아니라 `PENDING` 이다.** 검수를 통과하면 보일 수도 있으니 "아직"
+    # 이고, `READY` + `summary: null` 은 FE 에 빈 카드를 그리게 한다.
+    assert data["feedbackStatus"] == "PENDING"
+
+
+def test_fractional_score_is_rounded_not_truncated(
+    client: TestClient, db: Session
+) -> None:
+    """점수가 소수면 반올림한다 — 자르면 68.7 이 68 이 된다.
+
+    컬럼이 `Numeric(5, 2)` 라 소수가 들어올 수 있다. 반올림하는 다른 화면과 같은
+    끼니가 68 과 69 로 갈리면 안 된다.
+    """
+    user, meal = _meal(db)
+    _add_feedback(db, meal)
+    evaluation_crud.upsert(
+        db, meal_id=meal.id, stage=MedicationStage.MAINTENANCE,
+        quantity_score=None, quality_score=None, satiety_score=Decimal("68.7"),
+    )
+    db.flush()
+
+    data = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]
+
+    assert data["expectedSatietyPct"] == {"current": 69, "after": 69}
+
+
+@pytest.mark.parametrize(
+    "suggestion",
+    [
+        {"foodName": "두부", "advice": None},
+        {"foodName": "두부"},
+        {"advice": "단백질을 채워요"},
+        {"foodName": "", "advice": "단백질을 채워요"},
+    ],
+)
+def test_half_written_suggestion_is_dropped(
+    client: TestClient, db: Session, suggestion: dict
+) -> None:
+    """이름과 조언은 짝이다 — 한쪽만 있으면 FE 가 반쪽 카드를 그린다."""
+    user, meal = _meal(db)
+    _add_feedback(db, meal, suggestions=[suggestion])
+
+    data = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]
+
+    assert data["suggestions"] == []
+    assert data["summary"] == "유지기 기준 포만감이 부족한 식사예요."
 
 
 def test_suggestion_nutrients_come_from_food_refs(client: TestClient, db: Session) -> None:
@@ -454,6 +569,30 @@ def test_nan_nutrient_is_omitted_not_null(client: TestClient, db: Session) -> No
 
     # 멀쩡한 FIBER 만 남는다. PROTEIN 은 null 로도 0 으로도 나가지 않는다.
     assert data["suggestions"][0]["nutrients"] == [{"code": "FIBER", "amountG": 2.0}]
+
+
+def test_tiny_serving_size_does_not_overflow(client: TestClient, db: Session) -> None:
+    """기준량이 아주 작아도 500 이 나면 안 된다.
+
+    성분과 `serving_size` 가 둘 다 `Numeric(10, 3)` 이라 환산 결과가 약 1e12 까지
+    간다. 캐스팅 폭이 좁으면 Postgres 가 numeric field overflow 로 죽고, 그 한 행
+    때문에 끼니 피드백 전체를 못 읽는다.
+    """
+    user, meal = _meal(db)
+    make_food_ref(
+        db, food_ref_id="KFD_TINY", name="농축액",
+        serving_size=Decimal("0.001"), protein_g=Decimal("9999999.999"), fiber_g=None,
+    )
+    _add_feedback(
+        db, meal,
+        suggestions=[{"foodName": "농축액", "advice": "단백질을 채워요",
+                      "candidateFoodRefId": "KFD_TINY"}],
+    )
+
+    res = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id))
+
+    assert res.status_code == 200, res.text
+    assert res.json()["data"]["suggestions"][0]["nutrients"][0]["code"] == "PROTEIN"
 
 
 @pytest.mark.parametrize(

@@ -57,7 +57,7 @@ def _coerce(item: object) -> _StoredSuggestion | None:
     `get(k, "")` 의 기본값이 안 먹어 `None` 이 그대로 나오고, `food_name: str` 에서
     터진다.
 
-    문구가 둘 다 비면 버린다. `nutrients` 만 남은 카드는 FE 에 그릴 게 없다.
+    문구가 하나라도 비면 버린다. `nutrients` 만 남은 카드는 FE 에 그릴 게 없다.
     """
     if not isinstance(item, dict):
         return None
@@ -66,7 +66,9 @@ def _coerce(item: object) -> _StoredSuggestion | None:
     advice = item.get("advice") or ""
     if not isinstance(food_name, str) or not isinstance(advice, str):
         return None
-    if not food_name and not advice:
+    # **하나라도 비면 버린다.** 명세의 카드는 음식 이름과 조언 문구가 짝이라
+    # (`{foodName, nutrients, advice}`), 한쪽이 없으면 FE 가 반쪽 카드를 그린다.
+    if not food_name or not advice:
         return None
 
     ref_id = item.get("candidateFoodRefId")
@@ -128,7 +130,10 @@ def _expected_satiety(db: Session, meal_id: uuid.UUID) -> ExpectedSatiety | None
     row = evaluation_crud.get_by_meal(db, meal_id)
     if row is None or row.satiety_score is None:
         return None
-    current = int(row.satiety_score)
+    # `round` 다 — 컬럼이 `Numeric(5, 2)` 라 소수 점수가 들어올 수 있다.
+    # `int()` 로 자르면 68.7 이 68 이 되어, 반올림하는 다른 화면과 같은 끼니가
+    # 68 과 69 로 갈린다. 지금은 `score_satiety` 가 정수만 만들어 차이가 없다.
+    current = round(row.satiety_score)
     return ExpectedSatiety(current=current, after=current)
 
 
