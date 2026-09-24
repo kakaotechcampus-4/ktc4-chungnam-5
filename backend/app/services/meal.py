@@ -33,7 +33,11 @@ from app.schemas.meal import (
     MealListResponse,
     MealScores,
 )
-from app.schemas.nutrition import NutritionInfo
+from app.schemas.nutrition import (
+    ManualNutrition,
+    NutritionInfo,
+    NutritionUpdateResponse,
+)
 
 _KST_ZONE = ZoneInfo("Asia/Seoul")
 
@@ -281,8 +285,8 @@ def get_calendar(db: Session, *, user_id: uuid.UUID, month: str) -> MealCalendar
     )
     stage_by_day = {
         row.day.date(): row.stage
-        for row in meal_crud.get_calendar_day_stages(
-            db, user_id=user_id, month_start=month_start, month_end=month_end
+        for row in meal_crud.get_day_stages(
+            db, user_id=user_id, range_start=month_start, range_end=month_end
         )
     }
 
@@ -367,7 +371,7 @@ def add_item(
     )
 
 
-def _stored_amount(item: MealItem) -> tuple[Decimal | None, Decimal | None, str | None]:
+def resolved_amount(item: MealItem) -> tuple[Decimal | None, Decimal | None, str | None]:
     """고치기 전의 양 — `(g 환산값, 숫자, 단위)`.
 
     **확인 여부의 센티넬은 `confirmed_amount` 다.** `confirmed_amount_g` 가 아니다 —
@@ -493,7 +497,7 @@ def update_items(
 
         # 반영 전 값은 여기서 전부 잡아 둔다 — `update_item` 뒤에 읽으면 방금 쓴
         # 값이라 "안 고쳤다" 가 된다.
-        stored = _stored_amount(item)
+        stored = resolved_amount(item)
         stored_amount_g, stored_amount, stored_unit = stored
         before: dict[str, str | None] = {
             "displayName": item.display_name,
@@ -542,6 +546,19 @@ def update_items(
         changed = renamed or _amount_key(*stored) != _amount_key(
             update.amount_g, update.request.amount, update.request.unit
         )
+
+        # 직접 입력한 영양성분(`PUT .../nutrition` 의 `manual`)은 **섭취량 기준
+        # 총량**이라 양이 바뀌면 거짓이 되고, 이름이 바뀌면 다른 음식의 값이 된다.
+        # 남겨 두면 그 값이 Q/Q/S 채점까지 조용히 흘러간다 — 비어 있는 편이 낫다는
+        # 기존 원칙 그대로 지우고 `matched: false` 폴백으로 되돌린다
+        # (`endpoints/meal_items.py` 의 `add_meal_item` 독스트링).
+        #
+        # **`changed` 여야 한다.** 확인 화면은 고치지 않은 항목까지 보내므로
+        # (이 함수의 독스트링) 무조건 지우면 사용자는 아무것도 고치지 않았는데
+        # 직접 입력한 값을 잃는다.
+        if changed:
+            meal_crud.clear_item_manual_nutrition(db, item=item)
+
         if item.source is MealItemSource.MODEL and changed:
             meal_crud.add_correction(
                 db,
@@ -559,6 +576,167 @@ def update_items(
         status=meal.status,
         is_recalculation=meal.is_recalculation,
         steps=list(RECALCULATION_STEPS),
+    )
+
+
+@dataclass(frozen=True)
+class NutritionTarget:
+    """영양정보를 붙일 항목 + 그 항목의 지금 확정된 양.
+
+    `amount_g` 를 함께 내보내는 건 호출부(api 레이어)가 공공 DB 환산을 돌려야
+    하는데(README 절대 규칙 5 — services 끼리는 서로 부르지 않는다) 그 환산에
+    먹은 양이 필요하기 때문이다. 읽기 규칙(`resolved_amount`)을 호출부가 다시
+    구현하면 두 곳이 조용히 어긋난다.
+    """
+
+    meal: Meal
+    item: MealItem
+    amount_g: Decimal | None
+
+
+def get_nutrition_target(
+    db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID, item_id: uuid.UUID
+) -> NutritionTarget:
+    """영양정보를 고칠 항목을 소유권·상태째 확인해서 가져온다.
+
+    형제 엔드포인트 셋과 **똑같은 관문**을 지난다(`_editable_meal`) — 없는 식사·
+    남의 식사·삭제된 식사는 전부 `MealNotFoundError`, 고칠 수 없는 상태는
+    `MealNotEditableError` 다.
+
+    반영은 `set_item_nutrition` 이 한다. 둘로 나뉜 건 그 사이에서 api 레이어가
+    공공 DB 환산을 돌려야 하기 때문이다(`NutritionTarget` 참고).
+    """
+    meal = _editable_meal(db, user_id=user_id, meal_id=meal_id)
+
+    item = meal_crud.get_item(db, meal_id=meal.id, item_id=item_id)
+    if item is None:
+        raise MealItemNotFoundError(f"item {item_id} 는 이 식사의 항목이 아닙니다.")
+
+    return NutritionTarget(meal=meal, item=item, amount_g=resolved_amount(item)[0])
+
+
+def _manual_nutrition(item: MealItem) -> NutritionInfo | None:
+    """항목에 직접 입력된 영양성분. 하나도 없으면 None.
+
+    **환산하지 않는다** — `manual_*` 는 섭취량 기준 총량이다(`MealItem` 컬럼 주석).
+    """
+    values = (
+        item.manual_kcal,
+        item.manual_protein_g,
+        item.manual_fat_g,
+        item.manual_carb_g,
+        item.manual_fiber_g,
+        item.manual_sodium_mg,
+    )
+    if all(value is None for value in values):
+        return None
+
+    kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg = values
+    return NutritionInfo(
+        kcal=kcal,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carb_g=carb_g,
+        fiber_g=fiber_g,
+        sodium_mg=sodium_mg,
+    )
+
+
+def item_nutrition(
+    item: MealItem, public_db_nutrition: NutritionInfo | None
+) -> tuple[NutritionInfo | None, str | None]:
+    """항목의 영양정보와 그 **출처**를 유도한다 — `(nutrition, nutritionSource)`.
+
+    `meal_items` 에 `nutrition_source` 컬럼은 없다. 그 설계는 **유도하는 코드가 한
+    곳일 때만** 성립하므로, 이 필드를 내보내는 응답은 전부 여기를 거쳐야 한다
+    (`PUT .../nutrition` · `GET /meals/{mealId}` · `POST .../confirm`). 두 곳이
+    각자 계산하면 같은 항목이 화면마다 다른 출처로 보인다.
+
+    규칙은 한 줄이다:
+
+        직접 입력이 있으면 USER_INPUT → 없고 공공 DB 환산이 되면 PUBLIC_DB → 둘 다 없으면 null
+
+    **사용자가 고른 후보도 `PUBLIC_DB` 다.** 이 필드가 답하는 질문은 "숫자가 어디서
+    왔는가" 이지 "누가 골랐는가" 가 아니다 — 명세서의 `evidence.dbSource` 와 같은
+    자리다.
+
+    `public_db_nutrition` 을 인자로 받는 건 그 환산이 `services/nutrition.py` 의
+    일이고 services 끼리는 서로 부르지 않기 때문이다(README 절대 규칙 5).
+    """
+    manual = _manual_nutrition(item)
+    if manual is not None:
+        return manual, "USER_INPUT"
+    if public_db_nutrition is not None:
+        return public_db_nutrition, "PUBLIC_DB"
+    return None, None
+
+
+def set_item_nutrition(
+    db: Session,
+    *,
+    target: NutritionTarget,
+    food_ref_id: str | None,
+    manual: ManualNutrition | None,
+    public_db_nutrition: NutritionInfo | None,
+) -> NutritionUpdateResponse:
+    """사용자가 고른 영양정보를 항목에 붙이고 재계산 대기로 표시한다.
+
+    `add_item` · `update_items` · `delete_item` 과 같은 순서다 — 바꾸고, 식사를
+    재계산 대기로 옮기고, 커밋한다. 여기서도 큐에 아무것도 넣지 않는다
+    (`api/v1/endpoints/meal_items.py` 의 `add_meal_item` 독스트링 참고).
+
+    출처는 저장하지 않고 `item_nutrition` 이 유도한다.
+
+    ## 직접 입력은 기존 링크를 끊지 않는다
+
+    "어느 음식으로 봤는가" 는 그 자체로 남길 값이고, 직접 입력이 지워지면 돌아갈
+    자리이기도 하다(`test_changing_the_amount_falls_back_to_the_linked_public_db_values`).
+    반대로 후보를 고르면 링크가 그 후보로 **바뀐다.**
+
+    ## 이전 직접 입력은 새 값이 그 자리를 채울 때만 지운다
+
+    후보를 골랐고 환산까지 됐으면 그 값이 유효한 최신 선택이므로 이전 직접 입력을
+    남기면 안 된다 — 읽기 규칙상 직접 입력이 계속 이겨 **후보 선택이 아무 일도 하지
+    않은 것처럼 보인다.**
+
+    하지만 고른 후보로 아무 값도 못 만들었다면("계란 2개") 얘기가 다르다. 거기서도
+    지우면 사용자는 요청 한 번으로 갖고 있던 유일한 영양정보를 잃고 폴백 시작점으로
+    되돌아간다 — 얻은 것 없이 잃기만 한다. 그때는 그대로 둔다.
+    """
+    # 후보를 고른 요청은 링크를 바꾸고, 직접 입력(`food_ref_id` 없음)은 지킨다.
+    link = food_ref_id if food_ref_id is not None else target.item.food_ref_id
+    meal_crud.set_item_food_ref(db, item=target.item, food_ref_id=link)
+
+    if manual is not None:
+        meal_crud.set_item_manual_nutrition(
+            db,
+            item=target.item,
+            kcal=manual.kcal,
+            protein_g=manual.protein_g,
+            fat_g=manual.fat_g,
+            carb_g=manual.carb_g,
+            fiber_g=manual.fiber_g,
+            sodium_mg=manual.sodium_mg,
+        )
+    elif public_db_nutrition is not None:
+        meal_crud.clear_item_manual_nutrition(db, item=target.item)
+
+    meal_crud.mark_recalculating(db, target.meal)
+
+    # 트랜잭션 경계는 services 가 정한다(README 절대 규칙 5).
+    db.commit()
+
+    nutrition, source = item_nutrition(target.item, public_db_nutrition)
+
+    return NutritionUpdateResponse(
+        item_id=target.item.id,
+        # 형제 엔드포인트와 같은 정의 — "영양정보가 나가는가" 지 "공공 DB 에서
+        # 찾았는가" 가 아니다(`add_item` 참고).
+        matched=nutrition is not None,
+        nutrition_source=source,
+        nutrition=nutrition,
+        status=target.meal.status,
+        is_recalculation=target.meal.is_recalculation,
     )
 
 

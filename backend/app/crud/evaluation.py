@@ -12,7 +12,7 @@ from decimal import Decimal
 from types import MappingProxyType
 from typing import Final, NamedTuple
 
-from sqlalchemy import Numeric, and_, case, cast, func, select
+from sqlalchemy import Numeric, and_, case, cast, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -60,6 +60,29 @@ def upsert(
     row = db.execute(stmt).scalar_one()
     db.flush()
     return row
+
+
+def delete_by_meal(db: Session, meal_id: uuid.UUID) -> None:
+    """이 식사의 평가를 지운다. 커밋은 `services/` 가 한다 (절대 규칙 5).
+
+    **음식이 바뀌면 그 점수는 무효다.** 상태를 `ANALYZING` 으로 되돌리는 것만으로는
+    부족하다 — 상태를 안 보고 `qqs_evaluations` 를 join 하는 곳이 여섯이다
+    (`crud/meal.py` 의 `list_meals` · `get_calendar_summary`, `crud/dashboard.py` 의
+    집계 넷). 읽는 쪽마다 필터를 다는 방법도 있지만 읽는 곳이 계속 늘고(insights ·
+    home 이 남았다) 한 곳만 빠뜨려도 조용히 샌다. 행을 지우면 필터와 무관하게 맞는다.
+
+    행이 없으면 아무 일도 없다 — `DELETE` 는 멱등이라 확정 전 수정에서도 그냥 0 행이다.
+    그래서 호출부가 "확정된 적 있나" 를 따질 필요가 없다.
+
+    잃는 이력은 없다. `qqs_evaluations` 는 `UNIQUE (meal_id)` 라 재확정하면 어차피
+    `upsert` 로 덮인다 — 지우지 않아도 옛 점수는 남지 않는다.
+
+    🔗 `meal_feedbacks` 에는 같은 방법을 쓰지 않는다. `daily_feedback_sources` 가
+    `ON DELETE CASCADE` 로 물고 있어 행을 지우면 일일 피드백의 출처 링크가 조용히
+    사라진다. 그쪽은 읽는 곳이 하나뿐이라 읽는 쪽에서 막는다
+    (`services/feedback.py::get_feedback`).
+    """
+    db.execute(delete(QQSEvaluation).where(QQSEvaluation.meal_id == meal_id))
 
 
 # ── 채점 입력: 한 끼 영양 합계 ────────────────────────────────
