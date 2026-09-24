@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.crud import meal as meal_crud
+from app.crud.evaluation import NutrientTotals
 from app.models.enums import MealStatus, SafetyStatus
 from app.schemas.meal import MealScores
 from app.schemas.nutrition import NutritionInfo
@@ -19,6 +20,7 @@ from app.services.meal import (
     MealNotFoundError,
     _build_feedback,
     _build_item_detail,
+    _build_nutrients,
     _build_satiety,
     _build_scores,
     _build_thumbnail_url,
@@ -162,6 +164,12 @@ def _fake_item(
     estimated_amount_g=None,
     estimated_unit=None,
     confidence=None,
+    manual_kcal=None,
+    manual_protein_g=None,
+    manual_fat_g=None,
+    manual_carb_g=None,
+    manual_fiber_g=None,
+    manual_sodium_mg=None,
 ):
     return SimpleNamespace(
         id=uuid.uuid4(),
@@ -173,6 +181,12 @@ def _fake_item(
         estimated_amount=estimated_amount,
         estimated_amount_g=estimated_amount_g,
         estimated_unit=estimated_unit,
+        manual_kcal=manual_kcal,
+        manual_protein_g=manual_protein_g,
+        manual_fat_g=manual_fat_g,
+        manual_carb_g=manual_carb_g,
+        manual_fiber_g=manual_fiber_g,
+        manual_sodium_mg=manual_sodium_mg,
     )
 
 
@@ -182,7 +196,7 @@ def test_build_item_detail_unconfirmed_uses_estimated_amount():
         estimated_amount=Decimal("150"), estimated_unit="g", confidence=Decimal("0.62")
     )
 
-    detail = _build_item_detail(item, nutrition=None)
+    detail = _build_item_detail(item, public_db_nutrition=None)
 
     assert detail.amount == 150.0
     assert detail.unit == "g"
@@ -199,13 +213,29 @@ def test_build_item_detail_confirmed_with_nutrition():
         kcal=Decimal("274"), protein_g=None, fat_g=None, carb_g=None, fiber_g=None, sodium_mg=None
     )
 
-    detail = _build_item_detail(item, nutrition=nutrition)
+    detail = _build_item_detail(item, public_db_nutrition=nutrition)
 
     assert detail.amount == 200.0
     assert detail.matched is True
     assert detail.nutrition_source == "PUBLIC_DB"
     assert detail.user_confirmed is True
     assert detail.nutrition is nutrition
+
+
+def test_build_item_detail_prefers_manual_nutrition_over_public_db():
+    """직접 입력이 있으면 공공 DB 값이 같이 있어도 직접 입력이 우선이어야 한다 (PR #36 리뷰)."""
+    item = _fake_item(
+        confirmed_amount=Decimal("200"), confirmed_unit="g", manual_kcal=Decimal("300")
+    )
+    public_db_nutrition = NutritionInfo(
+        kcal=Decimal("274"), protein_g=None, fat_g=None, carb_g=None, fiber_g=None, sodium_mg=None
+    )
+
+    detail = _build_item_detail(item, public_db_nutrition=public_db_nutrition)
+
+    assert detail.matched is True
+    assert detail.nutrition_source == "USER_INPUT"
+    assert detail.nutrition.kcal == Decimal("300")
 
 
 @pytest.mark.parametrize(
@@ -275,3 +305,44 @@ def test_build_feedback_none_when_blocked():
     )
 
     assert _build_feedback(feedback_row) is None
+
+
+def test_build_feedback_none_when_review_required():
+    """가드레일 검사 전(기본값)도 SAFE 가 아니므로 BLOCKED 와 똑같이 숨겨야 한다."""
+    feedback_row = SimpleNamespace(
+        body="요약", suggestions="제안", safety_status=SafetyStatus.REVIEW_REQUIRED
+    )
+
+    assert _build_feedback(feedback_row) is None
+
+
+def test_build_nutrients_reports_full_sums():
+    totals = NutrientTotals(
+        protein_g=Decimal("20.5"), fiber_g=Decimal("3.2"), sodium_mg=Decimal("450"), counted=2
+    )
+
+    nutrients = _build_nutrients(totals)
+
+    assert [n.code for n in nutrients] == ["PROTEIN", "FIBER", "SODIUM"]
+    protein = nutrients[0]
+    assert protein.label == "단백질"
+    assert protein.current == 20.5
+    assert protein.unit == "g"
+    assert protein.target is None
+    assert protein.state is None
+
+
+def test_build_nutrients_hides_partial_sum_when_missing():
+    """성분별 결측(missing)이 있으면 그 성분은 부분합이라 current 를 None 으로 감춘다."""
+    totals = NutrientTotals(
+        protein_g=Decimal("20.5"),
+        fiber_g=None,
+        sodium_mg=Decimal("450"),
+        counted=2,
+        missing={"fiber_g": 1},
+    )
+
+    nutrients = _build_nutrients(totals)
+
+    fiber = next(n for n in nutrients if n.code == "FIBER")
+    assert fiber.current is None

@@ -11,12 +11,15 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Final
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from app.crud import evaluation as evaluation_crud
 from app.crud import meal as meal_crud
-from app.models.enums import MealItemSource, MealStatus, SafetyStatus
+from app.crud.evaluation import NutrientTotals
+from app.models.enums import MealItemSource, MealStatus, NutrientCode, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.models.meal import Meal, MealItem, SatietyLog
 from app.schemas.meal import (
@@ -615,9 +618,18 @@ def _resolve_steps(status: MealStatus, is_recalculation: bool) -> list[AnalysisS
     return list(RECALCULATION_STEPS)
 
 
-def _build_item_detail(item: MealItem, nutrition: NutritionInfo | None) -> MealItemDetail:
-    """항목 하나를 응답 모양으로 바꾼다. 영양정보는 이미 계산된 값을 받는다."""
+def _build_item_detail(
+    item: MealItem, public_db_nutrition: NutritionInfo | None
+) -> MealItemDetail:
+    """항목 하나를 응답 모양으로 바꾼다.
+
+    출처 판단은 `item_nutrition` 에 맡긴다 — 직접 입력이 있으면 그게 우선이고,
+    없을 때만 공공 DB 환산값(`public_db_nutrition`, 이미 호출부가 계산해 온 값)을
+    쓴다. 여기서 다시 판단하면 `PUT .../nutrition` 과 이 응답이 서로 다른 출처를
+    보여줄 수 있다(`item_nutrition` 독스트링 참고).
+    """
     _, amount, unit = resolved_amount(item)
+    nutrition, source = item_nutrition(item, public_db_nutrition)
     return MealItemDetail(
         item_id=item.id,
         display_name=item.display_name,
@@ -626,7 +638,7 @@ def _build_item_detail(item: MealItem, nutrition: NutritionInfo | None) -> MealI
         confidence=float(item.confidence) if item.confidence is not None else None,
         # meal_items.py 와 같은 정의 — "영양정보가 나가는가" 지 "공공 DB 에서 찾았는가" 가 아니다.
         matched=nutrition is not None,
-        nutrition_source="PUBLIC_DB" if nutrition is not None else None,
+        nutrition_source=source,
         user_confirmed=item.confirmed_amount is not None,
         nutrition=nutrition,
     )
@@ -644,8 +656,47 @@ def _build_satiety(satiety_log: SatietyLog | None) -> SatietyDetail | None:
     )
 
 
+_NUTRIENT_ROWS: Final[tuple[tuple[NutrientCode, str, str, str], ...]] = (
+    (NutrientCode.PROTEIN, "protein_g", "단백질", "g"),
+    (NutrientCode.FIBER, "fiber_g", "식이섬유", "g"),
+    (NutrientCode.SODIUM, "sodium_mg", "나트륨", "mg"),
+)
+"""명세 `nutrients[]` 의 세 줄. `services/evaluation/__init__.py::_NUTRIENT_ROWS` 와
+같은 목록이다 — `GET /meals/{mealId}`와 `GET /meals/{mealId}/evaluation`이 같은
+성분을 같은 순서·라벨·단위로 보여줘야 한다."""
+
+
+def _as_float(value: Decimal | None) -> float | None:
+    """명세의 `nutrients[].current` 는 숫자다. Decimal 을 그대로 두면 문자열로 샌다."""
+    return None if value is None else float(value)
+
+
+def _build_nutrients(totals: NutrientTotals) -> list[NutrientStatus]:
+    """평가 도메인의 성분 합계(`evaluation_crud.sum_nutrients`)를 이 응답 모양으로 옮긴다.
+
+    **결측이 있으면 합계를 안 내보낸다** — `totals.missing`(성분값이 비어 있던
+    항목 수)이 0 이 아니면 그 성분만 부분합인데, 숫자를 그대로 주면 완전한 값처럼
+    읽힌다(`crud/evaluation.py::NutrientTotals` 참고).
+
+    `target`·`state`는 단계별 목표치가 아직 팀 미확정이라 항상 None —
+    `services/evaluation/stage_profile.py` 와 같은 이유다.
+    """
+    return [
+        NutrientStatus(
+            code=code.value,
+            label=label,
+            current=None if totals.missing.get(key) else _as_float(getattr(totals, key)),
+            target=None,
+            unit=unit,
+            state=None,
+        )
+        for code, key, label, unit in _NUTRIENT_ROWS
+    ]
+
+
 def _build_feedback(feedback: MealFeedback | None) -> MealFeedbackSummary | None:
-    if feedback is None or feedback.safety_status == SafetyStatus.BLOCKED:
+    # SAFE 만 노출한다 — REVIEW_REQUIRED(가드레일 전)도 BLOCKED 와 똑같이 숨긴다.
+    if feedback is None or feedback.safety_status is not SafetyStatus.SAFE:
         return None
     return MealFeedbackSummary(summary=feedback.body, suggestions=feedback.suggestions)
 
@@ -662,7 +713,7 @@ def build_meal_detail(
     steps = _resolve_steps(meal.status, meal.is_recalculation)
 
     scores: MealScores | None = None
-    nutrients: list[NutrientStatus] = []  # TODO: services/evaluation/rule_engine.py 구현 후 채움.
+    nutrients: list[NutrientStatus] = []
     satiety: SatietyDetail | None = None
     feedback: MealFeedbackSummary | None = None
 
@@ -672,6 +723,7 @@ def build_meal_detail(
             scores = _build_scores(
                 evaluation.quantity_score, evaluation.quality_score, evaluation.satiety_score
             )
+        nutrients = _build_nutrients(evaluation_crud.sum_nutrients(db, meal.id))
         satiety = _build_satiety(meal.satiety_log)
         feedback = _build_feedback(meal_crud.get_feedback(db, meal.id))
 
