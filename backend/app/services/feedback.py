@@ -253,5 +253,5 @@ def add_checkin(
         satiety_pct=checkin.satiety_pct,
         # 방금 보낸 값이 아니라 **저장된 값**을 돌려준다. 이번에 안 보냈으면 앞서
         # 적어 둔 값이 그대로 나간다 — 사용자가 화면에서 보는 것과 맞다.
-        hunger_return_minutes=log.hunger_return_minutes,
+        hunger_return_minutes=log.hunger_return_minutes if log else None,
     )

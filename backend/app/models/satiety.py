@@ -40,8 +40,11 @@ class SatietyCheckin(Base):
     """응답의 `checkinId` 다."""
 
     meal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("meals.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("meals.id", ondelete="CASCADE"), nullable=False
     )
+    """**따로 인덱스를 두지 않는다.** 아래 `UNIQUE (meal_id, checkin_offset_hours)` 의
+    인덱스가 `meal_id` 를 선두 컬럼으로 가져서, `meal_id` 만으로 찾는 조회도 그걸 탄다.
+    하나 더 만들면 쓰기마다 갱신할 인덱스만 늘어난다."""
 
     checkin_offset_hours: Mapped[int] = mapped_column(Integer, nullable=False)
     """식후 몇 시간 뒤인지. 절대 시각이 아니라 **식사로부터의 간격**이다 —

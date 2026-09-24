@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
+from app.crud import satiety as satiety_crud
 from app.models.enums import MealStatus, MedicationStage, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.tests.factories import make_food_ref, make_meal, make_meal_item, make_user
@@ -810,11 +811,105 @@ def test_checkin_on_other_users_meal_is_404(client: TestClient, db: Session) -> 
     assert _checkin(client, other.id, meal.id).status_code == 404
 
 
-def test_out_of_range_checkin_is_422(client: TestClient, db: Session) -> None:
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"satietyPct": 101},
+        {"satietyPct": -1},
+        {"checkinOffsetHours": 100},
+        {"checkinOffsetHours": -1},
+        {"hungerReturnMinutes": -1},
+        # 상한이 없으면 여기서 Postgres 가 `integer out of range` 로 죽어 **500** 이
+        # 난다. 클라이언트 입력이므로 4xx 여야 한다.
+        {"hungerReturnMinutes": 99999999999},
+    ],
+)
+def test_out_of_range_checkin_is_422(
+    client: TestClient, db: Session, payload: dict
+) -> None:
     user, meal = _meal(db)
 
-    assert _checkin(client, user.id, meal.id, satietyPct=101).status_code == 422
-    assert _checkin(client, user.id, meal.id, checkinOffsetHours=100).status_code == 422
+    assert _checkin(client, user.id, meal.id, **payload).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"checkinOffsetHours": 0},
+        {"checkinOffsetHours": 48},
+        {"satietyPct": 0},
+        {"satietyPct": 100},
+        {"hungerReturnMinutes": 0},
+        {"hungerReturnMinutes": 2880},
+    ],
+)
+def test_boundary_values_are_accepted(
+    client: TestClient, db: Session, payload: dict
+) -> None:
+    """경계값은 통과해야 한다 — 막으면 Pydantic 과 DB CHECK 가 어긋난다."""
+    user, meal = _meal(db)
+
+    assert _checkin(client, user.id, meal.id, **payload).status_code == 201
+
+
+def test_checkin_without_extras_leaves_no_empty_log(
+    client: TestClient, db: Session
+) -> None:
+    """`hungerReturnMinutes` · `comment` 를 안 보내면 `satiety_logs` 행을 만들지 않는다.
+
+    둘 다 안 보내는 게 체크인의 기본 흐름이다. 그때마다 행을 만들면 전부 NULL 인
+    행이 남아 `GET /meals/{mealId}` 가 "기록 없음" 과 구분하지 못하고, `logged_at` 이
+    체크인 시각으로 먼저 박혀 식전 기록 시각을 잃는다.
+    """
+    user, meal = _meal(db)
+
+    res = _checkin(client, user.id, meal.id)
+
+    assert res.status_code == 201
+    assert res.json()["data"]["hungerReturnMinutes"] is None
+    assert satiety_crud.get_by_meal(db, meal.id) is None
+
+
+def test_comment_is_stored_even_though_it_is_not_returned(
+    client: TestClient, db: Session
+) -> None:
+    """`comment` 는 요청에만 있고 응답에 없다 — **테스트가 유일한 계약이다.**
+
+    응답 키만 보면 저장 분기를 통째로 지워도 스위트가 초록이다.
+    """
+    user, meal = _meal(db)
+
+    _checkin(client, user.id, meal.id, comment="3시간 뒤에 다시 배고팠어요")
+
+    log = satiety_crud.get_by_meal(db, meal.id)
+    assert log is not None
+    assert log.user_comment == "3시간 뒤에 다시 배고팠어요"
+
+
+def test_checkin_of_a_deleted_meal_is_404(client: TestClient, db: Session) -> None:
+    """삭제된 식사에는 못 쓴다 — 없는 식사·남의 식사와 같게 404 다."""
+    user, meal = _meal(db)
+    meal.deleted_at = datetime.now(UTC)
+    db.flush()
+
+    assert _checkin(client, user.id, meal.id).status_code == 404
+
+
+def test_checkin_of_an_unknown_meal_is_404(client: TestClient, db: Session) -> None:
+    user, _ = _meal(db)
+
+    assert _checkin(client, user.id, uuid.uuid4()).status_code == 404
+
+
+def test_checkin_without_header_is_401(client: TestClient, db: Session) -> None:
+    _, meal = _meal(db)
+
+    res = client.post(
+        f"/api/v1/meals/{meal.id}/satiety-checkins",
+        json={"checkinOffsetHours": 3, "satietyPct": 40},
+    )
+
+    assert res.status_code == 401
 
 
 def test_typo_field_is_rejected(client: TestClient, db: Session) -> None:

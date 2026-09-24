@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
+from typing import Final
+
 from pydantic import ConfigDict, Field
 
 from app.models.enums import FeedbackStatus, NutrientCode, SafetyStatus
@@ -127,6 +129,13 @@ class MealFeedbackResponse(CamelModel):
         )
 
 
+_MAX_HUNGER_MINUTES: Final = 2880
+"""48시간. `checkin_offset_hours` 상한과 같은 창이다."""
+
+_MAX_COMMENT_LENGTH: Final = 500
+"""한마디 한 줄이면 충분하다. 명세에 근거가 없는 방어값이다."""
+
+
 class SatietyCheckinRequest(CamelModel):
     """`POST /meals/{mealId}/satiety-checkins` 요청.
 
@@ -141,8 +150,19 @@ class SatietyCheckinRequest(CamelModel):
     포만감을 이틀 뒤에 보고하는 건 입력 실수에 가깝다."""
 
     satiety_pct: int = Field(ge=0, le=100)
-    hunger_return_minutes: int | None = Field(default=None, ge=0)
-    comment: str | None = None
+    hunger_return_minutes: int | None = Field(default=None, ge=0, le=_MAX_HUNGER_MINUTES)
+    """상한 2880분(48시간)은 `checkin_offset_hours` 의 48시간과 같은 근거의 방어값이다.
+
+    **없으면 500 이 난다.** `satiety_logs.hunger_return_minutes` 는 `Integer` 인데
+    Pydantic 은 임의 크기 정수를 통과시켜서, `99999999999` 를 보내면 Postgres 가
+    `integer out of range` 로 죽는다 — 클라이언트 입력인데 5xx 가 나간다.
+
+    DB CHECK 를 함께 걸지 않은 건 `satiety_logs` 가 `models/meal.py` 에 있어서다.
+    `checkin_offset_hours` · `satiety_pct` 는 내 테이블이라 Pydantic 과 CHECK 가
+    대칭인데 이 필드만 한쪽뿐이다 — 그 파일 담당자와 정하고 맞춘다."""
+    comment: str | None = Field(default=None, max_length=_MAX_COMMENT_LENGTH)
+    """컬럼이 `Text` 라 DB 는 안 막는다. 상한이 없으면 사용자가 보내는 만큼 그대로
+    쌓인다 — 응답에 실리지도 않아 눈에 띄지 않는다."""
 
 
 class SatietyCheckinResponse(CamelModel):

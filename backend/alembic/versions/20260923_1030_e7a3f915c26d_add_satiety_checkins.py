@@ -53,12 +53,10 @@ def upgrade() -> None:
             "satiety_pct BETWEEN 0 AND 100", name="satiety_checkins_pct_range"
         ),
     )
-    op.create_index(
-        op.f("ix_satiety_checkins_meal_id"), "satiety_checkins", ["meal_id"]
-    )
+    # meal_id 단독 인덱스는 두지 않는다 — 위 UNIQUE (meal_id, checkin_offset_hours)
+    # 의 인덱스가 meal_id 를 선두로 가져서 그 조회도 같은 인덱스를 탄다.
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index(op.f("ix_satiety_checkins_meal_id"), table_name="satiety_checkins")
     op.drop_table("satiety_checkins")

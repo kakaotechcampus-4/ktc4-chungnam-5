@@ -53,7 +53,7 @@ def set_satiety_after(db: Session, *, meal_id: uuid.UUID, pct: int) -> SatietyLo
 
 def set_hunger_return(
     db: Session, *, meal_id: uuid.UUID, minutes: int | None, comment: str | None
-) -> SatietyLog:
+) -> SatietyLog | None:
     """체크인이 함께 보낸 "다시 배고파진 시각" 과 한마디를 기록한다.
 
     체크인 행이 아니라 **`satiety_logs`** 에 넣는다. 명세의 `GET /meals/{mealId}` 가
@@ -69,30 +69,29 @@ def set_hunger_return(
     **`None` 은 덮지 않는다.** 체크인마다 두 값을 다 보내지는 않는데, 안 보낸 것을
     NULL 로 쓰면 앞서 적어 둔 값이 지워진다. "안 보냈다" 와 "지워 달라" 는 다르다.
     """
-    now = datetime.now(UTC)
-    values = {"meal_id": meal_id, "logged_at": now}
     updates: dict[str, object] = {}
     if minutes is not None:
-        values["hunger_return_minutes"] = minutes
         updates["hunger_return_minutes"] = minutes
     if comment is not None:
-        values["user_comment"] = comment
         updates["user_comment"] = comment
 
-    stmt = insert(SatietyLog).values(**values)
-    if updates:
-        stmt = stmt.on_conflict_do_update(
-            index_elements=[SatietyLog.meal_id], set_=updates
-        )
-    else:
-        # 둘 다 안 보냈다. 행이 없으면 만들기만 하고, 있으면 그대로 둔다.
-        stmt = stmt.on_conflict_do_nothing(index_elements=[SatietyLog.meal_id])
+    # **쓸 게 없으면 행을 만들지 않는다.** 둘 다 안 보내는 게 체크인의 기본 흐름인데,
+    # 그때마다 INSERT 하면 전부 NULL 인 `satiety_logs` 행이 남는다. 그러면
+    # `GET /meals/{mealId}` 가 행 존재로 분기할 때 "기록 없음" 과 구분되지 않고,
+    # `logged_at` 이 **체크인 시각**으로 먼저 박혀 나중에 `POST /meals` 의
+    # `satietyBeforePct` 가 붙을 때 식전 기록 시각을 잃는다
+    # (`set_satiety_after` 가 충돌 시 `logged_at` 을 안 건드리기 때문이다).
+    if not updates:
+        return get_by_meal(db, meal_id)
+
+    stmt = (
+        insert(SatietyLog)
+        .values(meal_id=meal_id, logged_at=datetime.now(UTC), **updates)
+        .on_conflict_do_update(index_elements=[SatietyLog.meal_id], set_=updates)
+    )
     db.execute(stmt)
     db.flush()
-
-    row = get_by_meal(db, meal_id)
-    assert row is not None  # 방금 만들었거나 이미 있었다
-    return row
+    return get_by_meal(db, meal_id)
 
 
 def upsert_checkin(
