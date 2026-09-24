@@ -14,12 +14,15 @@ from sqlalchemy.orm import Session
 from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
+from app.crud import satiety as satiety_crud
 from app.models.enums import MealStatus
 from app.models.meal import Meal
 from app.schemas.feedback import (
     ExpectedSatiety,
     FeedbackSuggestion,
     MealFeedbackResponse,
+    SatietyCheckinRequest,
+    SatietyCheckinResponse,
     SuggestionNutrient,
 )
 
@@ -221,4 +224,47 @@ def get_feedback(
         row,
         suggestions=_build_suggestions(db, row.suggestions),
         expected=_expected_satiety(db, meal.id),
+    )
+
+
+def add_checkin(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_id: uuid.UUID,
+    request: SatietyCheckinRequest,
+) -> SatietyCheckinResponse:
+    """사후 포만감을 기록한다. 커밋까지 한다.
+
+    **상태를 보지 않는다.** 포만감은 확정 여부와 무관하게 사용자가 실제로 겪는 일이고,
+    명세에도 상태 조건이 없다.
+
+    한 요청이 **두 테이블**에 쓴다. 체크인은 시점마다 하나(`satiety_checkins`),
+    "다시 배고파진 시각" 과 한마디는 식사당 하나(`satiety_logs`)라 자리가 다르다 —
+    명세의 `GET /meals/{mealId}` 가 그 둘을 `checkins[]` 바깥에 두는 것과 같다.
+    """
+    meal = _owned_meal(db, user_id, meal_id)
+
+    checkin = satiety_crud.upsert_checkin(
+        db,
+        meal_id=meal.id,
+        offset_hours=request.checkin_offset_hours,
+        pct=request.satiety_pct,
+    )
+    log = satiety_crud.set_hunger_return(
+        db,
+        meal_id=meal.id,
+        minutes=request.hunger_return_minutes,
+        comment=request.comment,
+    )
+    db.commit()
+
+    return SatietyCheckinResponse(
+        checkin_id=checkin.id,
+        meal_id=meal.id,
+        checkin_offset_hours=checkin.checkin_offset_hours,
+        satiety_pct=checkin.satiety_pct,
+        # 방금 보낸 값이 아니라 **저장된 값**을 돌려준다. 이번에 안 보냈으면 앞서
+        # 적어 둔 값이 그대로 나간다 — 사용자가 화면에서 보는 것과 맞다.
+        hunger_return_minutes=log.hunger_return_minutes if log else None,
     )

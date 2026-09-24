@@ -16,6 +16,7 @@ from app.models.food import FoodRef
 from app.models.handoff import MedicalHandoffLog
 from app.models.meal import Meal, MealItem, SatietyLog, UserCorrection
 from app.models.medication import MedicationRecord, MedicationSnapshot
+from app.models.satiety import SatietyCheckin
 from app.models.task import Task
 from app.models.user import User, UserGoal, UserState
 
@@ -33,6 +34,7 @@ __all__ = [
     "MedicationRecord",
     "MedicationSnapshot",
     "QQSEvaluation",
+    "SatietyCheckin",
     "SatietyLog",
     "Task",
     "User",
