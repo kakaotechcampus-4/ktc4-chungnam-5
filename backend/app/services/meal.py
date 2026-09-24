@@ -11,27 +11,39 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Final
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from app.crud import evaluation as evaluation_crud
 from app.crud import meal as meal_crud
-from app.models.enums import MealItemSource, MealStatus
-from app.models.meal import Meal, MealItem
+from app.crud.evaluation import NutrientTotals
+from app.models.enums import MealItemSource, MealStatus, NutrientCode, SafetyStatus
+from app.models.feedback import MealFeedback
+from app.models.meal import Meal, MealItem, SatietyLog
 from app.schemas.meal import (
+    EVALUATED_STEPS,
+    INITIAL_ANALYSIS_STEPS,
     RECALCULATION_STEPS,
+    AnalysisStep,
     CalendarDay,
     CalendarSummary,
     MealCalendarResponse,
     MealDeleteResponse,
+    MealDetailResponse,
+    MealFeedbackSummary,
     MealItemCreateRequest,
     MealItemCreateResponse,
     MealItemDeleteResponse,
+    MealItemDetail,
     MealItemsUpdateResponse,
     MealItemUpdate,
     MealListItem,
     MealListResponse,
     MealScores,
+    NutrientStatus,
+    SatietyDetail,
 )
 from app.schemas.nutrition import (
     ManualNutrition,
@@ -576,6 +588,163 @@ def update_items(
         status=meal.status,
         is_recalculation=meal.is_recalculation,
         steps=list(RECALCULATION_STEPS),
+    )
+
+
+def get_meal_for_detail(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal:
+    """소유권을 확인한 Meal 을 돌려준다 (`.items`, `.satiety_log` 지연 로딩 가능).
+
+    `GET /meals/{mealId}`는 항목별 영양정보(services/nutrition.py)가 필요한데,
+    services 끼리는 서로 부르지 않으므로(README 절대 규칙 5) 그 계산은 호출부(api
+    레이어)가 한다. 그러려면 api 레이어가 먼저 이 meal 객체를 쥐고 있어야 해서
+    조립 함수(`build_meal_detail`)와 분리했다.
+    """
+    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+    return meal
+
+
+def _resolve_steps(status: MealStatus, is_recalculation: bool) -> list[AnalysisStep]:
+    """상태별 고정 steps. 이 시스템엔 세부 진행상황을 기록하는 컬럼이 없다(RECALCULATION_STEPS 참고)."""
+    if status is MealStatus.FAILED:
+        # FAILED 는 DONE/RUNNING/PENDING 중 어디에도 안 맞는다 — steps 자체가 없다.
+        return []
+    if status is MealStatus.EVALUATED:
+        return list(EVALUATED_STEPS)
+    if status is MealStatus.ANALYZING and not is_recalculation:
+        return list(INITIAL_ANALYSIS_STEPS)
+    # ANALYZING(재분석) 또는 REVIEW_REQUIRED — 확인을 기다리는 중이라 STAGE_RULE_APPLY 만 아직이다.
+    return list(RECALCULATION_STEPS)
+
+
+def _build_item_detail(
+    item: MealItem, public_db_nutrition: NutritionInfo | None
+) -> MealItemDetail:
+    """항목 하나를 응답 모양으로 바꾼다.
+
+    출처 판단은 `item_nutrition` 에 맡긴다 — 직접 입력이 있으면 그게 우선이고,
+    없을 때만 공공 DB 환산값(`public_db_nutrition`, 이미 호출부가 계산해 온 값)을
+    쓴다. 여기서 다시 판단하면 `PUT .../nutrition` 과 이 응답이 서로 다른 출처를
+    보여줄 수 있다(`item_nutrition` 독스트링 참고).
+    """
+    _, amount, unit = resolved_amount(item)
+    nutrition, source = item_nutrition(item, public_db_nutrition)
+    return MealItemDetail(
+        item_id=item.id,
+        display_name=item.display_name,
+        amount=float(amount) if amount is not None else None,
+        unit=unit,
+        confidence=float(item.confidence) if item.confidence is not None else None,
+        # meal_items.py 와 같은 정의 — "영양정보가 나가는가" 지 "공공 DB 에서 찾았는가" 가 아니다.
+        matched=nutrition is not None,
+        nutrition_source=source,
+        user_confirmed=item.confirmed_amount is not None,
+        nutrition=nutrition,
+    )
+
+
+def _build_satiety(satiety_log: SatietyLog | None) -> SatietyDetail | None:
+    """satiety_logs 를 응답 모양으로. checkins 는 저장소가 없어 항상 빈 배열."""
+    if satiety_log is None:
+        return None
+    return SatietyDetail(
+        before_pct=satiety_log.satiety_before,
+        after_pct=satiety_log.satiety_after,
+        checkins=[],  # TODO: satiety-checkins 저장소 미구현.
+        hunger_return_minutes=satiety_log.hunger_return_minutes,
+    )
+
+
+_NUTRIENT_ROWS: Final[tuple[tuple[NutrientCode, str, str, str], ...]] = (
+    (NutrientCode.PROTEIN, "protein_g", "단백질", "g"),
+    (NutrientCode.FIBER, "fiber_g", "식이섬유", "g"),
+    (NutrientCode.SODIUM, "sodium_mg", "나트륨", "mg"),
+)
+"""명세 `nutrients[]` 의 세 줄. `services/evaluation/__init__.py::_NUTRIENT_ROWS` 와
+같은 목록이다 — `GET /meals/{mealId}`와 `GET /meals/{mealId}/evaluation`이 같은
+성분을 같은 순서·라벨·단위로 보여줘야 한다."""
+
+
+def _as_float(value: Decimal | None) -> float | None:
+    """명세의 `nutrients[].current` 는 숫자다. Decimal 을 그대로 두면 문자열로 샌다."""
+    return None if value is None else float(value)
+
+
+def _build_nutrients(totals: NutrientTotals) -> list[NutrientStatus]:
+    """평가 도메인의 성분 합계(`evaluation_crud.sum_nutrients`)를 이 응답 모양으로 옮긴다.
+
+    **결측이 있으면 합계를 안 내보낸다** — `totals.missing`(성분값이 비어 있던
+    항목 수)이 0 이 아니면 그 성분만 부분합인데, 숫자를 그대로 주면 완전한 값처럼
+    읽힌다(`crud/evaluation.py::NutrientTotals` 참고).
+
+    `target`·`state`는 단계별 목표치가 아직 팀 미확정이라 항상 None —
+    `services/evaluation/stage_profile.py` 와 같은 이유다.
+    """
+    return [
+        NutrientStatus(
+            code=code.value,
+            label=label,
+            current=None if totals.missing.get(key) else _as_float(getattr(totals, key)),
+            target=None,
+            unit=unit,
+            state=None,
+        )
+        for code, key, label, unit in _NUTRIENT_ROWS
+    ]
+
+
+def _build_feedback(feedback: MealFeedback | None) -> MealFeedbackSummary | None:
+    # SAFE 만 노출한다 — REVIEW_REQUIRED(가드레일 전)도 BLOCKED 와 똑같이 숨긴다.
+    if feedback is None or feedback.safety_status is not SafetyStatus.SAFE:
+        return None
+    # DB 는 아직 문장 하나(Text)뿐이라 배열로 감싼다 — 명세는 배열을 요구한다
+    # (PR #36 리뷰). 값이 없으면 다른 배열 필드들과 같이 빈 배열이지 null 이 아니다.
+    suggestions = [feedback.suggestions] if feedback.suggestions else []
+    return MealFeedbackSummary(summary=feedback.body, suggestions=suggestions)
+
+
+def build_meal_detail(
+    db: Session,
+    *,
+    meal: Meal,
+    nutrition_by_item: dict[uuid.UUID, NutritionInfo | None],
+) -> MealDetailResponse:
+    """`get_meal_for_detail` 로 얻은 meal 과 미리 계산된 영양정보로 응답을 조립한다."""
+    stage = meal_crud.get_stage(db, meal.medication_snapshot_id)
+    items = [_build_item_detail(item, nutrition_by_item.get(item.id)) for item in meal.items]
+    steps = _resolve_steps(meal.status, meal.is_recalculation)
+
+    scores: MealScores | None = None
+    nutrients: list[NutrientStatus] = []
+    satiety: SatietyDetail | None = None
+    feedback: MealFeedbackSummary | None = None
+
+    if meal.status is MealStatus.EVALUATED:
+        evaluation = meal_crud.get_evaluation(db, meal.id)
+        if evaluation is not None:
+            scores = _build_scores(
+                evaluation.quantity_score, evaluation.quality_score, evaluation.satiety_score
+            )
+        nutrients = _build_nutrients(evaluation_crud.sum_nutrients(db, meal.id))
+        satiety = _build_satiety(meal.satiety_log)
+        feedback = _build_feedback(meal_crud.get_feedback(db, meal.id))
+
+    return MealDetailResponse(
+        meal_id=meal.id,
+        status=meal.status,
+        is_recalculation=meal.is_recalculation,
+        stage=stage,
+        meal_type=meal.meal_type,
+        eaten_at=meal.eaten_at,
+        image_url=_build_thumbnail_url(meal.image_key),
+        steps=steps,
+        clarify_question=None,  # TODO: AI 스텁 연동 전까지 항상 None.
+        items=items,
+        scores=scores,
+        nutrients=nutrients,
+        satiety=satiety,
+        feedback=feedback,
     )
 
 

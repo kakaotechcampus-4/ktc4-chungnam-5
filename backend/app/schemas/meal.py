@@ -1,14 +1,14 @@
 """식사(meal) 관련 API 요청/응답 스키마."""
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, Field, StringConstraints, field_validator
 
 from app.models.enums import MealStatus, MealType, MedicationStage
-from app.schemas.base import CamelModel
+from app.schemas.base import CamelModel, KstDatetime
 from app.schemas.nutrition import NutritionInfo
 
 
@@ -25,7 +25,7 @@ class MealListItem(CamelModel):
 
     meal_id: uuid.UUID
     meal_type: MealType
-    eaten_at: datetime
+    eaten_at: KstDatetime
     stage: MedicationStage
     display_name: str
     thumbnail_url: str | None
@@ -52,7 +52,7 @@ class MealDeleteResponse(CamelModel):
     """DELETE /meals/{mealId} 응답."""
 
     meal_id: uuid.UUID
-    deleted_at: datetime
+    deleted_at: KstDatetime
     affected_insights: list[AffectedInsight]
 
 
@@ -251,3 +251,94 @@ class MealItemDeleteResponse(CamelModel):
 
     status: MealStatus
     is_recalculation: bool
+
+
+# 최초 분석 중(재분석 아님)일 때의 고정 steps. RECALCULATION_STEPS 와 같은 이유로
+# 고정값이다 — 이 시스템엔 세부 진행상황을 기록하는 컬럼이 없다.
+INITIAL_ANALYSIS_STEPS: tuple[AnalysisStep, ...] = (
+    AnalysisStep(key="FOOD_RECOGNITION", state="RUNNING"),
+    AnalysisStep(key="DB_MATCHING", state="PENDING"),
+    AnalysisStep(key="STAGE_RULE_APPLY", state="PENDING"),
+)
+
+# EVALUATED — Rule Engine 까지 전부 끝난 상태.
+EVALUATED_STEPS: tuple[AnalysisStep, ...] = (
+    AnalysisStep(key="FOOD_RECOGNITION", state="DONE"),
+    AnalysisStep(key="DB_MATCHING", state="DONE"),
+    AnalysisStep(key="STAGE_RULE_APPLY", state="DONE"),
+)
+
+
+class MealItemDetail(CamelModel):
+    """GET /meals/{mealId} 의 items 항목 하나."""
+
+    item_id: uuid.UUID
+    display_name: str
+    amount: float | None
+    unit: str | None
+    confidence: float | None
+    matched: bool
+    """영양정보가 함께 나가는가 — meal_items.py 의 정의와 동일 (공공 DB 매칭 여부가 아니다)."""
+    nutrition_source: Literal["PUBLIC_DB", "USER_INPUT"] | None
+    user_confirmed: bool
+    nutrition: NutritionInfo | None
+
+
+class SatietyCheckin(CamelModel):
+    """식사 후 추가 포만감 체크인 하나. (satiety-checkins 저장소 미구현이라 항상 빈 배열)"""
+
+    checkin_offset_hours: int
+    satiety_pct: int
+
+
+class SatietyDetail(CamelModel):
+    """status: EVALUATED 일 때만 채워지는 포만감 정보."""
+
+    before_pct: int | None
+    after_pct: int | None
+    checkins: list[SatietyCheckin]
+    hunger_return_minutes: int | None
+
+
+class MealFeedbackSummary(CamelModel):
+    """status: EVALUATED 일 때만 채워지는 단기 피드백 요약.
+
+    `suggestions` 는 명세상 배열이다. DB(`meal_feedbacks.suggestions`)는 아직
+    Text 컬럼 하나라 실제로는 문장 하나뿐이지만, 응답 모양은 명세를 따른다 —
+    AI 가 여러 개의 제안을 실제로 만들게 되면 그때 DB 구조도 같이 정리한다.
+    """
+
+    summary: str | None
+    suggestions: list[str]
+
+
+class NutrientStatus(CamelModel):
+    """영양소 하나의 목표 대비 현재. (Rule Engine 미구현이라 항상 빈 배열 — TODO)"""
+
+    code: str
+    label: str
+    current: float | None
+    target: float | None
+    unit: str
+    state: Literal["SHORT", "OK", "OVER"] | None
+
+
+class MealDetailResponse(CamelModel):
+    """GET /meals/{mealId} 응답. status 에 따라 EVALUATED 전용 필드가 채워진다."""
+
+    meal_id: uuid.UUID
+    status: MealStatus
+    is_recalculation: bool
+    stage: MedicationStage
+    meal_type: MealType
+    eaten_at: KstDatetime
+    image_url: str | None
+    steps: list[AnalysisStep]
+    clarify_question: str | None
+    items: list[MealItemDetail]
+
+    # status: EVALUATED 일 때만 값이 있다.
+    scores: MealScores | None
+    nutrients: list[NutrientStatus]
+    satiety: SatietyDetail | None
+    feedback: MealFeedbackSummary | None

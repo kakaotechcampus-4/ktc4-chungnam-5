@@ -135,6 +135,9 @@ def resolve_by_food_ref_id(
 ) -> NutritionInfo | None:
     """`food_ref_id` 로 바로 환산한다. 이름 재검색이 필요 없을 때 쓴다.
 
+    `GET /meals/{mealId}` 처럼 항목이 이미 `food_ref_id` 를 갖고 있고, 현재 확정된
+    양으로 영양정보만 다시 계산하면 되는 경우도 이 경로를 쓴다.
+
     사용자가 `GET /nutrition/candidates` 에서 고른 후보를 항목에 붙이는 경로가
     여기다(`PUT /meals/{mealId}/items/{itemId}/nutrition`).
 

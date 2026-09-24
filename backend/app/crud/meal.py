@@ -9,8 +9,9 @@ from sqlalchemy import Row, and_, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
-from app.models.enums import MealItemSource, MealStatus
+from app.models.enums import MealItemSource, MealStatus, MedicationStage
 from app.models.evaluation import QQSEvaluation
+from app.models.feedback import MealFeedback
 from app.models.meal import Meal, MealItem, UserCorrection
 from app.models.medication import MedicationSnapshot
 
@@ -119,6 +120,32 @@ def soft_delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> 
 
     meal.deleted_at = datetime.now(UTC)
     return meal
+
+
+def get_stage(db: Session, medication_snapshot_id: uuid.UUID) -> MedicationStage:
+    """식사에 연결된 medication_snapshot 의 stage 하나만 가져온다.
+
+    Meal 에 medication_snapshot 관계가 없어서(FK 컬럼만 있음) 별도 조회다.
+    snapshot 은 항상 존재한다(Meal.medication_snapshot_id 가 NOT NULL) — 없으면
+    데이터 정합성이 깨진 것이므로 조용히 None 을 주지 않고 시끄럽게 에러 낸다.
+    """
+    return db.execute(
+        select(MedicationSnapshot.stage).where(MedicationSnapshot.id == medication_snapshot_id)
+    ).scalar_one()
+
+
+def get_evaluation(db: Session, meal_id: uuid.UUID) -> QQSEvaluation | None:
+    """식사 하나의 Q/Q/S 평가. 아직 평가 전이면 None."""
+    return db.execute(
+        select(QQSEvaluation).where(QQSEvaluation.meal_id == meal_id)
+    ).scalar_one_or_none()
+
+
+def get_feedback(db: Session, meal_id: uuid.UUID) -> MealFeedback | None:
+    """식사 하나의 단기 피드백. 아직 생성 전이면 None."""
+    return db.execute(
+        select(MealFeedback).where(MealFeedback.meal_id == meal_id)
+    ).scalar_one_or_none()
 
 
 def set_status(db: Session, meal: Meal, status: MealStatus) -> None:
