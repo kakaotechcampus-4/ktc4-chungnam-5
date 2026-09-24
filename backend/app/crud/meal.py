@@ -8,6 +8,7 @@ from decimal import Decimal
 from sqlalchemy import Row, and_, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.crud import evaluation as evaluation_crud
 from app.models.enums import MealItemSource, MealStatus, MealType
 from app.models.evaluation import QQSEvaluation
 from app.models.meal import Meal, MealItem, SatietyLog, UserCorrection
@@ -118,6 +119,17 @@ def soft_delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> 
 
     meal.deleted_at = datetime.now(UTC)
     return meal
+
+
+def set_status(db: Session, meal: Meal, status: MealStatus) -> None:
+    """식사 상태를 바꾼다. add/flush 까지만 — 커밋은 services 가 한다.
+
+    `db` 를 받지만 쓰지 않는다 — 이미 세션에 붙어 있는 객체라 대입만으로 UPDATE 가
+    나간다. 시그니처를 맞춰 두는 건 "상태를 바꾸는 일은 crud 를 거친다"(절대 규칙 5)
+    를 호출부에서 눈에 보이게 하려는 것이다. `crud/__init__.py` 의 Worker 예시가
+    이 이름을 그대로 쓴다.
+    """
+    meal.status = status
 
 
 def get_calendar_days(
@@ -242,9 +254,23 @@ def mark_recalculating(db: Session, meal: Meal) -> None:
     `db` 를 받지만 쓰지 않는다 — 이미 세션에 붙어 있는 객체라 대입만으로 UPDATE 가
     나간다. 시그니처를 맞춰 두는 건 "상태를 바꾸는 일은 crud 를 거친다" 는 규칙을
     호출부에서 눈에 보이게 하려는 것이다.
+
+    ⚠️ **옛 `qqs_evaluations` 행도 함께 지운다** — 이름만 보면 상태 표시 같지만
+    파괴적이다. `ANALYZING` 은 "워커가 도는 중" 이 아니라 **"점수가 아직 유효하지
+    않다"** 는 표시이고, 그 문장을 상태에만 반영하면 상태를 안 보는 쿼리가 무효
+    점수를 그대로 내보낸다 — `list_meals` · `get_calendar_summary` 와
+    `crud/dashboard.py` 의 집계 넷, 모두 여섯 곳이다.
+
+    **호출부마다 챙기지 않고 여기서 지우는 이유**: 수정 경로가 넷인데
+    (`POST` · `PATCH` · `DELETE /items`, `PUT .../nutrition`) 전부 이 함수를 거친다.
+    호출부에 맡기면 새 경로가 생길 때 빠뜨리기 쉽고, 빠뜨려도 테스트가 안 잡는다 —
+    목록 화면을 실제로 열어 봐야 보인다.
+
+    확정 전 수정에서는 지울 행이 없어 0 행 `DELETE` 다.
     """
     meal.status = MealStatus.ANALYZING
     meal.is_recalculation = True
+    evaluation_crud.delete_by_meal(db, meal.id)
 
 
 def get_items_by_ids(
