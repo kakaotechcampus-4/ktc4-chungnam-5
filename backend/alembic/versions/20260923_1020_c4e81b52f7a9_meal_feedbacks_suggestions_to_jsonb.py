@@ -32,16 +32,26 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # 행이 0건이라 캐스팅이 실패할 데이터가 없다. 그래도 USING 을 명시하는 건
-    # 로컬에 손으로 넣어 본 행이 있을 수 있어서다 — 그 경우 유효한 JSON 이 아니면
-    # 여기서 시끄럽게 죽는 게 낫다.
+    # 프로덕션 행은 0건이다 — 채우는 워커(`worker/jobs/feedback_meal.py`)가 아직
+    # 스텁이고 `MealFeedback` 에 쓰는 코드가 없다. 그래도 빈 문자열을 NULL 로 흡수한다.
+    #
+    # `''::jsonb` 는 "invalid input syntax for type json" 으로 **마이그레이션 전체를
+    # abort** 시킨다. 로컬에 손으로 넣어 본 행 하나 때문에 다른 사람의
+    # `alembic upgrade head` 가 통째로 막히는데, 빈 문자열은 "제안이 없다" 라서
+    # NULL 로 바꿔도 잃는 정보가 없다.
+    #
+    # 평문(예: '단백질이 부족했어요')은 그대로 죽게 둔다 — 그건 이 컬럼에 들어가면
+    # 안 되는 값이라 조용히 버리면 안 된다.
     op.alter_column(
         "meal_feedbacks",
         "suggestions",
         existing_type=sa.Text(),
         type_=postgresql.JSONB(astext_type=sa.Text()),
         existing_nullable=True,
-        postgresql_using="suggestions::jsonb",
+        postgresql_using=(
+            "CASE WHEN suggestions IS NULL OR btrim(suggestions) = '' THEN NULL "
+            "ELSE suggestions::jsonb END"
+        ),
     )
 
 

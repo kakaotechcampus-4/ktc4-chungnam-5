@@ -38,7 +38,14 @@ class FeedbackSuggestion(CamelModel):
 
 
 class ExpectedSatiety(CamelModel):
-    """제안대로 먹었을 때의 예상 포만감. 명세 `expectedSatietyPct`."""
+    """`expectedSatietyPct`. `current` 는 지금 포만감, `after` 는 **제안을 따랐을 때의
+    예상치**다 — 명세 예시가 `{current: 62, after: 79}` 를 제안 바로 아래 둔다.
+
+    ⚠️ **지금은 `after` 에 `current` 를 그대로 넣는다.** 예측을 만들 소스가 없다 —
+    `ai-stub` 계약에 해당 필드가 없고, "두부를 먹으면 17%p 오른다" 를 BE 가 계산하면
+    절대 규칙 1(의료 판단 금지)에 걸린다. 그렇다고 객체째 `null` 로 두면 FE 가 게이지를
+    아예 못 그려서, 우선 같은 값으로 채워 "변화 없음" 으로 보이게 한다. 예측 소스가
+    생기면 `after` 만 갈아 끼우면 된다."""
 
     current: int
     after: int
@@ -73,7 +80,11 @@ class MealFeedbackResponse(CamelModel):
 
     @classmethod
     def from_row(
-        cls, row: MealFeedback, *, suggestions: list[FeedbackSuggestion]
+        cls,
+        row: MealFeedback,
+        *,
+        suggestions: list[FeedbackSuggestion],
+        expected: ExpectedSatiety | None,
     ) -> MealFeedbackResponse:
         """행 하나를 응답으로. **안전하지 않으면 내용을 싣지 않는다.**
 
@@ -95,7 +106,6 @@ class MealFeedbackResponse(CamelModel):
             summary=row.body if safe else None,
             reasoning=row.reasoning if safe else None,
             suggestions=suggestions if safe else [],
-            # 담을 컬럼도 AI 응답 필드도 없다. 명세 필드라 키는 두되 값이 없다.
-            expected_satiety_pct=None,
+            expected_satiety_pct=expected if safe else None,
             safety_status=row.safety_status,
         )

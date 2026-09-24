@@ -11,8 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
 from app.core.errors import ApiError, ErrorCode
-from app.core.response import ApiResponse, error_responses, ok
+from app.core.response import ApiResponse, error_responses, ok, ok_with_code
 from app.db.session import get_db
+from app.models.enums import SafetyStatus
 from app.schemas.feedback import MealFeedbackResponse
 from app.services import feedback as feedback_service
 
@@ -46,8 +47,18 @@ def get_meal_feedback(
     (명세: "상담 안내로 대체"). FE 는 그 필드를 보고 안내 화면으로 바꾼다.
     """
     try:
-        return ok(
-            feedback_service.get_feedback(db, user_id=user_id, meal_id=meal_id)
-        )
+        view = feedback_service.get_feedback(db, user_id=user_id, meal_id=meal_id)
     except feedback_service.MealNotFoundError as exc:
         raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None
+
+    # 명세 에러표: `MEDICAL_QUESTION_DETECTED` | 200 | "상담 안내 후 복귀".
+    # `safetyStatus` 로도 분기는 되지만, 이 레포는 FE 가 `error.code` 로 분기하는 것을
+    # 전제로 200 에 도메인 코드를 싣는다(`evaluations.py` 의 `NUTRITION_NOT_MATCHED`
+    # 와 같은 모양). 여기만 빼면 같은 성격의 분기가 두 방식이 된다.
+    if view.safety_status is SafetyStatus.BLOCKED:
+        return ok_with_code(
+            view,
+            ErrorCode.MEDICAL_QUESTION_DETECTED,
+            "의료 판단이 필요한 내용이라 피드백 대신 상담을 안내해요.",
+        )
+    return ok(view)

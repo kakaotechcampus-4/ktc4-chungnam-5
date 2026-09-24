@@ -20,6 +20,7 @@ from typing import Final, NamedTuple
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
+from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.crud import satiety as satiety_crud
@@ -244,6 +245,14 @@ def confirm(
         quality_score=scores.quality,
         satiety_score=scores.satiety,
     )
+    # **옛 AI 문장을 함께 무효화한다.** 점수는 바로 위 `upsert` 가 덮지만 문장은
+    # 아무도 안 건드려서, 닭가슴살을 더해 재확정해도 "단백질 비중이 낮았어요" 가
+    # 그대로 나간다. `services/feedback.py::get_feedback` 의 상태 가드는
+    # `ANALYZING` 구간만 막아, 여기서 `EVALUATED` 로 올리는 순간 풀린다.
+    #
+    # 행이 아니라 내용만 비운다 — `daily_feedback_sources` 가 CASCADE 라 지우면
+    # 일일 피드백의 출처 링크가 사라진다. 자세한 근거는 `crud/feedback.py` 참고.
+    feedback_crud.invalidate_by_meal(db, meal.id)
     meal_crud.set_status(db, meal, MealStatus.EVALUATED)
     db.commit()
 
