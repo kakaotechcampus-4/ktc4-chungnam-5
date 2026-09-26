@@ -8,9 +8,11 @@ from decimal import Decimal
 from sqlalchemy import Row, and_, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.enums import MealItemSource, MealStatus
+from app.crud import evaluation as evaluation_crud
+from app.models.enums import MealItemSource, MealStatus, MealType, MedicationStage
 from app.models.evaluation import QQSEvaluation
-from app.models.meal import Meal, MealItem, UserCorrection
+from app.models.feedback import MealFeedback
+from app.models.meal import Meal, MealItem, SatietyLog, UserCorrection
 from app.models.medication import MedicationSnapshot
 
 _KST = "Asia/Seoul"
@@ -118,6 +120,43 @@ def soft_delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> 
 
     meal.deleted_at = datetime.now(UTC)
     return meal
+
+
+def get_stage(db: Session, medication_snapshot_id: uuid.UUID) -> MedicationStage:
+    """식사에 연결된 medication_snapshot 의 stage 하나만 가져온다.
+
+    Meal 에 medication_snapshot 관계가 없어서(FK 컬럼만 있음) 별도 조회다.
+    snapshot 은 항상 존재한다(Meal.medication_snapshot_id 가 NOT NULL) — 없으면
+    데이터 정합성이 깨진 것이므로 조용히 None 을 주지 않고 시끄럽게 에러 낸다.
+    """
+    return db.execute(
+        select(MedicationSnapshot.stage).where(MedicationSnapshot.id == medication_snapshot_id)
+    ).scalar_one()
+
+
+def get_evaluation(db: Session, meal_id: uuid.UUID) -> QQSEvaluation | None:
+    """식사 하나의 Q/Q/S 평가. 아직 평가 전이면 None."""
+    return db.execute(
+        select(QQSEvaluation).where(QQSEvaluation.meal_id == meal_id)
+    ).scalar_one_or_none()
+
+
+def get_feedback(db: Session, meal_id: uuid.UUID) -> MealFeedback | None:
+    """식사 하나의 단기 피드백. 아직 생성 전이면 None."""
+    return db.execute(
+        select(MealFeedback).where(MealFeedback.meal_id == meal_id)
+    ).scalar_one_or_none()
+
+
+def set_status(db: Session, meal: Meal, status: MealStatus) -> None:
+    """식사 상태를 바꾼다. add/flush 까지만 — 커밋은 services 가 한다.
+
+    `db` 를 받지만 쓰지 않는다 — 이미 세션에 붙어 있는 객체라 대입만으로 UPDATE 가
+    나간다. 시그니처를 맞춰 두는 건 "상태를 바꾸는 일은 crud 를 거친다"(절대 규칙 5)
+    를 호출부에서 눈에 보이게 하려는 것이다. `crud/__init__.py` 의 Worker 예시가
+    이 이름을 그대로 쓴다.
+    """
+    meal.status = status
 
 
 def get_calendar_days(
@@ -242,9 +281,23 @@ def mark_recalculating(db: Session, meal: Meal) -> None:
     `db` 를 받지만 쓰지 않는다 — 이미 세션에 붙어 있는 객체라 대입만으로 UPDATE 가
     나간다. 시그니처를 맞춰 두는 건 "상태를 바꾸는 일은 crud 를 거친다" 는 규칙을
     호출부에서 눈에 보이게 하려는 것이다.
+
+    ⚠️ **옛 `qqs_evaluations` 행도 함께 지운다** — 이름만 보면 상태 표시 같지만
+    파괴적이다. `ANALYZING` 은 "워커가 도는 중" 이 아니라 **"점수가 아직 유효하지
+    않다"** 는 표시이고, 그 문장을 상태에만 반영하면 상태를 안 보는 쿼리가 무효
+    점수를 그대로 내보낸다 — `list_meals` · `get_calendar_summary` 와
+    `crud/dashboard.py` 의 집계 넷, 모두 여섯 곳이다.
+
+    **호출부마다 챙기지 않고 여기서 지우는 이유**: 수정 경로가 넷인데
+    (`POST` · `PATCH` · `DELETE /items`, `PUT .../nutrition`) 전부 이 함수를 거친다.
+    호출부에 맡기면 새 경로가 생길 때 빠뜨리기 쉽고, 빠뜨려도 테스트가 안 잡는다 —
+    목록 화면을 실제로 열어 봐야 보인다.
+
+    확정 전 수정에서는 지울 행이 없어 0 행 `DELETE` 다.
     """
     meal.status = MealStatus.ANALYZING
     meal.is_recalculation = True
+    evaluation_crud.delete_by_meal(db, meal.id)
 
 
 def get_items_by_ids(
@@ -329,6 +382,58 @@ def update_item(
     item.confidence = confidence
 
 
+def clear_item_manual_nutrition(db: Session, *, item: MealItem) -> None:
+    """직접 입력한 영양성분만 지운다. 커밋하지 않는다.
+
+    `food_ref_id` 는 건드리지 않는다 — 공공 DB 링크는 이름 규칙이 따로 정한다
+    (`services.meal.update_items`).
+    """
+    item.manual_kcal = None
+    item.manual_protein_g = None
+    item.manual_fat_g = None
+    item.manual_carb_g = None
+    item.manual_fiber_g = None
+    item.manual_sodium_mg = None
+
+
+def set_item_food_ref(db: Session, *, item: MealItem, food_ref_id: str | None) -> None:
+    """항목이 가리키는 공공 DB 음식을 바꾼다. 커밋하지 않는다.
+
+    `db` 를 받지만 쓰지 않는다 — `update_item` · `mark_recalculating` 과 같은 이유다.
+
+    양(`confirmed_*`)은 건드리지 않는다. 사용자가 고친 건 "이 음식이 무엇인가" 이지
+    "얼마나 먹었는가" 가 아니다.
+    """
+    item.food_ref_id = food_ref_id
+
+
+def set_item_manual_nutrition(
+    db: Session,
+    *,
+    item: MealItem,
+    kcal: Decimal | None,
+    protein_g: Decimal | None,
+    fat_g: Decimal | None,
+    carb_g: Decimal | None,
+    fiber_g: Decimal | None,
+    sodium_mg: Decimal | None,
+) -> None:
+    """사용자가 직접 적은 영양성분을 항목에 쓴다. 커밋하지 않는다.
+
+    **섭취량 기준 총량이다** — 기준량이 아니므로 읽을 때 환산하지 않는다
+    (`MealItem` 의 컬럼 주석).
+
+    여섯 값을 각각 받는 건 `crud/` 가 `schemas/` 를 모르기 때문이다 — 이 레이어는
+    DB 접근만 한다.
+    """
+    item.manual_kcal = kcal
+    item.manual_protein_g = protein_g
+    item.manual_fat_g = fat_g
+    item.manual_carb_g = carb_g
+    item.manual_fiber_g = fiber_g
+    item.manual_sodium_mg = sodium_mg
+
+
 def add_correction(
     db: Session,
     *,
@@ -410,3 +515,44 @@ def has_edited_items_since(
         .limit(1)
     )
     return db.execute(stmt).scalar_one_or_none() is not None
+
+
+def create_meal(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    medication_snapshot_id: uuid.UUID,
+    meal_type: MealType,
+    eaten_at: datetime,
+    image_key: str | None,
+    raw_text: str | None,
+) -> Meal:
+    """새 식사를 만든다. add + flush 까지만 하고 커밋하지 않는다.
+
+    `status` 는 컬럼 기본값(ANALYZING)에 맡긴다 — 방금 등록된 식사는 항상 그 상태다.
+    """
+    meal = Meal(
+        user_id=user_id,
+        medication_snapshot_id=medication_snapshot_id,
+        meal_type=meal_type,
+        eaten_at=eaten_at,
+        image_key=image_key,
+        raw_text=raw_text,
+    )
+    db.add(meal)
+    db.flush()  # meal.id 가 필요하다 — 큐 payload · satiety_log 양쪽에 쓴다
+    return meal
+
+
+def create_satiety_log(
+    db: Session, *, meal_id: uuid.UUID, satiety_before: int, logged_at: datetime
+) -> SatietyLog:
+    """식전 포만감을 기록한다. `satiety_after`는 아직 모르므로 NULL.
+
+    `meal_id` 가 UNIQUE 라 이 식사에 대해 딱 한 번만 불러야 한다 — 방금 만든 식사라
+    행이 없는 게 보장되므로 upsert 가 아니라 단순 INSERT 다.
+    """
+    log = SatietyLog(meal_id=meal_id, satiety_before=satiety_before, logged_at=logged_at)
+    db.add(log)
+    db.flush()
+    return log

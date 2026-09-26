@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
-from app.core.response import ApiResponse, error_responses, ok
+from app.core.errors import ErrorCode
+from app.core.response import ApiResponse, error_responses, ok, ok_with_code
 from app.db.session import get_db
 from app.schemas.meal import (
     MealItemCreateRequest,
@@ -20,6 +21,7 @@ from app.schemas.meal import (
     MealItemsUpdateResponse,
     MealItemUpdate,
 )
+from app.schemas.nutrition import NutritionUpdateRequest, NutritionUpdateResponse
 from app.services import meal as meal_service
 from app.services import nutrition as nutrition_service
 
@@ -68,9 +70,8 @@ def add_meal_item(
     가 NULL 허용인 이유). 그래서 흔한 음식도 이 경로로 간다: 실측하면
     `김치찌개` · `미역국` · `제육볶음` · `현미밥` 이 전부 여기 해당한다.
 
-    ⚠️ **`/nutrition/candidates` 와 `PUT .../nutrition` 이 붙기 전까지 사용자는
-    영양정보를 채울 수단이 없다.** 항목과 양은 남으므로 데이터가 유실되지는
-    않지만, 그 두 엔드포인트가 이 기능의 선행 조건이다.
+    두 엔드포인트 모두 붙어 있다 — 이 파일의 `set_meal_item_nutrition` 과
+    `endpoints/nutrition.py` 의 `search_nutrition_candidates` 다.
 
     없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다
     (`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).
@@ -215,6 +216,11 @@ def update_meal_items(
     알리는 필드가 없다** — 명세서가 `matched` 를 POST 응답에만 두기 때문이다. FE 는
     `GET /meals/{mealId}` 로 다시 읽어야 알 수 있다.
 
+    **이름이나 양이 실제로 바뀌면 직접 입력한 영양정보(`PUT .../nutrition` 의
+    `manual`)도 함께 지워진다.** 그 값은 섭취량 기준 총량이라 양이 바뀌면 거짓이
+    되고, 이름이 바뀌면 다른 음식의 값이 된다(`services.meal.update_items` 참고).
+    고치지 않은 항목을 그대로 되돌려보내는 정상 경로에서는 지워지지 않는다.
+
     ## ⚠️ 응답의 `steps` 는 고정값이다
 
     명세서(`contracts/API.md`)의 예시를 그대로 돌려준다 — 실시간 진행상황이
@@ -310,5 +316,71 @@ def delete_meal_item(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except meal_service.MealNotEditableError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return ok(response)
+
+
+@router.put(
+    "/meals/{meal_id}/items/{item_id}/nutrition",
+    response_model=ApiResponse[NutritionUpdateResponse],
+    responses=error_responses(401, 404, 409, 422),
+)
+def set_meal_item_nutrition(
+    meal_id: uuid.UUID,
+    item_id: uuid.UUID,
+    request: NutritionUpdateRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[NutritionUpdateResponse]:
+    """`matched: false` 로 나간 항목에 사용자가 영양정보를 붙인다.
+
+    영양정보 폴백의 마지막 단계다 — 앞 단계는 `GET /nutrition/candidates` 이고,
+    이 경로로 오는 이유는 `add_meal_item` 독스트링의 "`matched: false` 는 에러가
+    아니라 폴백 신호다" 에 적어 두었다.
+
+    여기서 조합한다: 항목 확인 → 공공 DB 환산 → 저장. `services/` 끼리는 서로
+    부르지 않으므로(README 절대 규칙 5) 순서를 아는 건 이 레이어뿐이다.
+    """
+    try:
+        target = meal_service.get_nutrition_target(
+            db, user_id=user_id, meal_id=meal_id, item_id=item_id
+        )
+    except (meal_service.MealNotFoundError, meal_service.MealItemNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except meal_service.MealNotEditableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    # 직접 입력은 공공 DB 를 볼 필요가 없다 — 사용자가 적은 값이 곧 결과다.
+    public_db_nutrition = None
+    if request.food_ref_id is not None:
+        try:
+            public_db_nutrition = nutrition_service.resolve_by_food_ref_id(
+                db, food_ref_id=request.food_ref_id, amount_g=target.amount_g
+            )
+        except nutrition_service.FoodRefNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    response = meal_service.set_item_nutrition(
+        db,
+        target=target,
+        food_ref_id=request.food_ref_id,
+        manual=request.manual,
+        public_db_nutrition=public_db_nutrition,
+    )
+
+    if not response.matched:
+        # 요청은 성공했고 항목도 바뀌었다 — 영양정보만 비어 있다. 명세서
+        # (`contracts/API.md` 에러 코드 표)가 이 갈래에 200 + 도메인 코드를 준다.
+        # 여기 오는 건 후보를 골랐는데 비례 계산의 근거가 없을 때다 — 먹은 양이
+        # g 으로 환산되지 않거나(흔함), 고른 후보의 공공 DB 기준량이 비어 있거나 0
+        # 이거나(드묾 — `serving_size` 는 nullable) 둘 중 하나다
+        # (`services.nutrition._nutrition_from_food_ref`). 직접 입력은 값이 있어야
+        # 통과하고, 없는 `foodRefId` 는 위에서 404 이므로 이 자리에 오지 않는다.
+        return ok_with_code(
+            response,
+            ErrorCode.NUTRITION_NOT_MATCHED,
+            "영양정보를 계산할 근거가 없습니다. "
+            "양을 g 으로 고치거나 직접 입력해 주세요.",
+        )
 
     return ok(response)

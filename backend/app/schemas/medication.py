@@ -79,6 +79,19 @@ class DoseEvent(CamelModel):
     effective_from: date = Field(description="이 용량으로 바꾼 날")
 
 
+class DoseEventsResponse(CamelModel):
+    """`GET /medications/dose-events`.
+
+    명세가 `{ "events": [...] }` 로 감싼다 — 배열을 그대로 내보내지 않는다. 나중에
+    커서나 요약을 붙일 자리가 남고, `data` 가 항상 객체라 FE 파싱이 한결같다.
+
+    **오래된 순이다** (명세 예시의 `de_001 → de_003`). 용량 사다리를 위에서 아래로
+    읽는 화면이라 역순으로 주면 FE 가 뒤집어야 한다.
+    """
+
+    events: list[DoseEvent]
+
+
 class MedicationRegisterResponse(CamelModel):
     """`POST /medications` 응답. 명세의 14필드다.
 

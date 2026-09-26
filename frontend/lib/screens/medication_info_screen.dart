@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../common/api_format.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -52,13 +53,6 @@ class MedicationCurrent {
         stageReason: json['stageReason'] as String?,
       );
 }
-
-String stageLabel(String stage) => switch (stage) {
-  'INITIAL' => '도입기',
-  'TITRATION' => '증량기',
-  'MAINTENANCE' => '유지기',
-  _ => stage,
-};
 
 /// `2026-06-14` 형식. 요청 body 에 쓴다.
 String formatApiDate(DateTime d) =>
@@ -264,7 +258,10 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       );
       if (!mounted) return;
       setState(() => _current = saved);
-      // TODO: 2/2(프로필 입력) 단계로 이동.
+      // 저장 완료 → 홈으로 돌아간다. 이 화면은 홈 투약 카드에서만 열리고,
+      // 홈이 돌아온 뒤 투약 정보를 다시 불러온다.
+      // TODO: 온보딩(2/2 프로필 입력)이 생기면 그 흐름에서는 다음 단계로 보낸다.
+      Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       setState(() => _saveError = '저장하지 못했어요: $e');
@@ -455,7 +452,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                     ),
                     // 저장 중에는 잠근다. 비활성 색은 테마가 이미 갖고 있다.
                     onPressed: _saving ? null : _submit,
-                    child: Text(_saving ? '저장 중' : '다음'),
+                    child: Text(_saving ? '저장 중' : '저장'),
                   ),
                 ],
               ),
@@ -681,7 +678,7 @@ class _StageResultBlock extends StatelessWidget {
           Text('입력 기준 현재 단계', style: AppTypography.caption),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            stage == null ? '다음을 누르면 알려드려요' : stageLabel(stage.stage),
+            stage == null ? '저장을 누르면 알려드려요' : stageLabel(stage.stage),
             style: AppTypography.screenTitle.copyWith(
               color: stage == null ? AppColors.textSecondary : null,
             ),

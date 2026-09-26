@@ -7,6 +7,11 @@ from app.models.enums import FoodCategory
 from app.models.food import FoodRef
 
 
+def get_by_id(db: Session, food_ref_id: str) -> FoodRef | None:
+    """이미 연결된 food_ref_id 로 바로 조회한다. 이름 검색이 필요 없을 때 쓴다."""
+    return db.execute(select(FoodRef).where(FoodRef.id == food_ref_id)).scalar_one_or_none()
+
+
 def normalize_name(name: str) -> str:
     """이름 비교용 정규화 — 공백과 밑줄을 지운다.
 

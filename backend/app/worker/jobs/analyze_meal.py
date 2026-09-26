@@ -56,6 +56,10 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
     # TODO: meals 조회. 없으면 raise ValueError(f"식사를 찾을 수 없다: {meal_id}")
     # TODO: deleted_at 이 NULL 이 아니면 return  ← soft delete 된 식사는 분석하지 않는다
     # TODO: status 가 ANALYZING 이 아니면 return  ← 멱등성. 지우지 말 것
+    # TODO: image_key 가 있으면 여기서(호출 직전에) FileStorage.url() 로 presigned URL 을
+    #   새로 발급한다. payload 엔 imageKey 만 있다(PR #42 리뷰 반영) — 큐에 넣는 시점에
+    #   미리 만든 URL 은 이 작업이 실제로 집힐 때(적체·재시도 backoff)면 이미 만료됐을
+    #   수 있어서, "쓰기 직전에 새로 발급" 이 아니면 안전하지 않다.
 
     result = ai.analyze_meal(
         {
@@ -63,7 +67,7 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
             "mealType": body["mealType"],
             "eatenAt": body["eatenAt"],
             "stage": body["stage"],
-            "imageUrl": body.get("imageUrl"),  # presigned URL. AI 는 S3 권한이 없다
+            "imageUrl": None,  # TODO: 위에서 새로 발급한 presigned URL 로 교체
             "rawText": body.get("rawText"),
         }
     )

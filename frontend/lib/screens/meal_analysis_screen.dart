@@ -6,6 +6,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_review_screen.dart';
 
 /// 분석 진행 3단계.
 ///
@@ -25,12 +26,11 @@ enum _StepState { done, inProgress, pending }
 /// `GET /meals/{mealId}` 를 1.5초 간격으로 불러 `status` 가
 /// `REVIEW_REQUIRED` 인지만 보면 된다 — 그 이상의 세부 단계는 없다.
 class MealAnalysisApiService {
-  int _pollCount = 0;
-
+  /// 더미는 첫 폴링에서 바로 완료를 돌려준다. 폴링 간격(1.5초) + 이 지연(0.5초)
+  /// 으로 2단계가 2초 걸린다.
   Future<bool> isReviewRequired(String mealId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    _pollCount++;
-    return _pollCount >= 4;
+    await Future.delayed(const Duration(milliseconds: 500));
+    return true;
   }
 }
 
@@ -54,8 +54,9 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
   static const _pollTimeout = Duration(seconds: 45);
 
   // 1·3단계 연출 타이머. 계산량을 예측할 수 있는 구간이라 고정값을 쓴다.
+  // 단계마다 2초씩, 더미 기준 총 6초 뒤 리뷰 화면으로 넘어간다.
   static const _recognizeFoodDuration = Duration(seconds: 2);
-  static const _applyDoseStageDuration = Duration(milliseconds: 800);
+  static const _applyDoseStageDuration = Duration(seconds: 2);
 
   final MealAnalysisApiService _api = MealAnalysisApiService();
 
@@ -86,7 +87,12 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
     await Future.delayed(_applyDoseStageDuration);
     if (!mounted) return;
 
-    // TODO: REVIEW_REQUIRED 확정 — 음식 확인·수정 화면(5번)으로 교체 이동한다.
+    // REVIEW_REQUIRED 확정 — 음식 확인·수정 화면(5번)으로 교체 이동한다.
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => MealReviewScreen(mealId: widget.mealId),
+      ),
+    );
   }
 
   /// `true` 를 돌려주면 분석 완료, `false` 면 45초 타임아웃.

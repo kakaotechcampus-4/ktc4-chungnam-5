@@ -32,3 +32,19 @@ def create_user_state(
     return ok(
         user_state_service.create_user_state(db, user_id=user_id, request=payload)
     )
+
+
+@router.get(
+    "/user-states/latest",
+    response_model=ApiResponse[UserStateResponse],
+    responses=error_responses(401, 404, 422),
+)
+def get_latest_user_state(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[UserStateResponse]:
+    """가장 최근 컨디션 기록 조회 (홈 컨디션 기록 팝업 미리 채우기).
+
+    기록이 하나도 없으면 404 가 아니라 200 + data: null 이다.
+    """
+    return ok(user_state_service.get_latest_user_state(db, user_id=user_id))

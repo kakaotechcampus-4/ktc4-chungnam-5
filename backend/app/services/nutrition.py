@@ -15,6 +15,10 @@ from app.models.food import FoodRef
 from app.schemas.nutrition import FoodCandidate, NutritionInfo
 
 
+class FoodRefNotFoundError(Exception):
+    """공공 DB 에 없는 `food_ref_id` 를 가리킬 때."""
+
+
 @dataclass(frozen=True)
 class NutritionMatch:
     """공공 DB 에 붙은 결과. `nutrition` 은 환산이 가능했을 때만 채워진다."""
@@ -78,6 +82,36 @@ def _scale(value: Decimal | None, factor: Decimal) -> Decimal | None:
     return (finite * factor).quantize(_QUANTUM)
 
 
+def _nutrition_from_food_ref(food_ref: FoodRef, amount_g: Decimal | None) -> NutritionInfo | None:
+    """food_ref 하나를 amount_g 만큼 환산한다. 근거가 없으면 None.
+
+    먹은 양을 모르거나(g 환산 불가) 기준량을 모르면 비례 계산의 근거가 없다.
+    0 도 걸러진다 — 나누면 터진다.
+
+    기준량의 NaN 을 `_scale` 이 잡아 주지 못한다는 점에 주의: `_scale` 은 곱해질
+    값만 보는데, 기준량이 NaN 이면 배율 자체가 NaN 이 되어 모든 성분이 NaN 으로
+    물든다. `not Decimal("NaN")` 은 False 라(NaN 은 truthy) 여기서 걸러야 한다.
+    """
+    serving_size = food_ref.serving_size
+    if (
+        amount_g is None
+        or serving_size is None
+        or not serving_size.is_finite()
+        or serving_size <= 0
+    ):
+        return None
+
+    factor = amount_g / serving_size
+    return NutritionInfo(
+        kcal=_scale(food_ref.calories, factor),
+        protein_g=_scale(food_ref.protein_g, factor),
+        fat_g=_scale(food_ref.fat_g, factor),
+        carb_g=_scale(food_ref.carbohydrate_g, factor),
+        fiber_g=_scale(food_ref.fiber_g, factor),
+        sodium_mg=_scale(food_ref.sodium_mg, factor),
+    )
+
+
 def resolve_by_name(
     db: Session, *, name: str, amount_g: Decimal | None
 ) -> NutritionMatch | None:
@@ -92,31 +126,35 @@ def resolve_by_name(
     if food_ref is None:
         return None
 
-    # 먹은 양을 모르거나(g 환산 불가) 기준량을 모르면 비례 계산의 근거가 없다.
-    # 0 도 걸러진다 — 나누면 터진다.
-    #
-    # 기준량의 NaN 을 `_scale` 이 잡아 주지 못한다는 점에 주의: `_scale` 은 곱해질
-    # 값만 보는데, 기준량이 NaN 이면 배율 자체가 NaN 이 되어 모든 성분이 NaN 으로
-    # 물든다. `not Decimal("NaN")` 은 False 라(NaN 은 truthy) 여기서 걸러야 한다.
-    serving_size = food_ref.serving_size
-    if (
-        amount_g is None
-        or serving_size is None
-        or not serving_size.is_finite()
-        or serving_size <= 0
-    ):
-        return NutritionMatch(food_ref_id=food_ref.id, nutrition=None)
-
-    factor = amount_g / serving_size
-    nutrition = NutritionInfo(
-        kcal=_scale(food_ref.calories, factor),
-        protein_g=_scale(food_ref.protein_g, factor),
-        fat_g=_scale(food_ref.fat_g, factor),
-        carb_g=_scale(food_ref.carbohydrate_g, factor),
-        fiber_g=_scale(food_ref.fiber_g, factor),
-        sodium_mg=_scale(food_ref.sodium_mg, factor),
-    )
+    nutrition = _nutrition_from_food_ref(food_ref, amount_g)
     return NutritionMatch(food_ref_id=food_ref.id, nutrition=nutrition)
+
+
+def resolve_by_food_ref_id(
+    db: Session, *, food_ref_id: str, amount_g: Decimal | None
+) -> NutritionInfo | None:
+    """`food_ref_id` 로 바로 환산한다. 이름 재검색이 필요 없을 때 쓴다.
+
+    `GET /meals/{mealId}` 처럼 항목이 이미 `food_ref_id` 를 갖고 있고, 현재 확정된
+    양으로 영양정보만 다시 계산하면 되는 경우도 이 경로를 쓴다.
+
+    사용자가 `GET /nutrition/candidates` 에서 고른 후보를 항목에 붙이는 경로가
+    여기다(`PUT /meals/{mealId}/items/{itemId}/nutrition`).
+
+    `resolve_by_name` 과 달리 **없는 id 를 조용히 넘기지 않고
+    `FoodRefNotFoundError` 를 낸다.** 이름 매칭은 "못 찾음" 이 정상 결과라
+    (`matched: false` 폴백으로 간다) None 을 주지만, 여기는 사용자가 방금 후보
+    목록에서 고른 값이 들어오는 자리다 — 그 id 가 공공 DB 에 없다는 건 클라이언트가
+    틀렸다는 뜻이다. 환산 실패(양을 모름)와 같은 응답으로 묶으면 FE 가 "직접 입력으로
+    유도" 와 "버그" 를 구분하지 못한다.
+
+    환산 자체가 불가능한 경우("2개")는 여전히 None 이다. 그건 정상 흐름이고,
+    호출부가 `NUTRITION_NOT_MATCHED` 로 옮긴다(`endpoints/meal_items.py`).
+    """
+    food_ref = food_crud.get_by_id(db, food_ref_id)
+    if food_ref is None:
+        raise FoodRefNotFoundError(f"food_ref {food_ref_id} 를 찾을 수 없습니다.")
+    return _nutrition_from_food_ref(food_ref, amount_g)
 
 
 def search_candidates(db: Session, *, query: str, limit: int) -> list[FoodCandidate]:

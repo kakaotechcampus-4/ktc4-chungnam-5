@@ -9,31 +9,52 @@ from __future__ import annotations
 import base64
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Final
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from app.crud import evaluation as evaluation_crud
+from app.crud import medication as medication_crud
 from app.crud import meal as meal_crud
-from app.models.enums import MealItemSource, MealStatus
-from app.models.meal import Meal, MealItem
+from app.crud.evaluation import NutrientTotals
+from app.infra.queue import enqueue
+from app.models.enums import MealItemSource, MealStatus, MealType, NutrientCode, SafetyStatus
+from app.models.feedback import MealFeedback
+from app.models.meal import Meal, MealItem, SatietyLog
 from app.schemas.meal import (
+    EVALUATED_STEPS,
+    INITIAL_ANALYSIS_STEPS,
+    MEAL_ANALYSIS_POLL_INTERVAL_MS,
+    MEAL_ANALYSIS_TIMEOUT_MS,
     RECALCULATION_STEPS,
+    AnalysisStep,
     CalendarDay,
     CalendarSummary,
     MealCalendarResponse,
+    MealCreateResponse,
     MealDeleteResponse,
+    MealDetailResponse,
+    MealFeedbackSummary,
     MealItemCreateRequest,
     MealItemCreateResponse,
     MealItemDeleteResponse,
+    MealItemDetail,
     MealItemsUpdateResponse,
     MealItemUpdate,
     MealListItem,
     MealListResponse,
     MealScores,
+    NutrientStatus,
+    SatietyDetail,
 )
-from app.schemas.nutrition import NutritionInfo
+from app.schemas.nutrition import (
+    ManualNutrition,
+    NutritionInfo,
+    NutritionUpdateResponse,
+)
 
 _KST_ZONE = ZoneInfo("Asia/Seoul")
 
@@ -367,7 +388,7 @@ def add_item(
     )
 
 
-def _stored_amount(item: MealItem) -> tuple[Decimal | None, Decimal | None, str | None]:
+def resolved_amount(item: MealItem) -> tuple[Decimal | None, Decimal | None, str | None]:
     """고치기 전의 양 — `(g 환산값, 숫자, 단위)`.
 
     **확인 여부의 센티넬은 `confirmed_amount` 다.** `confirmed_amount_g` 가 아니다 —
@@ -493,7 +514,7 @@ def update_items(
 
         # 반영 전 값은 여기서 전부 잡아 둔다 — `update_item` 뒤에 읽으면 방금 쓴
         # 값이라 "안 고쳤다" 가 된다.
-        stored = _stored_amount(item)
+        stored = resolved_amount(item)
         stored_amount_g, stored_amount, stored_unit = stored
         before: dict[str, str | None] = {
             "displayName": item.display_name,
@@ -542,6 +563,19 @@ def update_items(
         changed = renamed or _amount_key(*stored) != _amount_key(
             update.amount_g, update.request.amount, update.request.unit
         )
+
+        # 직접 입력한 영양성분(`PUT .../nutrition` 의 `manual`)은 **섭취량 기준
+        # 총량**이라 양이 바뀌면 거짓이 되고, 이름이 바뀌면 다른 음식의 값이 된다.
+        # 남겨 두면 그 값이 Q/Q/S 채점까지 조용히 흘러간다 — 비어 있는 편이 낫다는
+        # 기존 원칙 그대로 지우고 `matched: false` 폴백으로 되돌린다
+        # (`endpoints/meal_items.py` 의 `add_meal_item` 독스트링).
+        #
+        # **`changed` 여야 한다.** 확인 화면은 고치지 않은 항목까지 보내므로
+        # (이 함수의 독스트링) 무조건 지우면 사용자는 아무것도 고치지 않았는데
+        # 직접 입력한 값을 잃는다.
+        if changed:
+            meal_crud.clear_item_manual_nutrition(db, item=item)
+
         if item.source is MealItemSource.MODEL and changed:
             meal_crud.add_correction(
                 db,
@@ -559,6 +593,324 @@ def update_items(
         status=meal.status,
         is_recalculation=meal.is_recalculation,
         steps=list(RECALCULATION_STEPS),
+    )
+
+
+def get_meal_for_detail(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal:
+    """소유권을 확인한 Meal 을 돌려준다 (`.items`, `.satiety_log` 지연 로딩 가능).
+
+    `GET /meals/{mealId}`는 항목별 영양정보(services/nutrition.py)가 필요한데,
+    services 끼리는 서로 부르지 않으므로(README 절대 규칙 5) 그 계산은 호출부(api
+    레이어)가 한다. 그러려면 api 레이어가 먼저 이 meal 객체를 쥐고 있어야 해서
+    조립 함수(`build_meal_detail`)와 분리했다.
+    """
+    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+    return meal
+
+
+def _resolve_steps(status: MealStatus, is_recalculation: bool) -> list[AnalysisStep]:
+    """상태별 고정 steps. 이 시스템엔 세부 진행상황을 기록하는 컬럼이 없다(RECALCULATION_STEPS 참고)."""
+    if status is MealStatus.FAILED:
+        # FAILED 는 DONE/RUNNING/PENDING 중 어디에도 안 맞는다 — steps 자체가 없다.
+        return []
+    if status is MealStatus.EVALUATED:
+        return list(EVALUATED_STEPS)
+    if status is MealStatus.ANALYZING and not is_recalculation:
+        return list(INITIAL_ANALYSIS_STEPS)
+    # ANALYZING(재분석) 또는 REVIEW_REQUIRED — 확인을 기다리는 중이라 STAGE_RULE_APPLY 만 아직이다.
+    return list(RECALCULATION_STEPS)
+
+
+def _build_item_detail(
+    item: MealItem, public_db_nutrition: NutritionInfo | None
+) -> MealItemDetail:
+    """항목 하나를 응답 모양으로 바꾼다.
+
+    출처 판단은 `item_nutrition` 에 맡긴다 — 직접 입력이 있으면 그게 우선이고,
+    없을 때만 공공 DB 환산값(`public_db_nutrition`, 이미 호출부가 계산해 온 값)을
+    쓴다. 여기서 다시 판단하면 `PUT .../nutrition` 과 이 응답이 서로 다른 출처를
+    보여줄 수 있다(`item_nutrition` 독스트링 참고).
+    """
+    _, amount, unit = resolved_amount(item)
+    nutrition, source = item_nutrition(item, public_db_nutrition)
+    return MealItemDetail(
+        item_id=item.id,
+        display_name=item.display_name,
+        amount=float(amount) if amount is not None else None,
+        unit=unit,
+        confidence=float(item.confidence) if item.confidence is not None else None,
+        # meal_items.py 와 같은 정의 — "영양정보가 나가는가" 지 "공공 DB 에서 찾았는가" 가 아니다.
+        matched=nutrition is not None,
+        nutrition_source=source,
+        user_confirmed=item.confirmed_amount is not None,
+        nutrition=nutrition,
+    )
+
+
+def _build_satiety(satiety_log: SatietyLog | None) -> SatietyDetail | None:
+    """satiety_logs 를 응답 모양으로. checkins 는 저장소가 없어 항상 빈 배열."""
+    if satiety_log is None:
+        return None
+    return SatietyDetail(
+        before_pct=satiety_log.satiety_before,
+        after_pct=satiety_log.satiety_after,
+        checkins=[],  # TODO: satiety-checkins 저장소 미구현.
+        hunger_return_minutes=satiety_log.hunger_return_minutes,
+    )
+
+
+_NUTRIENT_ROWS: Final[tuple[tuple[NutrientCode, str, str, str], ...]] = (
+    (NutrientCode.PROTEIN, "protein_g", "단백질", "g"),
+    (NutrientCode.FIBER, "fiber_g", "식이섬유", "g"),
+    (NutrientCode.SODIUM, "sodium_mg", "나트륨", "mg"),
+)
+"""명세 `nutrients[]` 의 세 줄. `services/evaluation/__init__.py::_NUTRIENT_ROWS` 와
+같은 목록이다 — `GET /meals/{mealId}`와 `GET /meals/{mealId}/evaluation`이 같은
+성분을 같은 순서·라벨·단위로 보여줘야 한다."""
+
+
+def _as_float(value: Decimal | None) -> float | None:
+    """명세의 `nutrients[].current` 는 숫자다. Decimal 을 그대로 두면 문자열로 샌다."""
+    return None if value is None else float(value)
+
+
+def _build_nutrients(totals: NutrientTotals) -> list[NutrientStatus]:
+    """평가 도메인의 성분 합계(`evaluation_crud.sum_nutrients`)를 이 응답 모양으로 옮긴다.
+
+    **결측이 있으면 합계를 안 내보낸다** — `totals.missing`(성분값이 비어 있던
+    항목 수)이 0 이 아니면 그 성분만 부분합인데, 숫자를 그대로 주면 완전한 값처럼
+    읽힌다(`crud/evaluation.py::NutrientTotals` 참고).
+
+    `target`·`state`는 단계별 목표치가 아직 팀 미확정이라 항상 None —
+    `services/evaluation/stage_profile.py` 와 같은 이유다.
+    """
+    return [
+        NutrientStatus(
+            code=code.value,
+            label=label,
+            current=None if totals.missing.get(key) else _as_float(getattr(totals, key)),
+            target=None,
+            unit=unit,
+            state=None,
+        )
+        for code, key, label, unit in _NUTRIENT_ROWS
+    ]
+
+
+def _build_feedback(feedback: MealFeedback | None) -> MealFeedbackSummary | None:
+    # SAFE 만 노출한다 — REVIEW_REQUIRED(가드레일 전)도 BLOCKED 와 똑같이 숨긴다.
+    if feedback is None or feedback.safety_status is not SafetyStatus.SAFE:
+        return None
+    # DB 는 아직 문장 하나(Text)뿐이라 배열로 감싼다 — 명세는 배열을 요구한다
+    # (PR #36 리뷰). 값이 없으면 다른 배열 필드들과 같이 빈 배열이지 null 이 아니다.
+    suggestions = [feedback.suggestions] if feedback.suggestions else []
+    return MealFeedbackSummary(summary=feedback.body, suggestions=suggestions)
+
+
+def build_meal_detail(
+    db: Session,
+    *,
+    meal: Meal,
+    nutrition_by_item: dict[uuid.UUID, NutritionInfo | None],
+) -> MealDetailResponse:
+    """`get_meal_for_detail` 로 얻은 meal 과 미리 계산된 영양정보로 응답을 조립한다."""
+    stage = meal_crud.get_stage(db, meal.medication_snapshot_id)
+    items = [_build_item_detail(item, nutrition_by_item.get(item.id)) for item in meal.items]
+    steps = _resolve_steps(meal.status, meal.is_recalculation)
+
+    scores: MealScores | None = None
+    nutrients: list[NutrientStatus] = []
+    satiety: SatietyDetail | None = None
+    feedback: MealFeedbackSummary | None = None
+
+    if meal.status is MealStatus.EVALUATED:
+        evaluation = meal_crud.get_evaluation(db, meal.id)
+        if evaluation is not None:
+            scores = _build_scores(
+                evaluation.quantity_score, evaluation.quality_score, evaluation.satiety_score
+            )
+        nutrients = _build_nutrients(evaluation_crud.sum_nutrients(db, meal.id))
+        satiety = _build_satiety(meal.satiety_log)
+        feedback = _build_feedback(meal_crud.get_feedback(db, meal.id))
+
+    return MealDetailResponse(
+        meal_id=meal.id,
+        status=meal.status,
+        is_recalculation=meal.is_recalculation,
+        stage=stage,
+        meal_type=meal.meal_type,
+        eaten_at=meal.eaten_at,
+        image_url=_build_thumbnail_url(meal.image_key),
+        steps=steps,
+        clarify_question=None,  # TODO: AI 스텁 연동 전까지 항상 None.
+        items=items,
+        scores=scores,
+        nutrients=nutrients,
+        satiety=satiety,
+        feedback=feedback,
+    )
+
+
+@dataclass(frozen=True)
+class NutritionTarget:
+    """영양정보를 붙일 항목 + 그 항목의 지금 확정된 양.
+
+    `amount_g` 를 함께 내보내는 건 호출부(api 레이어)가 공공 DB 환산을 돌려야
+    하는데(README 절대 규칙 5 — services 끼리는 서로 부르지 않는다) 그 환산에
+    먹은 양이 필요하기 때문이다. 읽기 규칙(`resolved_amount`)을 호출부가 다시
+    구현하면 두 곳이 조용히 어긋난다.
+    """
+
+    meal: Meal
+    item: MealItem
+    amount_g: Decimal | None
+
+
+def get_nutrition_target(
+    db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID, item_id: uuid.UUID
+) -> NutritionTarget:
+    """영양정보를 고칠 항목을 소유권·상태째 확인해서 가져온다.
+
+    형제 엔드포인트 셋과 **똑같은 관문**을 지난다(`_editable_meal`) — 없는 식사·
+    남의 식사·삭제된 식사는 전부 `MealNotFoundError`, 고칠 수 없는 상태는
+    `MealNotEditableError` 다.
+
+    반영은 `set_item_nutrition` 이 한다. 둘로 나뉜 건 그 사이에서 api 레이어가
+    공공 DB 환산을 돌려야 하기 때문이다(`NutritionTarget` 참고).
+    """
+    meal = _editable_meal(db, user_id=user_id, meal_id=meal_id)
+
+    item = meal_crud.get_item(db, meal_id=meal.id, item_id=item_id)
+    if item is None:
+        raise MealItemNotFoundError(f"item {item_id} 는 이 식사의 항목이 아닙니다.")
+
+    return NutritionTarget(meal=meal, item=item, amount_g=resolved_amount(item)[0])
+
+
+def _manual_nutrition(item: MealItem) -> NutritionInfo | None:
+    """항목에 직접 입력된 영양성분. 하나도 없으면 None.
+
+    **환산하지 않는다** — `manual_*` 는 섭취량 기준 총량이다(`MealItem` 컬럼 주석).
+    """
+    values = (
+        item.manual_kcal,
+        item.manual_protein_g,
+        item.manual_fat_g,
+        item.manual_carb_g,
+        item.manual_fiber_g,
+        item.manual_sodium_mg,
+    )
+    if all(value is None for value in values):
+        return None
+
+    kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg = values
+    return NutritionInfo(
+        kcal=kcal,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carb_g=carb_g,
+        fiber_g=fiber_g,
+        sodium_mg=sodium_mg,
+    )
+
+
+def item_nutrition(
+    item: MealItem, public_db_nutrition: NutritionInfo | None
+) -> tuple[NutritionInfo | None, str | None]:
+    """항목의 영양정보와 그 **출처**를 유도한다 — `(nutrition, nutritionSource)`.
+
+    `meal_items` 에 `nutrition_source` 컬럼은 없다. 그 설계는 **유도하는 코드가 한
+    곳일 때만** 성립하므로, 이 필드를 내보내는 응답은 전부 여기를 거쳐야 한다
+    (`PUT .../nutrition` · `GET /meals/{mealId}` · `POST .../confirm`). 두 곳이
+    각자 계산하면 같은 항목이 화면마다 다른 출처로 보인다.
+
+    규칙은 한 줄이다:
+
+        직접 입력이 있으면 USER_INPUT → 없고 공공 DB 환산이 되면 PUBLIC_DB → 둘 다 없으면 null
+
+    **사용자가 고른 후보도 `PUBLIC_DB` 다.** 이 필드가 답하는 질문은 "숫자가 어디서
+    왔는가" 이지 "누가 골랐는가" 가 아니다 — 명세서의 `evidence.dbSource` 와 같은
+    자리다.
+
+    `public_db_nutrition` 을 인자로 받는 건 그 환산이 `services/nutrition.py` 의
+    일이고 services 끼리는 서로 부르지 않기 때문이다(README 절대 규칙 5).
+    """
+    manual = _manual_nutrition(item)
+    if manual is not None:
+        return manual, "USER_INPUT"
+    if public_db_nutrition is not None:
+        return public_db_nutrition, "PUBLIC_DB"
+    return None, None
+
+
+def set_item_nutrition(
+    db: Session,
+    *,
+    target: NutritionTarget,
+    food_ref_id: str | None,
+    manual: ManualNutrition | None,
+    public_db_nutrition: NutritionInfo | None,
+) -> NutritionUpdateResponse:
+    """사용자가 고른 영양정보를 항목에 붙이고 재계산 대기로 표시한다.
+
+    `add_item` · `update_items` · `delete_item` 과 같은 순서다 — 바꾸고, 식사를
+    재계산 대기로 옮기고, 커밋한다. 여기서도 큐에 아무것도 넣지 않는다
+    (`api/v1/endpoints/meal_items.py` 의 `add_meal_item` 독스트링 참고).
+
+    출처는 저장하지 않고 `item_nutrition` 이 유도한다.
+
+    ## 직접 입력은 기존 링크를 끊지 않는다
+
+    "어느 음식으로 봤는가" 는 그 자체로 남길 값이고, 직접 입력이 지워지면 돌아갈
+    자리이기도 하다(`test_changing_the_amount_falls_back_to_the_linked_public_db_values`).
+    반대로 후보를 고르면 링크가 그 후보로 **바뀐다.**
+
+    ## 이전 직접 입력은 새 값이 그 자리를 채울 때만 지운다
+
+    후보를 골랐고 환산까지 됐으면 그 값이 유효한 최신 선택이므로 이전 직접 입력을
+    남기면 안 된다 — 읽기 규칙상 직접 입력이 계속 이겨 **후보 선택이 아무 일도 하지
+    않은 것처럼 보인다.**
+
+    하지만 고른 후보로 아무 값도 못 만들었다면("계란 2개") 얘기가 다르다. 거기서도
+    지우면 사용자는 요청 한 번으로 갖고 있던 유일한 영양정보를 잃고 폴백 시작점으로
+    되돌아간다 — 얻은 것 없이 잃기만 한다. 그때는 그대로 둔다.
+    """
+    # 후보를 고른 요청은 링크를 바꾸고, 직접 입력(`food_ref_id` 없음)은 지킨다.
+    link = food_ref_id if food_ref_id is not None else target.item.food_ref_id
+    meal_crud.set_item_food_ref(db, item=target.item, food_ref_id=link)
+
+    if manual is not None:
+        meal_crud.set_item_manual_nutrition(
+            db,
+            item=target.item,
+            kcal=manual.kcal,
+            protein_g=manual.protein_g,
+            fat_g=manual.fat_g,
+            carb_g=manual.carb_g,
+            fiber_g=manual.fiber_g,
+            sodium_mg=manual.sodium_mg,
+        )
+    elif public_db_nutrition is not None:
+        meal_crud.clear_item_manual_nutrition(db, item=target.item)
+
+    meal_crud.mark_recalculating(db, target.meal)
+
+    # 트랜잭션 경계는 services 가 정한다(README 절대 규칙 5).
+    db.commit()
+
+    nutrition, source = item_nutrition(target.item, public_db_nutrition)
+
+    return NutritionUpdateResponse(
+        item_id=target.item.id,
+        # 형제 엔드포인트와 같은 정의 — "영양정보가 나가는가" 지 "공공 DB 에서
+        # 찾았는가" 가 아니다(`add_item` 참고).
+        matched=nutrition is not None,
+        nutrition_source=source,
+        nutrition=nutrition,
+        status=target.meal.status,
+        is_recalculation=target.meal.is_recalculation,
     )
 
 
@@ -599,4 +951,75 @@ def delete_item(
     return MealItemDeleteResponse(
         status=meal.status,
         is_recalculation=meal.is_recalculation,
+    )
+
+
+def create_meal(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_type: MealType,
+    eaten_at: datetime,
+    image_key: str | None,
+    raw_text: str | None,
+    satiety_before_pct: int | None,
+) -> MealCreateResponse:
+    """새 식사를 등록하고 분석 작업을 큐에 넣는다.
+
+    `crud/__init__.py` 의 "커밋은 부르는 쪽이 한다" 절에 있는 POST /meals 예시를
+    그대로 따른다. `crud.medication` 을 직접 부르는 건 규칙 5 위반이 아니다 —
+    막힌 건 services 끼리의 참조이지, 다른 도메인의 crud 호출이 아니다
+    (`services.medication.create_snapshot_for_meal` 독스트링 참고).
+
+    큐에는 presigned URL 이 아니라 `image_key` 만 싣는다(PR #42 리뷰 반영).
+    presigned URL 은 발급 후 몇 분 안에 만료되는데, 워커가 이 작업을 실제로
+    집는 시점은 큐 적체·재시도 backoff 로 훨씬 늦을 수 있어 미리 만든 URL을
+    실으면 워커가 열어볼 때 이미 죽어 있을 위험이 있다. URL 은 실제로 필요한
+    시점(워커가 AI 를 부르기 직전)에 `image_key` 로 새로 발급해야 한다 —
+    `worker/jobs/analyze_meal.py` 구현 시 반영 필요.
+    """
+    current_record = medication_crud.get_current(db, user_id)
+    snapshot = medication_crud.add_snapshot(db, user_id=user_id, source=current_record)
+
+    meal = meal_crud.create_meal(
+        db,
+        user_id=user_id,
+        medication_snapshot_id=snapshot.id,
+        meal_type=meal_type,
+        eaten_at=eaten_at,
+        image_key=image_key,
+        raw_text=raw_text,
+    )
+
+    if satiety_before_pct is not None:
+        meal_crud.create_satiety_log(
+            db,
+            meal_id=meal.id,
+            satiety_before=satiety_before_pct,
+            logged_at=datetime.now(UTC),
+        )
+
+    enqueue(
+        db,
+        "meal.analyze",
+        {
+            "mealId": str(meal.id),
+            "mealType": meal_type.value,
+            "eatenAt": eaten_at.isoformat(),
+            "stage": snapshot.stage.value,
+            "imageKey": image_key,
+            "rawText": raw_text,
+        },
+    )
+
+    # 도메인 쓰기(meal·satiety_log)와 작업 등록이 한 트랜잭션 — 커밋이 실패하면
+    # 둘 다 사라진다. get_db 는 더 이상 commit 하지 않는다.
+    db.commit()
+
+    return MealCreateResponse(
+        meal_id=meal.id,
+        status=meal.status,
+        steps=list(INITIAL_ANALYSIS_STEPS),
+        poll_interval_ms=MEAL_ANALYSIS_POLL_INTERVAL_MS,
+        timeout_ms=MEAL_ANALYSIS_TIMEOUT_MS,
     )
