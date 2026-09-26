@@ -9,7 +9,7 @@
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -135,6 +135,30 @@ def create(
     db.add(record)
     db.flush()
     return record
+
+
+def has_stage_change_since(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    since: datetime,
+    date_from: date,
+    date_to: date,
+) -> bool:
+    """[date_from, date_to] 안에서 시작된 투약 기록 변경이 since 이후에 등록됐는지.
+
+    장기 피드백이 그 뒤로 낡았는지(stale) 판단하는 데 쓴다 — GET /insights/long-term.
+    """
+    stmt = (
+        select(MedicationRecord.id)
+        .where(
+            MedicationRecord.user_id == user_id,
+            MedicationRecord.effective_from.between(date_from, date_to),
+            MedicationRecord.created_at > since,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
 
 
 def get_snapshot(db: Session, snapshot_id: uuid.UUID) -> MedicationSnapshot | None:
