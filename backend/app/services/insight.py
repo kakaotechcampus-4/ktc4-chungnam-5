@@ -130,7 +130,9 @@ def get_long_term_insight(
             stale_reason=None,
         )
 
-    is_safe = row.safety_status != SafetyStatus.BLOCKED
+    # SAFE 만 노출한다 — REVIEW_REQUIRED(가드레일 전)도 BLOCKED 와 똑같이 숨긴다
+    # (services/meal.py::_build_feedback 와 같은 규칙, PR #36 리뷰로 확정됨).
+    is_safe = row.safety_status is SafetyStatus.SAFE
     stale, stale_reason = _check_stale(db, user_id=user_id, row=row)
 
     return LongTermInsightResponse(

@@ -169,6 +169,24 @@ def test_get_long_term_insight_hides_content_when_blocked(monkeypatch):
     assert result.recommendation is None
 
 
+def test_get_long_term_insight_hides_content_when_review_required(monkeypatch):
+    """가드레일 검사 전(기본값)도 SAFE 가 아니므로 BLOCKED 와 똑같이 숨겨야 한다."""
+    row = _feedback_row(safety_status=SafetyStatus.REVIEW_REQUIRED)
+    monkeypatch.setattr(insight_crud, "get_latest", lambda *a, **k: row)
+    monkeypatch.setattr(insight_crud, "get_latest_refresh_task", lambda *a, **k: None)
+    monkeypatch.setattr(meal_crud, "has_deleted_meals_since", lambda *a, **k: False)
+    monkeypatch.setattr(meal_crud, "has_edited_items_since", lambda *a, **k: False)
+    monkeypatch.setattr(medication_crud, "has_stage_change_since", lambda *a, **k: False)
+    monkeypatch.setattr(meal_crud, "has_new_meals_since", lambda *a, **k: False)
+
+    result = get_long_term_insight(
+        db=None, user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 21)
+    )
+
+    assert result.trend_summary is None
+    assert result.recommendation is None
+
+
 def test_refresh_enqueues_feedback_long_task_and_commits(monkeypatch):
     """payload 키(userId/periodType/periodStart/periodEnd)는 worker/jobs/feedback_long.py
     가 이미 읽기로 정해둔 이름과 맞아야 한다."""
