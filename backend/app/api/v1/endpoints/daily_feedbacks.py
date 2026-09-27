@@ -10,10 +10,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
-from app.core.response import ApiResponse, error_responses
+from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
 from app.schemas.daily_feedbacks import DailyFeedbackRefreshRequest
 from app.schemas.insights import InsightRefreshResponse
+from app.services import daily_feedback as daily_feedback_service
 
 router = APIRouter()
 
@@ -30,4 +31,6 @@ def refresh_daily_feedback(
     db: Session = Depends(get_db),
 ) -> ApiResponse[InsightRefreshResponse]:
     """그날 하루 피드백 재생성 요청. 작업만 등록하고 202 를 돌려준다."""
-    raise NotImplementedError("refresh_daily_feedback 미구현")
+    return ok(
+        daily_feedback_service.request_refresh(db, user_id=user_id, target_date=body.date)
+    )
