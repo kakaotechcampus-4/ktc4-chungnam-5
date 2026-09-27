@@ -60,6 +60,13 @@ DOSE_LADDERS: Final[dict[DrugName, tuple[Decimal, ...]]] = {
     DrugName.MOUNJARO: tuple(Decimal(v) for v in ("2.5", "5.0", "7.5", "10", "12.5", "15")),
 }
 
+MAX_BACKDATE_DAYS: Final = 365 * 5
+"""투약 시작일을 과거로 옮길 수 있는 한계. 명세에 근거가 없는 방어값이다.
+
+없으면 `1900-01-01` 이 그대로 들어와 `doseCount` 가 6613 이 된다. GLP-1 은 5년 넘게
+이어서 맞는 경우가 드물고, 넘겨야 할 이유가 생기면 넓히는 건 안전하다(이미 저장된
+값이 걸리지 않는다)."""
+
 DOSE_INTERVAL_DAYS: Final = 7
 """표준 투약 간격. 위고비·마운자로 둘 다 주 1회다.
 
@@ -381,14 +388,26 @@ def restage(
 
     `exclude_id` 로 **이 행 자신을 이력에서 뺀다.** 안 빼면 직전의 '다른' 용량을 찾는
     훑기가 자기 자신부터 시작한다.
+
+    **닫힌 행도 판정할 수 있다** (`PATCH /medications/{id}` 의 과거 행 정정). 그러려면
+    두 입력을 그 구간 기준으로 잘라야 한다 — 둘 다 원래는 "오늘 / 전체 이력" 기준이라
+    현재 행에서만 맞았다.
+
+    - `before` 로 **뒤 행을 뺀다.** 안 빼면 "직전의 다른 용량" 이 아직 오지도 않은
+      용량이 된다 — 6월 구간을 고치는데 8월 용량과 비교해 "감량했다" 가 나온다.
+    - 앵커를 `effective_to` 로 당긴다. 오늘까지 세면 4회차짜리 구간이 16회차가 되어,
+      충분히 오래된 행은 무엇을 고치든 거의 항상 `MAINTENANCE` 가 된다.
     """
     drug_name = DrugName(record.drug_name)
+    as_of = min(record.effective_to, today) if record.effective_to else today
     context = dose_context(
         drug_name,
         record.dose_mg,
-        crud.list_doses_desc(db, user_id, exclude_id=record.id),
+        crud.list_doses_desc(
+            db, user_id, exclude_id=record.id, before=record.effective_from
+        ),
         effective_from=record.effective_from,
-        today=today,
+        today=as_of,
     )
     return judge_stage(drug_name, record.dose_mg, **context._asdict())
 
@@ -555,10 +574,16 @@ def correct(
     (`crud/dashboard.py::get_medication_records` · `restage` · `dose-events`) 셋 다
     **지금 다시 조회했을 때 보이는 화면**이다. 기록을 고쳤으니 화면이 바뀌는 건 맞다.
 
-    그래서 남는 건 데이터 자체의 정합성 하나뿐이고, 그건 이 행과 **바로 앞 행**만
-    보면 된다 — 연쇄가 아니다.
+    **구간 겹침 검사**는 이 행과 바로 앞 행만 보면 된다 — 연쇄가 아니다.
+    **단계 판정은 연쇄다** — 앞 행의 용량이 바뀌면 뒤 행의 판정 근거도 바뀌므로 고친
+    행 이후를 전부 다시 낸다. 둘을 같은 문장으로 읽으면 안 된다.
     """
     today = today or today_kst()
+
+    # 다른 medications 엔드포인트와 같은 순서다 — 사용자를 먼저 걸러야 유령 사용자에게
+    # `NOT_FOUND` 가 아니라 `USER_NOT_FOUND` 가 나가 FE 의 분기가 어긋나지 않는다.
+    if user_crud.get(db, user_id) is None:
+        raise ApiError(ErrorCode.USER_NOT_FOUND, "사용자를 찾을 수 없습니다.", 404)
 
     record = crud.get_owned(db, user_id=user_id, medication_id=medication_id)
     if record is None:
@@ -567,17 +592,28 @@ def correct(
     before_stage = record.stage
 
     if payload.started_at is not None:
-        _check_effective_from(db, record, payload.started_at, today=today)
+        _check_started_at(db, user_id, record, payload.started_at, today=today)
         record.effective_from = payload.started_at
     if payload.drug_name is not None:
         record.drug_name = payload.drug_name
     if payload.dose_mg is not None:
         record.dose_mg = payload.dose_mg
 
-    # 값이 바뀌었으니 저장된 판정도 다시 낸다. `restage` 는 이 행을 이력에서 빼고
-    # 보므로 자기 자신을 "직전의 다른 용량" 으로 세지 않는다.
-    record.stage = restage(db, user_id, record, today=today)
-    db.flush()
+    # **고친 행 이후를 전부 다시 판정한다.** 단계는 이력에 의존하므로 앞 행의 용량이
+    # 바뀌면 뒤 행의 "직전의 다른 용량" 도 바뀐다 — A(1.0) → B(0.5) 에서 B 는 감량인데,
+    # A 를 0.25 로 정정하면 B 는 증량이 된다.
+    #
+    # 고친 행만 다시 내면 `crud/dashboard.py::get_medication_records` 가 **저장된
+    # stage** 를 이웃끼리 비교해 변경 지점을 뽑으므로, 있지도 않았던 단계 하락이
+    # 대시보드에 찍히거나 실제 변경이 사라진다. 같은 순간 `GET /medications/current`
+    # 는 읽을 때 재판정하니 같은 사실에 두 답이 나온다.
+    #
+    # **구간 겹침 검사와 다르다.** 그쪽은 앞 행 하나만 보면 되지만(`_check_effective_from`)
+    # 단계 판정은 연쇄다. 행 수는 용량을 바꾼 횟수라 많지 않다.
+    for row in crud.list_history(db, user_id):
+        if row.effective_from >= record.effective_from:
+            row.stage = restage(db, user_id, row, today=today)
+
     db.commit()
 
     # **`dose_changed` 는 False 다.** 값은 바뀌었지만 "용량을 바꾼 사건" 이 아니다 —
@@ -591,38 +627,57 @@ def correct(
     )
 
 
-def _check_effective_from(
-    db: Session, record: MedicationRecord, new_from: date, *, today: date
+def _check_started_at(
+    db: Session,
+    user_id: uuid.UUID,
+    record: MedicationRecord,
+    new_from: date,
+    *,
+    today: date,
 ) -> None:
-    """구간 시작일을 옮겨도 되는지 본다. 안 되면 raise.
+    """전체 투약 시작일을 옮겨도 되는지 본다. 안 되면 raise.
 
-    보는 건 둘뿐이다.
+    **첫 행에서만 고칠 수 있다.** `startedAt` 은 `POST` 와 같은 뜻인 전체 투약
+    시작일이고, 그 값은 가장 오래된 행의 구간 시작일이다. 중간 행의 구간 시작일까지
+    여기서 고치게 하면 요청은 "그 행의 시작일", 응답은 "전체 시작일" 이 되어 값이
+    서로 달라진다 — 응답만 보고 "정정이 안 먹었다" 로 읽고 다시 보낸다.
 
-    - **앞 구간과 겹치지 않는가.** 앞 행이 끝난 다음 날부터만 시작할 수 있다.
-      겹치면 같은 날에 용량이 둘이 되어 `dose_context` 가 어느 쪽을 직전으로 볼지
-      모른다.
-    - **자기 구간을 넘지 않는가.** 끝난 행이면 `effective_from > effective_to` 가
-      되어 뒤집힌다. 현재 행(`effective_to IS NULL`)은 끝이 없으니 **오늘**까지다 —
-      미래에 시작한 투약은 아직 맞은 적이 없고, `register` 도 미래 시작일을 막는다.
+    잃는 것도 없다. 중간 행의 날짜는 애초에 사용자가 넣은 값이 아니다 — 용량을 바꾼
+    날은 `register` 가 `today` 로 박으므로 틀릴 수가 없다. 그 행의 약물·용량은 여전히
+    고칠 수 있다.
 
-    앞 행의 `effective_to` 는 건드리지 않는다. 그래서 날짜를 뒤로 미루면 그 사이가
-    빈다 — "그 기간에는 기록이 없다" 가 사실이므로 채워 넣지 않는다. 앞 행까지 같이
-    늘리면 사용자가 말하지 않은 것을 서버가 지어내는 셈이다.
+    첫 행이라 앞 구간이 없으므로 겹침 검사도 필요 없다. 보는 건 둘이다.
+
+    - **너무 옛날로 가지 않는가.** 하한이 없으면 `1900-01-01` 이 그대로 들어와
+      `doseCount` 가 6613 이 된다. `register` 가 미래를 막는 것과 대칭이다.
+    - **자기 구간을 넘지 않는가.** 닫힌 행이면 `effective_from > effective_to` 가 되어
+      뒤집힌다. 현재 행(`effective_to IS NULL`)은 끝이 없으니 **오늘**까지다 — 미래에
+      시작한 투약은 아직 맞은 적이 없다.
+
+    뒤 행의 구간은 건드리지 않는다. 그래서 날짜를 뒤로 미루면 그 사이가 빈다 —
+    "그 기간에는 기록이 없다" 가 사실이므로 채워 넣지 않는다. 뒤 행까지 같이 당기면
+    사용자가 말하지 않은 것을 서버가 지어내는 셈이다.
     """
-    previous = crud.get_previous(db, record)
-    if previous is not None and previous.effective_to is not None:
-        if new_from <= previous.effective_to:
-            raise ApiError(
-                ErrorCode.CONFLICT,
-                f"앞 구간이 {previous.effective_to} 에 끝나므로 그보다 뒤여야 합니다.",
-                409,
-            )
+    first = crud.get_first(db, user_id)
+    if first is None or first.id != record.id:
+        raise ApiError(
+            ErrorCode.CONFLICT,
+            "투약 시작일은 첫 투약 기록에서만 고칠 수 있습니다.",
+            409,
+        )
+
+    if new_from < today - timedelta(days=MAX_BACKDATE_DAYS):
+        raise ApiError(
+            ErrorCode.CONFLICT,
+            f"투약 시작일은 {MAX_BACKDATE_DAYS} 일 이전으로 옮길 수 없습니다.",
+            409,
+        )
 
     limit = record.effective_to if record.effective_to is not None else today
     if new_from > limit:
         raise ApiError(
             ErrorCode.CONFLICT,
-            f"이 구간의 시작일은 {limit} 보다 뒤일 수 없습니다.",
+            f"투약 시작일은 {limit} 보다 뒤일 수 없습니다.",
             409,
         )
 

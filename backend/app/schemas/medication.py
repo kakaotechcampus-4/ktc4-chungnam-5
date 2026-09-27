@@ -103,20 +103,57 @@ class MedicationCorrectRequest(CamelModel):
     **전부 선택 항목이지만 하나는 보내야 한다.** 빈 몸통은 아무 뜻이 없는데 200 을
     내리면 클라이언트가 뭔가 반영된 줄 안다.
 
-    `startedAt` 은 그 행의 구간 시작일이다. 첫 행이면 그게 곧 전체 투약 시작일이라
-    `doseCount` · `nextDoseDate` 가 함께 달라진다.
+    `startedAt` 은 `POST` 와 같은 뜻이다 — **전체 투약 시작일.** 그 값은 가장 오래된
+    행의 구간 시작일이므로 **첫 행에서만** 고칠 수 있다. 중간 행에 보내면 409 다.
+
+    이 제한이 뜻을 하나로 묶는다. 중간 행의 구간 시작일까지 여기서 고치게 하면 요청은
+    "그 행의 시작일", 응답은 "전체 시작일" 이 되어 값이 서로 달라진다 — 응답만 보고
+    "정정이 안 먹었다" 로 읽고 다시 보낸다.
+
+    중간 행의 날짜는 애초에 사용자가 넣은 값이 아니다. 용량을 바꾼 날은 서버가
+    `today` 로 박으므로 틀릴 수가 없다.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     drug_name: DrugName | None = None
-    dose_mg: Decimal | None = Field(default=None, gt=0, le=Decimal("999.999"))
-    started_at: date | None = None
+    dose_mg: Decimal | None = Field(
+        default=None, gt=0, le=Decimal("999.999"), decimal_places=3
+    )
+    """컬럼이 `Numeric(6, 3)` 이라 자릿수를 안 막으면 저장하며 반올림된다 —
+    `0.2555` 를 보내면 응답은 `0.2555`, 다시 조회하면 `0.256` 이다 (`expire_on_commit`
+    이 꺼져 있어 응답은 반올림 전 값을 읽는다). 단계 판정도 반올림 전 값으로 돈다."""
+
+    started_at: date | None = Field(
+        default=None,
+        description="전체 투약 시작일. 가장 오래된 행에서만 고칠 수 있다.",
+    )
 
     @model_validator(mode="after")
     def _at_least_one(self) -> "MedicationCorrectRequest":
-        if self.drug_name is None and self.dose_mg is None and self.started_at is None:
+        if (
+            self.drug_name is None
+            and self.dose_mg is None
+            and self.started_at is None
+        ):
             raise ValueError("고칠 필드를 하나 이상 보내야 합니다.")
+        return self
+
+    @model_validator(mode="after")
+    def _drug_change_needs_dose(self) -> "MedicationCorrectRequest":
+        """**약을 바꾸면 용량도 같이 보내야 한다.**
+
+        약마다 승인 용량 사다리가 다르다 — 위고비는 0.25~2.4, 마운자로는 2.5~15 다.
+        약만 바꾸면 "마운자로 1.0mg" 처럼 **존재하지 않는 처방**이 저장되고,
+        `judge_stage` 가 사다리 첫 칸 이하로 보아 INITIAL 을 준다. `dose-events` 도
+        그 조합을 그대로 표시한다.
+
+        `POST` 도 둘을 항상 함께 받는다. 약을 바꾼다는 건 용량을 다시 정한다는 뜻이다.
+        """
+        if self.drug_name is not None and self.dose_mg is None:
+            raise ValueError(
+                "약물을 바꾸면 용량도 함께 보내야 합니다 — 약마다 승인 용량이 다릅니다."
+            )
         return self
 
 
