@@ -18,7 +18,10 @@ from app.models.enums import (
     MealStatus,
     MealType,
     MedicationStage,
+    SafetyStatus,
 )
+from app.models.evaluation import QQSEvaluation
+from app.models.feedback import MealFeedback
 from app.models.food import FoodRef
 from app.models.meal import Meal, MealItem
 from app.models.medication import MedicationSnapshot
@@ -44,6 +47,7 @@ def make_meal(
     eaten_at: datetime = EATEN_AT,
     stage: MedicationStage = MedicationStage.MAINTENANCE,
     status: MealStatus | None = MealStatus.REVIEW_REQUIRED,
+    meal_type: MealType = MealType.LUNCH,
 ) -> Meal:
     """식사 하나와 거기 딸린 투약 스냅샷을 만든다. flush 까지만 하고 커밋하지 않는다.
 
@@ -52,6 +56,9 @@ def make_meal(
 
     `status=None` 이면 INSERT 에서 컬럼을 빼 DB 의 server_default 를 태운다 —
     기본값 자체를 검증하는 테스트가 쓴다.
+
+    `stage` 는 식사마다 새로 만드는 투약 스냅샷의 단계다 — 같은 날 단계가 다른 두 식사를
+    만들 수 있다. `meal_type` 은 하루 피드백처럼 끼니 구분이 결과에 드러나는 테스트가 쓴다.
     """
     snapshot = MedicationSnapshot(user_id=user_id, stage=stage)
     db.add(snapshot)
@@ -60,7 +67,7 @@ def make_meal(
     meal = Meal(
         user_id=user_id,
         medication_snapshot_id=snapshot.id,
-        meal_type=MealType.LUNCH,
+        meal_type=meal_type,
         raw_text="김치찌개",
         eaten_at=eaten_at,
         **({} if status is None else {"status": status}),
@@ -157,3 +164,57 @@ def make_meal_item(
     db.add(item)
     db.flush()
     return item
+
+
+def make_qqs_evaluation(
+    db: Session,
+    *,
+    meal_id: uuid.UUID,
+    quantity_score: Decimal | int | None = 60,
+    quality_score: Decimal | int | None = 60,
+    satiety_score: Decimal | int | None = 60,
+    stage_at_evaluation: MedicationStage = MedicationStage.MAINTENANCE,
+) -> QQSEvaluation:
+    """식사 하나의 Q/Q/S 점수 행. flush 까지만 하고 커밋하지 않는다.
+
+    점수는 Rule Engine 을 거치지 않고 그대로 넣는다 — 이걸 읽는 쪽(집계·피드백)의
+    테스트가 채점 규칙에 묶이지 않게 하려는 것이다. 점수 하나를 None 으로 두면
+    "채점 못 한 축" 이 있는 식사가 된다.
+    """
+    evaluation = QQSEvaluation(
+        meal_id=meal_id,
+        stage_at_evaluation=stage_at_evaluation,
+        quantity_score=quantity_score,
+        quality_score=quality_score,
+        satiety_score=satiety_score,
+    )
+    db.add(evaluation)
+    db.flush()
+    return evaluation
+
+
+def make_meal_feedback(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_id: uuid.UUID,
+    body: str | None = "채소를 먼저 드셔서 좋았어요.",
+    safety_status: SafetyStatus = SafetyStatus.SAFE,
+    model_version: str | None = "stub-short-0",
+) -> MealFeedback:
+    """식사 하나의 끼니 피드백 행. flush 까지만 하고 커밋하지 않는다.
+
+    아직 `feedback.meal` 워커가 없어서 이 행을 만드는 프로덕션 경로가 없다 — 그래서
+    모델을 직접 조립한다. 기본값이 `SAFE` 인 건 하루 피드백의 근거가 되는 모양이
+    그것이기 때문이다 (모델의 server_default 는 REVIEW_REQUIRED 다).
+    """
+    feedback = MealFeedback(
+        user_id=user_id,
+        meal_id=meal_id,
+        body=body,
+        safety_status=safety_status,
+        model_version=model_version,
+    )
+    db.add(feedback)
+    db.flush()
+    return feedback
