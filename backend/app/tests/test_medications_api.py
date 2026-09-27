@@ -691,3 +691,155 @@ def test_dose_events_for_unknown_user_is_404(client: TestClient) -> None:
 
     assert res.status_code == 404
     assert res.json()["error"]["code"] == "USER_NOT_FOUND"
+
+
+# ── PATCH /medications/{medicationId} ───────────────────────────
+
+
+def _patch(client: TestClient, user_id: uuid.UUID, medication_id, **body: object):
+    return client.patch(
+        f"/api/v1/medications/{medication_id}", json=body, headers=_h(user_id)
+    )
+
+
+def test_correction_updates_in_place_without_adding_history(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """**이력을 만들지 않는다.** 한 번도 맞은 적 없는 용량이 dose-events 에 남으면 안 된다.
+
+    `POST` 와 나뉘는 지점이다 — 그쪽은 앞 행을 닫고 새 행을 만든다.
+    """
+    posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    res = _patch(client, user_id, posted["medicationId"], doseMg=0.5)
+
+    assert res.status_code == 200, res.text
+    data = res.json()["data"]
+    assert data["doseMg"] == 0.5
+    assert data["medicationId"] == posted["medicationId"]  # 같은 행이다
+    assert len(medication_crud.list_history(db, user_id)) == 1
+
+
+def test_correction_reports_no_dose_event(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """값은 바뀌었지만 **용량을 바꾼 사건이 아니다.**
+
+    `doseEvent` 를 실어 보내면 FE 가 방금 증량한 것으로 읽는다. 그 구분이 이
+    엔드포인트의 존재 이유다.
+    """
+    posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    data = _patch(client, user_id, posted["medicationId"], doseMg=2.4).json()["data"]
+
+    assert data["doseChanged"] is False
+    assert data["doseEvent"] is None
+
+
+def test_correcting_a_past_row_is_allowed(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """과거 행도 고칠 수 있다 — 기록을 고치는 것이라 지난 화면이 바뀌는 게 맞다.
+
+    이미 나온 끼니 평가·피드백은 안 흔들린다. 식사는 만들 때 복사해 둔 스냅샷을
+    보고, 장기 피드백은 일일 피드백을 재료로 쓴다.
+    """
+    _history(db, user_id, ("0.25", "2026-06-14"), ("0.5", "2026-07-12"))
+    oldest = medication_crud.get_first(db, user_id)
+
+    res = _patch(client, user_id, oldest.id, doseMg=0.3)
+
+    assert res.status_code == 200, res.text
+    db.refresh(oldest)
+    assert oldest.dose_mg == Decimal("0.3")
+    # dose-events 는 기록을 그대로 보여주므로 같이 바뀐다.
+    events = _events(client, user_id)
+    assert [float(e["doseMg"]) for e in events] == [0.3, 0.5]
+
+
+def test_correction_restages_the_row(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """값이 바뀌었으니 저장된 단계 판정도 다시 낸다."""
+    posted = _post(client, user_id, drugName="위고비", doseMg=0.25, startedAt="2026-06-14")
+    assert posted["stage"] == "INITIAL"
+
+    data = _patch(client, user_id, posted["medicationId"], doseMg=2.4).json()["data"]
+
+    assert data["stage"] != "INITIAL"
+    assert data["stageChanged"] is True
+
+
+def test_moving_start_date_into_the_previous_period_is_409(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """앞 구간과 겹치면 막는다 — 같은 날에 용량이 둘이 되면 어느 쪽이 직전인지 모른다."""
+    _history(db, user_id, ("0.25", "2026-06-14"), ("0.5", "2026-07-12"))
+    second = medication_crud.get_current(db, user_id)
+
+    res = _patch(client, user_id, second.id, startedAt="2026-07-01")
+
+    assert res.status_code == 409, res.text
+    assert res.json()["error"]["code"] == "CONFLICT"
+
+
+def test_moving_start_date_into_the_future_is_409(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """현재 행은 끝이 없으니 오늘까지다 — 미래에 시작한 투약은 아직 맞은 적이 없다."""
+    posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+
+    res = _patch(client, user_id, posted["medicationId"], startedAt=tomorrow)
+
+    assert res.status_code == 409, res.text
+
+
+def test_start_date_correction_moves_the_dosing_start(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """첫 행의 시작일이 곧 전체 투약 시작일이라 회차까지 같이 달라진다."""
+    started = date.today() - timedelta(days=20)
+    posted = _post(
+        client, user_id, drugName="위고비", doseMg=1.0, startedAt=started.isoformat()
+    )
+    assert posted["doseCount"] == 3  # floor(20/7) + 1
+
+    fixed = started + timedelta(days=7)
+    data = _patch(
+        client, user_id, posted["medicationId"], startedAt=fixed.isoformat()
+    ).json()["data"]
+
+    assert data["startedAt"] == fixed.isoformat()
+    assert data["doseCount"] == 2
+
+
+def test_empty_correction_is_422(client: TestClient, user_id: uuid.UUID) -> None:
+    """빈 몸통에 200 을 내리면 클라이언트가 뭔가 반영된 줄 안다."""
+    posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    assert _patch(client, user_id, posted["medicationId"]).status_code == 422
+
+
+def test_correcting_another_users_row_is_404(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """**주인은 200, 남은 404** — 짝으로 봐야 라우트를 지워도 통과하지 않는다."""
+    posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+    other = user_crud.create(
+        db, nickname="남", height_cm=Decimal("160"), baseline_meal_kcal=Decimal("600")
+    )
+    db.flush()
+
+    assert _patch(client, user_id, posted["medicationId"], doseMg=0.5).status_code == 200
+
+    res = _patch(client, other.id, posted["medicationId"], doseMg=0.5)
+
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_correction_without_header_is_401(client: TestClient, db: Session) -> None:
+    res = client.patch(f"/api/v1/medications/{uuid.uuid4()}", json={"doseMg": 0.5})
+
+    assert res.status_code == 401

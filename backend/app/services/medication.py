@@ -36,6 +36,7 @@ from app.crud import user as user_crud
 from app.models.enums import DrugName, MedicationStage
 from app.models.medication import MedicationRecord, MedicationSnapshot
 from app.schemas.medication import (
+    MedicationCorrectRequest,
     CurrentMedicationResponse,
     DoseDirection,
     DoseEvent,
@@ -312,6 +313,11 @@ MAINTENANCE 문구는 명세 예시 그대로고 **나머지 넷은 초안이다
 # ── 3. 유스케이스 ───────────────────────────────────────────────
 
 
+class MedicationNotFoundError(LookupError):
+    """없는 id · 남의 투약 정보. 둘을 같게 응답한다 — 구분해서 알려 주면 남의 id 가
+    존재하는지를 떠볼 수 있다 (`services/feedback.py::MealNotFoundError` 와 같다)."""
+
+
 class InvalidStartDateError(ValueError):
     """받아들일 수 없는 시작일. API 층은 이 조상 하나만 잡아 422 로 옮긴다."""
 
@@ -526,6 +532,99 @@ def register(
         # 같은 doseEventId 에 두 답이 나온다.
         previous_dose_mg=context.previous_different_dose_mg,
     )
+
+
+def correct(
+    db: Session,
+    user_id: uuid.UUID,
+    medication_id: uuid.UUID,
+    payload: MedicationCorrectRequest,
+    *,
+    today: date | None = None,
+) -> RegisterResult:
+    """잘못 넣은 값을 고친다. **이력을 만들지 않는다.**
+
+    `register()` 와 결정적으로 다른 점은 행을 더하지 않는다는 것이다 —
+    `close_current` + `create` 대신 그 행을 UPDATE 한다. 한 번도 맞은 적 없는 용량이
+    `dose-events` 에 남으면 안 된다.
+
+    **과거 행도 고칠 수 있다.** 이미 만들어진 끼니 평가와 피드백은 안 흔들린다 —
+    식사는 `medication_snapshots`(식사를 만들 때 값을 복사해 둔 별도 행)를 보고,
+    장기 피드백은 일일 피드백을 재료로 쓴다(`long_term_feedback_sources` 가
+    가리키는 건 `daily_feedback_id` 뿐이다). 이력을 직접 읽는 곳은 셋인데
+    (`crud/dashboard.py::get_medication_records` · `restage` · `dose-events`) 셋 다
+    **지금 다시 조회했을 때 보이는 화면**이다. 기록을 고쳤으니 화면이 바뀌는 건 맞다.
+
+    그래서 남는 건 데이터 자체의 정합성 하나뿐이고, 그건 이 행과 **바로 앞 행**만
+    보면 된다 — 연쇄가 아니다.
+    """
+    today = today or today_kst()
+
+    record = crud.get_owned(db, user_id=user_id, medication_id=medication_id)
+    if record is None:
+        raise MedicationNotFoundError(f"medication {medication_id} 를 찾을 수 없습니다.")
+
+    before_stage = record.stage
+
+    if payload.started_at is not None:
+        _check_effective_from(db, record, payload.started_at, today=today)
+        record.effective_from = payload.started_at
+    if payload.drug_name is not None:
+        record.drug_name = payload.drug_name
+    if payload.dose_mg is not None:
+        record.dose_mg = payload.dose_mg
+
+    # 값이 바뀌었으니 저장된 판정도 다시 낸다. `restage` 는 이 행을 이력에서 빼고
+    # 보므로 자기 자신을 "직전의 다른 용량" 으로 세지 않는다.
+    record.stage = restage(db, user_id, record, today=today)
+    db.flush()
+    db.commit()
+
+    # **`dose_changed` 는 False 다.** 값은 바뀌었지만 "용량을 바꾼 사건" 이 아니다 —
+    # 그 구분이 이 엔드포인트의 존재 이유고, True 로 내면 `doseEvent` 가 실려 나가
+    # FE 가 방금 증량한 것으로 읽는다.
+    return RegisterResult(
+        record,
+        dose_changed=False,
+        stage_changed=record.stage != before_stage,
+        previous_dose_mg=None,
+    )
+
+
+def _check_effective_from(
+    db: Session, record: MedicationRecord, new_from: date, *, today: date
+) -> None:
+    """구간 시작일을 옮겨도 되는지 본다. 안 되면 raise.
+
+    보는 건 둘뿐이다.
+
+    - **앞 구간과 겹치지 않는가.** 앞 행이 끝난 다음 날부터만 시작할 수 있다.
+      겹치면 같은 날에 용량이 둘이 되어 `dose_context` 가 어느 쪽을 직전으로 볼지
+      모른다.
+    - **자기 구간을 넘지 않는가.** 끝난 행이면 `effective_from > effective_to` 가
+      되어 뒤집힌다. 현재 행(`effective_to IS NULL`)은 끝이 없으니 **오늘**까지다 —
+      미래에 시작한 투약은 아직 맞은 적이 없고, `register` 도 미래 시작일을 막는다.
+
+    앞 행의 `effective_to` 는 건드리지 않는다. 그래서 날짜를 뒤로 미루면 그 사이가
+    빈다 — "그 기간에는 기록이 없다" 가 사실이므로 채워 넣지 않는다. 앞 행까지 같이
+    늘리면 사용자가 말하지 않은 것을 서버가 지어내는 셈이다.
+    """
+    previous = crud.get_previous(db, record)
+    if previous is not None and previous.effective_to is not None:
+        if new_from <= previous.effective_to:
+            raise ApiError(
+                ErrorCode.CONFLICT,
+                f"앞 구간이 {previous.effective_to} 에 끝나므로 그보다 뒤여야 합니다.",
+                409,
+            )
+
+    limit = record.effective_to if record.effective_to is not None else today
+    if new_from > limit:
+        raise ApiError(
+            ErrorCode.CONFLICT,
+            f"이 구간의 시작일은 {limit} 보다 뒤일 수 없습니다.",
+            409,
+        )
 
 
 def get_current_view(

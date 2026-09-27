@@ -63,6 +63,39 @@ def get_first(db: Session, user_id: uuid.UUID) -> MedicationRecord | None:
     return db.execute(stmt).scalars().first()
 
 
+def get_owned(
+    db: Session, *, user_id: uuid.UUID, medication_id: uuid.UUID
+) -> MedicationRecord | None:
+    """그 사용자의 행만 골라 온다. 남의 행 id 를 넣어도 여기서 None 이 된다.
+
+    `user_id` 를 WHERE 에 함께 넣는 게 핵심이다 — id 로만 찾고 나중에 소유자를
+    비교하면, 그 비교를 빠뜨린 경로 하나가 그대로 누출이 된다.
+    """
+    stmt = select(MedicationRecord).where(
+        MedicationRecord.id == medication_id,
+        MedicationRecord.user_id == user_id,
+    )
+    return db.execute(stmt).scalars().first()
+
+
+def get_previous(db: Session, record: MedicationRecord) -> MedicationRecord | None:
+    """이 행 **바로 앞** 구간. 없으면 None (= 이 행이 첫 행이다).
+
+    `effective_from` 을 옮길 때 앞 구간과 겹치는지 보려면 이 한 행만 있으면 된다 —
+    더 앞은 이미 이 행보다 앞이라 새 날짜가 그 사이로 들어갈 수 없다.
+    """
+    stmt = (
+        select(MedicationRecord)
+        .where(
+            MedicationRecord.user_id == record.user_id,
+            MedicationRecord.effective_from < record.effective_from,
+        )
+        .order_by(MedicationRecord.effective_from.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalars().first()
+
+
 def list_doses_desc(
     db: Session,
     user_id: uuid.UUID,

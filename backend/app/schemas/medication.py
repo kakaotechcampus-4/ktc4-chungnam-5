@@ -13,7 +13,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from app.models.enums import DrugName, MedicationStage
 from app.schemas.base import CamelModel, KstDatetime
@@ -90,6 +90,34 @@ class DoseEventsResponse(CamelModel):
     """
 
     events: list[DoseEvent]
+
+
+class MedicationCorrectRequest(CamelModel):
+    """`PATCH /medications/{medicationId}` — **정정 전용.** 잘못 넣은 값을 고친다.
+
+    `POST` 와 나누는 이유가 여기 있다. 같은 날 들어온 `0.5` 가 "정말 용량을 내렸다"
+    인지 "`1.0` 을 잘못 쳐서 고친다" 인지 **요청만 봐서는 모른다.** 앞은 감량기
+    판정을 낳고 뒤는 낳으면 안 되는데 시간으로는 갈리지 않는다. 그래서 엔드포인트로
+    가른다 — `POST` 는 행을 **더하고**(INSERT), 여기는 있는 행을 **고친다**(UPDATE).
+
+    **전부 선택 항목이지만 하나는 보내야 한다.** 빈 몸통은 아무 뜻이 없는데 200 을
+    내리면 클라이언트가 뭔가 반영된 줄 안다.
+
+    `startedAt` 은 그 행의 구간 시작일이다. 첫 행이면 그게 곧 전체 투약 시작일이라
+    `doseCount` · `nextDoseDate` 가 함께 달라진다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    drug_name: DrugName | None = None
+    dose_mg: Decimal | None = Field(default=None, gt=0, le=Decimal("999.999"))
+    started_at: date | None = None
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> "MedicationCorrectRequest":
+        if self.drug_name is None and self.dose_mg is None and self.started_at is None:
+            raise ValueError("고칠 필드를 하나 이상 보내야 합니다.")
+        return self
 
 
 class MedicationRegisterResponse(CamelModel):
