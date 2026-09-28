@@ -13,8 +13,8 @@ import pytest
 from app.crud import insight as insight_crud
 from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
-from app.models.enums import SafetyStatus, TaskStatus
-from app.schemas.insights import InsightStatus, StaleReason
+from app.models.enums import FeedbackStatus, SafetyStatus, TaskStatus
+from app.schemas.insights import StaleReason
 from app.services import insight as insight_service
 from app.services.insight import (
     _check_stale,
@@ -74,29 +74,29 @@ def _feedback_row(**overrides) -> SimpleNamespace:
 
 def test_status_pending_task_wins_even_with_row():
     """갱신 중이면 낡은 행이 있어도 GENERATING — 폴링 중인 FE 에게 알려야 한다."""
-    assert _determine_status(_feedback_row(), _task(TaskStatus.PENDING)) == InsightStatus.GENERATING
+    assert _determine_status(_feedback_row(), _task(TaskStatus.PENDING)) == FeedbackStatus.GENERATING
 
 
 def test_status_ready_when_row_exists():
-    assert _determine_status(_feedback_row(), None) == InsightStatus.READY
+    assert _determine_status(_feedback_row(), None) == FeedbackStatus.READY
 
 
 def test_status_ready_when_row_exists_despite_failed_task():
     """행이 있으면(과거에 성공) 이후 재시도가 실패해도 기존 데이터로 READY."""
-    assert _determine_status(_feedback_row(), _task(TaskStatus.FAILED)) == InsightStatus.READY
+    assert _determine_status(_feedback_row(), _task(TaskStatus.FAILED)) == FeedbackStatus.READY
 
 
 def test_status_failed_when_no_row_and_last_task_failed():
-    assert _determine_status(None, _task(TaskStatus.FAILED)) == InsightStatus.FAILED
+    assert _determine_status(None, _task(TaskStatus.FAILED)) == FeedbackStatus.FAILED
 
 
 def test_status_ready_when_done_without_row():
     """데이터 부족으로 워커가 행 없이 정상 종료한 경우도 READY (dataSufficient=false 로 구분)."""
-    assert _determine_status(None, _task(TaskStatus.DONE)) == InsightStatus.READY
+    assert _determine_status(None, _task(TaskStatus.DONE)) == FeedbackStatus.READY
 
 
-def test_status_not_generated_when_nothing_exists():
-    assert _determine_status(None, None) == InsightStatus.NOT_GENERATED
+def test_status_pending_when_nothing_exists():
+    assert _determine_status(None, None) == FeedbackStatus.PENDING
 
 
 def test_check_stale_prioritizes_deletion_over_everything(monkeypatch):
@@ -135,7 +135,7 @@ def test_check_stale_false_when_nothing_changed(monkeypatch):
     assert reason is None
 
 
-def test_get_long_term_insight_not_generated_when_no_row(monkeypatch):
+def test_get_long_term_insight_pending_when_no_row(monkeypatch):
     monkeypatch.setattr(insight_crud, "get_latest", lambda *a, **k: None)
     monkeypatch.setattr(insight_crud, "get_latest_refresh_task", lambda *a, **k: None)
 
@@ -143,7 +143,7 @@ def test_get_long_term_insight_not_generated_when_no_row(monkeypatch):
         db=None, user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 21)
     )
 
-    assert result.status == InsightStatus.NOT_GENERATED
+    assert result.status == FeedbackStatus.PENDING
     assert result.data_sufficient is False
     assert result.trend_summary is None
     assert result.period.from_ == date(2026, 9, 15)
@@ -163,7 +163,7 @@ def test_get_long_term_insight_hides_content_when_blocked(monkeypatch):
         db=None, user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 21)
     )
 
-    assert result.status == InsightStatus.READY
+    assert result.status == FeedbackStatus.READY
     assert result.data_sufficient is True
     assert result.trend_summary is None
     assert result.recommendation is None
@@ -204,7 +204,7 @@ def test_refresh_enqueues_feedback_long_task_and_commits(monkeypatch):
     )
 
     fake_db.commit.assert_called_once()
-    assert result.status == InsightStatus.GENERATING
+    assert result.status == FeedbackStatus.GENERATING
     assert captured["task_type"] == "feedback.long"
     assert captured["payload"] == {
         "userId": str(user_id),

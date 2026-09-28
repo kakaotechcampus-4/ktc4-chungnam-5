@@ -12,13 +12,12 @@ from app.crud import insight as insight_crud
 from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.infra.queue import enqueue
-from app.models.enums import FeedbackPeriodType, SafetyStatus, TaskStatus
+from app.models.enums import FeedbackPeriodType, FeedbackStatus, SafetyStatus, TaskStatus
 from app.models.feedback import LongTermFeedback
 from app.models.task import Task
 from app.schemas.insights import (
     InsightPeriod,
     InsightRefreshResponse,
-    InsightStatus,
     LongTermInsightResponse,
     StaleReason,
 )
@@ -51,22 +50,25 @@ def _to_kst_range(date_from: date, date_to: date) -> tuple[datetime, datetime]:
     return range_start, range_end
 
 
-def _determine_status(row: LongTermFeedback | None, latest_task: Task | None) -> InsightStatus:
+def _determine_status(row: LongTermFeedback | None, latest_task: Task | None) -> FeedbackStatus:
     """행·작업 상태를 조합해 하나의 status 로 만든다.
+
+    자체 enum 이 아니라 `FeedbackStatus`(PENDING/GENERATING/READY/FAILED)를
+    재사용한다 — MealConfirmResponse.feedback_status 와 같은 개념이다(PR #46 리뷰).
 
     우선순위: 대기 중인 작업이 있으면(갱신 중) 낡은 행이 있어도 GENERATING —
     폴링 중인 FE 에게 지금 새로 만드는 중이라는 걸 알려야 한다.
     """
     if latest_task is not None and latest_task.status == TaskStatus.PENDING:
-        return InsightStatus.GENERATING
+        return FeedbackStatus.GENERATING
     if row is not None:
-        return InsightStatus.READY
+        return FeedbackStatus.READY
     if latest_task is not None and latest_task.status == TaskStatus.FAILED:
-        return InsightStatus.FAILED
+        return FeedbackStatus.FAILED
     if latest_task is not None and latest_task.status == TaskStatus.DONE:
         # 워커가 데이터 부족으로 행을 안 만들고 정상 종료한 경우 (dataSufficient=false).
-        return InsightStatus.READY
-    return InsightStatus.NOT_GENERATED
+        return FeedbackStatus.READY
+    return FeedbackStatus.PENDING
 
 
 def _check_stale(
@@ -170,4 +172,4 @@ def refresh_long_term_insight(
     )
     db.commit()
 
-    return InsightRefreshResponse(status=InsightStatus.GENERATING)
+    return InsightRefreshResponse(status=FeedbackStatus.GENERATING)
