@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.time import today_kst
 from app.crud import medication as medication_crud
+from app.services.medication import restage
 from app.crud import user as user_crud
 from app.models.enums import MedicationStage
 
@@ -1128,3 +1129,31 @@ def test_injection_count_tracks_elapsed_weeks_not_dose_changes(
     assert count_doses(date(2026, 6, 14), today=date(2026, 6, 14)) == 1
     assert count_doses(date(2026, 6, 14), today=date(2026, 7, 12)) == 5
     assert count_doses(date(2026, 6, 14), today=date(2026, 8, 9)) == 9
+
+
+def test_cascade_restaging_sees_the_corrected_dose(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """뒤 행을 다시 판정할 때 **정정된 값**을 봐야 한다.
+
+    세션이 `autoflush=False` 이고 `list_doses_desc` 는 ORM 엔티티가 아니라 컬럼을
+    뽑는다. 컬럼 select 는 identity map 을 안 거치고 DB 를 직접 읽으므로, 대입만 하고
+    flush 하지 않으면 뒤 행이 정정 **전** 용량을 "직전의 다른 용량" 으로 집는다.
+
+    고친 행 자신은 `exclude_id` 로 빠져 있어 드러나지 않는다 — 뒤 행에서만 터진다.
+    """
+    # B 구간을 짧게 둔다. 길면 같은 용량 연속이 MAINTENANCE 에 먼저 걸려 가려진다.
+    a_from = (today_kst() - timedelta(days=35)).isoformat()
+    b_from = (today_kst() - timedelta(days=7)).isoformat()
+    _history(db, user_id, ("1.0", a_from), ("0.5", b_from))
+    oldest = medication_crud.get_first(db, user_id)
+    current = medication_crud.get_current(db, user_id)
+
+    # 1.0 → 0.5 는 감량이다.
+    assert restage(db, user_id, current, today=today_kst()) is MedicationStage.REDUCED
+
+    # 앞 행을 0.25 로 정정하면 0.25 → 0.5 라 더는 감량이 아니다.
+    assert _patch(client, user_id, oldest.id, doseMg=0.25).status_code == 200
+
+    db.refresh(current)
+    assert current.stage is not MedicationStage.REDUCED

@@ -620,6 +620,15 @@ def correct(
     #
     # **구간 겹침 검사와 다르다.** 그쪽은 앞 행 하나만 보면 되지만(`_check_effective_from`)
     # 단계 판정은 연쇄다. 행 수는 용량을 바꾼 횟수라 많지 않다.
+    #
+    # **먼저 flush 한다.** 세션이 `autoflush=False` 이고 `crud.list_doses_desc` 는
+    # ORM 엔티티가 아니라 컬럼을 뽑는다(`select(MedicationRecord.drug_name, ...)`).
+    # 컬럼 select 는 identity map 을 안 거치고 DB 를 직접 읽으므로, 위에서 대입만 한
+    # 값은 안 보인다 — 뒤 행을 판정할 때 정정 **전** 용량을 "직전의 다른 용량" 으로
+    # 집는다. 고친 행 자신은 `exclude_id` 로 빠져 있어 드러나지 않는다.
+    # `list_history` 의 `ORDER BY effective_from` 도 같은 이유로 낡은 순서가 된다.
+    db.flush()
+
     for row in crud.list_history(db, user_id):
         if row.effective_from >= record.effective_from:
             row.stage = restage(db, user_id, row, today=today)
