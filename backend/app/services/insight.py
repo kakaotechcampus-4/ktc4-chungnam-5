@@ -27,19 +27,23 @@ _KST = ZoneInfo("Asia/Seoul")
 _PERIOD_TYPES: dict[str, FeedbackPeriodType] = {
     "7d": FeedbackPeriodType.WEEKLY,
     "28d": FeedbackPeriodType.MONTHLY,
+    "all": FeedbackPeriodType.ALL,
 }
 
 
-def _resolve_period(period: str, today: date) -> tuple[date, date]:
-    """"7d"/"28d" 를 [시작일, 종료일] 로 바꾼다. 종료일은 항상 오늘(KST).
+def _resolve_period(period: str, today: date) -> tuple[date | None, date]:
+    """"7d"/"28d"/"all" 을 [시작일, 종료일] 로 바꾼다. 종료일은 항상 오늘(KST).
 
-    period=all 은 이번 범위에서 지원하지 않는다 — FeedbackPeriodType 에 ALL 이 아직
-    없고, 그 값이 의미할 기간(가입일? 첫 식사일?)도 팀 합의가 안 났다.
+    all 은 하한이 없다(`dashboard.py::_resolve_period` 와 같은 규칙) — 실제로
+    이 값을 채워 `long_term_feedbacks` 행을 만드는 건 워커(`feedback_long.py`,
+    아직 스켈레톤)의 몫이라, "전체 기간"의 시작일을 뭘로 볼지는 거기서 정한다.
     """
     if period == "7d":
         return today - timedelta(days=6), today
     if period == "28d":
         return today - timedelta(days=27), today
+    if period == "all":
+        return None, today
     raise ValueError(f"알 수 없는 period 입니다: {period!r}")
 
 
@@ -74,7 +78,11 @@ def _determine_status(row: LongTermFeedback | None, latest_task: Task | None) ->
 def _check_stale(
     db: Session, *, user_id: uuid.UUID, row: LongTermFeedback
 ) -> tuple[bool, StaleReason | None]:
-    """생성 시점(row.created_at) 이후 그 기간 안에서 뭐가 바뀌었는지 확인한다.
+    """마지막 생성 시점(row.updated_at) 이후 그 기간 안에서 뭐가 바뀌었는지 확인한다.
+
+    `created_at` 이 아니라 `updated_at` 을 기준으로 삼는다 — 재생성된 행은
+    `updated_at` 이 갱신되므로, 옛 `created_at` 을 계속 기준으로 두면 이미 반영된
+    변화까지 매번 낡음으로 잘못 판단한다.
 
     우선순위(삭제 > 항목 수정 > 단계 변경 > 새 식사)는 응답에 미치는 영향이 큰
     순서다 — 삭제는 이미 반영된 데이터 자체가 사라진 것이라 가장 치명적이고,
@@ -84,26 +92,26 @@ def _check_stale(
     range_start, range_end = _to_kst_range(row.period_start, row.period_end)
 
     if meal_crud.has_deleted_meals_since(
-        db, user_id=user_id, since=row.created_at, range_start=range_start, range_end=range_end
+        db, user_id=user_id, since=row.updated_at, range_start=range_start, range_end=range_end
     ):
         return True, StaleReason.MEAL_DELETED
 
     if meal_crud.has_edited_items_since(
-        db, user_id=user_id, since=row.created_at, range_start=range_start, range_end=range_end
+        db, user_id=user_id, since=row.updated_at, range_start=range_start, range_end=range_end
     ):
         return True, StaleReason.MEAL_EDITED
 
     if medication_crud.has_stage_change_since(
         db,
         user_id=user_id,
-        since=row.created_at,
+        since=row.updated_at,
         date_from=row.period_start,
         date_to=row.period_end,
     ):
         return True, StaleReason.STAGE_CHANGED
 
     if meal_crud.has_new_meals_since(
-        db, user_id=user_id, since=row.created_at, range_start=range_start, range_end=range_end
+        db, user_id=user_id, since=row.updated_at, range_start=range_start, range_end=range_end
     ):
         return True, StaleReason.NEW_MEALS
 
@@ -143,7 +151,7 @@ def get_long_term_insight(
         data_sufficient=True,
         trend_summary=row.trend_summary if is_safe else None,
         recommendation=row.recommendation if is_safe else None,
-        generated_at=row.created_at,
+        generated_at=row.updated_at,
         stale=stale,
         stale_reason=stale_reason,
     )
@@ -166,7 +174,7 @@ def refresh_long_term_insight(
         {
             "userId": str(user_id),
             "periodType": period_type.value,
-            "periodStart": date_from.isoformat(),
+            "periodStart": date_from.isoformat() if date_from is not None else None,
             "periodEnd": date_to.isoformat(),
         },
     )

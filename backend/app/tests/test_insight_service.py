@@ -41,11 +41,15 @@ def test_resolve_period(period, expected_from, expected_to):
     assert date_to == expected_to
 
 
-@pytest.mark.parametrize("period", ["all", "3d"])
-def test_resolve_period_rejects_unsupported_values(period):
-    """all 은 이번 범위에서 미지원 — FeedbackPeriodType 에 ALL 이 아직 없어서."""
+def test_resolve_period_all_has_no_lower_bound():
+    date_from, date_to = _resolve_period("all", today=date(2026, 9, 21))
+    assert date_from is None
+    assert date_to == date(2026, 9, 21)
+
+
+def test_resolve_period_rejects_unsupported_values():
     with pytest.raises(ValueError):
-        _resolve_period(period, today=date(2026, 9, 21))
+        _resolve_period("3d", today=date(2026, 9, 21))
 
 
 def test_to_kst_range_covers_whole_to_day():
@@ -63,7 +67,7 @@ def _feedback_row(**overrides) -> SimpleNamespace:
     defaults = dict(
         period_start=date(2026, 8, 25),
         period_end=date(2026, 9, 21),
-        created_at=datetime(2026, 9, 21, 10, 0, tzinfo=UTC),
+        updated_at=datetime(2026, 9, 21, 10, 0, tzinfo=UTC),
         trend_summary="요약",
         recommendation="제안",
         safety_status=SafetyStatus.SAFE,
@@ -228,3 +232,21 @@ def test_refresh_maps_28d_to_monthly(monkeypatch):
 
     assert captured["payload"]["periodType"] == "MONTHLY"
     assert captured["payload"]["periodStart"] == "2026-08-27"
+
+
+def test_refresh_maps_all_to_null_period_start(monkeypatch):
+    """period=all 은 하한이 없으니 payload 의 periodStart 는 null 이어야 한다."""
+    captured = {}
+    monkeypatch.setattr(
+        insight_service,
+        "enqueue",
+        lambda db, task_type, payload: captured.update(payload=payload),
+    )
+
+    refresh_long_term_insight(
+        MagicMock(), user_id=uuid.uuid4(), period="all", today=date(2026, 9, 23)
+    )
+
+    assert captured["payload"]["periodType"] == "ALL"
+    assert captured["payload"]["periodStart"] is None
+    assert captured["payload"]["periodEnd"] == "2026-09-23"

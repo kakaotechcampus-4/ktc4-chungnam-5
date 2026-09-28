@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import FeedbackPeriodType, SafetyStatus, pg_enum
-from app.models.mixins import created_at, uuid_pk
+from app.models.mixins import created_at, updated_at, uuid_pk
 
 
 class MealFeedback(Base):
@@ -104,6 +104,13 @@ class LongTermFeedback(Base):
         server_default=SafetyStatus.REVIEW_REQUIRED.value,
     )
     created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = updated_at()
+    """마지막으로 생성/재생성된 시각. `GET /insights/long-term`의 `generatedAt`이
+    이 값을 쓴다 — `created_at`은 최초 INSERT 시각에 고정돼 재확정 때 안 바뀐다.
+
+    **주의**: `ON CONFLICT DO UPDATE`로 upsert 하면 SQLAlchemy 의 `onupdate`가
+    자동으로 안 걸린다 — SET 목록에 `updated_at=func.now()`를 직접 넣어야 한다
+    (`worker/jobs/feedback_long.py` 구현 시 챙길 것)."""
 
     sources: Mapped[list["LongTermFeedbackSource"]] = relationship(
         back_populates="long_term_feedback", cascade="all, delete-orphan"

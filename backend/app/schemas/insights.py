@@ -47,13 +47,9 @@ class LongTermInsightResponse(CamelModel):
 
 
 class InsightRefreshRequest(CamelModel):
-    """POST /insights/long-term/refresh 요청.
+    """POST /insights/long-term/refresh 요청."""
 
-    period=all 은 이번 범위에서 미지원(GET 과 동일한 이유) — 값 자체를 좁혀서
-    FastAPI 가 422 로 걸러내게 한다.
-    """
-
-    period: Literal["7d", "28d"]
+    period: Literal["7d", "28d", "all"]
 
 
 class InsightRefreshResponse(CamelModel):

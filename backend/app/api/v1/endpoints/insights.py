@@ -21,7 +21,7 @@ router = APIRouter()
     responses=error_responses(400, 401, 422),
 )
 def get_long_term_insight(
-    period: str = Query(default="7d", pattern=r"^(7d|28d)$"),
+    period: str = Query(default="7d", pattern=r"^(7d|28d|all)$"),
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> ApiResponse[LongTermInsightResponse]:
