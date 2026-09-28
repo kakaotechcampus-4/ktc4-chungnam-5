@@ -120,6 +120,30 @@ def get_next(db: Session, record: MedicationRecord) -> MedicationRecord | None:
     return db.execute(stmt).scalars().first()
 
 
+def lock_from(
+    db: Session, *, user_id: uuid.UUID, effective_from: date
+) -> list[MedicationRecord]:
+    """그 날짜 이후 구간을 **전부 잠근다.** 정정이 쓰게 될 행들이다.
+
+    `get_owned` 는 대상 행 하나만 잠그는데, 정정은 뒤 행들의 `stage` 와
+    `injection_count` 도 다시 쓴다. 안 잠그면 그 사이에 다른 정정이 끼어 계산해 둔
+    값을 덮어쓴다 — 사다리 최상단 용량이 "조정기" 로 저장되는 식이다.
+
+    `effective_from` 오름차순으로 잠가 순서를 단조하게 둔다. 정정이 항상 한 방향으로
+    잠그므로 순환이 생기지 않는다.
+    """
+    stmt = (
+        select(MedicationRecord)
+        .where(
+            MedicationRecord.user_id == user_id,
+            MedicationRecord.effective_from >= effective_from,
+        )
+        .order_by(MedicationRecord.effective_from.asc())
+        .with_for_update()
+    )
+    return list(db.execute(stmt).scalars())
+
+
 def list_doses_desc(
     db: Session,
     user_id: uuid.UUID,

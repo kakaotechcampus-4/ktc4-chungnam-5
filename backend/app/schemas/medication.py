@@ -38,7 +38,10 @@ class MedicationRegisterRequest(CamelModel):
     model_config = ConfigDict(extra="forbid")
 
     drug_name: DrugName
-    dose_mg: Decimal = Field(gt=0, le=Decimal("999.999"))
+    dose_mg: Decimal = Field(gt=0, le=Decimal("999.999"), decimal_places=3)
+    """컬럼이 `Numeric(6, 3)` 이라 자릿수를 안 막으면 저장하며 반올림된다 —
+    `0.2555` 를 보내면 응답은 `0.2555`, 다시 조회하면 `0.256` 이다
+    (`expire_on_commit` 이 꺼져 있어 응답은 반올림 전 값을 읽는다)."""
     started_at: date | None = Field(
         default=None,
         description=(

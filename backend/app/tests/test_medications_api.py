@@ -779,7 +779,8 @@ def test_correction_restages_the_row(
 
     data = _patch(client, user_id, posted["medicationId"], doseMg=2.4).json()["data"]
 
-    assert data["stage"] != "INITIAL"
+    # 위고비 2.4 는 사다리 최상단이라 MAINTENANCE 다. `!=` 로 두면 어떤 값이든 통과한다.
+    assert data["stage"] == "MAINTENANCE"
     assert data["stageChanged"] is True
 
 
@@ -794,9 +795,10 @@ def test_moving_start_date_into_the_previous_period_is_409(
 
     assert res.status_code == 409, res.text
     assert res.json()["error"]["code"] == "CONFLICT"
-    # 앞 구간이 끝난 다음 날부터는 된다.
+    # **경계는 앞 구간 종료일 + 1 이다.** 여유 있는 날짜로 두면 부등호가 `<` 든
+    # `<=` 든 통과해 off-by-one 을 못 잡는다.
     assert _patch(
-        client, user_id, second.id, effectiveFrom="2026-07-15"
+        client, user_id, second.id, effectiveFrom="2026-07-12"
     ).status_code == 200
 
 
@@ -1115,22 +1117,6 @@ def test_injection_count_is_the_dose_count_when_the_period_began(
     assert medication_crud.get_current(db, user_id).injection_count == 11
 
 
-def test_injection_count_tracks_elapsed_weeks_not_dose_changes(
-    client: TestClient, db: Session, user_id: uuid.UUID
-) -> None:
-    """용량을 여러 번 바꿔도 회차는 날짜를 따른다 — 1·2·3 으로 세지 않는다."""
-    _history(
-        db, user_id,
-        ("0.25", "2026-06-14"), ("0.5", "2026-07-12"), ("1.0", "2026-08-09"),
-    )
-    # `_history` 는 회차를 손으로 넣으므로, 계산 규칙만 직접 확인한다.
-    from app.services.medication import count_doses
-
-    assert count_doses(date(2026, 6, 14), today=date(2026, 6, 14)) == 1
-    assert count_doses(date(2026, 6, 14), today=date(2026, 7, 12)) == 5
-    assert count_doses(date(2026, 6, 14), today=date(2026, 8, 9)) == 9
-
-
 def test_cascade_restaging_sees_the_corrected_dose(
     client: TestClient, db: Session, user_id: uuid.UUID
 ) -> None:
@@ -1213,3 +1199,150 @@ def test_dose_events_has_no_phantom_change_after_correction(
 
     doses = [float(e["doseMg"]) for e in _events(client, user_id)]
     assert doses == [0.25, 0.5]  # 0.25 가 두 번 나오지 않는다
+
+
+def test_patch_for_unknown_user_is_user_not_found(client: TestClient) -> None:
+    """유령 사용자는 `USER_NOT_FOUND` 다 — 다른 medications 엔드포인트와 같다.
+
+    이 단언이 없으면 사용자 가드를 통째로 지워도 통과한다. `get_owned` 가 None 을
+    돌려 `NOT_FOUND` 로 떨어지는데 상태 코드가 같아서다.
+    """
+    res = client.patch(
+        f"/api/v1/medications/{uuid.uuid4()}",
+        json={"doseMg": 0.5},
+        headers=_h(uuid.uuid4()),
+    )
+
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "USER_NOT_FOUND"
+
+
+def test_injection_count_is_recomputed_when_effective_from_moves(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """날짜를 옮기면 회차도 따라간다 — 안 그러면 응답이 자기모순이다.
+
+    `injectionCount` 11 인데 같은 순간 `doseCount` 가 1 이면 같은 사실에 두 답이다.
+    """
+    started = today_kst() - timedelta(days=70)  # 11회차
+    posted = _post(
+        client, user_id, drugName="위고비", doseMg=1.0, startedAt=started.isoformat()
+    )
+    assert posted["doseCount"] == 11
+
+    data = _patch(
+        client, user_id, posted["medicationId"], effectiveFrom=today_kst().isoformat()
+    ).json()["data"]
+
+    assert data["injectionCount"] == 1
+
+
+def test_moving_the_first_row_recomputes_every_later_injection_count(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """전체 시작일이 움직이면 **모든 행**의 회차가 밀린다.
+
+    단계는 "고친 행 이후" 면 되지만 회차는 전체 시작일에 매달려 있어 범위가 더 넓다.
+    """
+    base = today_kst() - timedelta(days=70)
+    _history(
+        db, user_id,
+        ("0.25", base.isoformat()),
+        ("0.5", (base + timedelta(days=28)).isoformat()),
+        ("1.0", (base + timedelta(days=56)).isoformat()),
+    )
+    first = medication_crud.get_first(db, user_id)
+
+    # 시작일을 10주(70일) 앞으로 당긴다.
+    assert _patch(
+        client, user_id, first.id,
+        effectiveFrom=(base - timedelta(days=70)).isoformat(),
+    ).status_code == 200
+
+    counts = [r.injection_count for r in medication_crud.list_history(db, user_id)]
+    # 시작일 기준 0일 · 98일 · 126일 → 1 · 15 · 19
+    assert counts == [1, 15, 19]
+
+
+def test_user_given_injection_count_wins_over_recomputation(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """사용자가 회차를 직접 말하면 그 값이 이긴다.
+
+    한 주 걸러서 날짜 계산이 틀렸을 때 고치라고 있는 필드다.
+    """
+    started = today_kst() - timedelta(days=70)
+    posted = _post(
+        client, user_id, drugName="위고비", doseMg=1.0, startedAt=started.isoformat()
+    )
+
+    data = _patch(
+        client, user_id, posted["medicationId"], injectionCount=9
+    ).json()["data"]
+
+    assert data["injectionCount"] == 9  # 계산값 11 이 아니다
+
+
+def test_stage_changed_covers_rows_the_cascade_touched(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """캐스케이드가 다른 행의 단계를 바꿨으면 `stageChanged` 도 참이다.
+
+    고친 행만 보면 A 를 고쳐 B 가 뒤집혀도 `false` 가 나가, FE 가 대시보드를 다시
+    안 부른다.
+    """
+    a_from = (today_kst() - timedelta(days=35)).isoformat()
+    b_from = (today_kst() - timedelta(days=7)).isoformat()
+    _history(db, user_id, ("1.0", a_from), ("0.5", b_from))
+    oldest = medication_crud.get_first(db, user_id)
+    current = medication_crud.get_current(db, user_id)
+    # **고친 행의 단계는 안 바뀌게 둔다.** 0.25 는 사다리 첫 칸이라 INITIAL 인데,
+    # 미리 그 값을 박아두면 정정 후에도 그대로다 — 그래야 `stageChanged` 가
+    # 캐스케이드 때문에 참이 된 것인지 구분된다.
+    oldest.stage = MedicationStage.INITIAL
+    # 1.0 → 0.5 는 감량이다. 실제 판정값을 박아 둔다 (`_history` 는 TITRATION 고정).
+    current.stage = MedicationStage.REDUCED
+    db.flush()
+
+    # 앞 행을 0.25 로 고치면 0.25 → 0.5 라 더는 감량이 아니다.
+    data = _patch(client, user_id, oldest.id, doseMg=0.25).json()["data"]
+
+    db.refresh(current)
+    db.refresh(oldest)
+    assert oldest.stage is MedicationStage.INITIAL  # 고친 행은 안 바뀌었다
+    assert current.stage is not MedicationStage.REDUCED  # 뒤 행이 바뀌었다
+    assert data["stageChanged"] is True
+
+
+def test_moving_a_row_earlier_restages_the_rows_after_it(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """**날짜 정정으로도** 캐스케이드가 돈다 — 지금까지는 용량 정정만 봤다."""
+    a_from = (today_kst() - timedelta(days=35)).isoformat()
+    b_from = (today_kst() - timedelta(days=7)).isoformat()
+    _history(db, user_id, ("1.0", a_from), ("0.5", b_from))
+    oldest = medication_crud.get_first(db, user_id)
+    current = medication_crud.get_current(db, user_id)
+    current.stage = MedicationStage.INITIAL  # 낡은 판정을 박아 둔다
+    db.flush()
+
+    _patch(
+        client, user_id, oldest.id,
+        effectiveFrom=(today_kst() - timedelta(days=60)).isoformat(),
+    )
+
+    db.refresh(current)
+    assert current.stage is not MedicationStage.INITIAL
+
+
+def test_registration_rejects_more_than_three_decimals(
+    client: TestClient, user_id: uuid.UUID
+) -> None:
+    """`POST` 도 막는다 — `PATCH` 에만 걸면 같은 값이 한쪽 경로로 새어 들어온다."""
+    res = client.post(
+        "/api/v1/medications",
+        json={"drugName": "위고비", "doseMg": 0.2555, "startedAt": "2026-06-14"},
+        headers=_h(user_id),
+    )
+
+    assert res.status_code == 422

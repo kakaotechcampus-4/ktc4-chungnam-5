@@ -598,11 +598,23 @@ def correct(
         raise MedicationNotFoundError(f"medication {medication_id} 를 찾을 수 없습니다.")
 
     before_stage = record.stage
+    before_from = record.effective_from
 
-    _check_neighbours(db, record, payload)
-
+    # 날짜 검사가 먼저다 — 뒤로 가면 잘못된 날짜 요청에 "앞 기록과 같아집니다" 라는
+    # 엉뚱한 메시지가 나간다.
     if payload.effective_from is not None:
         _check_effective_from(db, record, payload.effective_from, today=today)
+    _check_neighbours(db, record, payload)
+
+    # **캐스케이드가 쓸 행을 전부 잠근다.** 날짜를 앞으로 당기면 그 사이 행도 대상이
+    # 되므로 옛 날짜와 새 날짜 중 이른 쪽부터 잠근다.
+    crud.lock_from(
+        db,
+        user_id=user_id,
+        effective_from=min(before_from, payload.effective_from or before_from),
+    )
+
+    if payload.effective_from is not None:
         record.effective_from = payload.effective_from
     if payload.drug_name is not None:
         record.drug_name = payload.drug_name
@@ -631,9 +643,23 @@ def correct(
     # `list_history` 의 `ORDER BY effective_from` 도 같은 이유로 낡은 순서가 된다.
     db.flush()
 
+    # **회차는 범위가 더 넓다.** 단계는 "고친 행 이후" 면 되지만 회차는 전체 투약
+    # 시작일에 매달려 있어서, 가장 오래된 행의 날짜가 움직이면 **모든 행**이 밀린다.
+    # 사용자가 회차를 직접 말했으면 그 값이 이긴다 — 한 주 걸러서 계산이 틀렸을 때
+    # 고치라고 있는 필드다.
+    start = crud.get_dosing_start_date(db, user_id)
+    cascade_changed = False
+
     for row in crud.list_history(db, user_id):
-        if row.effective_from >= record.effective_from:
-            row.stage = restage(db, user_id, row, today=today)
+        if row.effective_from >= min(before_from, record.effective_from):
+            restaged = restage(db, user_id, row, today=today)
+            if row.id != record.id and restaged != row.stage:
+                cascade_changed = True
+            row.stage = restaged
+        if start is not None and not (
+            row.id == record.id and payload.injection_count is not None
+        ):
+            row.injection_count = count_doses(start, today=row.effective_from)
 
     db.commit()
 
@@ -646,7 +672,9 @@ def correct(
         effective_to=record.effective_to,
         stage=record.stage,
         stage_reason=STAGE_REASONS[record.stage],
-        stage_changed=record.stage != before_stage,
+        # **캐스케이드로 다른 행이 바뀐 것도 센다.** 고친 행만 보면, A 를 고쳐 B 의
+        # 단계가 뒤집혀도 `false` 가 나가 FE 가 대시보드를 다시 안 부른다.
+        stage_changed=record.stage != before_stage or cascade_changed,
         rule_version=RULE_VERSION,
     )
 
