@@ -103,15 +103,8 @@ class MedicationCorrectRequest(CamelModel):
     **전부 선택 항목이지만 하나는 보내야 한다.** 빈 몸통은 아무 뜻이 없는데 200 을
     내리면 클라이언트가 뭔가 반영된 줄 안다.
 
-    `startedAt` 은 `POST` 와 같은 뜻이다 — **전체 투약 시작일.** 그 값은 가장 오래된
-    행의 구간 시작일이므로 **첫 행에서만** 고칠 수 있다. 중간 행에 보내면 409 다.
-
-    이 제한이 뜻을 하나로 묶는다. 중간 행의 구간 시작일까지 여기서 고치게 하면 요청은
-    "그 행의 시작일", 응답은 "전체 시작일" 이 되어 값이 서로 달라진다 — 응답만 보고
-    "정정이 안 먹었다" 로 읽고 다시 보낸다.
-
-    중간 행의 날짜는 애초에 사용자가 넣은 값이 아니다. 용량을 바꾼 날은 서버가
-    `today` 로 박으므로 틀릴 수가 없다.
+    `effectiveFrom` 은 **그 행의 구간 시작일**이다. `POST` 요청의 `startedAt`(전체 투약
+    시작일)과 다르고, 응답도 그 행의 값을 그대로 돌려주므로 이름이 어긋나지 않는다.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -124,9 +117,9 @@ class MedicationCorrectRequest(CamelModel):
     `0.2555` 를 보내면 응답은 `0.2555`, 다시 조회하면 `0.256` 이다 (`expire_on_commit`
     이 꺼져 있어 응답은 반올림 전 값을 읽는다). 단계 판정도 반올림 전 값으로 돈다."""
 
-    started_at: date | None = Field(
-        default=None,
-        description="전체 투약 시작일. 가장 오래된 행에서만 고칠 수 있다.",
+    injection_count: int | None = Field(default=None, ge=1)
+    effective_from: date | None = Field(
+        default=None, description="그 구간이 시작한 날."
     )
 
     @model_validator(mode="after")
@@ -134,7 +127,8 @@ class MedicationCorrectRequest(CamelModel):
         if (
             self.drug_name is None
             and self.dose_mg is None
-            and self.started_at is None
+            and self.injection_count is None
+            and self.effective_from is None
         ):
             raise ValueError("고칠 필드를 하나 이상 보내야 합니다.")
         return self
@@ -155,6 +149,29 @@ class MedicationCorrectRequest(CamelModel):
                 "약물을 바꾸면 용량도 함께 보내야 합니다 — 약마다 승인 용량이 다릅니다."
             )
         return self
+
+
+class MedicationCorrectResponse(CamelModel):
+    """`PATCH /medications/{recordId}` 응답. 명세의 10필드다.
+
+    **`POST` 응답과 다르다.** 그쪽은 "지금 투약이 어떤 상태인가" 를 말하므로 전체
+    투약 시작일 · 회차 · 다음 투약일이 들어간다. 여기는 "그 기록이 어떻게 고쳐졌나"
+    라서 고친 행 자체(`recordId` · `effectiveFrom` · `effectiveTo`)를 돌려준다.
+
+    그래서 `doseChanged` · `doseEvent` 가 없다. 정정은 용량을 바꾼 사건이 아니라
+    이미 있던 기록을 고친 것이고, `dose-events` 에 새 점을 찍지 않는다.
+    """
+
+    record_id: uuid.UUID = Field(description="고친 `medication_records` 행 id.")
+    drug_name: DrugName
+    dose_mg: float
+    injection_count: int
+    effective_from: date = Field(description="그 구간이 시작한 날")
+    effective_to: date | None = Field(description="그 구간이 끝난 날. 현재 구간이면 null")
+    stage: MedicationStage
+    stage_reason: str
+    stage_changed: bool = Field(description="정정으로 단계 판정이 달라졌는가")
+    rule_version: str
 
 
 class MedicationRegisterResponse(CamelModel):

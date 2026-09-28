@@ -37,6 +37,7 @@ from app.models.enums import DrugName, MedicationStage
 from app.models.medication import MedicationRecord, MedicationSnapshot
 from app.schemas.medication import (
     MedicationCorrectRequest,
+    MedicationCorrectResponse,
     CurrentMedicationResponse,
     DoseDirection,
     DoseEvent,
@@ -477,7 +478,9 @@ def register(
             user_id=user_id,
             drug_name=payload.drug_name,
             dose_mg=payload.dose_mg,
-            injection_count=1,  # 몇 번째 용량 변경인지. 회차가 아니다
+            # **그 구간이 시작될 때의 회차다.** 과거 시작일로 등록하면 이미 그만큼
+            # 맞아 온 것이라 1 이 아니다 — 6/14 시작을 8/23 에 등록하면 11회차다.
+            injection_count=count_doses(started_at or today, today=today),
             stage=judge_stage(
                 payload.drug_name,
                 payload.dose_mg,
@@ -533,7 +536,12 @@ def register(
         user_id=user_id,
         drug_name=payload.drug_name,
         dose_mg=payload.dose_mg,
-        injection_count=current.injection_count + 1,
+        # 앞 행 +1 이 아니라 **바꾼 날의 회차**다. `doseCount` 와 단위가 같아야
+        # "11회차인데 9회차부터 1.0 맞고 있다" 가 성립한다. 용량 변경 횟수를 세면
+        # 같은 행에서 11 과 3 이 나온다.
+        injection_count=count_doses(
+            crud.get_dosing_start_date(db, user_id) or change_date, today=change_date
+        ),
         stage=judge_stage(payload.drug_name, payload.dose_mg, **context._asdict()),
         effective_from=change_date,
     )
@@ -560,7 +568,7 @@ def correct(
     payload: MedicationCorrectRequest,
     *,
     today: date | None = None,
-) -> RegisterResult:
+) -> MedicationCorrectResponse:
     """잘못 넣은 값을 고친다. **이력을 만들지 않는다.**
 
     `register()` 와 결정적으로 다른 점은 행을 더하지 않는다는 것이다 —
@@ -591,13 +599,15 @@ def correct(
 
     before_stage = record.stage
 
-    if payload.started_at is not None:
-        _check_started_at(db, user_id, record, payload.started_at, today=today)
-        record.effective_from = payload.started_at
+    if payload.effective_from is not None:
+        _check_effective_from(db, record, payload.effective_from, today=today)
+        record.effective_from = payload.effective_from
     if payload.drug_name is not None:
         record.drug_name = payload.drug_name
     if payload.dose_mg is not None:
         record.dose_mg = payload.dose_mg
+    if payload.injection_count is not None:
+        record.injection_count = payload.injection_count
 
     # **고친 행 이후를 전부 다시 판정한다.** 단계는 이력에 의존하므로 앞 행의 용량이
     # 바뀌면 뒤 행의 "직전의 다른 용량" 도 바뀐다 — A(1.0) → B(0.5) 에서 B 는 감량인데,
@@ -616,57 +626,59 @@ def correct(
 
     db.commit()
 
-    # **`dose_changed` 는 False 다.** 값은 바뀌었지만 "용량을 바꾼 사건" 이 아니다 —
-    # 그 구분이 이 엔드포인트의 존재 이유고, True 로 내면 `doseEvent` 가 실려 나가
-    # FE 가 방금 증량한 것으로 읽는다.
-    return RegisterResult(
-        record,
-        dose_changed=False,
+    return MedicationCorrectResponse(
+        record_id=record.id,
+        drug_name=record.drug_name,
+        dose_mg=record.dose_mg,
+        injection_count=record.injection_count,
+        effective_from=record.effective_from,
+        effective_to=record.effective_to,
+        stage=record.stage,
+        stage_reason=STAGE_REASONS[record.stage],
         stage_changed=record.stage != before_stage,
-        previous_dose_mg=None,
+        rule_version=RULE_VERSION,
     )
 
 
-def _check_started_at(
-    db: Session,
-    user_id: uuid.UUID,
-    record: MedicationRecord,
-    new_from: date,
-    *,
-    today: date,
+def _check_effective_from(
+    db: Session, record: MedicationRecord, new_from: date, *, today: date
 ) -> None:
-    """전체 투약 시작일을 옮겨도 되는지 본다. 안 되면 raise.
+    """구간 시작일을 옮겨도 되는지 본다. 안 되면 raise.
 
-    **첫 행에서만 고칠 수 있다.** `startedAt` 은 `POST` 와 같은 뜻인 전체 투약
-    시작일이고, 그 값은 가장 오래된 행의 구간 시작일이다. 중간 행의 구간 시작일까지
-    여기서 고치게 하면 요청은 "그 행의 시작일", 응답은 "전체 시작일" 이 되어 값이
-    서로 달라진다 — 응답만 보고 "정정이 안 먹었다" 로 읽고 다시 보낸다.
+    **이 행과 바로 앞 행만 본다.** 더 앞은 이미 이 행보다 앞이라 새 날짜가 그 사이로
+    들어갈 수 없다. 연쇄가 아니다.
 
-    잃는 것도 없다. 중간 행의 날짜는 애초에 사용자가 넣은 값이 아니다 — 용량을 바꾼
-    날은 `register` 가 `today` 로 박으므로 틀릴 수가 없다. 그 행의 약물·용량은 여전히
-    고칠 수 있다.
+    - **앞 구간과 겹치지 않는가.** 앞 행이 끝난 다음 날부터만 시작할 수 있다.
+      겹치면 같은 날에 용량이 둘이 되어 `dose_context` 가 어느 쪽을 직전으로 볼지
+      모른다.
+    - **자기 구간을 넘지 않는가.** 닫힌 행이면 `effective_from > effective_to` 가
+      되어 뒤집힌다. 현재 행(`effective_to IS NULL`)은 끝이 없으니 **오늘**까지다 —
+      미래에 시작한 투약은 아직 맞은 적이 없고, `register` 도 미래 시작일을 막는다.
+    - **첫 행에는 앞 구간이 없어 하한이 빈다.** 그 값이 곧 전체 투약 시작일이라
+      `doseCount` 가 그대로 터진다 — `1900-01-01` 을 넣으면 6613 회차가 나온다.
 
-    첫 행이라 앞 구간이 없으므로 겹침 검사도 필요 없다. 보는 건 둘이다.
-
-    - **너무 옛날로 가지 않는가.** 하한이 없으면 `1900-01-01` 이 그대로 들어와
-      `doseCount` 가 6613 이 된다. `register` 가 미래를 막는 것과 대칭이다.
-    - **자기 구간을 넘지 않는가.** 닫힌 행이면 `effective_from > effective_to` 가 되어
-      뒤집힌다. 현재 행(`effective_to IS NULL`)은 끝이 없으니 **오늘**까지다 — 미래에
-      시작한 투약은 아직 맞은 적이 없다.
-
-    뒤 행의 구간은 건드리지 않는다. 그래서 날짜를 뒤로 미루면 그 사이가 빈다 —
-    "그 기간에는 기록이 없다" 가 사실이므로 채워 넣지 않는다. 뒤 행까지 같이 당기면
-    사용자가 말하지 않은 것을 서버가 지어내는 셈이다.
+    앞 행의 `effective_to` 는 건드리지 않는다. 그래서 날짜를 뒤로 미루면 그 사이가
+    빈다 — "그 기간에는 기록이 없다" 가 사실이므로 채워 넣지 않는다. 앞 행까지 같이
+    늘리면 사용자가 말하지 않은 것을 서버가 지어내는 셈이다.
     """
-    first = crud.get_first(db, user_id)
-    if first is None or first.id != record.id:
-        raise ApiError(
-            ErrorCode.CONFLICT,
-            "투약 시작일은 첫 투약 기록에서만 고칠 수 있습니다.",
-            409,
-        )
-
-    if new_from < today - timedelta(days=MAX_BACKDATE_DAYS):
+    previous = crud.get_previous(db, record)
+    if previous is not None:
+        if previous.effective_to is None:
+            # 앞 구간이 열려 있으면 그 자체가 불변식 위반이다 — 부분 유니크 인덱스가
+            # 막으므로 정상 경로로는 못 만든다. 조용히 통과시키면 겹침 검사가 통째로
+            # 건너뛰어지므로 거절한다.
+            raise ApiError(
+                ErrorCode.CONFLICT,
+                "앞 구간이 닫혀 있지 않아 시작일을 옮길 수 없습니다.",
+                409,
+            )
+        if new_from <= previous.effective_to:
+            raise ApiError(
+                ErrorCode.CONFLICT,
+                f"앞 구간이 {previous.effective_to} 에 끝나므로 그보다 뒤여야 합니다.",
+                409,
+            )
+    elif new_from < today - timedelta(days=MAX_BACKDATE_DAYS):
         raise ApiError(
             ErrorCode.CONFLICT,
             f"투약 시작일은 {MAX_BACKDATE_DAYS} 일 이전으로 옮길 수 없습니다.",
@@ -677,7 +689,7 @@ def _check_started_at(
     if new_from > limit:
         raise ApiError(
             ErrorCode.CONFLICT,
-            f"투약 시작일은 {limit} 보다 뒤일 수 없습니다.",
+            f"이 구간의 시작일은 {limit} 보다 뒤일 수 없습니다.",
             409,
         )
 

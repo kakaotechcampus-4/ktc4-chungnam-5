@@ -88,6 +88,24 @@ def get_owned(
     return db.execute(stmt).scalars().first()
 
 
+def get_previous(db: Session, record: MedicationRecord) -> MedicationRecord | None:
+    """이 행 **바로 앞** 구간. 없으면 None (= 이 행이 첫 행이다).
+
+    `effective_from` 을 옮길 때 앞 구간과 겹치는지 보려면 이 한 행만 있으면 된다 —
+    더 앞은 이미 이 행보다 앞이라 새 날짜가 그 사이로 들어갈 수 없다.
+    """
+    stmt = (
+        select(MedicationRecord)
+        .where(
+            MedicationRecord.user_id == record.user_id,
+            MedicationRecord.effective_from < record.effective_from,
+        )
+        .order_by(MedicationRecord.effective_from.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalars().first()
+
+
 def list_doses_desc(
     db: Session,
     user_id: uuid.UUID,

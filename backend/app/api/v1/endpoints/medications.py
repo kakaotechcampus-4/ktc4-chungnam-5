@@ -17,6 +17,7 @@ from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
 from app.schemas.medication import (
     MedicationCorrectRequest,
+    MedicationCorrectResponse,
     CurrentMedicationResponse,
     DoseEventsResponse,
     MedicationRegisterRequest,
@@ -66,18 +67,18 @@ def register_medication(
 
 
 @router.patch(
-    "/medications/{medication_id}",
-    response_model=ApiResponse[MedicationRegisterResponse],
+    "/medications/{record_id}",
+    response_model=ApiResponse[MedicationCorrectResponse],
     summary="투약 정보 정정",
     # 422 를 빠뜨리면 openapi.json 에 깨진 $ref 가 남는다 — 위 POST 주석 참고.
     responses=error_responses(401, 404, 409, 422),
 )
 def correct_medication(
-    medication_id: uuid.UUID,
+    record_id: uuid.UUID,
     payload: MedicationCorrectRequest,
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
-) -> ApiResponse[MedicationRegisterResponse]:
+) -> ApiResponse[MedicationCorrectResponse]:
     """**정정 전용.** 잘못 넣은 값을 고친다. 이력을 만들지 않는다.
 
     `POST` 가 행을 더한다면(INSERT) 여기는 있는 행을 고친다(UPDATE). 한 번도 맞은 적
@@ -87,16 +88,13 @@ def correct_medication(
     복사해 둔 스냅샷을 보고, 장기 피드백은 일일 피드백에서 나온다. 바뀌는 건
     대시보드와 `dose-events` 처럼 **기록을 그대로 보여주는 화면**뿐이다.
 
-    응답은 `POST /medications` 와 같은 구조다 (명세). 다만 `doseChanged` 는 항상
-    `false` 이고 `doseEvent` 는 `null` 이다 — 값이 바뀐 것이지 용량을 바꾼 사건이
-    아니다.
+    **응답이 `POST` 와 다르다.** 그쪽은 "지금 투약이 어떤 상태인가" 를 말하지만
+    여기는 "그 기록이 어떻게 고쳐졌나" 라서, 고친 행 자체를 돌려준다.
     """
     try:
-        result = medication_service.correct(db, user_id, medication_id, payload)
+        return ok(medication_service.correct(db, user_id, record_id, payload))
     except medication_service.MedicationNotFoundError as exc:
         raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None
-
-    return ok(medication_service.build_register_view(db, user_id, result))
 
 
 @router.get(

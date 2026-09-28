@@ -717,24 +717,35 @@ def test_correction_updates_in_place_without_adding_history(
     assert res.status_code == 200, res.text
     data = res.json()["data"]
     assert data["doseMg"] == 0.5
-    assert data["medicationId"] == posted["medicationId"]  # 같은 행이다
+    assert data["recordId"] == posted["medicationId"]  # 같은 행이다
     assert len(medication_crud.list_history(db, user_id)) == 1
 
 
-def test_correction_reports_no_dose_event(
+CORRECT_FIELDS = {
+    "recordId", "drugName", "doseMg", "injectionCount",
+    "effectiveFrom", "effectiveTo", "stage", "stageReason",
+    "stageChanged", "ruleVersion",
+}
+
+
+def test_correction_returns_exactly_the_spec_fields(
     client: TestClient, db: Session, user_id: uuid.UUID
 ) -> None:
-    """값은 바뀌었지만 **용량을 바꾼 사건이 아니다.**
+    """명세의 10필드다. **`POST` 응답과 다르다.**
 
-    `doseEvent` 를 실어 보내면 FE 가 방금 증량한 것으로 읽는다. 그 구분이 이
-    엔드포인트의 존재 이유다.
+    그쪽은 "지금 투약이 어떤 상태인가" 라 전체 시작일·회차·다음 투약일이 들어가고,
+    여기는 "그 기록이 어떻게 고쳐졌나" 라 고친 행 자체를 돌려준다.
+
+    `doseChanged` · `doseEvent` 가 없는 게 핵심이다 — 정정은 용량을 바꾼 사건이
+    아니라서 `dose-events` 에 새 점을 찍지 않는다.
     """
     posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
 
     data = _patch(client, user_id, posted["medicationId"], doseMg=2.4).json()["data"]
 
-    assert data["doseChanged"] is False
-    assert data["doseEvent"] is None
+    assert set(data) == CORRECT_FIELDS
+    assert data["recordId"] == posted["medicationId"]
+    assert data["effectiveTo"] is None  # 현재 구간이다
 
 
 def test_correcting_a_past_row_is_allowed(
@@ -771,26 +782,21 @@ def test_correction_restages_the_row(
     assert data["stageChanged"] is True
 
 
-def test_start_date_is_correctable_only_on_the_first_row(
+def test_moving_start_date_into_the_previous_period_is_409(
     client: TestClient, db: Session, user_id: uuid.UUID
 ) -> None:
-    """`startedAt` 은 **전체 투약 시작일**이라 첫 행에서만 고친다.
-
-    중간 행에서도 고치게 하면 요청은 "그 행의 시작일", 응답은 "전체 시작일" 이 되어
-    값이 서로 달라진다 — 응답만 보고 "정정이 안 먹었다" 로 읽고 다시 보낸다.
-
-    잃는 것은 없다. 중간 행의 날짜는 용량을 바꾼 날이라 서버가 `today` 로 박은
-    값이고, 사용자가 틀릴 수가 없다. 그 행의 용량은 여전히 고칠 수 있다.
-    """
+    """앞 구간과 겹치면 막는다 — 같은 날에 용량이 둘이 되면 어느 쪽이 직전인지 모른다."""
     _history(db, user_id, ("0.25", "2026-06-14"), ("0.5", "2026-07-12"))
     second = medication_crud.get_current(db, user_id)
 
-    res = _patch(client, user_id, second.id, startedAt="2026-07-20")
+    res = _patch(client, user_id, second.id, effectiveFrom="2026-07-01")
 
     assert res.status_code == 409, res.text
     assert res.json()["error"]["code"] == "CONFLICT"
-    # 용량 정정은 막히지 않는다.
-    assert _patch(client, user_id, second.id, doseMg=0.6).status_code == 200
+    # 앞 구간이 끝난 다음 날부터는 된다.
+    assert _patch(
+        client, user_id, second.id, effectiveFrom="2026-07-15"
+    ).status_code == 200
 
 
 def test_moving_start_date_into_the_future_is_409(
@@ -800,33 +806,28 @@ def test_moving_start_date_into_the_future_is_409(
     posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
     tomorrow = (today_kst() + timedelta(days=1)).isoformat()
 
-    res = _patch(client, user_id, posted["medicationId"], startedAt=tomorrow)
+    res = _patch(client, user_id, posted["medicationId"], effectiveFrom=tomorrow)
 
     assert res.status_code == 409, res.text
 
 
-def test_start_date_correction_moves_the_dosing_start(
+def test_correction_returns_the_row_it_changed(
     client: TestClient, db: Session, user_id: uuid.UUID
 ) -> None:
-    """첫 행의 시작일이 곧 전체 투약 시작일이라 회차까지 같이 달라진다.
+    """응답의 `effectiveFrom` 은 **그 행의 값**이다 — 보낸 값이 그대로 돌아온다.
 
-    `today_kst()` 를 쓴다 — `date.today()` 는 컨테이너가 UTC 면 서버와 하루가 어긋나
-    회차가 하나씩 밀린다 (`core/time.py`: "한 곳이라도 date.today() 를 쓰면 같은
-    순간에 두 답이 나온다").
+    `POST` 응답의 `startedAt`(전체 투약 시작일)과 다르다. 중간 행을 고쳐도 값이
+    어긋나지 않는 이유다.
     """
-    started = today_kst() - timedelta(days=20)
-    posted = _post(
-        client, user_id, drugName="위고비", doseMg=1.0, startedAt=started.isoformat()
-    )
-    assert posted["doseCount"] == 3  # floor(20/7) + 1
+    _history(db, user_id, ("0.25", "2026-06-14"), ("0.5", "2026-07-12"))
+    second = medication_crud.get_current(db, user_id)
 
-    fixed = started + timedelta(days=7)
     data = _patch(
-        client, user_id, posted["medicationId"], startedAt=fixed.isoformat()
+        client, user_id, second.id, effectiveFrom="2026-07-20"
     ).json()["data"]
 
-    assert data["startedAt"] == fixed.isoformat()
-    assert data["doseCount"] == 2
+    assert data["recordId"] == str(second.id)
+    assert data["effectiveFrom"] == "2026-07-20"
 
 
 def test_empty_correction_is_422(client: TestClient, user_id: uuid.UUID) -> None:
@@ -962,7 +963,7 @@ def test_correction_rejects_absurdly_old_start_date(
     """
     posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
 
-    res = _patch(client, user_id, posted["medicationId"], startedAt="1900-01-01")
+    res = _patch(client, user_id, posted["medicationId"], effectiveFrom="1900-01-01")
 
     assert res.status_code == 409, res.text
 
@@ -979,11 +980,11 @@ def test_correction_cannot_invert_a_closed_period(
     end = oldest.effective_to  # 2026-07-11
 
     assert _patch(
-        client, user_id, oldest.id, startedAt=end.isoformat()
+        client, user_id, oldest.id, effectiveFrom=end.isoformat()
     ).status_code == 200
 
     res = _patch(
-        client, user_id, oldest.id, startedAt=(end + timedelta(days=1)).isoformat()
+        client, user_id, oldest.id, effectiveFrom=(end + timedelta(days=1)).isoformat()
     )
 
     assert res.status_code == 409, res.text
@@ -1001,7 +1002,7 @@ def test_correction_leaves_neighbour_periods_untouched(
 
     # 첫 행의 시작일을 6일 뒤로 미룬다 (전체 투약 시작일 정정).
     assert _patch(
-        client, user_id, first.id, startedAt="2026-06-20"
+        client, user_id, first.id, effectiveFrom="2026-06-20"
     ).status_code == 200
 
     db.refresh(first)
@@ -1050,3 +1051,80 @@ def test_correction_rejects_more_than_three_decimals(
     posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
 
     assert _patch(client, user_id, posted["medicationId"], doseMg=0.2555).status_code == 422
+
+
+def test_correcting_injection_count(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """회차도 정정 대상이다 (명세 요청 4필드 중 하나).
+
+    이 테스트가 없으면 `record.injection_count = ...` 두 줄을 지워도 통과한다 —
+    요청은 200 을 받고 값만 조용히 안 바뀐다.
+    """
+    posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    data = _patch(client, user_id, posted["medicationId"], injectionCount=12).json()["data"]
+
+    assert data["injectionCount"] == 12
+    assert medication_crud.get_current(db, user_id).injection_count == 12
+
+
+def test_correction_rejects_non_positive_injection_count(
+    client: TestClient, user_id: uuid.UUID
+) -> None:
+    posted = _post(client, user_id, drugName="위고비", doseMg=1.0, startedAt="2026-06-14")
+
+    assert _patch(
+        client, user_id, posted["medicationId"], injectionCount=0
+    ).status_code == 422
+
+
+def test_correcting_a_closed_row_keeps_its_effective_to(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """닫힌 행을 고치면 응답에 그 구간의 끝이 실린다 — 현재 행만 `null` 이다."""
+    _history(db, user_id, ("0.25", "2026-06-14"), ("0.5", "2026-07-12"))
+    oldest = medication_crud.get_first(db, user_id)
+
+    data = _patch(client, user_id, oldest.id, doseMg=0.3).json()["data"]
+
+    assert data["effectiveTo"] == "2026-07-11"
+
+
+def test_injection_count_is_the_dose_count_when_the_period_began(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """`injection_count` 는 **그 구간이 시작될 때의 회차**다.
+
+    `doseCount` 와 단위가 같아야 "11회차인데 9회차부터 1.0 맞고 있다" 가 성립한다.
+    용량 변경 횟수를 세면 같은 행에서 11 과 3 이 나온다.
+    """
+    started = today_kst() - timedelta(days=70)  # 11회차
+    posted = _post(
+        client, user_id, drugName="위고비", doseMg=0.25, startedAt=started.isoformat()
+    )
+    assert posted["doseCount"] == 11
+
+    # 과거 시작일로 첫 등록하면 이미 그만큼 맞아 온 것이다 — 1 이 아니다.
+    assert medication_crud.get_first(db, user_id).injection_count == 11
+
+    # 오늘 용량을 올리면 오늘 회차가 박힌다.
+    _post(client, user_id, drugName="위고비", doseMg=0.5)
+
+    assert medication_crud.get_current(db, user_id).injection_count == 11
+
+
+def test_injection_count_tracks_elapsed_weeks_not_dose_changes(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """용량을 여러 번 바꿔도 회차는 날짜를 따른다 — 1·2·3 으로 세지 않는다."""
+    _history(
+        db, user_id,
+        ("0.25", "2026-06-14"), ("0.5", "2026-07-12"), ("1.0", "2026-08-09"),
+    )
+    # `_history` 는 회차를 손으로 넣으므로, 계산 규칙만 직접 확인한다.
+    from app.services.medication import count_doses
+
+    assert count_doses(date(2026, 6, 14), today=date(2026, 6, 14)) == 1
+    assert count_doses(date(2026, 6, 14), today=date(2026, 7, 12)) == 5
+    assert count_doses(date(2026, 6, 14), today=date(2026, 8, 9)) == 9
