@@ -1157,3 +1157,59 @@ def test_cascade_restaging_sees_the_corrected_dose(
 
     db.refresh(current)
     assert current.stage is not MedicationStage.REDUCED
+
+
+def test_correction_cannot_make_a_row_equal_to_its_neighbour(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """정정으로 이웃 구간과 (약물, 용량) 이 같아지면 거절한다.
+
+    `POST` 가 보장하는 불변식이다 — 같은 값으로 다시 등록하면 행을 안 만든다
+    (명세: "같음 → 기록 없음"). 정정으로 그 상태를 만들면 `dose-events` 에 바꾸지
+    않은 변경이 점으로 찍힌다.
+    """
+    _history(
+        db, user_id,
+        ("0.25", "2026-06-14"), ("0.5", "2026-07-12"), ("1.0", "2026-08-09"),
+    )
+    _, middle, _ = medication_crud.list_history(db, user_id)
+
+    # 가운데 행을 뒤 행과 같게
+    res = _patch(client, user_id, middle.id, doseMg=1.0)
+    assert res.status_code == 409, res.text
+    assert res.json()["error"]["code"] == "CONFLICT"
+
+    # 가운데 행을 앞 행과 같게
+    assert _patch(client, user_id, middle.id, doseMg=0.25).status_code == 409
+
+    # 이웃과 다른 값이면 통과한다.
+    assert _patch(client, user_id, middle.id, doseMg=0.75).status_code == 200
+
+
+def test_correcting_drug_name_cannot_collide_with_a_neighbour(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """약물이 달라서 허용됐던 이웃이 약물명 정정으로 같아질 수 있다.
+
+    위고비 2.4 → 마운자로 2.4 는 사다리가 달라 정상인데, 뒤 행을 위고비로 고치면
+    같은 약물·같은 용량이 연달아 놓인다.
+    """
+    _history(db, user_id, ("2.4", "2026-06-14"), ("2.4", "2026-07-12", "마운자로"))
+    _, second = medication_crud.list_history(db, user_id)
+
+    res = _patch(client, user_id, second.id, drugName="위고비", doseMg=2.4)
+
+    assert res.status_code == 409, res.text
+
+
+def test_dose_events_has_no_phantom_change_after_correction(
+    client: TestClient, db: Session, user_id: uuid.UUID
+) -> None:
+    """이웃 검사가 지키려는 것 — 바꾸지 않은 변경이 그래프에 안 찍힌다."""
+    _history(db, user_id, ("0.25", "2026-06-14"), ("0.5", "2026-07-12"))
+    current = medication_crud.get_current(db, user_id)
+
+    _patch(client, user_id, current.id, doseMg=0.25)  # 거절된다
+
+    doses = [float(e["doseMg"]) for e in _events(client, user_id)]
+    assert doses == [0.25, 0.5]  # 0.25 가 두 번 나오지 않는다

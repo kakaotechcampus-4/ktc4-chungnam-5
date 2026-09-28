@@ -599,6 +599,8 @@ def correct(
 
     before_stage = record.stage
 
+    _check_neighbours(db, record, payload)
+
     if payload.effective_from is not None:
         _check_effective_from(db, record, payload.effective_from, today=today)
         record.effective_from = payload.effective_from
@@ -647,6 +649,45 @@ def correct(
         stage_changed=record.stage != before_stage,
         rule_version=RULE_VERSION,
     )
+
+
+def _check_neighbours(
+    db: Session, record: MedicationRecord, payload: MedicationCorrectRequest
+) -> None:
+    """정정 후 이웃 구간과 (약물, 용량) 이 같아지면 거절한다.
+
+    **`POST` 가 보장하는 불변식이다.** 같은 값으로 다시 등록하면 `register` 가 행을
+    만들지 않는다(`unchanged` 분기) — 명세도 "같음 → 기록 없음" 이다. 정정으로 그
+    상태를 만들면 안 된다.
+
+    깨지면 두 가지가 틀어진다.
+
+    - `dose-events` 에 **바꾸지 않은 변경**이 점으로 찍힌다. "8/09 에 1.0 으로
+      올렸다" 고 보이는데 실은 7/12 부터 1.0 이었다.
+    - `same_dose_streak` 을 적게 센다. 그 용량을 실제로는 앞 구간부터 맞고 있었는데
+      이 구간 시작일부터 세어, 정착 판정이 늦어진다.
+
+    ⚠️ 거절당한 사용자는 **그 상태를 고칠 방법이 없다.** 올바른 데이터는 "두 행을
+    같은 값으로 두는 것" 이 아니라 "그 행이 아예 없는 것" 인데, 투약 기록을 지우는
+    엔드포인트가 없다. 잘못된 상태를 만드는 것보다는 막는 게 낫다고 보고 거절하되,
+    `DELETE` 를 둘지는 팀에서 정할 일이다.
+    """
+    drug = payload.drug_name or record.drug_name
+    dose = payload.dose_mg if payload.dose_mg is not None else record.dose_mg
+
+    for neighbour, where in (
+        (crud.get_previous(db, record), "앞"),
+        (crud.get_next(db, record), "뒤"),
+    ):
+        if neighbour is None:
+            continue
+        if neighbour.drug_name == drug and neighbour.dose_mg == dose:
+            raise ApiError(
+                ErrorCode.CONFLICT,
+                f"{where} 기록과 약물·용량이 같아집니다 — 그 구간에는 용량 변경이"
+                " 없었던 것이므로 이 기록이 아니라 그쪽을 고쳐야 합니다.",
+                409,
+            )
 
 
 def _check_effective_from(

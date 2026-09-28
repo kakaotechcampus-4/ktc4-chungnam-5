@@ -106,6 +106,20 @@ def get_previous(db: Session, record: MedicationRecord) -> MedicationRecord | No
     return db.execute(stmt).scalars().first()
 
 
+def get_next(db: Session, record: MedicationRecord) -> MedicationRecord | None:
+    """이 행 **바로 뒤** 구간. 없으면 None (= 이 행이 현재 구간이다)."""
+    stmt = (
+        select(MedicationRecord)
+        .where(
+            MedicationRecord.user_id == record.user_id,
+            MedicationRecord.effective_from > record.effective_from,
+        )
+        .order_by(MedicationRecord.effective_from.asc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalars().first()
+
+
 def list_doses_desc(
     db: Session,
     user_id: uuid.UUID,
