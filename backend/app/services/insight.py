@@ -13,7 +13,7 @@ from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.infra.queue import enqueue
 from app.models.enums import FeedbackPeriodType, FeedbackStatus, SafetyStatus, TaskStatus
-from app.models.feedback import LongTermFeedback
+from app.models.feedback import ALL_PERIOD_START, LongTermFeedback
 from app.models.task import Task
 from app.schemas.insights import (
     InsightPeriod,
@@ -150,8 +150,13 @@ def get_long_term_insight(
     is_safe = row.safety_status is SafetyStatus.SAFE
     stale, stale_reason = _check_stale(db, user_id=user_id, row=row, requested_to=date_to)
 
+    # ALL 행의 period_start 는 사용자에게 보여줄 실제 날짜가 아니라 DB 유니크 키를
+    # 채우기 위한 고정값(ALL_PERIOD_START)이다 — 그대로 내보내면 FE 에 "1970-01-01"이
+    # 나간다(PR #46 리뷰).
+    period_from = None if row.period_type is FeedbackPeriodType.ALL else row.period_start
+
     return LongTermInsightResponse(
-        period=InsightPeriod(from_=row.period_start, to=row.period_end),
+        period=InsightPeriod(from_=period_from, to=row.period_end),
         status=status,
         data_sufficient=True,
         trend_summary=row.trend_summary if is_safe else None,
@@ -179,7 +184,7 @@ def refresh_long_term_insight(
         {
             "userId": str(user_id),
             "periodType": period_type.value,
-            "periodStart": date_from.isoformat() if date_from is not None else None,
+            "periodStart": (date_from or ALL_PERIOD_START).isoformat(),
             "periodEnd": date_to.isoformat(),
         },
     )

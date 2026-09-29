@@ -77,6 +77,15 @@ class DailyFeedback(Base):
     __table_args__ = (UniqueConstraint("user_id", "feedback_date"),)
 
 
+ALL_PERIOD_START = date(1970, 1, 1)
+"""period_type=ALL 행의 period_start 고정값.
+
+실제 분석 시작일이 아니라, UNIQUE(user_id, period_type, period_start) 를
+사용자당 한 행으로 만드는 키다. `date.min` 은 쓰지 않는다 — KST 로 만든
+aware datetime 을 UTC 로 바꾸면 범위를 벗어나 OverflowError 가 난다.
+"""
+
+
 class LongTermFeedback(Base):
     """주간·월간 Q/Q/S 추이와 장기 행동 제안."""
 

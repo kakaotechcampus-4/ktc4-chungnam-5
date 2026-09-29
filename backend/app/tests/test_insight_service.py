@@ -13,7 +13,7 @@ import pytest
 from app.crud import insight as insight_crud
 from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
-from app.models.enums import FeedbackStatus, SafetyStatus, TaskStatus
+from app.models.enums import FeedbackPeriodType, FeedbackStatus, SafetyStatus, TaskStatus
 from app.schemas.insights import StaleReason
 from app.services import insight as insight_service
 from app.services.insight import (
@@ -65,6 +65,7 @@ def _task(status: TaskStatus) -> SimpleNamespace:
 
 def _feedback_row(**overrides) -> SimpleNamespace:
     defaults = dict(
+        period_type=FeedbackPeriodType.WEEKLY,
         period_start=date(2026, 8, 25),
         period_end=date(2026, 9, 21),
         updated_at=datetime(2026, 9, 21, 10, 0, tzinfo=UTC),
@@ -214,6 +215,24 @@ def test_get_long_term_insight_hides_content_when_review_required(monkeypatch):
     assert result.recommendation is None
 
 
+def test_get_long_term_insight_hides_sentinel_period_start_for_all(monkeypatch):
+    """ALL 행의 period_start 는 DB 유니크 키용 고정값이지 실제 날짜가 아니므로
+    응답에는 null 로 나가야 한다 (PR #46 리뷰)."""
+    row = _feedback_row(period_type=FeedbackPeriodType.ALL, period_start=date(1970, 1, 1))
+    monkeypatch.setattr(insight_crud, "get_latest", lambda *a, **k: row)
+    monkeypatch.setattr(insight_crud, "get_latest_refresh_task", lambda *a, **k: None)
+    monkeypatch.setattr(meal_crud, "has_deleted_meals_since", lambda *a, **k: False)
+    monkeypatch.setattr(meal_crud, "has_edited_items_since", lambda *a, **k: False)
+    monkeypatch.setattr(medication_crud, "has_stage_change_since", lambda *a, **k: False)
+    monkeypatch.setattr(meal_crud, "has_new_meals_since", lambda *a, **k: False)
+
+    result = get_long_term_insight(
+        db=None, user_id=uuid.uuid4(), period="all", today=date(2026, 9, 21)
+    )
+
+    assert result.period.from_ is None
+
+
 def test_refresh_enqueues_feedback_long_task_and_commits(monkeypatch):
     """payload 키(userId/periodType/periodStart/periodEnd)는 worker/jobs/feedback_long.py
     가 이미 읽기로 정해둔 이름과 맞아야 한다."""
@@ -257,8 +276,9 @@ def test_refresh_maps_28d_to_monthly(monkeypatch):
     assert captured["payload"]["periodStart"] == "2026-08-27"
 
 
-def test_refresh_maps_all_to_null_period_start(monkeypatch):
-    """period=all 은 하한이 없으니 payload 의 periodStart 는 null 이어야 한다."""
+def test_refresh_maps_all_to_sentinel_period_start(monkeypatch):
+    """period=all 은 하한이 없지만, period_start 는 DB 에서 NOT NULL + UNIQUE 키라
+    null 을 그대로 못 넣는다 — ALL_PERIOD_START 고정값으로 채워야 한다 (PR #46 리뷰)."""
     captured = {}
     monkeypatch.setattr(
         insight_service,
@@ -271,5 +291,5 @@ def test_refresh_maps_all_to_null_period_start(monkeypatch):
     )
 
     assert captured["payload"]["periodType"] == "ALL"
-    assert captured["payload"]["periodStart"] is None
+    assert captured["payload"]["periodStart"] == "1970-01-01"
     assert captured["payload"]["periodEnd"] == "2026-09-23"
