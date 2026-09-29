@@ -9,7 +9,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Index, Integer, Numeric, String, text
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Integer, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -42,6 +42,14 @@ class MedicationRecord(Base):
     updated_at: Mapped[datetime] = updated_at()
 
     __table_args__ = (
+        # 구간이 뒤집힌 행은 코드 버그로만 생긴다 — 정상 경로는 전부 막혀 있다.
+        # 그래도 DB 에 걸어 두는 건 마지막 방어선이라서다. 뒤집힌 행이 한 번 생기면
+        # `get_previous` 가 그 행을 못 찾아 이후 모든 검증이 깨진 값 위에서 돌고,
+        # 500 이 아니라 **조용한 영구 손상**이 된다.
+        CheckConstraint(
+            "effective_to IS NULL OR effective_from <= effective_to",
+            name="ck_medication_records_period_order",
+        ),
         # "현재 단계"인 행이 둘이면 단계 판정이 모호해진다.
         Index(
             "uq_medication_records_current",

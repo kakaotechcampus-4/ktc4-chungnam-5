@@ -20,6 +20,7 @@ from typing import Final, NamedTuple
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
+from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.crud import satiety as satiety_crud
@@ -40,7 +41,8 @@ from app.schemas.evaluation import (
     NutrientRow,
     QqsScores,
 )
-from app.services.evaluation.rule_engine import evaluate
+from app.models.evaluation import QQSEvaluation
+from app.services.evaluation.rule_engine import Scores, evaluate
 from app.services.evaluation.stage_profile import emphasis_for
 
 
@@ -86,12 +88,44 @@ _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATE
 고치면 점수가 다시 매겨져야 하고, `qqs_evaluations` 가 식사당 1행(upsert)인 것도
 그 전제다.
 
-🔗 TODO(`feedbacks.py` 구현 시): **재확정이 `meal_feedbacks` 를 건드리지 않는다.**
-점수는 upsert 로 덮이는데 AI 가 쓴 문장은 옛 점수 기준으로 남아, 확정 응답은
-`feedbackStatus: PENDING` 인데 `GET /meals/{mealId}/feedback` 은 낡은 문장을 준다.
-지금은 `endpoints/feedbacks.py` 가 비어 있어 드러나지 않는다. 무효화 방식(행 삭제 ·
-stale 플래그 · 상태 되돌리기)이 그 엔드포인트 설계에 달려 있어 거기서 함께 정한다.
+🔗 **재확정은 `meal_feedbacks` 도 무효화한다** — `_is_stale_feedback`(아래) 이 판정하고
+`crud/feedback.py::invalidate_by_meal` 이 내용을 비운다. 점수는 upsert 로 덮이는데 AI 가
+쓴 문장은 아무도 안 건드려서, 그냥 두면 닭가슴살을 더해 재확정해도 "단백질 비중이
+낮았어요" 가 그대로 나갔다. **여기서 또 구현하지 말 것.**
 """
+
+
+def _is_stale_feedback(
+    meal: Meal, previous: QQSEvaluation | None, scores: Scores
+) -> bool:
+    """이번 확정이 옛 AI 문장을 무효로 만드는가.
+
+    **무조건 지우면 안 된다.** `_CONFIRMABLE` 에 `EVALUATED` 가 있어 아무것도 고치지
+    않은 재확정(확정 버튼 더블탭 · FE 타임아웃 재시도 · 같은 값 재전송)도 허용되는데,
+    그때까지 지우면 멀쩡한 문장이 날아간다. 되살릴 길도 없다 — `feedback.meal` 을
+    큐에 넣는 코드가 아직 없고 워커도 스텁이라, 한 번 비우면 `PENDING` 에 고착된다.
+
+    두 가지를 본다. **하나만으로는 부족하다:**
+
+    - **상태가 `EVALUATED` 가 아니다** — 음식을 고쳐 `mark_recalculating` 을 거쳐
+      왔다는 뜻이다. 성분이 달라졌으니 그 성분을 보고 쓴 문장은 낡았다.
+      점수 비교로는 이걸 못 잡는다 — Quantity·Quality 가 아직 `None` 이고 Satiety 는
+      요청값을 그대로 쓰므로, **음식을 고쳐도 점수는 하나도 안 바뀐다.**
+    - **점수가 달라졌다** — 사용자가 `satietyAfterPct` 를 고쳐 다시 확정했다.
+      상태로는 못 잡는다. 음식을 안 고쳤으면 `EVALUATED` 그대로 들어온다.
+      Quantity·Quality 가 채워지면 그쪽 변화도 자동으로 잡힌다.
+
+    첫 확정은 `previous` 가 없어 True 다 — 지울 행도 없어 0 행 UPDATE 다.
+    """
+    if meal.status is not MealStatus.EVALUATED:
+        return True
+    if previous is None:
+        return True
+    return (
+        previous.quantity_score != scores.quantity
+        or previous.quality_score != scores.quality
+        or previous.satiety_score != scores.satiety
+    )
 
 
 def _is_confirmable(meal: Meal) -> bool:
@@ -236,6 +270,9 @@ def confirm(
     # 기준선이 미정이라 Quantity·Quality 는 None 이다 (`rule_engine` 독스트링).
     scores = evaluate(satiety_after_pct=request.satiety_after_pct)
 
+    # `upsert` 보다 **먼저** 읽는다 — 덮고 나면 비교할 옛 점수가 없다.
+    stale = _is_stale_feedback(meal, evaluation_crud.get_by_meal(db, meal.id), scores)
+
     evaluation_crud.upsert(
         db,
         meal_id=meal.id,
@@ -244,6 +281,10 @@ def confirm(
         quality_score=scores.quality,
         satiety_score=scores.satiety,
     )
+    if stale:
+        # 행이 아니라 내용만 비운다 — `daily_feedback_sources` 가 CASCADE 라 지우면
+        # 일일 피드백의 출처 링크가 사라진다. 자세한 근거는 `crud/feedback.py` 참고.
+        feedback_crud.invalidate_by_meal(db, meal.id)
     meal_crud.set_status(db, meal, MealStatus.EVALUATED)
     db.commit()
 

@@ -13,7 +13,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from app.models.enums import DrugName, MedicationStage
 from app.schemas.base import CamelModel, KstDatetime
@@ -38,7 +38,10 @@ class MedicationRegisterRequest(CamelModel):
     model_config = ConfigDict(extra="forbid")
 
     drug_name: DrugName
-    dose_mg: Decimal = Field(gt=0, le=Decimal("999.999"))
+    dose_mg: Decimal = Field(gt=0, le=Decimal("999.999"), decimal_places=3)
+    """컬럼이 `Numeric(6, 3)` 이라 자릿수를 안 막으면 저장하며 반올림된다 —
+    `0.2555` 를 보내면 응답은 `0.2555`, 다시 조회하면 `0.256` 이다
+    (`expire_on_commit` 이 꺼져 있어 응답은 반올림 전 값을 읽는다)."""
     started_at: date | None = Field(
         default=None,
         description=(
@@ -90,6 +93,88 @@ class DoseEventsResponse(CamelModel):
     """
 
     events: list[DoseEvent]
+
+
+class MedicationCorrectRequest(CamelModel):
+    """`PATCH /medications/{medicationId}` — **정정 전용.** 잘못 넣은 값을 고친다.
+
+    `POST` 와 나누는 이유가 여기 있다. 같은 날 들어온 `0.5` 가 "정말 용량을 내렸다"
+    인지 "`1.0` 을 잘못 쳐서 고친다" 인지 **요청만 봐서는 모른다.** 앞은 감량기
+    판정을 낳고 뒤는 낳으면 안 되는데 시간으로는 갈리지 않는다. 그래서 엔드포인트로
+    가른다 — `POST` 는 행을 **더하고**(INSERT), 여기는 있는 행을 **고친다**(UPDATE).
+
+    **전부 선택 항목이지만 하나는 보내야 한다.** 빈 몸통은 아무 뜻이 없는데 200 을
+    내리면 클라이언트가 뭔가 반영된 줄 안다.
+
+    `effectiveFrom` 은 **그 행의 구간 시작일**이다. `POST` 요청의 `startedAt`(전체 투약
+    시작일)과 다르고, 응답도 그 행의 값을 그대로 돌려주므로 이름이 어긋나지 않는다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    drug_name: DrugName | None = None
+    dose_mg: Decimal | None = Field(
+        default=None, gt=0, le=Decimal("999.999"), decimal_places=3
+    )
+    """컬럼이 `Numeric(6, 3)` 이라 자릿수를 안 막으면 저장하며 반올림된다 —
+    `0.2555` 를 보내면 응답은 `0.2555`, 다시 조회하면 `0.256` 이다 (`expire_on_commit`
+    이 꺼져 있어 응답은 반올림 전 값을 읽는다). 단계 판정도 반올림 전 값으로 돈다."""
+
+    injection_count: int | None = Field(default=None, ge=1)
+    effective_from: date | None = Field(
+        default=None, description="그 구간이 시작한 날."
+    )
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> "MedicationCorrectRequest":
+        if (
+            self.drug_name is None
+            and self.dose_mg is None
+            and self.injection_count is None
+            and self.effective_from is None
+        ):
+            raise ValueError("고칠 필드를 하나 이상 보내야 합니다.")
+        return self
+
+    @model_validator(mode="after")
+    def _drug_change_needs_dose(self) -> "MedicationCorrectRequest":
+        """**약을 바꾸면 용량도 같이 보내야 한다.**
+
+        약마다 승인 용량 사다리가 다르다 — 위고비는 0.25~2.4, 마운자로는 2.5~15 다.
+        약만 바꾸면 "마운자로 1.0mg" 처럼 **존재하지 않는 처방**이 저장되고,
+        `judge_stage` 가 사다리 첫 칸 이하로 보아 INITIAL 을 준다. `dose-events` 도
+        그 조합을 그대로 표시한다.
+
+        `POST` 도 둘을 항상 함께 받는다. 약을 바꾼다는 건 용량을 다시 정한다는 뜻이다.
+        """
+        if self.drug_name is not None and self.dose_mg is None:
+            raise ValueError(
+                "약물을 바꾸면 용량도 함께 보내야 합니다 — 약마다 승인 용량이 다릅니다."
+            )
+        return self
+
+
+class MedicationCorrectResponse(CamelModel):
+    """`PATCH /medications/{recordId}` 응답. 명세의 10필드다.
+
+    **`POST` 응답과 다르다.** 그쪽은 "지금 투약이 어떤 상태인가" 를 말하므로 전체
+    투약 시작일 · 회차 · 다음 투약일이 들어간다. 여기는 "그 기록이 어떻게 고쳐졌나"
+    라서 고친 행 자체(`recordId` · `effectiveFrom` · `effectiveTo`)를 돌려준다.
+
+    그래서 `doseChanged` · `doseEvent` 가 없다. 정정은 용량을 바꾼 사건이 아니라
+    이미 있던 기록을 고친 것이고, `dose-events` 에 새 점을 찍지 않는다.
+    """
+
+    record_id: uuid.UUID = Field(description="고친 `medication_records` 행 id.")
+    drug_name: DrugName
+    dose_mg: float
+    injection_count: int
+    effective_from: date = Field(description="그 구간이 시작한 날")
+    effective_to: date | None = Field(description="그 구간이 끝난 날. 현재 구간이면 null")
+    stage: MedicationStage
+    stage_reason: str
+    stage_changed: bool = Field(description="정정으로 단계 판정이 달라졌는가")
+    rule_version: str
 
 
 class MedicationRegisterResponse(CamelModel):
