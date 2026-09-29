@@ -35,7 +35,7 @@ class AiSettings(BaseSettings):
     AI_TIMEOUT_SEC: float = 45.0
 
     # ai-stub 의 X-Stub-Scenario 를 강제로 지정한다. 실패 경로를 부르는 손잡이다.
-    # SQS_ENDPOINT_URL 과 같은 성격 — 로컬에서만 채우고 프로덕션에서는 비운다.
+    # 로컬에서만 채우고 프로덕션에서는 비운다.
     # 비어 있으면 헤더 자체가 붙지 않으므로 실제 AI 에는 아무 영향이 없다.
     AI_STUB_SCENARIO: str = ""
 

@@ -12,11 +12,11 @@ pydantic-settings==2.15.0
 # 공공 영양DB 엑셀 적재 (scripts/load_food_refs.py)
 openpyxl==3.1.5
 
-# 큐 — SQS. 로컬은 ElasticMQ(SQS API 호환)를 같은 코드로 쓴다
-boto3==1.43.93
-
 # AI Service HTTP 클라이언트
 httpx==0.28.1
+
+# POST /meals 멀티파트(사진 업로드) 파싱
+python-multipart==0.0.20
 
 # 테스트
 pytest==9.1.1

@@ -65,27 +65,40 @@ crud 함수 안에는 `commit()` 이 없다. 한 작업이 여러 crud 를 묶�
         snapshot = crud_snapshot.add(db, user_id, stage=stage)
         db.flush()                      # snapshot.id 가 필요하다
         meal = crud_meal.create(db, medication_snapshot_id=snapshot.id, ...)
-        db.commit()                     # ← 큐에 넣기 전에 커밋한다
-        queue.send({"type": "meal.analyze", "mealId": str(meal.id)})
+        queue.enqueue(db, "meal.analyze", {"mealId": str(meal.id)})
+        db.commit()                     # ← 도메인 쓰기와 작업 등록이 한 번에
         return MealCreatedResponse(meal_id=meal.id, ...)
 
-순서가 중요하다. `queue.send()` 를 먼저 하면, 커밋이 실패했을 때 워커가 **DB 에 없는
-식사**를 처리하려다 3번 재시도 끝에 DLQ 로 보낸다.
+**큐가 DB 테이블이라 순서를 사람이 지킬 필요가 없다.** `enqueue()` 는 넘겨받은 세션에
+INSERT 만 하고 커밋하지 않으므로, 작업 등록이 도메인 쓰기와 같은 트랜잭션에 들어간다 —
+커밋이 실패하면 작업도 같이 사라지고, `meals` 는 들어갔는데 작업은 없는(또는 그 반대인)
+상태가 애초에 만들어지지 않는다. 별도 큐 미들웨어를 쓸 때 필요했던 "커밋을 먼저 하고
+그 다음에 큐에 넣는다" 규칙은 더 이상 없다.
 
 커밋을 `get_db` 에 맡기지 않는 이유도 같은 종류다. FastAPI 0.106+ 에서 yield 의존성의
 종료 코드는 응답을 클라이언트에 **이미 보낸 뒤** 실행되므로, 거기서 커밋하면 "201 을
 받았는데 저장은 안 된" 상태가 생긴다(`db/session.py` 참고). 대신 **`services/` 가
 커밋을 빠뜨리면 에러 없이 조용히 버려진다** — 쓰기 경로를 짤 때 이걸 먼저 확인한다.
 
-**Worker** — 요청 맥락이 없으니 세션을 직접 연다. 작업 하나가 트랜잭션 하나다.
+**Worker** — 세션을 직접 열지 않는다. 큐가 `SELECT … FOR UPDATE SKIP LOCKED` 로 작업
+행을 잠근 세션을 그대로 넘겨주고(`worker/dispatch.py` 의 `db`), 핸들러는 그 세션으로
+도메인을 쓴다. 작업 하나가 트랜잭션 하나다.
 
-    with SessionLocal() as db:
+    # worker/jobs/analyze_meal.py
+    def run(db, task, ai):
         crud_meal_item.delete_model_items(db, meal)
         for item in items:
             crud_meal_item.add(db, meal, ...)
         crud_meal.set_status(db, meal, MealStatus.REVIEW_REQUIRED)
-        db.commit()                     # ← 전부 끝나고 한 번
+        return {"items": len(items)}    # ← 커밋하지 않는다
 
-중간에 터지면 전부 롤백되고 식사는 `ANALYZING` 으로 남는다. 큐가 재배달하므로
-다시 시도된다 — 그래서 `analyze_meal` 은 상태를 먼저 보고 이미 처리된 건 건너뛴다.
+**핸들러도, 핸들러가 부르는 `services/` 함수도 커밋하면 안 된다.** 커밋은 큐가 작업을
+DONE 으로 옮기면서 한 번에 한다. 중간에 커밋해 버리면 AI 호출이 끝나기 한참 전에 행
+잠금이 풀려 다른 워커가 같은 작업을 집고, 이후 정말 실패해도 이미 커밋된 도메인 변경은
+롤백되지 않는다. 이 레포의 `services/` 는 관례상 자기가 커밋하므로(`services/meal.py`
+참고), 워커에서 그런 함수를 붙여야 하면 **커밋 없는 버전으로 쪼개서** 부른다.
+
+중간에 터지면 도메인 변경과 작업 완료가 함께 롤백되고 식사는 `ANALYZING` 으로 남는다.
+행은 PENDING 그대로라 다음 폴링에 다시 집힌다 — 그래서 `analyze_meal` 은 상태를 먼저
+보고 이미 처리된 건 건너뛴다.
 """

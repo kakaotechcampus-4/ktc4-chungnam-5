@@ -5,9 +5,11 @@
 API 컨테이너와 **별도 프로세스**로 돈다. API 는 큐에 넣고 202 를 돌려줄 뿐이고,
 꺼내서 처리하는 건 여기다 — AI 분석이 10~30초 걸리기 때문이다.
 
+큐는 PostgreSQL 테이블(`task_queue`)이다. 컨테이너를 따로 띄우지 않는다.
+
 이 파일은 기동만 한다. 실제 내용은 `app/worker/` 에 있다:
 
-    worker/loop.py       폴링 루프 + 삭제 시점
+    worker/loop.py       폴링 루프 + 커밋 시점
     worker/dispatch.py   작업 타입 → 핸들러
     worker/jobs/         작업 하나당 파일 하나
 """
