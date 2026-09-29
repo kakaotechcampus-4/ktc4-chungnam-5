@@ -109,7 +109,7 @@ def test_check_stale_prioritizes_deletion_over_everything(monkeypatch):
     monkeypatch.setattr(medication_crud, "has_stage_change_since", lambda *a, **k: True)
     monkeypatch.setattr(meal_crud, "has_new_meals_since", lambda *a, **k: True)
 
-    stale, reason = _check_stale(db=None, user_id=uuid.uuid4(), row=_feedback_row())
+    stale, reason = _check_stale(db=None, user_id=uuid.uuid4(), row=_feedback_row(), requested_to=date(2026, 9, 28))
 
     assert stale is True
     assert reason == StaleReason.MEAL_DELETED
@@ -121,7 +121,7 @@ def test_check_stale_falls_back_to_new_meals(monkeypatch):
     monkeypatch.setattr(medication_crud, "has_stage_change_since", lambda *a, **k: False)
     monkeypatch.setattr(meal_crud, "has_new_meals_since", lambda *a, **k: True)
 
-    stale, reason = _check_stale(db=None, user_id=uuid.uuid4(), row=_feedback_row())
+    stale, reason = _check_stale(db=None, user_id=uuid.uuid4(), row=_feedback_row(), requested_to=date(2026, 9, 28))
 
     assert stale is True
     assert reason == StaleReason.NEW_MEALS
@@ -133,10 +133,33 @@ def test_check_stale_false_when_nothing_changed(monkeypatch):
     monkeypatch.setattr(medication_crud, "has_stage_change_since", lambda *a, **k: False)
     monkeypatch.setattr(meal_crud, "has_new_meals_since", lambda *a, **k: False)
 
-    stale, reason = _check_stale(db=None, user_id=uuid.uuid4(), row=_feedback_row())
+    stale, reason = _check_stale(db=None, user_id=uuid.uuid4(), row=_feedback_row(), requested_to=date(2026, 9, 28))
 
     assert stale is False
     assert reason is None
+
+
+def test_check_stale_extends_range_to_requested_to_not_row_period_end(monkeypatch):
+    """행의 period_end(9/21)가 아니라 요청 기준 종료일(9/28)까지 봐야 한다.
+
+    안 그러면 행 생성 다음 날부터 쌓인 식사를 영영 못 잡는다 (PR #46 리뷰).
+    """
+    captured = {}
+    monkeypatch.setattr(meal_crud, "has_deleted_meals_since", lambda *a, **k: False)
+    monkeypatch.setattr(meal_crud, "has_edited_items_since", lambda *a, **k: False)
+    monkeypatch.setattr(medication_crud, "has_stage_change_since", lambda *a, **k: False)
+
+    def fake_has_new_meals_since(db, *, user_id, since, range_start, range_end):
+        captured["range_end"] = range_end
+        return False
+
+    monkeypatch.setattr(meal_crud, "has_new_meals_since", fake_has_new_meals_since)
+
+    _check_stale(
+        db=None, user_id=uuid.uuid4(), row=_feedback_row(), requested_to=date(2026, 9, 28)
+    )
+
+    assert captured["range_end"] == datetime(2026, 9, 29, tzinfo=_KST)
 
 
 def test_get_long_term_insight_pending_when_no_row(monkeypatch):

@@ -76,7 +76,7 @@ def _determine_status(row: LongTermFeedback | None, latest_task: Task | None) ->
 
 
 def _check_stale(
-    db: Session, *, user_id: uuid.UUID, row: LongTermFeedback
+    db: Session, *, user_id: uuid.UUID, row: LongTermFeedback, requested_to: date
 ) -> tuple[bool, StaleReason | None]:
     """마지막 생성 시점(row.updated_at) 이후 그 기간 안에서 뭐가 바뀌었는지 확인한다.
 
@@ -84,12 +84,17 @@ def _check_stale(
     `updated_at` 이 갱신되므로, 옛 `created_at` 을 계속 기준으로 두면 이미 반영된
     변화까지 매번 낡음으로 잘못 판단한다.
 
+    검사 범위의 끝은 행의 `period_end` 가 아니라 **요청 기준 종료일**(`requested_to`,
+    보통 오늘)이다 — 7d/28d 는 날마다 창이 밀리는데 행의 period_end 는 그 행이
+    생성됐을 때 값으로 고정돼 있어서, 그것만 보면 생성 다음 날부터 새로 쌓인
+    변화를 영영 못 잡는다(PR #46 리뷰).
+
     우선순위(삭제 > 항목 수정 > 단계 변경 > 새 식사)는 응답에 미치는 영향이 큰
     순서다 — 삭제는 이미 반영된 데이터 자체가 사라진 것이라 가장 치명적이고,
     새 식사 추가는 "더 볼 게 생겼다" 정도라 가장 가볍다. 여러 개 겹쳐도
     staleReason 은 하나만 보여줄 수 있어 이 순서로 고른다.
     """
-    range_start, range_end = _to_kst_range(row.period_start, row.period_end)
+    range_start, range_end = _to_kst_range(row.period_start, requested_to)
 
     if meal_crud.has_deleted_meals_since(
         db, user_id=user_id, since=row.updated_at, range_start=range_start, range_end=range_end
@@ -106,7 +111,7 @@ def _check_stale(
         user_id=user_id,
         since=row.updated_at,
         date_from=row.period_start,
-        date_to=row.period_end,
+        date_to=requested_to,
     ):
         return True, StaleReason.STAGE_CHANGED
 
@@ -143,7 +148,7 @@ def get_long_term_insight(
     # SAFE 만 노출한다 — REVIEW_REQUIRED(가드레일 전)도 BLOCKED 와 똑같이 숨긴다
     # (services/meal.py::_build_feedback 와 같은 규칙, PR #36 리뷰로 확정됨).
     is_safe = row.safety_status is SafetyStatus.SAFE
-    stale, stale_reason = _check_stale(db, user_id=user_id, row=row)
+    stale, stale_reason = _check_stale(db, user_id=user_id, row=row, requested_to=date_to)
 
     return LongTermInsightResponse(
         period=InsightPeriod(from_=row.period_start, to=row.period_end),

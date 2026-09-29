@@ -483,13 +483,19 @@ def has_new_meals_since(
 def has_deleted_meals_since(
     db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
 ) -> bool:
-    """[range_start, range_end) 안의 식사 중 since 이후에 soft delete 된 것이 있는지."""
+    """[range_start, range_end) 안의 식사 중 since 이후에 soft delete 된 것이 있는지.
+
+    `Meal.created_at <= since` 를 같이 본다 — since 이후에 만들어졌다가 since
+    이후에 지워진 식사는 애초에 분석에 들어간 적이 없어서, 지워져도 "이미
+    반영된 데이터가 사라졌다"가 아니다(PR #46 리뷰).
+    """
     stmt = (
         select(Meal.id)
         .where(
             Meal.user_id == user_id,
             Meal.deleted_at.is_not(None),
             Meal.deleted_at > since,
+            Meal.created_at <= since,
             Meal.eaten_at >= range_start,
             Meal.eaten_at < range_end,
         )
