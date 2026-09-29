@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
+import '../api/api_exception.dart';
+import '../api/dummy_store.dart';
 import '../common/api_format.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -34,7 +38,8 @@ class MedicationCurrent {
   final DateTime nextDoseDate;
   final int daysUntilNextDose;
 
-  /// `INITIAL` · `TITRATION` · `MAINTENANCE`.
+  /// `INITIAL` · `TITRATION` · `MAINTENANCE` · `REDUCED`. 투약 기록이 있을 때만
+  /// 이 응답이 오므로 `PRE_DOSE` 는 여기 안 온다(미등록은 409 `STAGE_NOT_SET`).
   final String stage;
 
   /// `약효가 줄고 식욕이 돌아오는 구간` 같은 한 줄 설명.
@@ -54,48 +59,96 @@ class MedicationCurrent {
       );
 }
 
-/// `2026-06-14` 형식. 요청 body 에 쓴다.
-String formatApiDate(DateTime d) =>
-    '${d.year}-${d.month.toString().padLeft(2, '0')}-'
-    '${d.day.toString().padLeft(2, '0')}';
-
 // ── API ─────────────────────────────────────────────────────
 
-/// 투약 화면이 쓰는 엔드포인트.
-///
-/// 지금은 명세 예시를 그대로 돌려준다. 통신 라이브러리가 정해지면
-/// 메서드 본문만 교체하면 되고 화면은 건드리지 않는다.
+/// 투약 화면이 쓰는 엔드포인트. `ApiConfig.useRealApi` 가 false 면 더미를 돌려준다.
 class MedicationApiService {
+  MedicationApiService(this._client);
+
+  final ApiClient _client;
+
   /// `GET /medications/current`
   ///
-  /// 미등록이면 `error.code = STAGE_NOT_SET` 이 온다. 이건 실패가 아니라
+  /// 미등록이면 409 `STAGE_NOT_SET` 이 온다. 이건 실패가 아니라
   /// "아직 입력 안 함" 이므로 null 로 바꿔 돌려주고 화면은 빈 폼을 보여 준다.
   Future<MedicationCurrent?> fetchCurrent() async {
-    // TODO(http|dio 결정 후): 실제 GET 요청으로 교체.
-    //   error.code == 'STAGE_NOT_SET' 이면 null 을 반환하고,
-    //   그 밖의 에러만 throw 한다.
-    await Future.delayed(const Duration(milliseconds: 250));
-    return MedicationCurrent.fromJson(_sample);
+    if (!ApiConfig.useRealApi) {
+      await Future.delayed(const Duration(milliseconds: 250));
+      // 회원가입을 거친 더미 사용자는 저장한 값(없으면 미등록), 아니면 예시.
+      final (stored, medication) = await DummyStore.readMedication();
+      if (!stored) return MedicationCurrent.fromJson(_sample);
+      return medication == null ? null : MedicationCurrent.fromJson(medication);
+    }
+    try {
+      final result = await _client.get('/medications/current');
+      return MedicationCurrent.fromJson(result.dataMap);
+    } on ApiException catch (e) {
+      if (e.code == 'STAGE_NOT_SET') return null;
+      rethrow;
+    }
   }
 
-  /// `POST /medications` — 등록·수정 겸용.
+  /// `POST /medications` — **등록 전용**이다.
   ///
-  /// `doseMg` 가 현재 값과 다르면 서버가 `dose_events` 를 자동 기록한다.
-  /// 그래서 미리보기 용도로는 절대 부르면 안 된다.
+  /// - `doseMg` 가 현재 값과 다르면 서버가 용량 변경 1건을 기록한다. 그래서
+  ///   미리보기 용도로는 절대 부르면 안 된다.
+  /// - [startedAt] 은 첫 등록에만 보낸다. null 이면 서버가 기존 시작일을
+  ///   그대로 둔다. 등록 후 다른 값을 보내면 409 `CONFLICT` 다.
+  /// - 오늘 등록·변경한 용량을 오늘 또 바꿔도 409 `CONFLICT` 다.
+  ///   정정은 `PATCH /medications/{recordId}`(BE 미머지, FE-14).
   Future<MedicationCurrent> save({
     required String drugName,
     required double doseMg,
-    required DateTime startedAt,
+    DateTime? startedAt,
   }) async {
-    // TODO(http|dio 결정 후): 실제 POST 요청으로 교체.
-    //   body: { drugName, doseMg, startedAt: "YYYY-MM-DD" }
-    await Future.delayed(const Duration(milliseconds: 300));
-    return MedicationCurrent.fromJson({
+    if (!ApiConfig.useRealApi) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      final saved = await _dummySave(drugName, doseMg, startedAt);
+      return MedicationCurrent.fromJson(saved);
+    }
+    final result = await _client.post(
+      '/medications',
+      body: {
+        'drugName': drugName,
+        'doseMg': doseMg,
+        if (startedAt != null) 'startedAt': formatApiDate(startedAt),
+      },
+    );
+    return MedicationCurrent.fromJson(result.dataMap);
+  }
+
+  /// 더미 저장. 서버 공식(명세 `POST /medications`)대로 회차·다음 투약일을
+  /// 계산해 [DummyStore] 에 남긴다. 단계 판정 규칙은 흉내 내지 않는다.
+  static Future<Map<String, dynamic>> _dummySave(
+    String drugName,
+    double doseMg,
+    DateTime? startedAt,
+  ) async {
+    final (_, previous) = await DummyStore.readMedication();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start =
+        startedAt ??
+        (previous == null
+            ? today
+            : DateTime.parse(previous['startedAt'] as String));
+    final doseCount = today.difference(start).inDays ~/ 7 + 1;
+    final nextDoseDate = start.add(Duration(days: 7 * doseCount));
+    final saved = {
       ..._sample,
       'drugName': drugName,
       'doseMg': doseMg,
-      'startedAt': formatApiDate(startedAt),
-    });
+      'startedAt': formatApiDate(start),
+      'doseCount': doseCount,
+      'nextDoseDate': formatApiDate(nextDoseDate),
+      'daysUntilNextDose': nextDoseDate.difference(today).inDays,
+      'stage': previous == null ? 'INITIAL' : previous['stage'],
+      'stageReason': previous == null
+          ? '처음 용량에 몸이 적응하는 구간'
+          : previous['stageReason'],
+    };
+    await DummyStore.writeMedication(saved);
+    return saved;
   }
 
   /// 명세의 `POST /medications` 예시 응답(`data` 안쪽).
@@ -135,7 +188,9 @@ class MedicationInfoScreen extends StatefulWidget {
 }
 
 class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
-  final MedicationApiService _api = MedicationApiService();
+  late final MedicationApiService _api = MedicationApiService(
+    context.read<ApiClient>(),
+  );
 
   /// 약별 1회 용량 스텝(mg, 주 1회). 약을 바꾸면 값도 개수도 달라진다.
   /// Figma 에는 위고비 5칸만 그려져 있어 마운자로는 가로 스크롤로 받는다.
@@ -162,10 +217,16 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
 
   String _drug = '위고비';
   double _dose = 1.0;
-  DateTime _startedAt = DateTime(2026, 6, 14);
+  /// 처음 입력하는 사람은 오늘(1회차)부터. 등록돼 있으면 서버 값으로 바뀐다.
+  DateTime _startedAt = _dateOnly(DateTime.now());
 
-  /// 서버가 판정한 현재 투약. 단계 블록을 채우는 데만 쓴다.
+  /// 서버가 판정한 현재 투약. 단계 블록을 채우고, 있으면 등록 후 모드다.
   MedicationCurrent? _current;
+
+  /// 이미 등록했는지. 등록 후에는 시작일·회차를 잠근다 — `POST` 는 등록
+  /// 전용이라 둘을 바꾸면 409 이고, 고치는 건 정정(`PATCH`, FE-14)이다.
+  /// 약·용량은 "오늘부터 이 용량으로 바꿈"이라 그대로 열어 둔다.
+  bool get _registered => _current != null;
 
   /// 사용자가 폼을 건드렸는지. 늦게 도착한 프리필이 입력을 덮지 않게 한다.
   bool _touchedByUser = false;
@@ -185,11 +246,12 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       if (!mounted || current == null) return;
       setState(() {
         _current = current;
-        // 사용자가 이미 손댔으면 입력값은 건드리지 않는다.
+        // 시작일은 잠기므로 사용자가 먼저 손댔어도 서버 값으로 맞춘다.
+        _startedAt = current.startedAt;
+        // 약·용량은 사용자가 이미 손댔으면 건드리지 않는다.
         if (!_touchedByUser) {
           _drug = current.drugName;
           _dose = current.doseMg;
-          _startedAt = current.startedAt;
         }
       });
     } catch (_) {
@@ -254,14 +316,22 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       final saved = await _api.save(
         drugName: _drug,
         doseMg: _dose,
-        startedAt: _startedAt,
+        startedAt: _registered ? null : _startedAt,
       );
       if (!mounted) return;
       setState(() => _current = saved);
-      // 저장 완료 → 홈으로 돌아간다. 이 화면은 홈 투약 카드에서만 열리고,
-      // 홈이 돌아온 뒤 투약 정보를 다시 불러온다.
-      // TODO: 온보딩(2/2 프로필 입력)이 생기면 그 흐름에서는 다음 단계로 보낸다.
+      // 저장 완료 → 연 곳으로 돌아간다. 홈 투약 카드에서 열었으면 홈이
+      // 투약 정보를 다시 불러오고, 온보딩(프로필 다음)에서 열었으면 RootShell 이
+      // 이어서 하루 팝업을 확인한다.
       Navigator.of(context).pop();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      // 시작일은 등록 후 보내지 않으므로 409 는 "오늘 이미 바꾼 용량"뿐이다.
+      setState(
+        () => _saveError = e.code == 'CONFLICT'
+            ? '오늘 저장한 용량은 내일부터 바꿀 수 있어요'
+            : '저장하지 못했어요: ${e.message}',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _saveError = '저장하지 못했어요: $e');
@@ -283,7 +353,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const _Header(step: 1, totalSteps: 2),
+            const _Header(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(
@@ -371,7 +441,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                               const _SectionLabel('투약 시작일'),
                               const SizedBox(height: AppSpacing.md),
                               _FieldBox(
-                                onTap: _pickStartDate,
+                                onTap: _registered ? null : _pickStartDate,
                                 child: Row(
                                   children: [
                                     Expanded(
@@ -380,10 +450,12 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                                         style: AppTypography.cardTitle,
                                       ),
                                     ),
-                                    const Icon(
+                                    Icon(
                                       Icons.calendar_today_outlined,
                                       size: AppLayout.tabIconSize,
-                                      color: AppColors.textSecondary,
+                                      color: _registered
+                                          ? AppColors.inactive
+                                          : AppColors.textSecondary,
                                     ),
                                   ],
                                 ),
@@ -403,7 +475,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                                   children: [
                                     _StepperButton(
                                       icon: Icons.remove,
-                                      onTap: _doseCount > 1
+                                      onTap: !_registered && _doseCount > 1
                                           ? () => _changeDoseCount(-1)
                                           : null,
                                     ),
@@ -416,7 +488,9 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                                     ),
                                     _StepperButton(
                                       icon: Icons.add,
-                                      onTap: () => _changeDoseCount(1),
+                                      onTap: _registered
+                                          ? null
+                                          : () => _changeDoseCount(1),
                                     ),
                                   ],
                                 ),
@@ -426,6 +500,14 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                         ),
                       ],
                     ),
+                    if (_registered) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        '시작일과 회차는 등록 후에는 바꿀 수 없어요. '
+                        '잘못 입력했다면 정정 기능을 준비하고 있어요.',
+                        style: AppTypography.caption,
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.xl),
 
                     _StageResultBlock(current: _current),
@@ -464,41 +546,22 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
   }
 }
 
-/// 뒤로가기 + `1 / 2` + 진행바.
+/// 뒤로가기.
+///
+/// Figma 의 `1 / 2` 진행 표시는 뺐다. 이 화면은 온보딩(회원가입 다음)과 홈
+/// 투약 카드 두 곳에서 열려서, 단계 표시가 홈에서 열 때는 틀린 말이 된다.
 class _Header extends StatelessWidget {
-  const _Header({required this.step, required this.totalSteps});
-
-  final int step;
-  final int totalSteps;
+  const _Header();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            IconButton(
-              onPressed: () => Navigator.maybePop(context),
-              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-              color: AppColors.textPrimary,
-            ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.only(
-                right: AppSpacing.screenHorizontal,
-              ),
-              child: Text('$step / $totalSteps', style: AppTypography.caption),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        LinearProgressIndicator(
-          value: step / totalSteps,
-          minHeight: 4,
-          backgroundColor: AppColors.surfaceMuted,
-          color: AppColors.primary,
-        ),
-      ],
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: IconButton(
+        onPressed: () => Navigator.maybePop(context),
+        icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+        color: AppColors.textPrimary,
+      ),
     );
   }
 }

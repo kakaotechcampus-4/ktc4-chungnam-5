@@ -8,10 +8,15 @@ library;
 // ── 표시 문구 ────────────────────────────────────────────────
 // 열거형 → 한글 변환.
 
+/// 단계 이름은 BE `MedicationStage`(`backend/app/models/enums.py`)를 따른다.
+/// `TITRATION` 은 증량이 아니라 **조정기**다 — 중간 용량에서 아직 정착 전이라는
+/// 뜻이고 방향을 담지 않는다.
 String stageLabel(String stage) => switch (stage) {
+  'PRE_DOSE' => '투약 전',
   'INITIAL' => '도입기',
-  'TITRATION' => '증량기',
+  'TITRATION' => '조정기',
   'MAINTENANCE' => '유지기',
+  'REDUCED' => '감량기',
   _ => stage,
 };
 
@@ -34,3 +39,12 @@ DateTime parseApiDate(String value) => DateTime.parse(value);
 /// `toLocal()` 은 기기 설정에 휘둘려서 쓰지 않는다.
 DateTime parseApiDateTime(String value) =>
     DateTime.parse(value).toUtc().add(const Duration(hours: 9));
+
+/// 요청에 쓰는 날짜(`2026-08-21`).
+String formatApiDate(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-'
+    '${d.day.toString().padLeft(2, '0')}';
+
+/// 요청에 쓰는 월(`2026-08`).
+String formatApiMonth(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}';
