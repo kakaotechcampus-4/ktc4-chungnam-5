@@ -137,9 +137,11 @@ class MealCard extends StatelessWidget {
   /// `토스트, 그릭요거트`.
   final String foodNames;
 
-  final String quantityLabel;
-  final int quality;
-  final int satiety;
+  /// 셋 중 하나라도 null 이면 평가 전이다 — Q·Q·S 대신 `평가 전` 배지 하나를
+  /// 보인다. 점수 자리에 0 을 채우면 "0점짜리 식사"로 읽힌다.
+  final String? quantityLabel;
+  final int? quality;
+  final int? satiety;
 
   final VoidCallback? onTap;
   final bool showChevron;
@@ -181,11 +183,18 @@ class MealCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    QqsBadgeRow(
-                      quantityLabel: quantityLabel,
-                      quality: quality,
-                      satiety: satiety,
-                    ),
+                    if ((quantityLabel, quality, satiety) case (
+                      final q?,
+                      final ql?,
+                      final s?,
+                    ))
+                      QqsBadgeRow(quantityLabel: q, quality: ql, satiety: s)
+                    else
+                      const _Badge(
+                        text: '평가 전',
+                        background: AppColors.surfaceMuted,
+                        foreground: AppColors.textSecondary,
+                      ),
                   ],
                 ),
               ),
