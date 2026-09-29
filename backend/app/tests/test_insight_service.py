@@ -237,6 +237,7 @@ def test_refresh_enqueues_feedback_long_task_and_commits(monkeypatch):
     """payload 키(userId/periodType/periodStart/periodEnd)는 worker/jobs/feedback_long.py
     가 이미 읽기로 정해둔 이름과 맞아야 한다."""
     captured = {}
+    monkeypatch.setattr(insight_crud, "get_latest_refresh_task", lambda *a, **k: None)
     monkeypatch.setattr(
         insight_service,
         "enqueue",
@@ -262,6 +263,7 @@ def test_refresh_enqueues_feedback_long_task_and_commits(monkeypatch):
 
 def test_refresh_maps_28d_to_monthly(monkeypatch):
     captured = {}
+    monkeypatch.setattr(insight_crud, "get_latest_refresh_task", lambda *a, **k: None)
     monkeypatch.setattr(
         insight_service,
         "enqueue",
@@ -280,6 +282,7 @@ def test_refresh_maps_all_to_sentinel_period_start(monkeypatch):
     """period=all 은 하한이 없지만, period_start 는 DB 에서 NOT NULL + UNIQUE 키라
     null 을 그대로 못 넣는다 — ALL_PERIOD_START 고정값으로 채워야 한다 (PR #46 리뷰)."""
     captured = {}
+    monkeypatch.setattr(insight_crud, "get_latest_refresh_task", lambda *a, **k: None)
     monkeypatch.setattr(
         insight_service,
         "enqueue",
@@ -293,3 +296,44 @@ def test_refresh_maps_all_to_sentinel_period_start(monkeypatch):
     assert captured["payload"]["periodType"] == "ALL"
     assert captured["payload"]["periodStart"] == "1970-01-01"
     assert captured["payload"]["periodEnd"] == "2026-09-23"
+
+
+def test_refresh_skips_enqueue_when_already_pending(monkeypatch):
+    """이미 대기 중인 feedback.long 작업이 있으면 새로 넣지 않는다 (PR #46 리뷰).
+
+    안 그러면 새로고침 연타마다 큐에 쌓여 AI 를 중복 호출하고, 여러 워커가 같은
+    행을 동시에 upsert 하면서 근거 링크가 꼬일 수 있다.
+    """
+    monkeypatch.setattr(
+        insight_crud, "get_latest_refresh_task", lambda *a, **k: _task(TaskStatus.PENDING)
+    )
+    enqueue_calls = []
+    monkeypatch.setattr(
+        insight_service, "enqueue", lambda db, task_type, payload: enqueue_calls.append(payload)
+    )
+    fake_db = MagicMock()
+
+    result = refresh_long_term_insight(
+        fake_db, user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 23)
+    )
+
+    assert enqueue_calls == []
+    fake_db.commit.assert_not_called()
+    assert result.status == FeedbackStatus.GENERATING
+
+
+def test_refresh_enqueues_when_latest_task_already_done(monkeypatch):
+    """마지막 작업이 끝났으면(PENDING 이 아니면) 새로고침 요청을 새로 넣어야 한다."""
+    monkeypatch.setattr(
+        insight_crud, "get_latest_refresh_task", lambda *a, **k: _task(TaskStatus.DONE)
+    )
+    enqueue_calls = []
+    monkeypatch.setattr(
+        insight_service, "enqueue", lambda db, task_type, payload: enqueue_calls.append(payload)
+    )
+
+    refresh_long_term_insight(
+        MagicMock(), user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 23)
+    )
+
+    assert len(enqueue_calls) == 1

@@ -174,9 +174,20 @@ def refresh_long_term_insight(
 
     payload 키(userId/periodType/periodStart/periodEnd)는
     `worker/jobs/feedback_long.py` 가 이미 정해둔 이름 그대로 맞춘다.
+
+    **이미 대기 중인 작업이 있으면 새로 넣지 않는다.** 안 그러면 사용자가 새로고침을
+    연타할 때마다 큐에 쌓여서 (1) AI 를 여러 번 불러 비용이 늘고, (2) 워커 여러 대가
+    같은 `(user_id, period_type, period_start)` 행을 동시에 upsert 하면서 근거
+    링크(`long_term_feedback_sources`)가 꼬일 수 있고, (3) `_determine_status`가
+    가장 최근 작업만 보므로 먼저 끝난 작업의 결과를 뒤늦은 작업이 GENERATING 으로
+    계속 가려서 사용자가 이미 나온 결과를 늦게 보게 된다(PR #46 리뷰).
     """
     period_type = _PERIOD_TYPES[period]
     date_from, date_to = _resolve_period(period, today)
+
+    latest_task = insight_crud.get_latest_refresh_task(db, user_id=user_id, period_type=period_type)
+    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+        return InsightRefreshResponse(status=FeedbackStatus.GENERATING)
 
     enqueue(
         db,
