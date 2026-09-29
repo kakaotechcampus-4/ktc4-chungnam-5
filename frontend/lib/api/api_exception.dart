@@ -15,6 +15,10 @@ class ApiException implements Exception {
   /// 응답이 `{ success, data, error }` 래퍼 모양이 아니다.
   static const unexpectedResponse = 'UNEXPECTED_RESPONSE';
 
+  /// 기기에 저장된 `userId` 가 서버에 없다(DB 초기화 등). [ApiClient] 가
+  /// 받으면 세션을 지워 프로필 입력부터 다시 시작한다.
+  static const userNotFound = 'USER_NOT_FOUND';
+
   final String code;
   final String message;
   final int? statusCode;
