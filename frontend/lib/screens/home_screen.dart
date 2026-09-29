@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
 import '../common/api_format.dart';
 import '../popups/satiety_checkin_popup.dart';
 import '../theme/app_colors.dart';
@@ -60,7 +62,23 @@ class HomeMedication {
   final String stage;
   final DateTime nextDoseDate;
   final int daysUntilNextDose;
-  final bool doseChangeScheduled;
+
+  /// `/home` 에만 있는 값. `GET /medications/current` 로 채우면 null 이고,
+  /// 카드는 그 줄을 숨긴다.
+  final bool? doseChangeScheduled;
+
+  /// `GET /medications/current` 응답으로 만든다. `/home` 이 BE 에 없는
+  /// 동안(FE-14) 홈 투약 카드는 이걸로 채운다.
+  factory HomeMedication.fromCurrent(MedicationCurrent current) =>
+      HomeMedication(
+        drugName: current.drugName,
+        doseMg: current.doseMg,
+        doseCount: current.doseCount,
+        stage: current.stage,
+        nextDoseDate: current.nextDoseDate,
+        daysUntilNextDose: current.daysUntilNextDose,
+        doseChangeScheduled: null,
+      );
 
   factory HomeMedication.fromJson(Map<String, dynamic> json) => HomeMedication(
     drugName: json['drugName'] as String,
@@ -69,7 +87,7 @@ class HomeMedication {
     stage: json['stage'] as String,
     nextDoseDate: parseApiDate(json['nextDoseDate'] as String),
     daysUntilNextDose: json['daysUntilNextDose'] as int,
-    doseChangeScheduled: json['doseChangeScheduled'] as bool,
+    doseChangeScheduled: json['doseChangeScheduled'] as bool?,
   );
 }
 
@@ -140,11 +158,22 @@ class HomeSummary {
   });
 
   final DateTime date;
-  final HomeMedication medication;
+
+  /// 투약 미등록이면 null — 카드 대신 입력 안내를 보인다.
+  final HomeMedication? medication;
   final HomeStomach stomach;
   final int recordedCount;
   final List<HomeMeal> meals;
   final List<String> missingMealTypes;
+
+  HomeSummary withMedication(HomeMedication? medication) => HomeSummary(
+    date: date,
+    medication: medication,
+    stomach: stomach,
+    recordedCount: recordedCount,
+    meals: meals,
+    missingMealTypes: missingMealTypes,
+  );
 
   factory HomeSummary.fromJson(Map<String, dynamic> json) {
     final today = json['today'] as Map<String, dynamic>;
@@ -198,8 +227,8 @@ String _formatDose(double mg) => '${mg}mg';
 class HomeApiService {
   /// `GET /home`
   Future<HomeSummary> fetchHome() async {
-    // TODO(http|dio 결정 후): 실제 GET 요청으로 교체.
-    //   응답 래퍼 { success, data, error } 를 벗기고 data 를 넘긴다.
+    // TODO(FE-14): `GET /home` 은 BE 미구현(명세 🕓)이라 실제 모드에서도 더미다.
+    //   생기면 ApiClient 로 부르고, 투약 카드도 그 `medication` 으로 되돌린다.
     //   error.code 분기: PROFILE_REQUIRED -> 프로필 입력,
     //                    STAGE_NOT_SET   -> 투약 정보 입력.
     //   둘 다 실패가 아니라 이동이라 재시도 블록을 띄우지 않는다.
@@ -267,6 +296,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final HomeApiService _api = HomeApiService();
 
+  /// 투약 카드는 `/home` 대신 이미 구현된 `GET /medications/current` 로
+  /// 채운다. 그래야 온보딩·투약 화면에서 저장한 값이 홈에 보인다.
+  /// TODO(FE-14): `GET /home` 이 BE 에 생기면 그 `medication` 으로 되돌린다.
+  late final MedicationApiService _medicationApi = MedicationApiService(
+    context.read<ApiClient>(),
+  );
+
   HomeSummary? _home;
   LoadState _state = LoadState.loading;
   String? _errorMessage;
@@ -283,10 +319,18 @@ class _HomeScreenState extends State<HomeScreen> {
       _errorMessage = null;
     });
     try {
-      final result = await _api.fetchHome();
+      // Future.wait 은 먼저 난 에러 하나를 그대로 던진다(재시도 블록 문구용).
+      final results = await Future.wait<Object?>([
+        _api.fetchHome(),
+        _medicationApi.fetchCurrent(),
+      ]);
+      final home = results[0] as HomeSummary;
+      final medication = results[1] as MedicationCurrent?;
       if (!mounted) return;
       setState(() {
-        _home = result;
+        _home = home.withMedication(
+          medication == null ? null : HomeMedication.fromCurrent(medication),
+        );
         _state = LoadState.ready;
       });
     } catch (e) {
@@ -396,11 +440,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ? null
         : mealTypeLabel(home.missingMealTypes.first);
 
+    final medication = home.medication;
     return [
-      _MedicationStatusCard(
-        medication: home.medication,
-        onTap: _openMedicationInfo,
-      ),
+      if (medication == null)
+        AddMealCard(label: '＋ 투약 정보 입력하기', onTap: _openMedicationInfo)
+      else
+        _MedicationStatusCard(
+          medication: medication,
+          onTap: _openMedicationInfo,
+        ),
       const SizedBox(height: AppSpacing.xl),
 
       // 위 게이지 영역 탭 → 사후 포만감 체크인 팝업. 기준 끼니가 없으면 막는다.
@@ -561,13 +609,13 @@ class _MedicationStatusCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      medication.doseChangeScheduled
-                          ? '증량 예정 있음'
-                          : '증량 예정 없음',
-                      style: AppTypography.caption,
-                    ),
+                    if (medication.doseChangeScheduled case final scheduled?) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        scheduled ? '증량 예정 있음' : '증량 예정 없음',
+                        style: AppTypography.caption,
+                      ),
+                    ],
                   ],
                 ),
               ],
