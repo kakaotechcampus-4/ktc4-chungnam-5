@@ -12,6 +12,17 @@ def get_by_id(db: Session, food_ref_id: str) -> FoodRef | None:
     return db.execute(select(FoodRef).where(FoodRef.id == food_ref_id)).scalar_one_or_none()
 
 
+def existing_ids(db: Session, food_ref_ids: set[str]) -> set[str]:
+    """넘긴 id 중 `food_refs` 에 실재하는 것만 돌려준다.
+
+    AI 가 지목한 `candidateFoodRefId` 를 그대로 `meal_items.food_ref_id` 에 넣으면
+    없는 id 하나로 FK 가 깨져 커밋이 통째로 실패한다(`worker/jobs/analyze_meal.py`).
+    """
+    if not food_ref_ids:
+        return set()
+    return set(db.execute(select(FoodRef.id).where(FoodRef.id.in_(food_ref_ids))).scalars())
+
+
 def normalize_name(name: str) -> str:
     """이름 비교용 정규화 — 공백과 밑줄을 지운다.
 
