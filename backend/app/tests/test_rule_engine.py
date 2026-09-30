@@ -1,6 +1,6 @@
 """rule_engine 순수 함수. DB 를 쓰지 않는다 (절대 규칙 2).
 
-수치 근거는 docs/be-qqs-scoring-rule.md. 여기 밴드는 spec 1.4 표의 MAINTENANCE · REDUCED 다.
+수치 근거는 docs/be-qqs-scoring-rule.md. 여기 밴드는 spec 「단계별 수치」 표의 MAINTENANCE · REDUCED 다.
 """
 
 from decimal import Decimal as D
@@ -49,7 +49,7 @@ def test_outside_band_falls_linearly_by_tolerance() -> None:
 
 
 def test_strict_side_falls_faster() -> None:
-    """같은 '평소의 100%' 라도 초과 쪽이 엄격한 감량기가 더 크게 깎인다 (spec 1.2 예시)."""
+    """같은 '평소의 100%' 라도 초과 쪽이 엄격한 감량기가 더 크게 깎인다."""
     assert score_quantity(D("100"), REDUCED_BAND) == 33       # 10%p 초과 / T 15
     assert score_quantity(D("100"), MAINTENANCE_BAND) == 50
 

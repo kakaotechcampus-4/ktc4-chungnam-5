@@ -21,7 +21,7 @@ _ONE = Decimal("1")
 _HUNDRED = Decimal("100")
 
 MEALS_PER_DAY: Final = 3
-"""하루 기준량을 끼니 목표로 나누는 수. 하루 세 끼 가정이다 (spec 5.2)."""
+"""하루 기준량을 끼니 목표로 나누는 수. 하루 세 끼 가정이다."""
 
 
 class Scores(NamedTuple):
@@ -39,7 +39,7 @@ class QuantityBand(NamedTuple):
     """평소 대비 섭취 비율(%)의 적정 구간과 허용폭(%p).
 
     허용폭은 구간을 벗어난 뒤 몇 %p 를 더 벗어나야 0점이 되는지다. **작을수록 엄격하다.**
-    부족 쪽과 초과 쪽을 나눈 건 단계마다 위험한 방향이 달라서다 (spec 2장).
+    부족 쪽과 초과 쪽을 나눈 건 단계마다 위험한 방향이 달라서다.
     """
 
     lo: Decimal
@@ -147,7 +147,7 @@ def score_quality(
         subs.append(min(_ONE, fiber_g / targets.fiber_g))
     if sodium_mg is not None:
         over = max(_ZERO, sodium_mg - targets.sodium_mg)
-        # 한도의 2배에서 0 이다 (spec 5.3, 제품 결정).
+        # 한도의 2배에서 0 이다 (제품 결정).
         subs.append(max(_ZERO, _ONE - over / targets.sodium_mg))
     return _as_score(sum(subs, _ZERO) / len(subs))
 

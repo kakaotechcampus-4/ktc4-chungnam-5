@@ -193,7 +193,7 @@ def _usable(totals: NutrientTotals, key: str) -> Decimal | None:
     합산된 음식 중 그 성분 컬럼이 비어 있던 게 있으면(`missing`) None — 화면도 그
     합계를 안 내보낸다.
 
-    **빠진 음식(`excluded > 0`)이 있어도 있는 것만으로 쓴다** (spec 4.2, 2026-09-30 결정).
+    **빠진 음식(`excluded > 0`)이 있어도 있는 것만으로 쓴다** (2026-09-30 결정).
     그 경우 응답에 `NUTRITION_NOT_MATCHED` 경고가 이미 붙는다
     (`api/v1/endpoints/evaluations.py::_respond`). 감수하는 것: 빠진 만큼 낮게 나온다.
     """

@@ -251,7 +251,7 @@ def test_excluded_item_is_scored_on_the_rest_with_warning(
 ) -> None:
     """성분을 못 구한 음식은 빼고 매기되, 경고가 **같이** 나가야 한다 (Review Focus 1).
 
-    결정 A (spec 4.2): 점수가 늘 나오는 대신 빠진 만큼 낮게 나올 수 있다. 경고가
+    결정 A (spec 「값이 없을 때」): 점수가 늘 나오는 대신 빠진 만큼 낮게 나올 수 있다. 경고가
     사용자에게 그 사실을 알리는 유일한 장치라 여기서 함께 못 박는다.
     """
     user, meal = _meal_with(db, calories=Decimal("280"), **_BALANCED)

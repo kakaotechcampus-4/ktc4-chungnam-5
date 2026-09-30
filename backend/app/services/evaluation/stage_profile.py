@@ -2,9 +2,9 @@
 
 **둘은 역할이 다르다.**
 
-- `STAGE_PROFILES` — **점수를 바꾸는** 값. 단계마다 어느 방향이 위험한지(spec 2장 위험 표)를
-  보고 그 쪽 기준을 조였다. 수치와 근거는 `docs/be-qqs-scoring-rule.md` 1.4 표다.
-- `STAGE_EMPHASIS` — **화면에서 어느 게이지를 앞세울지**만 정한다. 채점에 쓰지 않는다 (spec 1.3).
+- `STAGE_PROFILES` — **점수를 바꾸는** 값. 단계마다 어느 방향이 위험한지를
+  보고 그 쪽 기준을 조였다. 수치와 근거는 `docs/be-qqs-scoring-rule.md` 「단계별 수치」 표다.
+- `STAGE_EMPHASIS` — **화면에서 어느 게이지를 앞세울지**만 정한다. 채점에 쓰지 않는다.
 
 **절대 규칙 3(D9):** `total_score` 도 축별 가중치도 없다. 단계별 차이는 곱셈이 아니라
 기준선의 엄격함으로 낸다. 이 표를 바꾸면 `services/evaluation` 의 `STAGE_RULE_VERSION` 을 올린다.
@@ -51,7 +51,7 @@ STAGE_PROFILES: Final[dict[MedicationStage, StageProfile]] = {
         _band("60", "85", "30", "30"),
         DailyTargets(_PROTEIN_ON_DRUG, _FIBER_G_PER_DAY, _SODIUM_MG_PER_DAY),
     ),
-    # 초과 쪽 엄격 — 용량을 내리면 식욕이 돌아온다 (간접 근거, spec 2.1).
+    # 초과 쪽 엄격 — 용량을 내리면 식욕이 돌아온다 (간접 근거, Seier 2025).
     MedicationStage.REDUCED: StageProfile(
         _band("65", "90", "30", "15"),
         DailyTargets(_PROTEIN_ON_DRUG, _FIBER_G_PER_DAY, _SODIUM_MG_PER_DAY),
