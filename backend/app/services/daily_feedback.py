@@ -14,9 +14,10 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError, ErrorCode
 from app.core.time import today_kst
+from app.crud import daily_feedback as daily_feedback_crud
 from app.crud import user as user_crud
 from app.infra.queue import enqueue
-from app.models.enums import FeedbackStatus
+from app.models.enums import FeedbackStatus, TaskStatus
 from app.schemas.insights import InsightRefreshResponse
 
 
@@ -32,7 +33,12 @@ def request_refresh(
     """그날(KST) 하루 피드백 재생성 작업(feedback.daily)을 등록하고 202 응답을 만든다.
 
     근거가 있는지는 여기서 따지지 않는다 — 없으면 워커가 행을 만들지 않고 끝난다 (D6(b)).
-    이미 대기 중인 작업이 있어도 새로 넣는다 (D7(a)). 워커가 upsert 라 행은 하나다.
+
+    **이 사용자·날짜의 최신 작업이 대기 중이면 새로 넣지 않는다** (장기 피드백 refresh 와
+    같은 판단, PR #46 리뷰). 안 그러면 새로고침을 연타할 때마다 큐에 쌓여서 (1) AI 를 여러
+    번 불러 비용이 늘고, (2) 워커 여러 대가 같은 `(user_id, feedback_date)` 행을 동시에
+    upsert 하면서 근거 링크(`daily_feedback_sources`)가 꼬일 수 있고, (3) 상태 판정이
+    가장 최근 작업만 보므로 뒤늦게 등록된 작업이 이미 나온 결과를 GENERATING 으로 가린다.
     """
     _ensure_user_exists(db, user_id)
 
@@ -43,8 +49,18 @@ def request_refresh(
             ErrorCode.VALIDATION_ERROR, "미래 날짜의 하루 피드백은 만들 수 없습니다.", 422
         )
 
+    latest_task = daily_feedback_crud.get_latest_refresh_task(
+        db, user_id=user_id, feedback_date=target_date
+    )
+    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+        return InsightRefreshResponse(status=FeedbackStatus.GENERATING)
+
     # payload 키는 워커(jobs/feedback_daily.py)가 읽는 이름과 같아야 한다.
-    enqueue(db, "feedback.daily", {"userId": str(user_id), "date": target_date.isoformat()})
+    enqueue(
+        db,
+        daily_feedback_crud.REFRESH_TASK_TYPE,
+        {"userId": str(user_id), "date": target_date.isoformat()},
+    )
 
     db.commit()
 

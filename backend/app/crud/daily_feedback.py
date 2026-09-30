@@ -34,7 +34,16 @@ def get_latest_refresh_task(
     payload 키 이름(userId/date)은 `worker/jobs/feedback_daily.py` 가 이미
     정해둔 것과 맞춘다 — 여기서 새로 정하면 워커가 못 읽는다.
     """
-    raise NotImplementedError("get_latest_refresh_task 미구현")
+    return db.execute(
+        select(Task)
+        .where(
+            Task.type == REFRESH_TASK_TYPE,
+            Task.payload["userId"].astext == str(user_id),
+            Task.payload["date"].astext == feedback_date.isoformat(),
+        )
+        .order_by(Task.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
 
 
 def list_day_evidence(
@@ -95,8 +104,9 @@ def upsert(
 ) -> uuid.UUID:
     """있으면 덮고 없으면 만든다. 행 id 를 돌려준다. flush 까지만.
 
-    재생성해도 id 는 그대로다. 대신 `created_at` 을 새로 찍는다 — 이 컬럼이
-    "마지막으로 생성된 시각"(generatedAt)이다 (D2(b)).
+    재생성해도 id 와 `created_at`(최초 INSERT 시각)은 그대로다. 대신 `updated_at` 을
+    새로 찍는다 — 이 컬럼이 "마지막으로 생성된 시각"(generatedAt)이다.
+    `ON CONFLICT DO UPDATE` 는 SQLAlchemy 의 `onupdate` 를 타지 않으므로 SET 에 직접 넣는다.
 
     `ON CONFLICT` 한 문장이다 — 같은 날 작업이 둘 겹쳐도 무결성 위반으로 죽지 않는다.
     """
@@ -113,7 +123,7 @@ def upsert(
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=[DailyFeedback.user_id, DailyFeedback.feedback_date],
-        set_={**values, "created_at": func.now()},
+        set_={**values, "updated_at": func.now()},
     ).returning(DailyFeedback.id)
     daily_feedback_id = db.execute(stmt).scalar_one()
     db.flush()
