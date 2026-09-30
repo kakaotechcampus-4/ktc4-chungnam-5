@@ -109,6 +109,34 @@ def get_owned_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Me
     return db.execute(stmt).scalar_one_or_none()
 
 
+def get_meal_for_worker(db: Session, meal_id: uuid.UUID) -> Meal | None:
+    """워커 전용 — 소유자도 삭제 여부도 보지 않고 행을 그대로 가져온다.
+
+    워커에는 "요청한 사용자" 가 없어 `get_owned_meal` 을 쓸 수 없다. 대신
+    **`deleted_at` 을 거르지 않으므로 호출부가 직접 확인해야 한다** — meals 는 soft
+    delete 라 지운 식사도 여기서 나온다. API 경로에서는 쓰지 말 것.
+    """
+    return db.execute(select(Meal).where(Meal.id == meal_id)).scalar_one_or_none()
+
+
+def lock_meal_for_worker(db: Session, meal_id: uuid.UUID) -> Meal | None:
+    """워커 전용 — 행을 `FOR UPDATE` 로 잠그고 **DB 의 최신 값으로** 다시 읽는다.
+
+    `get_meal_for_worker` 로 읽은 뒤 AI 를 부르는 동안(최대 45초) 사용자가 식사를
+    지울 수 있다. 쓰기 직전에 이걸로 다시 확인한다. `populate_existing` 이 없으면
+    identity map 의 옛 객체가 그대로 나와 그 사이의 변경을 못 본다.
+
+    처음부터 잠그지 않는 이유: AI 를 부르는 내내 사용자의 삭제 요청이 막힌다.
+    """
+    stmt = (
+        select(Meal)
+        .where(Meal.id == meal_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
 def soft_delete_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal | None:
     """user_id 소유의 meal_id 를 soft delete 한다.
 
@@ -273,6 +301,58 @@ def add_item(
     db.add(item)
     db.flush()
     return item
+
+
+def add_model_item(
+    db: Session,
+    *,
+    meal_id: uuid.UUID,
+    original_food_name: str,
+    amount: Decimal,
+    unit: str,
+    amount_g: Decimal | None,
+    confidence: Decimal,
+    food_ref_id: str | None,
+    raw_ai_result: dict,
+) -> MealItem:
+    """AI 가 인식한 음식 1건을 넣는다. add + flush 까지만 하고 커밋하지 않는다.
+
+    `add_item`(사용자 추가)과 반대로 양은 `estimated_*` 로 들어가고 `confirmed_*` 는
+    전부 NULL 이다 — 사용자가 확인하기 전이다. `display_name` 은 사용자가 고치기
+    전까지 AI 가 말한 이름 그대로다.
+    """
+    item = MealItem(
+        meal_id=meal_id,
+        food_ref_id=food_ref_id,
+        original_food_name=original_food_name,
+        display_name=original_food_name,
+        estimated_amount=amount,
+        estimated_unit=unit,
+        estimated_amount_g=amount_g,
+        confidence=confidence,
+        source=MealItemSource.MODEL,
+        raw_ai_result=raw_ai_result,
+    )
+    db.add(item)
+    db.flush()
+    return item
+
+
+def delete_model_items(db: Session, meal_id: uuid.UUID) -> None:
+    """이 식사의 AI 인식 항목(`source=MODEL`)을 지운다. 커밋하지 않는다.
+
+    **`source=USER` 는 남긴다** — 사용자가 직접 넣은 음식이다. 한 건씩 ORM 으로
+    지우는 이유는 `delete_item` 과 같다(`user_corrections` cascade). flush 까지 해서
+    뒤이은 INSERT 보다 DELETE 가 먼저 나가게 한다.
+    """
+    items = db.execute(
+        select(MealItem).where(
+            MealItem.meal_id == meal_id, MealItem.source == MealItemSource.MODEL
+        )
+    ).scalars()
+    for item in items:
+        db.delete(item)
+    db.flush()
 
 
 def mark_recalculating(db: Session, meal: Meal) -> None:
