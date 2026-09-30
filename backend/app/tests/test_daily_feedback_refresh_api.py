@@ -346,6 +346,29 @@ def test_latest_pending_blocks_even_with_older_done(client, db):
     assert _count_tasks(db) == 2
 
 
+def test_older_pending_does_not_block_when_latest_is_done(client, db):
+    """R17: 오래된 PENDING 이 남아 있어도 최신 작업이 DONE 이면 새로 넣는다.
+
+    R3 의 짝이다 — "PENDING 이 하나라도 있으면 막는다"로 구현하면 여기서 걸린다.
+    판정은 최신 작업 하나의 상태로 한다 (이슈: `latest.status == PENDING`).
+    """
+    user = make_user(db)
+    _put_task(
+        db, user_id=user.id, status=TaskStatus.PENDING,
+        created_at=datetime(2026, 8, 21, 9, 0, tzinfo=KST),
+    )
+    _put_task(
+        db, user_id=user.id, status=TaskStatus.DONE,
+        created_at=datetime(2026, 8, 21, 10, 0, tzinfo=KST),
+    )
+
+    response = client.post(URL, json={"date": D}, headers=_headers(user))
+
+    assert response.status_code == 202, response.text
+    assert response.json()["data"]["status"] == "GENERATING"
+    assert _count_tasks(db) == 3
+
+
 @pytest.mark.parametrize(
     "previous_status",
     [
