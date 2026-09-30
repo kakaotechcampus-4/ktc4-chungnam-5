@@ -6,12 +6,13 @@
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from app.crud import user as user_crud
+from app.crud import user_state as user_state_crud
 from app.models.enums import (
     FoodCategory,
     MealItemSource,
@@ -25,7 +26,7 @@ from app.models.feedback import MealFeedback
 from app.models.food import FoodRef
 from app.models.meal import Meal, MealItem
 from app.models.medication import MedicationSnapshot
-from app.models.user import User
+from app.models.user import User, UserState
 from app.services.meal import to_grams
 
 EATEN_AT = datetime(2026, 8, 22, 12, 30, tzinfo=UTC)
@@ -218,3 +219,16 @@ def make_meal_feedback(
     db.add(feedback)
     db.flush()
     return feedback
+
+
+def make_weight(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    weight_kg: Decimal = Decimal("70.00"),
+    recorded_at: datetime = EATEN_AT - timedelta(days=1),
+) -> UserState:
+    """체중 기록 1건. 기본값은 **식사 하루 전** — 먹을 때의 체중으로 읽히는 시각이다."""
+    return user_state_crud.create(
+        db, user_id=user_id, weight_kg=weight_kg, recorded_at=recorded_at
+    )

@@ -98,9 +98,7 @@ class NutrientTotals(NamedTuple):
     """
 
     kcal: Decimal | None = None
-    """지금은 읽는 곳이 없다. Quantity 채점(개인 baseline 대비 감소폭, 절대 규칙 4)
-    이 들어올 때 분자가 될 값이라 미리 구해 둔다 — 그때 쿼리를 다시 짜지 않으려는
-    것이다. 채점을 안 하기로 최종 확정되면 이 줄과 SELECT 항목을 같이 지운다."""
+    """Quantity 채점의 분자다 (평소 한 끼 대비 비율, 절대 규칙 4)."""
     protein_g: Decimal | None = None
     fiber_g: Decimal | None = None
     sodium_mg: Decimal | None = None
