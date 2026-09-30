@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'api/api_client.dart';
 import 'navigation/root_shell.dart';
+import 'popups/popup_gate.dart';
 import 'screens/profile_input_screen.dart';
 import 'state/app_state.dart';
 import 'state/tab_state.dart';
@@ -31,6 +32,8 @@ class MyApp extends StatelessWidget {
         Provider(create: (_) => ApiClient(session: session)),
         ChangeNotifierProvider(create: (_) => AppState()),
         ChangeNotifierProvider(create: (_) => TabState()),
+        // 팝업은 전부 이 하나를 거친다 — 여러 개면 "한 번에 하나" 잠금이 나뉜다.
+        Provider(create: (_) => PopupGate()),
       ],
       child: MaterialApp(
         // TODO: 알림 기능 착수 시 navigatorKey(GlobalKey<NavigatorState>) 추가.
