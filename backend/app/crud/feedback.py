@@ -1,17 +1,17 @@
 """meal_feedbacks 접근 + 제안 음식의 성분 조회.
 
-`meal_feedbacks` 는 `(meal_id)` UNIQUE 라 식사당 1행이다. 여기서는 읽기와 무효화만
-한다. 내용을 **채우는** 쪽은 워커다 —
-쓰는 쪽은 워커(`worker/jobs/feedback_meal.py`)이고 아직 스텁이다.
+`meal_feedbacks` 는 `(meal_id)` UNIQUE 라 식사당 1행이다. 내용을 **채우는** 쪽은
+워커(`worker/jobs/feedback_meal.py`)이고 `upsert` 로 쓴다. API 쪽은 읽기와 무효화만 한다.
 """
 
 from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from typing import Final, NamedTuple
+from typing import Any, Final, NamedTuple
 
 from sqlalchemy import Numeric, and_, cast, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models.enums import NutrientCode, SafetyStatus
@@ -22,6 +22,46 @@ from app.models.food import FoodRef
 def get_by_meal(db: Session, meal_id: uuid.UUID) -> MealFeedback | None:
     stmt = select(MealFeedback).where(MealFeedback.meal_id == meal_id)
     return db.execute(stmt).scalar_one_or_none()
+
+
+def upsert(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_id: uuid.UUID,
+    body: str,
+    reasoning: str | None,
+    suggestions: list[dict[str, Any]] | None,
+    model_version: str | None,
+    safety_status: SafetyStatus,
+) -> uuid.UUID:
+    """있으면 덮고 없으면 만든다. 행 id 를 돌려준다. flush 까지만 — 커밋은 부르는 쪽(워커는 큐).
+
+    **`ON CONFLICT` 한 문장이다.** 같은 끼니 작업이 두 번 등록되면(재확정 · 재시도) 두 번째
+    INSERT 가 `(meal_id)` UNIQUE 에 걸려 커밋이 통째로 깨진다.
+
+    **덮어써도 id 는 그대로다.** `invalidate_by_meal` 이 행을 지우지 않고 비우는 이유와
+    같다 — `daily_feedback_sources.meal_feedback_id` 가 이 id 를 물고 있다.
+
+    `safety_status` 는 **빠짐없이 매번** 쓴다. 비운 행은 `REVIEW_REQUIRED` 로 되돌아가
+    있지만, 여기서 빠뜨리면 검수 안 된 새 문장이 옛 판정을 물려받는다 (절대 규칙 1).
+    """
+    values = {
+        "body": body,
+        "reasoning": reasoning,
+        "suggestions": suggestions,
+        "model_version": model_version,
+        "safety_status": safety_status,
+    }
+    stmt = (
+        insert(MealFeedback)
+        .values(user_id=user_id, meal_id=meal_id, **values)
+        .on_conflict_do_update(index_elements=[MealFeedback.meal_id], set_=values)
+        .returning(MealFeedback.id)
+    )
+    meal_feedback_id = db.execute(stmt).scalar_one()
+    db.flush()
+    return meal_feedback_id
 
 
 class SuggestedNutrients(NamedTuple):

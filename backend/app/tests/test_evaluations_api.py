@@ -8,13 +8,20 @@ from datetime import timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import event, select, text
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
 from app.crud import meal as meal_crud
 from app.models.enums import MealStatus, MedicationStage
-from app.tests.factories import make_food_ref, make_meal, make_meal_item, make_user
+from app.models.task import Task
+from app.tests.factories import (
+    make_food_ref,
+    make_meal,
+    make_meal_feedback,
+    make_meal_item,
+    make_user,
+)
 
 _SPEC_FIELDS = {
     "mealId", "status", "stage", "scores", "stageEmphasis",
@@ -810,3 +817,132 @@ def test_nullable_response_fields_are_required_in_the_schema() -> None:
     assert set(schemas["QqsScores"]["required"]) == {"quantity", "quality", "satiety"}
     assert "current" in schemas["NutrientRow"]["required"]
     assert "target" in schemas["NutrientRow"]["required"]
+
+
+# ── 끼니 피드백 작업 등록 ──────────────────────────────────────
+
+
+def _feedback_tasks(db: Session, meal_id: uuid.UUID) -> list[Task]:
+    return list(
+        db.execute(
+            select(Task).where(
+                Task.type == "feedback.meal",
+                Task.payload["mealId"].astext == str(meal_id),
+            )
+        ).scalars()
+    )
+
+
+def _confirm(client: TestClient, user, meal, pct: int = 68):
+    res = client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id), json={"satietyAfterPct": pct}
+    )
+    assert res.status_code == 200, res.text
+    return res
+
+
+def test_confirm_enqueues_meal_feedback(client: TestClient, db: Session) -> None:
+    """확정하면 `feedback.meal` 이 들어간다 — 채점과 같은 트랜잭션이다.
+
+    제안 화면을 열 때 넣지 않는다. 하루 피드백이 끼니 피드백을 근거로 쓰므로, 화면을 안 연
+    끼니가 하루 요약에서 빠진다.
+    """
+    user, meal = _ready_meal(db)
+
+    _confirm(client, user, meal)
+
+    (task,) = _feedback_tasks(db, meal.id)
+    assert task.payload == {"mealId": str(meal.id)}
+
+
+def test_reconfirm_without_changes_keeps_feedback_and_enqueues_nothing(
+    client: TestClient, db: Session
+) -> None:
+    """더블탭 · 같은 값 재전송 — 멀쩡한 문장이 있으면 AI 를 다시 부르지 않는다."""
+    user, meal = _ready_meal(db)
+    _confirm(client, user, meal)
+    make_meal_feedback(db, user_id=user.id, meal_id=meal.id)  # 워커가 채운 상태
+
+    _confirm(client, user, meal)
+
+    assert len(_feedback_tasks(db, meal.id)) == 1
+
+
+def test_reconfirm_without_feedback_enqueues_again(client: TestClient, db: Session) -> None:
+    """문장이 아직(또는 영영) 없으면 재확정이 다시 넣는다 — 앞선 작업이 DLQ 로 갔어도 되살릴 길이다."""
+    user, meal = _ready_meal(db)
+    _confirm(client, user, meal)
+
+    _confirm(client, user, meal)
+
+    assert len(_feedback_tasks(db, meal.id)) == 2
+
+
+def test_reconfirm_with_changed_satiety_enqueues_again(client: TestClient, db: Session) -> None:
+    """점수가 바뀌면 옛 문장은 무효다 — 비우고 새 작업을 넣는다."""
+    user, meal = _ready_meal(db)
+    _confirm(client, user, meal, pct=68)
+    make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
+
+    _confirm(client, user, meal, pct=30)
+
+    assert len(_feedback_tasks(db, meal.id)) == 2
+
+
+def test_reconfirm_after_editing_food_enqueues_again(client: TestClient, db: Session) -> None:
+    """음식을 고친 뒤 재확정 — 점수는 그대로여도(Quantity · Quality 가 NULL) 문장은 무효다."""
+    user, meal = _ready_meal(db)
+    _confirm(client, user, meal)
+    make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
+    meal_crud.mark_recalculating(db, meal)  # 음식 수정 4경로가 모두 거치는 곳
+    db.flush()
+
+    _confirm(client, user, meal)
+
+    assert len(_feedback_tasks(db, meal.id)) == 2
+
+
+def test_rejected_confirm_enqueues_nothing(client: TestClient, db: Session) -> None:
+    """확정이 거부되면(분석 중) 작업도 없다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.ANALYZING)
+
+    res = client.post(
+        f"/api/v1/meals/{meal.id}/confirm", headers=_h(user.id), json={"satietyAfterPct": 68}
+    )
+
+    assert res.status_code == 409
+    assert _feedback_tasks(db, meal.id) == []
+
+
+def test_confirm_locks_the_meal_before_touching_meal_feedbacks(
+    client: TestClient, db: Session
+) -> None:
+    """확정은 식사 행을 **먼저** 잠근다 — `feedback.meal` 워커와 잠금 순서를 맞춘다.
+
+    워커는 `meals FOR UPDATE` → `meal_feedbacks` upsert 순서다. 확정이 거꾸로
+    `meal_feedbacks` (invalidate) → `meals` (상태 UPDATE) 로 잡으면 둘이 겹칠 때 교착이
+    나 한쪽이 죽는다 — 확정 쪽이면 사용자에게 500 이다. 동시 실행은 이 픽스처(커밋 안 된
+    바깥 트랜잭션)로 재현할 수 없어 SQL 순서로 본다.
+    """
+    user, meal = _ready_meal(db)
+    _confirm(client, user, meal, pct=68)
+    make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
+    statements: list[str] = []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        statements.append(" ".join(statement.split()))
+
+    engine = db.get_bind().engine
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        _confirm(client, user, meal, pct=30)  # 점수가 바뀌어 invalidate 가 나간다
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+
+    lock = next(
+        i for i, s in enumerate(statements) if s.startswith("SELECT") and "FROM meals" in s
+        and s.endswith("FOR UPDATE")
+    )
+    touch = next(i for i, s in enumerate(statements) if s.startswith("UPDATE meal_feedbacks"))
+    assert lock < touch

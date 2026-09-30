@@ -51,9 +51,15 @@ class PeriodType(str, Enum):
 
 
 class QQS(_Camel):
-    quantity: float
-    quality: float
-    satiety: float
+    """BE Rule Engine 의 점수. **null 은 "못 쟀다" 다** — 0(바닥)과 다르다.
+
+    기준선이 미정인 축은 BE 가 채점하지 않고 null 로 둔다(`backend/app/services/
+    evaluation/rule_engine.py`). AI 는 null 인 축을 평가하는 문장을 쓰지 않는다.
+    """
+
+    quantity: float | None
+    quality: float | None
+    satiety: float | None
 
 
 # ─────────────────────────── /analyze-meal ───────────────────────────
@@ -112,8 +118,8 @@ class Nutrition(_Camel):
 
 class FeedbackItem(_Camel):
     display_name: str
-    amount: float
-    unit: str
+    amount: float | None  # null 이면 먹은 양을 모른다. 음식을 빼지 않고 보낸다
+    unit: str | None
     nutrition: Nutrition | None = None
 
 

@@ -89,7 +89,9 @@ def get_display_names(db: Session, meal_ids: list[uuid.UUID]) -> dict[uuid.UUID,
     return {meal_id: ", ".join(names) for meal_id, names in names_by_meal.items()}
 
 
-def get_owned_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal | None:
+def get_owned_meal(
+    db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID, for_update: bool = False
+) -> Meal | None:
     """user_id 소유의 살아있는 meal_id 를 가져온다.
 
     없거나, 남의 것이거나, 이미 삭제됐으면 None — 셋을 구분하지 않는다.
@@ -100,11 +102,46 @@ def get_owned_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Me
 
     이름이 "owned" 인 것에 주의: 존재·소유·미삭제만 본다. 지금 고칠 수 있는
     상태인지(`status`)는 보지 않는다 — 그건 `services/meal.py` 의 판단이다.
+
+    `for_update=True` 면 행을 `FOR UPDATE` 로 잠근다. 확정(`services/evaluation`)이 쓴다 —
+    `feedback.meal` 워커가 `meals` 를 먼저 잠그고 `meal_feedbacks` 를 쓰므로, 확정도
+    `meals` 부터 잡아야 두 트랜잭션의 잠금 순서가 같아져 교착이 안 난다. 조건을 복사한
+    잠금 버전 함수를 따로 두지 않으려고 인자로 받는다.
     """
     stmt = select(Meal).where(
         Meal.id == meal_id,
         Meal.user_id == user_id,
         Meal.deleted_at.is_(None),
+    )
+    if for_update:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def get_meal_for_worker(db: Session, meal_id: uuid.UUID) -> Meal | None:
+    """워커 전용 — 소유자도 삭제 여부도 보지 않고 행을 그대로 가져온다.
+
+    워커에는 "요청한 사용자" 가 없어 `get_owned_meal` 을 쓸 수 없다. 대신
+    **`deleted_at` 을 거르지 않으므로 호출부가 직접 확인해야 한다** — meals 는 soft
+    delete 라 지운 식사도 여기서 나온다. API 경로에서는 쓰지 말 것.
+    """
+    return db.execute(select(Meal).where(Meal.id == meal_id)).scalar_one_or_none()
+
+
+def lock_meal_for_worker(db: Session, meal_id: uuid.UUID) -> Meal | None:
+    """워커 전용 — 행을 `FOR UPDATE` 로 잠그고 **DB 의 최신 값으로** 다시 읽는다.
+
+    `get_meal_for_worker` 로 읽은 뒤 AI 를 부르는 동안(최대 45초) 사용자가 식사를
+    지울 수 있다. 쓰기 직전에 이걸로 다시 확인한다. `populate_existing` 이 없으면
+    identity map 의 옛 객체가 그대로 나와 그 사이의 변경을 못 본다.
+
+    처음부터 잠그지 않는 이유: AI 를 부르는 내내 사용자의 삭제 요청이 막힌다.
+    """
+    stmt = (
+        select(Meal)
+        .where(Meal.id == meal_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     return db.execute(stmt).scalar_one_or_none()
 

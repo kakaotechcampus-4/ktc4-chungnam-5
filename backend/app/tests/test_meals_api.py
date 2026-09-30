@@ -4,8 +4,16 @@
 """
 
 import uuid
+from decimal import Decimal
 
-from app.tests.factories import make_meal, make_user
+from app.models.enums import MealStatus
+from app.tests.factories import (
+    make_food_ref,
+    make_meal,
+    make_meal_feedback,
+    make_qqs_evaluation,
+    make_user,
+)
 
 
 def test_delete_returns_wrapped_camel_case_body(client, db):
@@ -106,3 +114,36 @@ def test_list_only_returns_the_callers_meals(client, db):
 
     items = response.json()["data"]["items"]
     assert [item["mealId"] for item in items] == [str(mine.id)]
+
+
+def test_detail_feedback_suggestions_are_objects_like_the_feedback_endpoint(client, db):
+    """상세의 `feedback.suggestions` 는 `GET /meals/{mealId}/feedback` 과 같은 객체 배열이다.
+
+    컬럼은 워커가 AI 제안 모양(`{foodName, advice, candidateFoodRefId}`) 그대로 담는 JSONB
+    배열이다. 문자열로 보고 감싸면 응답 검증이 터져 상세 화면 전체가 500 이 된다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.EVALUATED)
+    make_qqs_evaluation(db, meal_id=meal.id)
+    make_food_ref(db, food_ref_id="KFD_TOFU", protein_g=Decimal("8.000"), fiber_g=None)
+    make_meal_feedback(
+        db,
+        user_id=user.id,
+        meal_id=meal.id,
+        suggestions=[
+            {"foodName": "두부 반 모", "advice": "단백질을 채워요", "candidateFoodRefId": "KFD_TOFU"},
+            {"foodName": "나물", "advice": "식이섬유", "candidateFoodRefId": None},
+        ],
+    )
+
+    response = client.get(f"/api/v1/meals/{meal.id}", headers={"X-User-Id": str(user.id)})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["feedback"]["suggestions"] == [
+        {
+            "foodName": "두부 반 모",
+            "advice": "단백질을 채워요",
+            "nutrients": [{"code": "PROTEIN", "amountG": 8.0}],
+        },
+        {"foodName": "나물", "advice": "식이섬유", "nutrients": []},
+    ]

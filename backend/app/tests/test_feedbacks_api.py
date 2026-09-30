@@ -2,8 +2,9 @@
 
 FE 가 실제로 보는 모양 — 응답 래퍼 · camelCase · 명세 필드 · 404 단일화 · 마스킹.
 
-**피드백 행은 직접 넣는다.** 채우는 워커(`worker/jobs/feedback_meal.py`)가 아직
-스텁이라 API 로는 만들 수 없다. 워커가 붙으면 이 픽스처가 그 계약이 된다.
+**피드백 행은 직접 넣는다.** 채우는 쪽은 워커(`worker/jobs/feedback_meal.py`)이고
+AI 를 부르므로, 이 파일은 워커가 남기는 행 모양을 픽스처로 흉내 내 읽는 쪽만 본다.
+워커 자체는 `test_feedback_meal_job.py` 가 본다.
 """
 
 import uuid
@@ -157,8 +158,7 @@ def test_confirming_twice_without_editing_keeps_the_feedback(
 
     `_CONFIRMABLE` 에 `EVALUATED` 가 있어 확정 버튼 더블탭 · FE 타임아웃 재시도 ·
     같은 값 재전송이 전부 여기로 온다. 무조건 비우면 멀쩡한 문장이 날아가고,
-    되살릴 길이 없다 — `feedback.meal` 을 큐에 넣는 코드가 아직 없고 워커도 스텁이라
-    `PENDING` 에 고착된다.
+    새로 만드느라 AI 를 한 번 더 부르는 동안 화면이 `PENDING` 으로 돌아간다.
     """
     user, meal = _meal(db)
     make_food_ref(db)

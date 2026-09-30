@@ -4,11 +4,21 @@
 채점 자체는 순수 함수(`rule_engine`)가 하고 여기서는 **입력을 모아 주고 결과를
 저장**한다.
 
-## 여기서 비동기 작업을 만들지 않는다
+## 채점은 동기, 문장만 큐로
 
 Q/Q/S 는 순수 함수라 0.01 초면 끝난다(절대 규칙 2). 확정은 200 으로 즉답한다 —
 명세의 `202 + 폴링` 은 `POST /meals`(사진 인식) 자리다. 피드백 **문장**은 AI 가
-따로 만들고, 그래서 응답의 `feedbackStatus` 가 `PENDING` 으로 나간다.
+따로 만든다 — `confirm` 이 채점과 같은 트랜잭션에서 `feedback.meal` 을 넣고, 그래서
+응답의 `feedbackStatus` 가 `PENDING` 으로 나간다.
+
+**제안 화면을 열 때(`GET /meals/{mealId}/feedback`) 넣지 않고 여기서 넣는 이유:**
+하루 피드백이 끼니 피드백을 근거로 쓴다(`crud/daily_feedback.py::list_day_evidence`).
+화면을 연 끼니에만 문장이 생기면 안 연 끼니가 하루 요약에서 조용히 빠진다. 대가는
+아무도 안 볼 문장에도 AI 를 부른다는 것이다.
+
+⚠️ 지금은 그 근거가 발동하지 않는다 — `list_day_evidence` 는 세 점수가 모두 있어야
+근거로 쓰는데 Rule Engine 이 Quantity · Quality 를 아직 NULL 로 둔다. 기준선이
+정해지면 그때부터 효력이 생긴다.
 """
 
 from __future__ import annotations
@@ -25,6 +35,7 @@ from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.crud import satiety as satiety_crud
 from app.crud.evaluation import NutrientTotals
+from app.infra.queue import enqueue
 from app.models.enums import (
     FeedbackStatus,
     MealStatus,
@@ -102,8 +113,8 @@ def _is_stale_feedback(
 
     **무조건 지우면 안 된다.** `_CONFIRMABLE` 에 `EVALUATED` 가 있어 아무것도 고치지
     않은 재확정(확정 버튼 더블탭 · FE 타임아웃 재시도 · 같은 값 재전송)도 허용되는데,
-    그때까지 지우면 멀쩡한 문장이 날아간다. 되살릴 길도 없다 — `feedback.meal` 을
-    큐에 넣는 코드가 아직 없고 워커도 스텁이라, 한 번 비우면 `PENDING` 에 고착된다.
+    그때까지 지우면 멀쩡한 문장이 날아가고, 새 문장을 만드느라 AI 를 한 번 더 부른다
+    (`confirm` 은 비운 끼니에 `feedback.meal` 을 다시 넣는다).
 
     두 가지를 본다. **하나만으로는 부족하다:**
 
@@ -242,8 +253,34 @@ def _sources_of(totals: NutrientTotals) -> list[NutritionSource]:
     return [NutritionSource.PUBLIC_DB] if totals.counted > 0 else []
 
 
-def _owned_meal(db: Session, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal:
-    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
+FEEDBACK_TASK_TYPE: Final = "feedback.meal"
+
+
+def _has_feedback_text(db: Session, meal_id: uuid.UUID) -> bool:
+    """이 식사에 쓸 만한 끼니 피드백 문장이 이미 있는가.
+
+    **없으면 아무것도 안 고친 재확정도 작업을 다시 넣는다.** 앞선 작업이 재시도를 다
+    쓰고 DLQ 로 갔으면 문장이 영영 `PENDING` 에 고착되는데, 사용자가 다시 확정하는 것
+    말고는 되살릴 길이 없다. 대가로 작업이 도는 중에 더블탭하면 작업이 둘 들어가지만,
+    워커가 upsert 라 결과는 같고 AI 호출만 한 번 는다.
+
+    판정은 `services/feedback.py::get_feedback` 의 `PENDING` 조건과 같다 — 본문이
+    비었으면(NULL · 빈 문자열) 없는 것이다.
+
+    🔗 TODO(가드레일이 붙을 때): **안전 판정은 보지 않는다.** AI 가 본문과 함께
+    `REVIEW_REQUIRED` 를 주면 재확정해도 다시 넣지 않아 계속 가려진 채 남는다.
+    검수 대기를 재시도 대상으로 볼지는 가드레일 흐름이 정해지면 정한다.
+    """
+    row = feedback_crud.get_by_meal(db, meal_id)
+    return row is not None and bool((row.body or "").strip())
+
+
+def _owned_meal(
+    db: Session, user_id: uuid.UUID, meal_id: uuid.UUID, *, for_update: bool = False
+) -> Meal:
+    meal = meal_crud.get_owned_meal(
+        db, user_id=user_id, meal_id=meal_id, for_update=for_update
+    )
     if meal is None:
         raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
     return meal
@@ -256,8 +293,14 @@ def confirm(
     meal_id: uuid.UUID,
     request: MealConfirmRequest,
 ) -> EvaluationResult:
-    """식사를 확정하고 Q/Q/S 를 매긴다. 커밋까지 한다."""
-    meal = _owned_meal(db, user_id, meal_id)
+    """식사를 확정하고 Q/Q/S 를 매긴다. 커밋까지 한다.
+
+    **식사 행부터 잠근다.** `feedback.meal` 워커가 `meals` → `meal_feedbacks` 순으로
+    잠그므로 여기도 같은 순서여야 한다 — 거꾸로 잡으면(`invalidate_by_meal` 이 먼저)
+    둘이 겹칠 때 교착이 난다. 잠가 두면 워커의 "쓰기 직전 재확인" 도 이 확정이 커밋된
+    뒤의 점수를 본다.
+    """
+    meal = _owned_meal(db, user_id, meal_id, for_update=True)
     if not _is_confirmable(meal):
         raise MealNotConfirmableError(
             f"{meal.status.value} 상태의 식사는 확정할 수 없습니다."
@@ -285,6 +328,10 @@ def confirm(
         # 행이 아니라 내용만 비운다 — `daily_feedback_sources` 가 CASCADE 라 지우면
         # 일일 피드백의 출처 링크가 사라진다. 자세한 근거는 `crud/feedback.py` 참고.
         feedback_crud.invalidate_by_meal(db, meal.id)
+    if stale or not _has_feedback_text(db, meal.id):
+        # 채점과 **같은 트랜잭션**에 넣는다 — 점수는 저장됐는데 작업은 없는 상태가
+        # 생기지 않는다. 제안 화면을 열 때가 아니라 여기서 넣는 이유는 모듈 독스트링 참고.
+        enqueue(db, FEEDBACK_TASK_TYPE, {"mealId": str(meal.id)})
     meal_crud.set_status(db, meal, MealStatus.EVALUATED)
     db.commit()
 

@@ -201,10 +201,11 @@ def make_meal_feedback(
     body: str | None = "채소를 먼저 드셔서 좋았어요.",
     safety_status: SafetyStatus = SafetyStatus.SAFE,
     model_version: str | None = "stub-short-0",
+    suggestions: list[dict] | None = None,
 ) -> MealFeedback:
     """식사 하나의 끼니 피드백 행. flush 까지만 하고 커밋하지 않는다.
 
-    아직 `feedback.meal` 워커가 없어서 이 행을 만드는 프로덕션 경로가 없다 — 그래서
+    프로덕션에서는 `feedback.meal` 워커가 AI 를 불러 이 행을 채운다. 여기서는 AI 없이
     모델을 직접 조립한다. 기본값이 `SAFE` 인 건 하루 피드백의 근거가 되는 모양이
     그것이기 때문이다 (모델의 server_default 는 REVIEW_REQUIRED 다).
     """
@@ -214,6 +215,7 @@ def make_meal_feedback(
         body=body,
         safety_status=safety_status,
         model_version=model_version,
+        suggestions=suggestions,
     )
     db.add(feedback)
     db.flush()
