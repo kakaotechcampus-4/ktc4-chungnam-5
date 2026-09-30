@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../common/api_format.dart';
-import '../popups/satiety_checkin_popup.dart';
+import '../popups/popup_gate.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -345,7 +345,10 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 위 게이지 탭 → 사후 포만감 체크인 팝업. 저장했으면 게이지가 바뀌니
   /// 홈을 다시 불러온다.
   Future<void> _openSatietyCheckin(String mealId) async {
-    final saved = await showSatietyCheckinPopup(context, mealId: mealId);
+    final saved = await context.read<PopupGate>().showSatietyCheckin(
+      context,
+      mealId: mealId,
+    );
     if (!mounted || !saved) return;
     _load();
   }

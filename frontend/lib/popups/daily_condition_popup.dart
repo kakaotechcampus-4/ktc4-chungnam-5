@@ -182,20 +182,10 @@ class ConditionApiService {
 
 // ── 팝업 ────────────────────────────────────────────────────
 
-/// 오늘 컨디션 기록 팝업을 띄운다. 기록을 저장했으면 `true`,
-/// "나중에"·닫기·바깥 탭이면 `false`.
-Future<bool> showDailyConditionPopup(BuildContext context) async {
-  final saved = await showDialog<bool>(
-    context: context,
-    barrierColor: AppColors.overlay,
-    builder: (_) => const DailyConditionPopup(),
-  );
-  return saved ?? false;
-}
-
 /// 오늘 컨디션 기록 — Figma `hOxrHBitBpjwIBBg2GO49y` node `74:8` (2-a).
 ///
-/// 하루 한 번, 오늘 첫 접속 때 `RootShell` 이 띄운다(`PopupGate` 참고).
+/// 하루 한 번, 오늘 첫 접속 때 `PopupGate.showDailyPopupsIfDue` 로 뜬다.
+/// 직접 `showDialog` 하지 않는다.
 ///
 /// NOTE: 체중 뱃지(질 초록)·식욕(포만감 주황)·GI(양 갈색)의 Q·Q·S 색
 /// 재사용은 Figma 그대로다(§0 메타 규칙). 팝업 틀은 `popup_widgets.dart`.

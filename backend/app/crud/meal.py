@@ -459,6 +459,96 @@ def add_correction(
     return correction
 
 
+def has_new_meals_since(
+    db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
+) -> bool:
+    """[range_start, range_end) 안에서 since 이후에 기록된(살아있는) 식사가 있는지.
+
+    장기 피드백이 그 뒤로 낡았는지(stale) 판단하는 데 쓴다 — GET /insights/long-term.
+    """
+    stmt = (
+        select(Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+            Meal.created_at > since,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
+def has_deleted_meals_since(
+    db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
+) -> bool:
+    """[range_start, range_end) 안의 식사 중 since 이후에 soft delete 된 것이 있는지.
+
+    `Meal.created_at <= since` 를 같이 본다 — since 이후에 만들어졌다가 since
+    이후에 지워진 식사는 애초에 분석에 들어간 적이 없어서, 지워져도 "이미
+    반영된 데이터가 사라졌다"가 아니다(PR #46 리뷰).
+    """
+    stmt = (
+        select(Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_not(None),
+            Meal.deleted_at > since,
+            Meal.created_at <= since,
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
+def has_edited_items_since(
+    db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
+) -> bool:
+    """[range_start, range_end) 안의 식사 중 since 이후에 재확정됐거나 재계산 대기 중인 것이 있는지.
+
+    `UserCorrection` 만 보면 놓친다 — 그 테이블은 식사를 고치는 4가지 경로(항목
+    수정·추가·삭제·영양정보 직접입력) 중 일부만 반영하는 불완전한 상태다(PR #46
+    리뷰). 네 경로 전부 `mark_recalculating`을 거쳐 `qqs_evaluations` 행을
+    지우고(`evaluation_crud.delete_by_meal`) 재확정 전까지 없는 상태로 두므로,
+    그 자리를 보는 게 더 안정적이다.
+
+    **주의**: `QQSEvaluation.computed_at`은 재확정(upsert) 시 갱신되지 않는다
+    (`crud/evaluation.py::upsert`가 `computed_at`을 SET 목록에 안 둠, 모델도
+    `onupdate` 없는 `created_at()` 믹스인). 그래서 재확정 직후 짧은 구간은 이
+    함수가 그 수정을 못 잡을 수 있다 — 평가 도메인 쪽 문제라 팀에 공유만 하고
+    일단 이대로 둔다.
+
+    **`is_recalculation` 도 같이 봐야 한다.** `QQSEvaluation` 행이 없는 것만으로는
+    "평가됐다가 수정 중이라 지워짐"과 "애초에 한 번도 평가된 적 없음"(막 올라와서
+    분석 대기 중인 평범한 식사)을 구분 못 한다 — 후자는 `mark_recalculating` 을
+    거친 적이 없어 `is_recalculation` 이 기본값 False 다. 이걸 빠뜨리면 평가 전
+    식사가 하나만 있어도 항상 낡음(stale)으로 잘못 나온다.
+    """
+    stmt = (
+        select(Meal.id)
+        .outerjoin(QQSEvaluation, QQSEvaluation.meal_id == Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+            Meal.created_at <= since,  # 새 식사는 NEW_MEALS 몫
+            or_(
+                QQSEvaluation.computed_at > since,  # 수정 후 재확정됨
+                and_(
+                    QQSEvaluation.id.is_(None),
+                    Meal.is_recalculation.is_(True),
+                ),  # 수정 중(아직 재확인 전) — 한 번도 평가 안 된 식사는 제외
+            ),
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
 def create_meal(
     db: Session,
     *,

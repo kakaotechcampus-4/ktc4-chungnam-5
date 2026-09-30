@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models.meal import SatietyLog
+from app.models.satiety import SatietyCheckin
 
 
 def get_by_meal(db: Session, meal_id: uuid.UUID) -> SatietyLog | None:
@@ -31,7 +32,7 @@ def set_satiety_after(db: Session, *, meal_id: uuid.UUID, pct: int) -> SatietyLo
     `logged_at` 은 서버 기본값이 없는 NOT NULL 이라 **처음 만들 때만** 채운다.
     충돌 시에는 건드리지 않는다 — 한 행에 식전·식후 두 값이 들어 있어 타임스탬프
     하나가 둘 다를 뜻할 수 없다. 덮으면 식전 기록 시각이 사라진다.
-    식후 시각이 따로 필요해지면 컬럼을 나눈다 (satiety-checkins 티켓).
+    식후 시각이 따로 필요해지면 컬럼을 나눈다 — 아직 읽는 곳이 없어 미뤄 둔다.
 
     **`ON CONFLICT` 한 문장이다.** 읽고 나서 넣으면 `(meal_id)` UNIQUE 경합에서
     두 번째 요청이 죽는다 (`crud/evaluation.py::upsert` 와 같은 이유).
@@ -45,6 +46,84 @@ def set_satiety_after(db: Session, *, meal_id: uuid.UUID, pct: int) -> SatietyLo
         index_elements=[SatietyLog.meal_id],
         set_={"satiety_after": pct},
     ).returning(SatietyLog)
+    row = db.execute(stmt).scalar_one()
+    db.flush()
+    return row
+
+
+def set_hunger_return(
+    db: Session, *, meal_id: uuid.UUID, minutes: int | None, comment: str | None
+) -> SatietyLog | None:
+    """체크인이 함께 보낸 "다시 배고파진 시각" 과 한마디를 기록한다.
+
+    체크인 행이 아니라 **`satiety_logs`** 에 넣는다. 명세의 `GET /meals/{mealId}` 가
+    이 둘을 `checkins[]` **바깥**에 두기 때문이다 — 식사당 하나다.
+
+        "satiety": { "beforePct": …, "afterPct": …,
+                     "checkins": [ … ],
+                     "hungerReturnMinutes": 60 }
+
+    **`satiety_before` · `satiety_after` 는 건드리지 않는다.** 식사 등록과 확정이
+    쓰는 칸이라, 체크인이 덮으면 그 기록이 사라진다 (`set_satiety_after` 와 같은 이유).
+
+    **`None` 은 덮지 않는다.** 체크인마다 두 값을 다 보내지는 않는데, 안 보낸 것을
+    NULL 로 쓰면 앞서 적어 둔 값이 지워진다. "안 보냈다" 와 "지워 달라" 는 다르다.
+    """
+    updates: dict[str, object] = {}
+    if minutes is not None:
+        updates["hunger_return_minutes"] = minutes
+    # 빈 문자열은 안 보낸 것과 같다 — FE 의 텍스트 입력이 비면 `""` 를 보내는 게
+    # 흔하다. `is not None` 으로 보면 `updates` 가 비지 않아 아래 가드를 통과하고,
+    # 내용 없는 `satiety_logs` 행이 그대로 생긴다.
+    if comment and comment.strip():
+        updates["user_comment"] = comment
+
+    # **쓸 게 없으면 행을 만들지 않는다.** 둘 다 안 보내는 게 체크인의 기본 흐름인데,
+    # 그때마다 INSERT 하면 전부 NULL 인 `satiety_logs` 행이 남는다. 그러면
+    # `GET /meals/{mealId}` 가 행 존재로 분기할 때 "기록 없음" 과 구분되지 않고,
+    # `logged_at` 이 **체크인 시각**으로 먼저 박혀 나중에 `POST /meals` 의
+    # `satietyBeforePct` 가 붙을 때 식전 기록 시각을 잃는다
+    # (`set_satiety_after` 가 충돌 시 `logged_at` 을 안 건드리기 때문이다).
+    if not updates:
+        return get_by_meal(db, meal_id)
+
+    stmt = (
+        insert(SatietyLog)
+        .values(meal_id=meal_id, logged_at=datetime.now(UTC), **updates)
+        .on_conflict_do_update(index_elements=[SatietyLog.meal_id], set_=updates)
+    )
+    db.execute(stmt)
+    db.flush()
+    return get_by_meal(db, meal_id)
+
+
+def upsert_checkin(
+    db: Session, *, meal_id: uuid.UUID, offset_hours: int, pct: int
+) -> SatietyCheckin:
+    """사후 포만감 한 건. add/flush 까지만 — 커밋은 services 가 한다.
+
+    **같은 시점을 다시 보내면 덮는다** (`UNIQUE (meal_id, checkin_offset_hours)`).
+    "식후 3시간 포만감" 은 하나이고, 더블탭이나 오입력이 그래프에 점 두 개를 만들면
+    안 된다.
+
+    **`ON CONFLICT` 한 문장이다.** 읽고 나서 넣으면 두 요청이 겹칠 때 두 번째가
+    UNIQUE 위반으로 죽는다 (`crud/evaluation.py::upsert` 와 같은 이유).
+
+    덮어써도 `id` 는 유지된다 — `ON CONFLICT DO UPDATE` 는 기존 행을 고치므로,
+    같은 시점의 체크인은 늘 같은 `checkinId` 를 갖는다.
+    """
+    stmt = (
+        insert(SatietyCheckin)
+        .values(meal_id=meal_id, checkin_offset_hours=offset_hours, satiety_pct=pct)
+        .on_conflict_do_update(
+            index_elements=[
+                SatietyCheckin.meal_id,
+                SatietyCheckin.checkin_offset_hours,
+            ],
+            set_={"satiety_pct": pct},
+        )
+        .returning(SatietyCheckin)
+    )
     row = db.execute(stmt).scalar_one()
     db.flush()
     return row

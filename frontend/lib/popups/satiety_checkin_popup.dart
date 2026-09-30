@@ -100,25 +100,11 @@ class SatietyCheckinApiService {
 
 // ── 팝업 ────────────────────────────────────────────────────
 
-/// 사후 포만감 체크인 팝업을 띄운다. 저장했으면 `true`, 아니면 `false`.
-///
-/// **진입점은 [mealId] 하나뿐이다.** 홈 게이지 탭에서도, 나중에 알림을
-/// 눌렀을 때(`NotificationRouter`, 알림 티켓에서 구현)도 이 함수만 부른다.
-/// 멘토 리뷰(PR #9) "알림 진입 화면은 id 로 생성" 원칙 — 끼니 정보는 팝업이
-/// 스스로 불러온다.
-Future<bool> showSatietyCheckinPopup(
-  BuildContext context, {
-  required String mealId,
-}) async {
-  final saved = await showDialog<bool>(
-    context: context,
-    barrierColor: AppColors.overlay,
-    builder: (_) => SatietyCheckinPopup(mealId: mealId),
-  );
-  return saved ?? false;
-}
-
 /// 사후 포만감 체크인 — Figma `hOxrHBitBpjwIBBg2GO49y` node `100:6` (10).
+///
+/// 직접 `showDialog` 하지 말고 `PopupGate.showSatietyCheckin` 으로 띄운다.
+/// 진입점은 [mealId] 하나뿐이고 끼니 정보는 팝업이 스스로 불러온다
+/// (멘토 리뷰 PR #9 "알림 진입 화면은 id 로 생성").
 ///
 /// Figma 의 `satietyPct` · `hungerReturnMinutes` 라벨은 API 필드 주석이라
 /// 화면에 그리지 않는다. 빈 "메모 (선택)" 자리도 아직 내용이 없어 뺐다.
