@@ -588,3 +588,22 @@ def create_satiety_log(
     db.add(log)
     db.flush()
     return log
+
+
+def list_meals_in_range(
+    db: Session, *, user_id: uuid.UUID, range_start: datetime, range_end: datetime
+) -> list[Row]:
+    """user_id 의 살아있는 식사 중 eaten_at 이 [range_start, range_end) 인 것을 조회한다.
+
+    각 행은 (Meal, quantity_score, quality_score, satiety_score) 튜플이다 — 평가 전이면 점수는 None.
+    eaten_at · id 오름차순. 커서용 `list_meals` 와 달리 하루 범위(홈의 "오늘의 식사")용이다.
+    """
+    raise NotImplementedError("list_meals_in_range 미구현")
+
+
+def get_latest_meal_with_satiety_after(db: Session, *, user_id: uuid.UUID) -> Row | None:
+    """user_id 의 살아있는 식사 중 satiety_after 가 기록된 가장 최근 1건을 돌려준다.
+
+    행은 (Meal, satiety_after) 튜플이다. 날짜로 한정하지 않는다. 없으면 None.
+    """
+    raise NotImplementedError("get_latest_meal_with_satiety_after 미구현")

@@ -32,6 +32,7 @@ AUTHENTICATED_ROUTES = [
     ("/api/v1/insights/long-term/refresh", "post"),
     ("/api/v1/insights/daily/refresh", "post"),
     ("/api/v1/insights/daily", "get"),  # BE-5 #47
+    ("/api/v1/home", "get"),
 ]
 
 

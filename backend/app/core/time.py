@@ -20,3 +20,12 @@ def today_kst() -> date:
     같은 순간에 두 답이 나온다.
     """
     return datetime.now(KST).date()
+
+
+def now_kst() -> datetime:
+    """지금 — **KST 기준** aware datetime 이다.
+
+    "오늘"(`now_kst().date()`)과 "몇 분 전"을 같은 한 순간에서 뽑으려고 둔다.
+    모듈 전역 `datetime` 을 써야 테스트의 시각 고정(monkeypatch)이 잡는다.
+    """
+    raise NotImplementedError("now_kst 미구현")
