@@ -1,4 +1,5 @@
 import 'api_client.dart';
+import 'dummy_store.dart';
 
 /// 회원 정보. `POST /users/profile` · `GET /users/me` 응답(`data` 안쪽).
 ///
@@ -51,14 +52,16 @@ class UserApiService {
   }) async {
     if (!ApiConfig.useRealApi) {
       await Future.delayed(const Duration(milliseconds: 300));
-      return UserProfile.fromJson({
+      final profile = {
         ..._sample,
         'nickname': nickname,
         'heightCm': heightCm,
         'weightKg': weightKg,
         'baselineIntake': baselineIntake,
-        'onboardingStatus': 'MEDICATION_REQUIRED',
-      });
+      };
+      await DummyStore.writeProfile(profile);
+      await DummyStore.markMedicationNotRegistered();
+      return UserProfile.fromJson(await _withDummyStatus(profile));
     }
     final result = await _client.post(
       '/users/profile',
@@ -72,14 +75,53 @@ class UserApiService {
     return UserProfile.fromJson(result.dataMap);
   }
 
+  /// `PATCH /users/me` — 준 필드만 바꾼다. 응답은 `GET /users/me` 와 같다.
+  ///
+  /// 체중은 덮어쓰기가 아니라 **새 체중 기록**이다 — 서버는 체중을
+  /// `user_states` 에만 두고, 여기서 온 값도 그날의 기록 1건으로 남긴다.
+  Future<UserProfile> updateProfile({
+    String? nickname,
+    double? heightCm,
+    double? weightKg,
+    double? baselineIntake,
+  }) async {
+    final body = {
+      'nickname': ?nickname,
+      'heightCm': ?heightCm,
+      'weightKg': ?weightKg,
+      'baselineIntake': ?baselineIntake,
+    };
+    if (!ApiConfig.useRealApi) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      final profile = {...await DummyStore.readProfile() ?? _sample, ...body};
+      await DummyStore.writeProfile(profile);
+      return UserProfile.fromJson(await _withDummyStatus(profile));
+    }
+    final result = await _client.patch('/users/me', body: body);
+    return UserProfile.fromJson(result.dataMap);
+  }
+
   /// `GET /users/me`
   Future<UserProfile> fetchMe() async {
     if (!ApiConfig.useRealApi) {
       await Future.delayed(const Duration(milliseconds: 300));
-      return UserProfile.fromJson(_sample);
+      final profile = await DummyStore.readProfile() ?? _sample;
+      return UserProfile.fromJson(await _withDummyStatus(profile));
     }
     final result = await _client.get('/users/me');
     return UserProfile.fromJson(result.dataMap);
+  }
+
+  /// 더미 `onboardingStatus` — 서버처럼 투약 등록 여부로 정한다.
+  static Future<Map<String, dynamic>> _withDummyStatus(
+    Map<String, dynamic> profile,
+  ) async {
+    final (stored, medication) = await DummyStore.readMedication();
+    final registered = !stored || medication != null;
+    return {
+      ...profile,
+      'onboardingStatus': registered ? 'READY' : 'MEDICATION_REQUIRED',
+    };
   }
 
   static const Map<String, dynamic> _sample = {

@@ -45,11 +45,15 @@ class ApiResult {
 /// - 요청마다 `X-User-Id` 를 붙인다([UserSession]).
 /// - 응답 래퍼를 벗겨 [ApiResult] 로 돌려준다.
 /// - 실패는 전부 [ApiException] 으로 바꾼다. 화면은 dio 를 몰라도 된다.
+/// - `USER_NOT_FOUND` 는 화면마다 처리하지 않고 여기서 세션을 지운다.
+///   저장된 사용자가 서버에 없으면 어느 API 도 성공할 수 없어서다. 세션이
+///   비면 `main.dart` 가 쌓인 화면을 닫고 프로필 입력으로 돌린다.
 ///
 /// 각 화면의 `XxxApiService` 는 이 클라이언트를 받아 메서드 본문만 채운다.
 class ApiClient {
   ApiClient({required UserSession session, Dio? dio})
-    : _dio =
+    : _session = session,
+      _dio =
           dio ??
           Dio(
             BaseOptions(
@@ -70,6 +74,7 @@ class ApiClient {
     );
   }
 
+  final UserSession _session;
   final Dio _dio;
 
   Future<ApiResult> get(String path, {Map<String, dynamic>? query}) =>
@@ -85,13 +90,21 @@ class ApiClient {
       _send(() => _dio.delete<dynamic>(path));
 
   Future<ApiResult> _send(Future<Response<dynamic>> Function() request) async {
-    final Response<dynamic> response;
     try {
-      response = await request();
-    } on DioException catch (e) {
-      throw _toException(e);
+      final Response<dynamic> response;
+      try {
+        response = await request();
+      } on DioException catch (e) {
+        throw _toException(e);
+      }
+      return _unwrap(response.data, response.statusCode);
+    } on ApiException catch (e) {
+      // 예외는 그대로 던진다 — 부른 화면도 자기 로딩·에러 상태를 끝내야 한다.
+      if (e.code == ApiException.userNotFound && _session.hasProfile) {
+        await _session.clear();
+      }
+      rethrow;
     }
-    return _unwrap(response.data, response.statusCode);
   }
 
   ApiResult _unwrap(dynamic body, int? statusCode) {

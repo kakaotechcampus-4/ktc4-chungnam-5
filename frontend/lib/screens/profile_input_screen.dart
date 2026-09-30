@@ -18,10 +18,16 @@ import '../theme/app_typography.dart';
 ///
 /// 백엔드는 프로필 → 투약 정보 순서다(`onboardingStatus`:
 /// PROFILE_REQUIRED → MEDICATION_REQUIRED → READY). 투약 정보를 쓰려면
-/// 사용자가 먼저 있어야 하기 때문이다.
-// TODO: onboardingStatus 가 MEDICATION_REQUIRED 면 투약 정보 입력으로 이어 보낸다.
+/// 사용자가 먼저 있어야 하기 때문이다. 투약 입력으로 이어 보내는 건
+/// `RootShell` 이 `onboardingStatus` 를 보고 한다.
+///
+/// **[initial] 을 주면 수정 모드다**(마이 탭). 입력칸·검증은 같고, 저장이
+/// `PATCH /users/me` 로 바뀌며 바꾼 칸만 보낸다. 저장하면 바뀐 [UserProfile]
+/// 을 들고 닫힌다(안 바꿨으면 호출 없이 [initial] 그대로).
 class ProfileInputScreen extends StatefulWidget {
-  const ProfileInputScreen({super.key});
+  const ProfileInputScreen({super.key, this.initial});
+
+  final UserProfile? initial;
 
   @override
   State<ProfileInputScreen> createState() => _ProfileInputScreenState();
@@ -29,12 +35,20 @@ class ProfileInputScreen extends StatefulWidget {
 
 class _ProfileInputScreenState extends State<ProfileInputScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nickname = TextEditingController();
-  final _height = TextEditingController();
-  final _weight = TextEditingController();
-  final _baselineIntake = TextEditingController();
+  late final _nickname = TextEditingController(text: widget.initial?.nickname);
+  late final _height = TextEditingController(
+    text: _numberText(widget.initial?.heightCm),
+  );
+  late final _weight = TextEditingController(
+    text: _numberText(widget.initial?.weightKg),
+  );
+  late final _baselineIntake = TextEditingController(
+    text: _numberText(widget.initial?.baselineIntake),
+  );
 
   late final UserApiService _api = UserApiService(context.read<ApiClient>());
+
+  bool get _editing => widget.initial != null;
 
   bool _saving = false;
   String? _saveError;
@@ -55,14 +69,40 @@ class _ProfileInputScreenState extends State<ProfileInputScreen> {
       _saveError = null;
     });
     try {
-      final profile = await _api.createProfile(
-        nickname: _nickname.text.trim(),
-        heightCm: double.parse(_height.text),
-        weightKg: double.parse(_weight.text),
-        baselineIntake: double.parse(_baselineIntake.text),
-      );
+      final nickname = _nickname.text.trim();
+      final heightCm = double.parse(_height.text);
+      final weightKg = double.parse(_weight.text);
+      final baselineIntake = double.parse(_baselineIntake.text);
+      final initial = widget.initial;
+      if (initial == null) {
+        final profile = await _api.createProfile(
+          nickname: nickname,
+          heightCm: heightCm,
+          weightKg: weightKg,
+          baselineIntake: baselineIntake,
+        );
+        if (!mounted) return;
+        await context.read<UserSession>().setUserId(profile.userId);
+        return;
+      }
+      // 바꾼 칸만 보낸다. 체중은 보낼 때마다 새 기록이 되므로 특히 그렇다.
+      final changed =
+          nickname != initial.nickname ||
+          heightCm != initial.heightCm ||
+          weightKg != initial.weightKg ||
+          baselineIntake != initial.baselineIntake;
+      final profile = changed
+          ? await _api.updateProfile(
+              nickname: nickname != initial.nickname ? nickname : null,
+              heightCm: heightCm != initial.heightCm ? heightCm : null,
+              weightKg: weightKg != initial.weightKg ? weightKg : null,
+              baselineIntake: baselineIntake != initial.baselineIntake
+                  ? baselineIntake
+                  : null,
+            )
+          : initial;
       if (!mounted) return;
-      await context.read<UserSession>().setUserId(profile.userId);
+      Navigator.of(context).pop(profile);
     } catch (e) {
       if (!mounted) return;
       setState(() => _saveError = '저장하지 못했어요: $e');
@@ -74,7 +114,7 @@ class _ProfileInputScreenState extends State<ProfileInputScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('프로필 입력')),
+      appBar: AppBar(title: Text(_editing ? '프로필 수정' : '프로필 입력')),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -87,7 +127,9 @@ class _ProfileInputScreenState extends State<ProfileInputScreen> {
             ),
             children: [
               Text(
-                '맞춤 코칭을 위해 기본 정보를 알려 주세요.',
+                _editing
+                    ? '체중을 바꾸면 오늘 체중 기록으로 남아요.'
+                    : '맞춤 코칭을 위해 기본 정보를 알려 주세요.',
                 style: AppTypography.bodySecondary,
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -139,7 +181,13 @@ class _ProfileInputScreenState extends State<ProfileInputScreen> {
               const SizedBox(height: AppSpacing.xl),
               FilledButton(
                 onPressed: _saving ? null : _submit,
-                child: Text(_saving ? '저장 중' : '시작하기'),
+                child: Text(
+                  _saving
+                      ? '저장 중'
+                      : _editing
+                      ? '저장'
+                      : '시작하기',
+                ),
               ),
             ],
           ),
@@ -147,6 +195,12 @@ class _ProfileInputScreenState extends State<ProfileInputScreen> {
       ),
     );
   }
+}
+
+/// 입력칸 초기값. `175.0` → `175`, `78.4` → `78.4`, 없으면 빈칸.
+String _numberText(double? value) {
+  if (value == null) return '';
+  return value % 1 == 0 ? value.toStringAsFixed(0) : '$value';
 }
 
 /// 백엔드 스키마(`backend/app/schemas/user.py`) 범위: 0 초과 ~ [max] 이하.

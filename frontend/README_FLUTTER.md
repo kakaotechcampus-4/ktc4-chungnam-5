@@ -16,7 +16,7 @@
 | 상태관리 | **Provider** (`lib/state/`) |
 | 라우팅 | `Navigator.push` + `MaterialPageRoute` (라이브러리 없음) |
 | 폰트 | Pretendard (번들, `assets/fonts/`) |
-| 의존성 | `provider`, `cupertino_icons`, `flutter_lints` |
+| 의존성 | `provider`, `dio`(HTTP), `shared_preferences`(기기 저장), `image_picker`(카메라·갤러리), `cupertino_icons`, `flutter_lints` |
 
 Dart는 Flutter 전용 언어라 따로 설치할 필요가 없다. `flutter` SDK를 깔면 Dart가 같이 들어온다.
 
@@ -51,14 +51,31 @@ flutter pub get
 
 ## 실행
 
-### 웹 (UI 빠르게 확인할 때)
+### 더미 모드 / 실서버 모드
+
+API 를 부를지는 빌드할 때 `--dart-define` 으로 정한다(`lib/api/api_client.dart` 의 `ApiConfig`).
+
+| 모드 | 옵션 | 동작 |
+|---|---|---|
+| **더미**(기본) | 없음 | 서버를 부르지 않고 각 화면의 예시 응답을 쓴다. 회원가입·투약 입력값은 기기 저장소에 기억해 화면끼리 이어진다(`lib/api/dummy_store.dart`) |
+| **실서버** | `--dart-define=USE_REAL_API=true --dart-define=API_BASE_URL=<주소>` | 실제 BE 를 부른다. `API_BASE_URL` 기본값은 `http://localhost:8000/api/v1` |
+
+> BE 에 아직 없는 API(`GET /home`, 피드백·인사이트, 식사 분석 흐름 등)는 실서버 모드에서도 더미로 동작한다.
+> 어느 화면이 실제 호출인지는 각 화면 `XxxApiService` 의 `ApiConfig.useRealApi` 분기를 보면 된다.
+
+### 웹 (UI 빠르게 확인할 때 — 더미 모드 전용)
 
 ```bash
 cd frontend
-flutter run -d chrome        # 또는 -d edge
+flutter run -d chrome --web-port=5555     # 또는 -d edge. 포트를 고정하면 주소가 매번 같다
 ```
 
-핫 리로드는 터미널에서 `r`, 핫 리스타트는 `R`, 종료는 `q`.
+브라우저에서 `http://localhost:5555` 가 열린다. 핫 리로드는 터미널에서 `r`, 핫 리스타트는 `R`, 종료는 `q`.
+
+- **웹에서는 실서버에 붙지 않는다.** BE 에 CORS 설정이 없어 브라우저가 요청을 막는다
+  (`NETWORK_ERROR`). 실서버 확인은 아래 [실기기 테스트](#실기기-테스트-실서버)로 한다.
+- **처음부터(회원가입부터) 다시 보려면** 개발자도구(F12) → Application → Local Storage 를
+  지우고 새로고침한다. `flutter run` 이 띄운 Chrome 은 매번 새 프로필이라 새로 띄워도 된다.
 
 빌드 결과물만 필요하면:
 
@@ -85,6 +102,100 @@ flutter run -d <device-id>   # 기기가 여러 개일 때
 flutter build apk --release  # build/app/outputs/flutter-apk/app-release.apk
 ```
 
+### 실기기 테스트 (실서버)
+
+USB 로 연결한 Android 폰에서 로컬 BE 에 붙여 보는 순서다. Windows · PowerShell 기준.
+
+#### 1. 폰 준비
+
+1. 설정 → 휴대전화 정보 → 소프트웨어 정보 → **빌드번호 7번 탭** → 개발자 옵션 켜짐
+2. 개발자 옵션 → **USB 디버깅** 켜기
+3. USB 케이블로 PC 에 연결 → 폰에 뜨는 "USB 디버깅 허용" 수락
+4. 인식 확인:
+
+```powershell
+flutter devices        # 예: SM S928N (mobile) • R3CX804GY4F • android-arm64
+```
+
+#### 2. BE 띄우기 (Docker)
+
+Python 을 따로 깔지 않고 전부 Docker 로 띄운다. **Docker Desktop 을 먼저 실행**해 둔다.
+
+```powershell
+cd infra
+docker compose -f docker-compose.yml -f docker-compose.ai-stub.yml -f docker-compose.be.yml up -d --build
+```
+
+DB·AI 스텁·API(`:8000`)·워커 컨테이너 4개가 뜬다.
+
+**DB 마이그레이션** — BE 이미지에 `alembic/` 이 들어 있지 않아서, `backend/` 를 붙인 임시 컨테이너로 돌린다.
+처음 한 번, 그리고 BE 에 마이그레이션이 추가될 때마다:
+
+```powershell
+# infra 폴더에서 실행
+$backend = (Resolve-Path ..\backend).Path
+docker run --rm --network infra_default -v "${backend}:/src" -w /src `
+  -e DB_URL=db:5432/glp1_dev -e DB_USER=glp1 -e DB_PASSWORD=glp1_local_dev `
+  glp1-be alembic upgrade head
+```
+
+확인:
+
+```powershell
+curl http://localhost:8000/health     # {"status":"ok"}
+```
+
+> 식사 분석 워커는 아직 결과 저장이 미구현이라, 식사를 등록해도 `ANALYZING` 에서 넘어가지 않는다.
+> 내리기: `docker compose -f docker-compose.ai-stub.yml -f docker-compose.be.yml down`
+> (`--remove-orphans` 는 DB 컨테이너까지 지우니 쓰지 않는다 — `infra/README.md` 참고)
+
+#### 3. 폰에서 PC 서버로 연결 (`adb reverse`)
+
+폰의 `localhost:8000` 을 PC 의 `localhost:8000` 으로 넘긴다. **케이블을 다시 꽂을 때마다** 다시 건다.
+
+```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+& $adb reverse tcp:8000 tcp:8000
+& $adb reverse --list                  # UsbFfs tcp:8000 tcp:8000
+```
+
+> 에뮬레이터라면 `adb reverse` 없이 `API_BASE_URL=http://10.0.2.2:8000/api/v1` 로 PC 에 닿는다.
+
+#### 4. 실서버 모드로 실행
+
+```powershell
+cd frontend
+flutter run -d <device-id> `
+  --dart-define=USE_REAL_API=true `
+  --dart-define=API_BASE_URL=http://localhost:8000/api/v1
+```
+
+첫 빌드는 몇 분 걸린다. 서버에 요청이 들어오는지는 `docker logs -f glp1-api` 로 본다.
+
+> ⚠️ **경로에 한글이 있으면 Android 빌드가 실패한다.**
+> `Your project path contains non-ASCII characters` — Gradle(Android 플러그인)이 막는다.
+> 리포지터리를 `C:\dev\` 같은 **영문 경로에 클론**하는 게 가장 간단하다.
+> 당장 옮기기 어려우면 `frontend` 만 영문 경로로 복사해서 거기서 실행한다
+> (코드를 고치면 다시 복사해야 한다):
+>
+> ```powershell
+> robocopy . C:\dev\glp1-frontend /MIR /XD build .dart_tool .gradle
+> cd C:\dev\glp1-frontend
+> flutter run -d <device-id> --dart-define=USE_REAL_API=true --dart-define=API_BASE_URL=http://localhost:8000/api/v1
+> ```
+>
+> `gradle.properties` 에 `android.overridePathCheck=true` 를 넣어 검사를 끄는 방법도 있지만,
+> 빌드가 다른 곳에서 깨질 수 있고 팀 전체 설정이 바뀌므로 커밋하지 않는다.
+
+#### 5. 자주 쓰는 것
+
+| 하고 싶은 것 | 방법 |
+|---|---|
+| 회원가입부터 다시(로그아웃) | `& $adb shell pm clear com.ktc4.chungnam5.frontend` → 앱 다시 실행. 기기에 저장된 사용자 ID 만 지워진다(서버 DB 의 계정은 남음) |
+| 앱 다시 켜기 | `& $adb shell monkey -p com.ktc4.chungnam5.frontend -c android.intent.category.LAUNCHER 1` |
+| "Lost connection to device" | 케이블이 빠졌거나 화면이 꺼져 디버그 연결이 끊긴 것. 앱은 계속 쓸 수 있지만 **`adb reverse` 를 다시 걸어야** 서버에 닿는다. 핫 리로드가 필요하면 `flutter run` 을 다시 |
+| DB 를 비우고 처음부터 | `docker compose -f docker-compose.yml down -v` 후 2단계부터 다시(볼륨까지 지운다) |
+
 ### 데스크톱
 
 지원하지 않는다. Windows 데스크톱 빌드는 Visual Studio C++ 툴체인이 별도로 필요한데,
@@ -96,7 +207,11 @@ flutter build apk --release  # build/app/outputs/flutter-apk/app-release.apk
 
 ```bash
 dart analyze                 # 정적 분석
-flutter test                 # 위젯 테스트
+flutter test                 # 위젯 테스트 + API 클라이언트 테스트 (더미 모드)
+
+# 각 화면 API 서비스의 실제 호출 경로(경로·메서드·body·응답 파싱)를 가짜 서버 응답으로 확인한다.
+# 기본 실행에서는 건너뛰는 테스트라 옵션을 붙여 따로 돌린다. 실제 BE 는 필요 없다.
+flutter test --dart-define=USE_REAL_API=true test/real_api_services_test.dart test/api_client_test.dart
 ```
 
 > ⚠️ **경로에 한글이 있으면 `flutter analyze`가 죽는다.**
@@ -111,7 +226,11 @@ flutter test                 # 위젯 테스트
 
 ```
 frontend/lib/
-├─ main.dart              앱 진입점 · MaterialApp 설정 · MultiProvider 등록
+├─ main.dart              앱 진입점 · MaterialApp 설정 · MultiProvider 등록 · 첫 화면 선택
+├─ api/                   ApiClient(dio · 응답 래퍼 · X-User-Id) · ApiException · 회원 API · 더미 저장소
+├─ common/
+│  └─ api_format.dart     API 값 ↔ 화면 표시 변환(단계·끼니 라벨, 날짜 파싱·포맷)
+├─ popups/                하루 한 번 팝업(컨디션 기록) · 포만감 체크인 · PopupGate
 ├─ theme/
 │  ├─ app_colors.dart     색상 상수
 │  ├─ app_spacing.dart    여백 스케일 (xs~xxl) · AppLayout
@@ -119,7 +238,9 @@ frontend/lib/
 │  ├─ app_typography.dart 타이포그래피 (Pretendard)
 │  └─ app_theme.dart      ThemeData 조립
 ├─ state/
-│  └─ app_state.dart      화면 2개 이상이 공유하는 상태 (ChangeNotifier)
+│  ├─ app_state.dart      화면 2개 이상이 공유하는 상태 (ChangeNotifier) 예시
+│  ├─ tab_state.dart      현재 탭
+│  └─ user_session.dart   현재 사용자(userId) — 기기에 저장
 ├─ navigation/
 │  └─ root_shell.dart     하단 탭 4개(홈·피드백·기록·마이) 셸
 └─ screens/               탭별 화면
@@ -170,6 +291,11 @@ Navigator.push(
 `--dart-define` 또는 `.env`(gitignore됨)로 주입한다. **키를 소스에 하드코딩하지 않는다.**
 자세한 키 목록은 [`README.md`](./README.md#환경변수) 참고.
 
+| 키 | 기본값 | 설명 |
+|---|---|---|
+| `USE_REAL_API` | `false` | `true` 면 실제 BE 를 부른다. 아니면 더미 응답 |
+| `API_BASE_URL` | `http://localhost:8000/api/v1` | BE 주소. 실기기는 `adb reverse` 후 기본값, 에뮬레이터는 `http://10.0.2.2:8000/api/v1` |
+
 ```bash
-flutter run --dart-define=API_BASE_URL=https://...
+flutter run --dart-define=USE_REAL_API=true --dart-define=API_BASE_URL=https://...
 ```

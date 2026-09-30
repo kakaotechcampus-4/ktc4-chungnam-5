@@ -50,12 +50,35 @@ class MyApp extends StatelessWidget {
 
 /// 저장된 사용자가 없으면 프로필 입력(온보딩), 있으면 탭 화면.
 /// 프로필을 저장하면 [UserSession] 이 바뀌어 자동으로 탭 화면으로 넘어간다.
-class _StartScreen extends StatelessWidget {
+///
+/// 반대로 사용 중에 세션이 지워지면(서버에 사용자가 없음 — `ApiClient` 참고)
+/// 이 화면만 바뀌고 그 위에 push 한 화면·팝업은 남는다. 그래서 그때는
+/// 첫 화면까지 닫고 이유를 알린다.
+class _StartScreen extends StatefulWidget {
   const _StartScreen();
+
+  @override
+  State<_StartScreen> createState() => _StartScreenState();
+}
+
+class _StartScreenState extends State<_StartScreen> {
+  late bool _hadProfile = context.read<UserSession>().hasProfile;
 
   @override
   Widget build(BuildContext context) {
     final hasProfile = context.select<UserSession, bool>((s) => s.hasProfile);
+    if (_hadProfile && !hasProfile) _onSessionLost();
+    _hadProfile = hasProfile;
     return hasProfile ? const RootShell() : const ProfileInputScreen();
+  }
+
+  void _onSessionLost() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('사용자 정보를 찾지 못해 처음부터 다시 시작해요')),
+      );
+    });
   }
 }

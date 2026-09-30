@@ -6,11 +6,13 @@ import '../api/user_api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'profile_input_screen.dart';
 import 'shared_meal_widgets.dart';
 
-/// 마이 탭 — 회원 정보만 보여 준다. Figma 노드가 없어 간단히 구성했다.
+/// 마이 탭 — 회원 정보 조회·수정. Figma 노드가 없어 간단히 구성했다.
 ///
-/// 데이터는 `GET /users/me`. 설정·수정 기능이 정해지면 이 화면에 더한다.
+/// 조회는 `GET /users/me`, 수정은 프로필 입력 화면을 수정 모드로 띄워
+/// `PATCH /users/me` 한다.
 class MyScreen extends StatefulWidget {
   const MyScreen({super.key});
 
@@ -54,6 +56,14 @@ class _MyScreenState extends State<MyScreen> {
     }
   }
 
+  Future<void> _openEdit(UserProfile profile) async {
+    final updated = await Navigator.of(context).push<UserProfile>(
+      MaterialPageRoute(builder: (_) => ProfileInputScreen(initial: profile)),
+    );
+    if (!mounted || updated == null) return;
+    setState(() => _profile = updated);
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
@@ -80,7 +90,10 @@ class _MyScreenState extends State<MyScreen> {
                 message: _errorMessage ?? '잠시 후 다시 시도해 주세요',
                 onRetry: _load,
               ),
-              LoadState.ready => _ProfileCard(profile: profile!),
+              LoadState.ready => _ProfileCard(
+                profile: profile!,
+                onEdit: () => _openEdit(profile),
+              ),
             },
           ],
         ),
@@ -90,9 +103,10 @@ class _MyScreenState extends State<MyScreen> {
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.profile});
+  const _ProfileCard({required this.profile, required this.onEdit});
 
   final UserProfile profile;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +116,17 @@ class _ProfileCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${profile.nickname} 님', style: AppTypography.sectionHead),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${profile.nickname} 님',
+                    style: AppTypography.sectionHead,
+                  ),
+                ),
+                TextButton(onPressed: onEdit, child: const Text('수정')),
+              ],
+            ),
             const SizedBox(height: AppSpacing.md),
             const Divider(height: 1),
             _InfoRow(label: '키', value: _formatNumber(profile.heightCm, 'cm')),
