@@ -24,7 +24,7 @@ Q/Q/S 는 순수 함수라 0.01 초면 끝난다(절대 규칙 2). 확정은 200
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Final, NamedTuple
 
 from sqlalchemy.orm import Session
@@ -34,6 +34,8 @@ from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.crud import satiety as satiety_crud
+from app.crud import user as user_crud
+from app.crud import user_state as user_state_crud
 from app.crud.evaluation import NutrientTotals
 from app.infra.queue import enqueue
 from app.models.enums import (
@@ -41,6 +43,7 @@ from app.models.enums import (
     MealStatus,
     MedicationStage,
     NutrientCode,
+    NutrientState,
     NutritionSource,
 )
 from app.models.meal import Meal
@@ -53,8 +56,8 @@ from app.schemas.evaluation import (
     QqsScores,
 )
 from app.models.evaluation import QQSEvaluation
-from app.services.evaluation.rule_engine import Scores, evaluate
-from app.services.evaluation.stage_profile import emphasis_for
+from app.services.evaluation.rule_engine import MealTargets, Scores, evaluate, meal_targets
+from app.services.evaluation.stage_profile import emphasis_for, profile_for
 
 
 class MealNotFoundError(Exception):
@@ -88,9 +91,12 @@ class EvaluationResult(NamedTuple):
 
 
 DB_SOURCE: Final = "식품안전나라 식품영양성분DB"
-STAGE_RULE_VERSION: Final = "v1"
-WEIGHT_PROFILE_VERSION: Final = "v1"
-"""명세 `evidence` 의 상수들. 채점 기준선(`stage_profile`)을 바꾸면 올린다."""
+STAGE_RULE_VERSION: Final = "v2"
+WEIGHT_PROFILE_VERSION: Final = "v2"
+"""명세 `evidence` 의 상수들. 채점 기준선(`stage_profile`)을 바꾸면 올린다.
+
+v2: Quantity · Quality 채점 도입 (`docs/be-qqs-scoring-rule.md`).
+"""
 
 _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATED})
 """상태만 보고 확정 가능한 것들. `_is_confirmable` 이 쓴다.
@@ -120,11 +126,11 @@ def _is_stale_feedback(
 
     - **상태가 `EVALUATED` 가 아니다** — 음식을 고쳐 `mark_recalculating` 을 거쳐
       왔다는 뜻이다. 성분이 달라졌으니 그 성분을 보고 쓴 문장은 낡았다.
-      점수 비교로는 이걸 못 잡는다 — Quantity·Quality 가 아직 `None` 이고 Satiety 는
-      요청값을 그대로 쓰므로, **음식을 고쳐도 점수는 하나도 안 바뀐다.**
+      점수 비교로는 다 못 잡는다 — 체중이 없으면 Quality 가 `None` 이고, 음식을 바꿔도
+      Quantity 가 같은 점수(구간 안이면 100)에 머물 수 있다. **점수가 같아도 성분은 바뀌었다.**
     - **점수가 달라졌다** — 사용자가 `satietyAfterPct` 를 고쳐 다시 확정했다.
       상태로는 못 잡는다. 음식을 안 고쳤으면 `EVALUATED` 그대로 들어온다.
-      Quantity·Quality 가 채워지면 그쪽 변화도 자동으로 잡힌다.
+      Quantity·Quality 의 변화(예: 체중을 새로 기록해 목표가 바뀜)도 여기서 잡힌다.
 
     첫 확정은 `previous` 가 없어 True 다 — 지울 행도 없어 0 행 UPDATE 다.
     """
@@ -164,6 +170,58 @@ _NUTRIENT_ROWS: Final[tuple[tuple[NutrientCode, str, str, str], ...]] = (
 )
 """명세 `nutrients[]` 의 세 줄 — (코드, 합계 필드, 라벨, 단위). 순서·라벨·단위가 명세 그대로다."""
 
+_TARGET_STEP: Final = Decimal("0.1")
+
+_LIMIT_KEYS: Final = frozenset({"sodium_mg"})
+"""목표가 아니라 **한도**인 성분. 넘으면 `OVER`, 모자란 건 문제가 아니다."""
+
+
+def _weight_at(db: Session, meal: Meal) -> Decimal | None:
+    """먹을 때의 체중. 그 이전 기록이 없으면 가장 최근 체중으로 대신한다.
+
+    투약 단계를 "먹을 때의 단계" 로 읽는 것과 같은 원칙이다(`_stage_of`). 대신하는
+    경우는 가입 직후 과거 시각으로 식사를 적었을 때다 — 그때 체중이 없다고 Quality 를
+    비우면, 온보딩에서 받은 체중이 있는데도 점수가 안 나온다.
+    """
+    weight = user_state_crud.get_latest_weight_before(
+        db, user_id=meal.user_id, before=meal.eaten_at
+    )
+    if weight is None:
+        weight = user_state_crud.get_latest_weight(db, meal.user_id)
+    return weight
+
+
+def _targets(
+    stage: MedicationStage, weight_kg: Decimal | None
+) -> MealTargets:
+    """그 단계 · 그때 체중의 끼니 목표. confirm 과 조회가 **같은 함수**로 구한다."""
+    return meal_targets(profile_for(stage).daily, weight_kg)
+
+
+def _usable(totals: NutrientTotals, key: str) -> Decimal | None:
+    """채점에 쓰는 성분 합계. **화면의 `current` 와 같은 기준이다.**
+
+    합산된 음식 중 그 성분 컬럼이 비어 있던 게 있으면(`missing`) None — 화면도 그
+    합계를 안 내보낸다.
+
+    **빠진 음식(`excluded > 0`)이 있어도 있는 것만으로 쓴다** (2026-09-30 결정).
+    그 경우 응답에 `NUTRITION_NOT_MATCHED` 경고가 이미 붙는다
+    (`api/v1/endpoints/evaluations.py::_respond`). 감수하는 것: 빠진 만큼 낮게 나온다.
+    """
+    if totals.missing.get(key):
+        return None
+    return getattr(totals, key)
+
+
+def _state(
+    current: Decimal | None, target: Decimal | None, *, is_limit: bool
+) -> NutrientState | None:
+    if current is None or target is None:
+        return None
+    if is_limit:
+        return NutrientState.OVER if current > target else NutrientState.OK
+    return NutrientState.SHORT if current < target else NutrientState.OK
+
 
 def _stage_of(db: Session, meal: Meal) -> MedicationStage:
     """그 식사 시점의 투약 단계.
@@ -184,11 +242,21 @@ def _as_float(value: Decimal | None) -> float | None:
     return None if value is None else float(value)
 
 
+def _shown_target(value: Decimal | None) -> Decimal | None:
+    """화면에 내보내는 목표치 — 소수 1자리. 표시와 `state` 판정이 **같은 값**을 쓴다.
+
+    8.333… g 을 그대로 주면 화면이 자리수를 다뤄야 하고, 표시만 반올림하면
+    보이는 숫자와 판정이 어긋난다.
+    """
+    return None if value is None else value.quantize(_TARGET_STEP, rounding=ROUND_HALF_UP)
+
+
 def _build_view(
     meal: Meal,
     *,
     stage: MedicationStage,
     totals: NutrientTotals,
+    targets: MealTargets,
     scores: QqsScores,
     model: type[MealEvaluationResponse] = MealEvaluationResponse,
     **extra: object,
@@ -211,20 +279,21 @@ def _build_view(
             NutrientRow(
                 code=code,
                 label=label,
-                # **결측이 있으면 합계를 안 내보낸다.** 그 성분값이 비어 있던 항목은
-                # SUM 이 조용히 건너뛰어서, 숫자를 주면 부분합이 완전한 값으로 읽힌다.
-                # 같은 응답 안에서 단백질만 부분합이고 식이섬유는 완전한 상태가 되는데
-                # 겉으로는 구분이 안 된다 (`NutrientTotals.missing`).
+                # **결측이 있으면 합계를 안 내보낸다.** (기존 주석 유지)
                 current=(
                     None
                     if totals.missing.get(key)
                     else _as_float(getattr(totals, key))
                 ),
-                # 단계별 목표치가 팀 확정 전이라 null 이다.
-                # 명세: "target · state 는 null 허용. 미확정 시 게이지 미표시."
-                target=None,
+                target=_as_float(_shown_target(getattr(targets, key))),
                 unit=unit,
-                state=None,
+                # 상태는 **화면에 보이는 목표**와 비교한다. 반올림 전 값과 비교하면
+                # `8.3 / 8.3` 인데 SHORT 가 나간다. 채점(`rule_engine`)은 반올림 전 값을 쓴다.
+                state=_state(
+                    _usable(totals, key),
+                    _shown_target(getattr(targets, key)),
+                    is_limit=key in _LIMIT_KEYS,
+                ),
             )
             for code, key, label, unit in _NUTRIENT_ROWS
         ],
@@ -310,8 +379,21 @@ def confirm(
 
     stage = _stage_of(db, meal)
     totals = evaluation_crud.sum_nutrients(db, meal.id)
-    # 기준선이 미정이라 Quantity·Quality 는 None 이다 (`rule_engine` 독스트링).
-    scores = evaluate(satiety_after_pct=request.satiety_after_pct)
+    user = user_crud.get(db, user_id)
+    if user is None:  # _owned_meal 을 통과했으니 도달 불가. assert 는 -O 에서 지워진다
+        raise RuntimeError(f"user {user_id} 가 없습니다.")
+    weight = _weight_at(db, meal)
+    targets = _targets(stage, weight)
+    scores = evaluate(
+        profile=profile_for(stage),
+        satiety_after_pct=request.satiety_after_pct,
+        meal_kcal=_usable(totals, "kcal"),
+        baseline_meal_kcal=user.baseline_meal_kcal,
+        protein_g=_usable(totals, "protein_g"),
+        fiber_g=_usable(totals, "fiber_g"),
+        sodium_mg=_usable(totals, "sodium_mg"),
+        weight_kg=weight,
+    )
 
     # `upsert` 보다 **먼저** 읽는다 — 덮고 나면 비교할 옛 점수가 없다.
     stale = _is_stale_feedback(meal, evaluation_crud.get_by_meal(db, meal.id), scores)
@@ -340,6 +422,7 @@ def confirm(
             meal,
             stage=stage,
             totals=totals,
+            targets=targets,
             scores=QqsScores(**scores._asdict()),
             model=MealConfirmResponse,
             # 점수는 났지만 문장은 아직이다. AI 가 따로 만든다.
@@ -391,6 +474,8 @@ def get_view(
             # 조회도 하나 줄어든다.
             stage=row.stage_at_evaluation,
             totals=totals,
+            targets=_targets(row.stage_at_evaluation, _weight_at(db, meal)),
+
             scores=QqsScores(
                 quantity=_int(row.quantity_score),
                 quality=_int(row.quality_score),
