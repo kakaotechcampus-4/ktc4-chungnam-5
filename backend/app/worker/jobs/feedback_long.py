@@ -103,11 +103,16 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
         db, user_id=user_id, range_start=last_start, range_end=last_end
     )[-1].stage
 
+    # ALL 의 period_start 는 UNIQUE 키 고정값(1970-01-01)이지 실제 날짜가 아니다. 그대로 보내면
+    # 모델이 문장에 그 날짜를 쓸 수 있어, AI 에는 실제 분석 시작일(점수 있는 첫 날)을 보낸다.
+    # WEEKLY · MONTHLY 는 창 자체가 분석 구간이라 첫 며칠이 비어도 창 시작일을 보낸다.
+    ai_period_start = series[0]["date"] if date_from is None else period_start.isoformat()
+
     result = ai.long_feedback(
         {
             "userId": str(user_id),
             "periodType": period_type.value,
-            "periodStart": period_start.isoformat(),
+            "periodStart": ai_period_start,
             "periodEnd": period_end.isoformat(),
             "stage": stage.value,
             "series": series,

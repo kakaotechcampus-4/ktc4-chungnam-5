@@ -554,6 +554,33 @@ def test_all_period_has_no_lower_bound(db):
     assert row.period_end == END
 
 
+def test_all_period_sends_first_scored_date_to_ai(db):
+    """L22b: ALL 이면 AI 에는 점수 있는 첫 날을 periodStart 로 보낸다 — 고정 키(1970-01-01)는 실제 날짜가 아니다.
+
+    고정 키가 넘어가면 모델이 "1970년부터" 같은 문장을 쓸 수 있다. 저장 키는 그대로다.
+    """
+    user = make_user(db)
+    _scored_meal(db, user, date(2024, 1, 5))
+    _enough_days(db, user, 2)
+    ai = FakeAi()
+
+    run(db, _task(user.id, period_type="ALL", period_start=ALL_PERIOD_START), ai)
+
+    assert ai.calls[0]["periodStart"] == "2024-01-05"
+    assert _only_row(db, user.id).period_start == ALL_PERIOD_START
+
+
+def test_rolling_window_sends_window_start_even_if_first_days_are_empty(db):
+    """L22c: WEEKLY 는 첫 며칠에 식사가 없어도 창 시작일을 그대로 보낸다 — "이번 주" 창 자체가 분석 구간이다 (L22b 짝)."""
+    user = make_user(db)
+    _enough_days(db, user, start=START + timedelta(days=2))
+    ai = FakeAi()
+
+    run(db, _task(user.id), ai)
+
+    assert ai.calls[0]["periodStart"] == START.isoformat()
+
+
 def test_all_period_excludes_meals_after_period_end(db):
     """L23: ALL 도 상한(periodEnd)은 지킨다."""
     user = make_user(db)

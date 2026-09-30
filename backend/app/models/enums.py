@@ -110,8 +110,9 @@ class FeedbackPeriodType(str, enum.Enum):
     WEEKLY = "WEEKLY"
     MONTHLY = "MONTHLY"
     ALL = "ALL"
-    """전체 기간. `period_start` 가 무엇을 뜻하는지(가입일? 첫 식사일?)는 아직
-    미정 — `worker/jobs/feedback_long.py` 구현 시 정한다."""
+    """전체 기간. `long_term_feedbacks.period_start` 는 실제 날짜가 아니라 UNIQUE 키 고정값
+    `ALL_PERIOD_START`(1970-01-01)다 — 워커(`worker/jobs/feedback_long.py`)는 하한 없이 모으고,
+    AI 에는 점수 있는 첫 날을 periodStart 로 보낸다. 조회 API 는 `period.from` 을 null 로 내보낸다."""
 
 
 class TaskStatus(str, enum.Enum):
