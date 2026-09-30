@@ -274,11 +274,12 @@ def test_rerun_overwrites_summary(db):
     assert _only_row(db, user.id).summary == "B"
 
 
-def test_rerun_keeps_id_and_refreshes_created_at(db):
-    """W21: 재실행하면 같은 행(id 유지)의 created_at 이 새로 찍힌다 (D2(b)).
+def test_rerun_keeps_id_and_created_at(db):
+    """R13(W21 교체): 재실행해도 같은 행(id 유지)이고 created_at 은 최초 생성 시각 그대로다.
 
-    created_at 이 곧 generatedAt 이다. 트랜잭션 안에서 now() 가 고정되므로 첫 실행 뒤
-    created_at 을 과거로 옮겨 두고, 재실행이 그 값을 바꾸는지로 본다.
+    created_at 은 최초 INSERT 시각이고, 마지막 생성 시각은 updated_at 이 맡는다 (#46 과 같은 결론).
+    트랜잭션 안에서 now() 가 고정되므로 첫 실행 뒤 created_at 을 과거로 옮겨 두고,
+    재실행이 그 값을 건드리지 않는지로 본다.
     """
     user = make_user(db)
     _evidence(db, user)
@@ -295,7 +296,45 @@ def test_rerun_keeps_id_and_refreshes_created_at(db):
     rows = _daily_rows(db, user.id)
     assert len(rows) == 1
     assert rows[0].id == first.id
-    assert rows[0].created_at > past
+    assert rows[0].created_at == past
+
+
+def test_rerun_refreshes_updated_at(db):
+    """R14: 재실행하면 같은 행의 updated_at 이 새로 찍힌다 — generatedAt · stale 판정 기준이다.
+
+    ON CONFLICT 는 SQLAlchemy onupdate 를 타지 않으므로 upsert 가 직접 넣어야 한다.
+    첫 실행 뒤 updated_at 을 과거로 옮겨 두고, 재실행이 그 값을 바꾸는지로 본다.
+    """
+    user = make_user(db)
+    _evidence(db, user)
+    run(db, _task(user.id), FakeAi())
+    first = _only_row(db, user.id)
+    past = datetime(2000, 1, 1, tzinfo=UTC)
+    db.execute(
+        update(DailyFeedback).where(DailyFeedback.id == first.id).values(updated_at=past)
+    )
+    db.flush()
+
+    run(db, _task(user.id), FakeAi())
+
+    rows = _daily_rows(db, user.id)
+    assert len(rows) == 1
+    assert rows[0].updated_at > past
+
+
+def test_first_run_sets_updated_at_equal_to_created_at(db):
+    """R15: 처음 만든 행은 updated_at 이 채워져 있고 created_at 과 같다.
+
+    축: 회귀 — 컬럼 기본값(now())이 빠지면 첫 생성 행의 generatedAt 이 비거나 어긋난다.
+    """
+    user = make_user(db)
+    _evidence(db, user)
+
+    run(db, _task(user.id), FakeAi())
+
+    row = _only_row(db, user.id)
+    assert row.updated_at is not None
+    assert row.updated_at == row.created_at
 
 
 # ─────────────────────────── 근거 거르기 ───────────────────────────

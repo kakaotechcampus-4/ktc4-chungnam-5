@@ -81,6 +81,12 @@ class DailyFeedback(Base):
         server_default=SafetyStatus.REVIEW_REQUIRED.value,
     )
     created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = updated_at()
+    """마지막으로 생성/재생성된 시각. `created_at` 은 최초 INSERT 시각에 고정된다.
+
+    **주의**: `ON CONFLICT DO UPDATE` 로 upsert 하면 SQLAlchemy 의 `onupdate` 가
+    자동으로 안 걸린다 — `crud/daily_feedback.py::upsert` 의 `set_` 에
+    `updated_at=func.now()` 를 직접 넣어야 한다."""
 
     sources: Mapped[list["DailyFeedbackSource"]] = relationship(
         back_populates="daily_feedback", cascade="all, delete-orphan"

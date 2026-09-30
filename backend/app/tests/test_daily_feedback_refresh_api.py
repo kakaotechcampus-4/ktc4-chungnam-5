@@ -6,12 +6,13 @@
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 from sqlalchemy import func, select
 
 from app.core.time import KST
+from app.crud.daily_feedback import get_latest_refresh_task
 from app.models.enums import TaskStatus
 from app.models.feedback import DailyFeedback
 from app.models.task import Task
@@ -38,6 +39,32 @@ def _count_tasks(db) -> int:
     return db.execute(
         select(func.count()).select_from(Task).where(Task.type == TASK_TYPE)
     ).scalar_one()
+
+
+def _put_task(
+    db,
+    *,
+    user_id: uuid.UUID,
+    date: str = D,
+    status: TaskStatus = TaskStatus.PENDING,
+    type: str = TASK_TYPE,
+    payload: dict | None = None,
+    created_at: datetime | None = None,
+) -> Task:
+    """task_queue 에 작업 1행을 직접 심는다. flush 까지만.
+
+    같은 트랜잭션 안에서는 now() 가 고정되므로, 순서가 판정에 영향을 주면 created_at 을 명시한다.
+    """
+    extra = {"created_at": created_at} if created_at is not None else {}
+    task = Task(
+        type=type,
+        payload=payload if payload is not None else {"userId": str(user_id), "date": date},
+        status=status,
+        **extra,
+    )
+    db.add(task)
+    db.flush()
+    return task
 
 
 def _add_safe_evidence(db, user) -> None:
@@ -147,10 +174,11 @@ def test_payload_user_id_is_the_header_user(client, db):
     assert tasks[0].payload["userId"] == str(user2.id)
 
 
-def test_two_requests_same_day_enqueue_two_tasks(client, db):
-    """A14: 같은 날 두 번 요청하면 둘 다 202 GENERATING 이고 작업이 2건 쌓인다 (중복 허용, D7(a)).
+def test_two_requests_same_day_enqueue_only_one_task(client, db):
+    """R1(A14 교체): 같은 날 두 번 요청하면 둘 다 202 GENERATING 이지만 작업은 1건만 쌓인다.
 
-    워커가 upsert 라 두 번 돌아도 행은 하나다 (W14).
+    첫 작업이 아직 PENDING 이라 두 번째 요청은 새로 넣지 않는다 — 새로고침 연타마다
+    AI 를 여러 번 부르지 않고, 워커 여러 대가 같은 행을 동시에 upsert 하지 않게 한다 (#46 과 같은 결론).
     """
     user = make_user(db)
 
@@ -160,7 +188,7 @@ def test_two_requests_same_day_enqueue_two_tasks(client, db):
     for response in (first, second):
         assert response.status_code == 202, response.text
         assert response.json()["data"]["status"] == "GENERATING"
-    assert _count_tasks(db) == 2
+    assert _count_tasks(db) == 1
 
 
 def test_no_evidence_still_returns_202_and_enqueues(client, db):
@@ -275,3 +303,196 @@ def test_today_kst_is_accepted(client, db, frozen_today):
 
     assert response.status_code == 202, response.text
     assert _count_tasks(db) == 1
+
+
+# ─────────────────────────── 중복 요청 방지 ───────────────────────────
+
+
+def test_pending_task_blocks_new_enqueue_and_returns_generating(client, db):
+    """R2: 같은 사용자·날짜의 대기(PENDING) 작업이 있으면 새로 넣지 않고 202 GENERATING 을 준다.
+
+    이미 워커가 처리할 작업이 있다 — 하나 더 넣으면 AI 호출만 늘고 결과는 같다.
+    """
+    user = make_user(db)
+    pending = _put_task(db, user_id=user.id)
+
+    response = client.post(URL, json={"date": D}, headers=_headers(user))
+
+    assert response.status_code == 202, response.text
+    assert response.json()["data"] == {"status": "GENERATING", "pollIntervalMs": 1500}
+    tasks = _tasks(db)
+    assert [task.id for task in tasks] == [pending.id]
+
+
+def test_latest_pending_blocks_even_with_older_done(client, db):
+    """R3: 최신 작업이 PENDING 이면 그보다 오래된 DONE 이 있어도 새로 넣지 않는다.
+
+    판정은 가장 최근 작업 하나로 한다 — 오래된 DONE 을 보고 새로 넣으면 중복이 생긴다.
+    """
+    user = make_user(db)
+    _put_task(
+        db, user_id=user.id, status=TaskStatus.DONE,
+        created_at=datetime(2026, 8, 21, 9, 0, tzinfo=KST),
+    )
+    _put_task(
+        db, user_id=user.id, status=TaskStatus.PENDING,
+        created_at=datetime(2026, 8, 21, 10, 0, tzinfo=KST),
+    )
+
+    response = client.post(URL, json={"date": D}, headers=_headers(user))
+
+    assert response.status_code == 202, response.text
+    assert response.json()["data"]["status"] == "GENERATING"
+    assert _count_tasks(db) == 2
+
+
+@pytest.mark.parametrize(
+    "previous_status",
+    [
+        pytest.param(TaskStatus.DONE, id="R4-done"),
+        pytest.param(TaskStatus.FAILED, id="R5-failed"),
+    ],
+)
+def test_finished_previous_task_allows_new_enqueue(client, db, previous_status):
+    """R4·R5: 직전 작업이 DONE 이거나 FAILED 면 새 작업을 넣는다.
+
+    끝난 작업까지 막으면 사용자가 다시 생성할 방법이 없다 (R2·R3 의 짝).
+    """
+    user = make_user(db)
+    _put_task(db, user_id=user.id, status=previous_status)
+
+    response = client.post(URL, json={"date": D}, headers=_headers(user))
+
+    assert response.status_code == 202, response.text
+    tasks = _tasks(db)
+    assert len(tasks) == 2
+    pending = [task for task in tasks if task.status == TaskStatus.PENDING]
+    assert len(pending) == 1
+    assert pending[0].payload == {"userId": str(user.id), "date": D}
+
+
+def test_other_users_pending_task_does_not_block(client, db):
+    """R6: 다른 사용자의 같은 날 PENDING 작업은 내 요청을 막지 않는다.
+
+    userId 조건이 빠지면 한 사용자의 새로고침이 모든 사용자를 막는다.
+    """
+    user = make_user(db, nickname="나")
+    other = make_user(db, nickname="남")
+    _put_task(db, user_id=other.id)
+
+    response = client.post(URL, json={"date": D}, headers=_headers(user))
+
+    assert response.status_code == 202, response.text
+    mine = [
+        task for task in _tasks(db)
+        if task.payload["userId"] == str(user.id) and task.status == TaskStatus.PENDING
+    ]
+    assert len(mine) == 1
+
+
+def test_my_other_date_pending_task_does_not_block(client, db):
+    """R7: 내 다른 날짜의 PENDING 작업은 이 날짜의 요청을 막지 않는다.
+
+    date 조건이 빠지면 어제 피드백을 생성 중일 때 오늘 피드백을 요청할 수 없다.
+    """
+    user = make_user(db)
+    _put_task(db, user_id=user.id, date="2026-08-20")
+
+    response = client.post(URL, json={"date": D}, headers=_headers(user))
+
+    assert response.status_code == 202, response.text
+    today = [
+        task for task in _tasks(db)
+        if task.payload["date"] == D and task.status == TaskStatus.PENDING
+    ]
+    assert len(today) == 1
+
+
+def test_other_type_pending_task_does_not_block(client, db):
+    """R8: 다른 타입(feedback.long)의 PENDING 작업은 하루 피드백 요청을 막지 않는다.
+
+    type 조건이 빠지면 장기 피드백 생성 중에 하루 피드백을 요청할 수 없다.
+    payload 에 date 까지 같게 넣는다 — 없으면 date 조건이 대신 걸러 type 누락을 못 잡는다.
+    """
+    user = make_user(db)
+    _put_task(
+        db, user_id=user.id, type="feedback.long",
+        payload={"userId": str(user.id), "date": D, "periodType": "WEEKLY"},
+    )
+
+    response = client.post(URL, json={"date": D}, headers=_headers(user))
+
+    assert response.status_code == 202, response.text
+    assert _count_tasks(db) == 1
+
+
+def test_unknown_user_with_pending_task_still_returns_404(client, db):
+    """R11: 대기 작업이 있어도 없는 사용자면 404 USER_NOT_FOUND 이고 작업 수는 그대로다.
+
+    축: 회귀 — 중복 판정이 사용자 확인보다 먼저 와서 202 로 새는 것을 막는다.
+    """
+    unknown = uuid.uuid4()
+    _put_task(db, user_id=unknown)
+
+    response = client.post(URL, json={"date": D}, headers={"X-User-Id": str(unknown)})
+
+    _assert_error(response, 404, "USER_NOT_FOUND")
+    assert _count_tasks(db) == 1
+
+
+def test_future_date_with_pending_task_still_returns_422(client, db, frozen_today):
+    """R12: 대기 작업이 있어도 미래 날짜면 422 VALIDATION_ERROR 이고 작업 수는 그대로다.
+
+    축: 회귀 — 중복 판정이 날짜 검증보다 먼저 와서 202 로 새는 것을 막는다.
+    """
+    user = make_user(db)
+    _put_task(db, user_id=user.id, date="2026-08-22")
+
+    response = client.post(URL, json={"date": "2026-08-22"}, headers=_headers(user))
+
+    _assert_error(response, 422, "VALIDATION_ERROR")
+    assert _count_tasks(db) == 1
+
+
+# ─────────────────────────── crud: get_latest_refresh_task ───────────────────────────
+
+
+def test_get_latest_refresh_task_returns_most_recent_for_user_and_date(db):
+    """R9: 같은 사용자·날짜의 feedback.daily 작업 중 가장 최근에 등록된 1건을 돌려준다.
+
+    다른 사용자·다른 날짜·다른 타입의 더 최근 작업은 고르지 않는다.
+    """
+    user = make_user(db, nickname="나")
+    other = make_user(db, nickname="남")
+    _put_task(
+        db, user_id=user.id, status=TaskStatus.PENDING,
+        created_at=datetime(2026, 8, 21, 9, 0, tzinfo=KST),
+    )
+    latest = _put_task(
+        db, user_id=user.id, status=TaskStatus.FAILED,
+        created_at=datetime(2026, 8, 21, 10, 0, tzinfo=KST),
+    )
+    newer = datetime(2026, 8, 21, 11, 0, tzinfo=KST)
+    _put_task(db, user_id=other.id, created_at=newer)
+    _put_task(db, user_id=user.id, date="2026-08-20", created_at=newer)
+    _put_task(
+        db, user_id=user.id, type="feedback.long",
+        payload={"userId": str(user.id), "date": D}, created_at=newer,
+    )
+
+    found = get_latest_refresh_task(db, user_id=user.id, feedback_date=date(2026, 8, 21))
+
+    assert found is not None
+    assert found.id == latest.id
+
+
+def test_get_latest_refresh_task_returns_none_when_no_match(db):
+    """R10: 이 사용자·날짜의 feedback.daily 작업이 없으면 None 이다 — 남의 작업을 대신 돌려주지 않는다."""
+    user = make_user(db, nickname="나")
+    other = make_user(db, nickname="남")
+    _put_task(db, user_id=other.id)
+    _put_task(db, user_id=user.id, date="2026-08-20")
+
+    found = get_latest_refresh_task(db, user_id=user.id, feedback_date=date(2026, 8, 21))
+
+    assert found is None

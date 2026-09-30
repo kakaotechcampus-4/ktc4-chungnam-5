@@ -21,6 +21,20 @@ from app.models.enums import SafetyStatus
 from app.models.evaluation import QQSEvaluation
 from app.models.feedback import DailyFeedback, DailyFeedbackSource, MealFeedback
 from app.models.meal import Meal
+from app.models.task import Task
+
+REFRESH_TASK_TYPE = "feedback.daily"
+
+
+def get_latest_refresh_task(
+    db: Session, *, user_id: uuid.UUID, feedback_date: date
+) -> Task | None:
+    """이 사용자·날짜의 feedback.daily 작업 중 가장 최근에 등록된 것. 없으면 None.
+
+    payload 키 이름(userId/date)은 `worker/jobs/feedback_daily.py` 가 이미
+    정해둔 것과 맞춘다 — 여기서 새로 정하면 워커가 못 읽는다.
+    """
+    raise NotImplementedError("get_latest_refresh_task 미구현")
 
 
 def list_day_evidence(
