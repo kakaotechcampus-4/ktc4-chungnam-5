@@ -5,18 +5,35 @@ insights.py 는 장기 피드백 담당이라 하루 피드백은 이 파일에 
 """
 
 import uuid
+from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
 from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
-from app.schemas.daily_feedbacks import DailyFeedbackRefreshRequest
+from app.schemas.daily_feedbacks import DailyFeedbackRefreshRequest, DailyFeedbackResponse
 from app.schemas.insights import InsightRefreshResponse
 from app.services import daily_feedback as daily_feedback_service
 
 router = APIRouter()
+
+
+@router.get(
+    "/insights/daily",
+    response_model=ApiResponse[DailyFeedbackResponse],
+    responses=error_responses(401, 404, 422),
+)
+def get_daily_feedback(
+    target_date: date = Query(..., alias="date"),
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[DailyFeedbackResponse]:
+    """그날 하루 피드백 조회. 읽기 전용 — FE 는 refresh 202 뒤 이 API 를 폴링한다."""
+    return ok(
+        daily_feedback_service.get_daily_feedback(db, user_id=user_id, target_date=target_date)
+    )
 
 
 @router.post(
