@@ -187,7 +187,7 @@ def refresh_long_term_insight(
 
     latest_task = insight_crud.get_latest_refresh_task(db, user_id=user_id, period_type=period_type)
     if latest_task is not None and latest_task.status == TaskStatus.PENDING:
-        return InsightRefreshResponse(status=FeedbackStatus.GENERATING)
+        return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)
 
     enqueue(
         db,
@@ -201,4 +201,4 @@ def refresh_long_term_insight(
     )
     db.commit()
 
-    return InsightRefreshResponse(status=FeedbackStatus.GENERATING)
+    return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)

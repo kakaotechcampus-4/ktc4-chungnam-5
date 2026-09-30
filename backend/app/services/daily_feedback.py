@@ -53,7 +53,7 @@ def request_refresh(
         db, user_id=user_id, feedback_date=target_date
     )
     if latest_task is not None and latest_task.status == TaskStatus.PENDING:
-        return InsightRefreshResponse(status=FeedbackStatus.GENERATING)
+        return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)
 
     # payload 키는 워커(jobs/feedback_daily.py)가 읽는 이름과 같아야 한다.
     enqueue(
@@ -64,4 +64,4 @@ def request_refresh(
 
     db.commit()
 
-    return InsightRefreshResponse(status=FeedbackStatus.GENERATING)
+    return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)

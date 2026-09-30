@@ -114,7 +114,7 @@ def test_valid_request_returns_202_generating_with_poll_interval(client, db):
     assert response.status_code == 202, response.text
     body = response.json()
     assert body["success"] is True
-    assert body["data"] == {"status": "GENERATING", "pollIntervalMs": 1500}
+    assert body["data"] == {"feedbackStatus": "GENERATING", "pollIntervalMs": 1500}
 
 
 def test_response_has_no_timeout_ms(client, db):
@@ -187,7 +187,7 @@ def test_two_requests_same_day_enqueue_only_one_task(client, db):
 
     for response in (first, second):
         assert response.status_code == 202, response.text
-        assert response.json()["data"]["status"] == "GENERATING"
+        assert response.json()["data"]["feedbackStatus"] == "GENERATING"
     assert _count_tasks(db) == 1
 
 
@@ -319,7 +319,7 @@ def test_pending_task_blocks_new_enqueue_and_returns_generating(client, db):
     response = client.post(URL, json={"date": D}, headers=_headers(user))
 
     assert response.status_code == 202, response.text
-    assert response.json()["data"] == {"status": "GENERATING", "pollIntervalMs": 1500}
+    assert response.json()["data"] == {"feedbackStatus": "GENERATING", "pollIntervalMs": 1500}
     tasks = _tasks(db)
     assert [task.id for task in tasks] == [pending.id]
 
@@ -342,7 +342,7 @@ def test_latest_pending_blocks_even_with_older_done(client, db):
     response = client.post(URL, json={"date": D}, headers=_headers(user))
 
     assert response.status_code == 202, response.text
-    assert response.json()["data"]["status"] == "GENERATING"
+    assert response.json()["data"]["feedbackStatus"] == "GENERATING"
     assert _count_tasks(db) == 2
 
 
@@ -365,7 +365,7 @@ def test_older_pending_does_not_block_when_latest_is_done(client, db):
     response = client.post(URL, json={"date": D}, headers=_headers(user))
 
     assert response.status_code == 202, response.text
-    assert response.json()["data"]["status"] == "GENERATING"
+    assert response.json()["data"]["feedbackStatus"] == "GENERATING"
     assert _count_tasks(db) == 3
 
 
