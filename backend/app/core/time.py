@@ -3,7 +3,7 @@
 DB 는 UTC(timestamptz)로 저장하고, "하루" 경계와 응답 표기는 KST 로 한다.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 KST = ZoneInfo("Asia/Seoul")
@@ -19,7 +19,7 @@ def today_kst() -> date:
     "하루" 경계를 쓰는 곳은 전부 이걸 쓴다 — 한 곳이라도 `date.today()` 를 쓰면
     같은 순간에 두 답이 나온다.
     """
-    return datetime.now(KST).date()
+    return now_kst().date()
 
 
 def now_kst() -> datetime:
@@ -28,4 +28,10 @@ def now_kst() -> datetime:
     "오늘"(`now_kst().date()`)과 "몇 분 전"을 같은 한 순간에서 뽑으려고 둔다.
     모듈 전역 `datetime` 을 써야 테스트의 시각 고정(monkeypatch)이 잡는다.
     """
-    raise NotImplementedError("now_kst 미구현")
+    return datetime.now(KST)
+
+
+def kst_day_range(day: date) -> tuple[datetime, datetime]:
+    """KST 하루 `[00:00, 다음날 00:00)`. eaten_at 은 UTC 로 저장되므로 UTC 날짜로 자르지 않는다."""
+    start = datetime.combine(day, time.min, tzinfo=KST)
+    return start, start + timedelta(days=1)

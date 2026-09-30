@@ -598,7 +598,23 @@ def list_meals_in_range(
     각 행은 (Meal, quantity_score, quality_score, satiety_score) 튜플이다 — 평가 전이면 점수는 None.
     eaten_at · id 오름차순. 커서용 `list_meals` 와 달리 하루 범위(홈의 "오늘의 식사")용이다.
     """
-    raise NotImplementedError("list_meals_in_range 미구현")
+    stmt = (
+        select(
+            Meal,
+            QQSEvaluation.quantity_score,
+            QQSEvaluation.quality_score,
+            QQSEvaluation.satiety_score,
+        )
+        .outerjoin(QQSEvaluation, QQSEvaluation.meal_id == Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+        )
+        .order_by(Meal.eaten_at.asc(), Meal.id.asc())
+    )
+    return list(db.execute(stmt).all())
 
 
 def get_latest_meal_with_satiety_after(db: Session, *, user_id: uuid.UUID) -> Row | None:
@@ -606,4 +622,15 @@ def get_latest_meal_with_satiety_after(db: Session, *, user_id: uuid.UUID) -> Ro
 
     행은 (Meal, satiety_after) 튜플이다. 날짜로 한정하지 않는다. 없으면 None.
     """
-    raise NotImplementedError("get_latest_meal_with_satiety_after 미구현")
+    stmt = (
+        select(Meal, SatietyLog.satiety_after)
+        .join(SatietyLog, SatietyLog.meal_id == Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            SatietyLog.satiety_after.is_not(None),
+        )
+        .order_by(Meal.eaten_at.desc(), Meal.id.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).first()

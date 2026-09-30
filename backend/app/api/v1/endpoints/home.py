@@ -11,9 +11,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
-from app.core.response import ApiResponse, error_responses
+from app.core.errors import ApiError, ErrorCode
+from app.core.response import ApiResponse, error_responses, ok
+from app.core.time import now_kst
 from app.db.session import get_db
 from app.schemas.home import HomeResponse
+from app.services import home as home_service
+from app.services import medication as medication_service
 
 router = APIRouter()
 
@@ -35,4 +39,16 @@ def get_home(
     `medication: null` 로 200 이다. 기준 식사가 없으면 `stomach: null` 이다.
     없는 사용자는 404 `USER_NOT_FOUND` 다. 읽기 전용.
     """
-    raise NotImplementedError("GET /home 미구현")
+    # 시계는 여기서 한 번만 읽는다 — 투약의 "오늘"과 홈의 "오늘"·"몇 분 전"이 같은 순간이어야 한다.
+    now = now_kst()
+
+    # 투약은 GET /medications/current 의 계산을 그대로 쓴다. 미등록(STAGE_NOT_SET)은 홈에서는
+    # 에러가 아니라 "카드 대신 입력 안내"라 None 으로 흡수한다. 없는 사용자 404 등은 그대로 올린다.
+    try:
+        medication = medication_service.get_current_view(db, user_id, today=now.date())
+    except ApiError as exc:
+        if exc.code is not ErrorCode.STAGE_NOT_SET:
+            raise
+        medication = None
+
+    return ok(home_service.get_home(db, user_id=user_id, medication=medication, now=now))
