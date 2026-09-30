@@ -6,6 +6,8 @@ from app.api.v1.endpoints import (
     daily_feedbacks,
     dashboard,
     evaluations,
+    feedbacks,
+    insights,
     meal_items,
     meals,
     medications,
@@ -23,4 +25,6 @@ api_router.include_router(dashboard.router, tags=["dashboard"])
 api_router.include_router(user_states.router, tags=["user-states"])
 api_router.include_router(medications.router, tags=["medications"])
 api_router.include_router(evaluations.router, tags=["evaluations"])
+api_router.include_router(feedbacks.router, tags=["feedbacks"])
+api_router.include_router(insights.router, tags=["insights"])
 api_router.include_router(daily_feedbacks.router, tags=["insights"])

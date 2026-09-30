@@ -16,7 +16,8 @@ from app.core.errors import ApiError, ErrorCode
 from app.core.time import today_kst
 from app.crud import user as user_crud
 from app.infra.queue import enqueue
-from app.schemas.insights import InsightRefreshResponse, InsightStatus
+from app.models.enums import FeedbackStatus
+from app.schemas.insights import InsightRefreshResponse
 
 
 def _ensure_user_exists(db: Session, user_id: uuid.UUID) -> None:
@@ -47,4 +48,4 @@ def request_refresh(
 
     db.commit()
 
-    return InsightRefreshResponse(status=InsightStatus.GENERATING)
+    return InsightRefreshResponse(status=FeedbackStatus.GENERATING)
