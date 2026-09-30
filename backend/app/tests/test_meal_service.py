@@ -14,6 +14,7 @@ import pytest
 from app.crud import meal as meal_crud
 from app.crud.evaluation import NutrientTotals
 from app.models.enums import MealStatus, SafetyStatus
+from app.schemas.feedback import FeedbackSuggestion
 from app.schemas.meal import MealScores
 from app.schemas.nutrition import NutritionInfo
 from app.services.meal import (
@@ -284,47 +285,43 @@ def test_build_satiety_maps_fields_and_checkins_always_empty():
     assert detail.checkins == []
 
 
+_SUGGESTION = FeedbackSuggestion(food_name="두부 반 모", advice="단백질을 채워요", nutrients=[])
+
+
 def test_build_feedback_none_when_missing():
-    assert _build_feedback(None) is None
+    assert _build_feedback(None, [_SUGGESTION]) is None
 
 
 def test_build_feedback_maps_fields():
-    feedback_row = SimpleNamespace(
-        body="요약", suggestions="제안", safety_status=SafetyStatus.SAFE
-    )
+    """제안은 호출부가 조립해 넘긴 객체 배열을 그대로 싣는다 — 문자열로 감싸지 않는다."""
+    feedback_row = SimpleNamespace(body="요약", safety_status=SafetyStatus.SAFE)
 
-    summary = _build_feedback(feedback_row)
+    summary = _build_feedback(feedback_row, [_SUGGESTION])
 
     assert summary.summary == "요약"
-    assert summary.suggestions == ["제안"]
+    assert summary.suggestions == [_SUGGESTION]
 
 
 def test_build_feedback_suggestions_empty_list_when_absent():
-    """DB 에 suggestions 가 없으면 null 이 아니라 빈 배열이어야 한다 (명세는 배열 타입)."""
-    feedback_row = SimpleNamespace(
-        body="요약", suggestions=None, safety_status=SafetyStatus.SAFE
-    )
+    """제안이 없으면 null 이 아니라 빈 배열이어야 한다 (명세는 배열 타입)."""
+    feedback_row = SimpleNamespace(body="요약", safety_status=SafetyStatus.SAFE)
 
-    summary = _build_feedback(feedback_row)
+    summary = _build_feedback(feedback_row, [])
 
     assert summary.suggestions == []
 
 
 def test_build_feedback_none_when_blocked():
-    feedback_row = SimpleNamespace(
-        body="요약", suggestions="제안", safety_status=SafetyStatus.BLOCKED
-    )
+    feedback_row = SimpleNamespace(body="요약", safety_status=SafetyStatus.BLOCKED)
 
-    assert _build_feedback(feedback_row) is None
+    assert _build_feedback(feedback_row, [_SUGGESTION]) is None
 
 
 def test_build_feedback_none_when_review_required():
     """가드레일 검사 전(기본값)도 SAFE 가 아니므로 BLOCKED 와 똑같이 숨겨야 한다."""
-    feedback_row = SimpleNamespace(
-        body="요약", suggestions="제안", safety_status=SafetyStatus.REVIEW_REQUIRED
-    )
+    feedback_row = SimpleNamespace(body="요약", safety_status=SafetyStatus.REVIEW_REQUIRED)
 
-    assert _build_feedback(feedback_row) is None
+    assert _build_feedback(feedback_row, [_SUGGESTION]) is None
 
 
 def test_build_nutrients_reports_full_sums():
