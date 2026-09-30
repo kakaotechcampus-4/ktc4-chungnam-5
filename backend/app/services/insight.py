@@ -34,9 +34,8 @@ _PERIOD_TYPES: dict[str, FeedbackPeriodType] = {
 def _resolve_period(period: str, today: date) -> tuple[date | None, date]:
     """"7d"/"28d"/"all" 을 [시작일, 종료일] 로 바꾼다. 종료일은 항상 오늘(KST).
 
-    all 은 하한이 없다(`dashboard.py::_resolve_period` 와 같은 규칙) — 실제로
-    이 값을 채워 `long_term_feedbacks` 행을 만드는 건 워커(`feedback_long.py`,
-    아직 스켈레톤)의 몫이라, "전체 기간"의 시작일을 뭘로 볼지는 거기서 정한다.
+    all 은 하한이 없다(`dashboard.py::_resolve_period` 와 같은 규칙). 큐 payload 에는
+    `ALL_PERIOD_START` 를 싣고, 워커(`feedback_long.py`)는 ALL 이면 하한 없이 모은다.
     """
     if period == "7d":
         return today - timedelta(days=6), today
@@ -73,6 +72,23 @@ def _determine_status(row: LongTermFeedback | None, latest_task: Task | None) ->
         # 워커가 데이터 부족으로 행을 안 만들고 정상 종료한 경우 (dataSufficient=false).
         return FeedbackStatus.READY
     return FeedbackStatus.PENDING
+
+
+def _superseded_by_insufficient_run(row: LongTermFeedback | None, latest_task: Task | None) -> bool:
+    """가장 최근 작업이 이 행보다 새 창을 돌리고 행 없이 끝났는가(데이터 부족).
+
+    워커는 부족하면 **같은 창**(period_start)의 행만 지운다. 그런데 `get_latest` 는 창과
+    상관없이 가장 늦은 행을 주므로, 7d·28d 처럼 날마다 창이 밀리는 유형은 어제 창의 행이
+    남아 "오늘 창은 부족" 이라는 결과를 가린다. 최근 DONE 작업의 `periodStart` 가 행보다
+    늦으면 그 작업이 행을 못 만든 것이다 — 행이 없는 것으로 본다.
+
+    DONE 만 본다. PENDING 이면 아직 만드는 중이고(GENERATING), FAILED 면 부족 판정이 난 게
+    아니다 — 둘 다 기존 행을 계속 보여 준다. ALL 은 period_start 가 고정값이라 걸리지 않는다
+    (같은 키 행을 워커가 이미 지운다).
+    """
+    if row is None or latest_task is None or latest_task.status != TaskStatus.DONE:
+        return False
+    return date.fromisoformat(latest_task.payload["periodStart"]) > row.period_start
 
 
 def _check_stale(
@@ -131,6 +147,8 @@ def get_long_term_insight(
 
     row = insight_crud.get_latest(db, user_id=user_id, period_type=period_type)
     latest_task = insight_crud.get_latest_refresh_task(db, user_id=user_id, period_type=period_type)
+    if _superseded_by_insufficient_run(row, latest_task):
+        row = None
     status = _determine_status(row, latest_task)
 
     if row is None:
@@ -170,7 +188,7 @@ def get_long_term_insight(
 def refresh_long_term_insight(
     db: Session, *, user_id: uuid.UUID, period: str, today: date
 ) -> InsightRefreshResponse:
-    """`feedback.long` 작업을 큐에 넣는다. 실제 생성은 워커(미구현) 담당이다.
+    """`feedback.long` 작업을 큐에 넣는다. 실제 생성은 워커(`worker/jobs/feedback_long.py`)가 한다.
 
     payload 키(userId/periodType/periodStart/periodEnd)는
     `worker/jobs/feedback_long.py` 가 이미 정해둔 이름 그대로 맞춘다.
