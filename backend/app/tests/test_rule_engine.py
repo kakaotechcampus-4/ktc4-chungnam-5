@@ -1,6 +1,6 @@
 """rule_engine 순수 함수. DB 를 쓰지 않는다 (절대 규칙 2).
 
-수치 근거는 docs/be-qqs-scoring-rule.md. 여기 밴드는 spec 「단계별 수치」 표의 MAINTENANCE · REDUCED 다.
+수치 근거는 docs/be-qqs-scoring-rule.md. 여기 밴드는 spec 「6. 단계별 기준」 표의 MAINTENANCE · REDUCED 다.
 """
 
 from decimal import Decimal as D
