@@ -127,3 +127,13 @@ def upsert_checkin(
     row = db.execute(stmt).scalar_one()
     db.flush()
     return row
+
+
+def list_checkins(db: Session, meal_id: uuid.UUID) -> list[SatietyCheckin]:
+    """이 식사의 사후 체크인을 식후 시점 순으로. 없으면 빈 목록."""
+    stmt = (
+        select(SatietyCheckin)
+        .where(SatietyCheckin.meal_id == meal_id)
+        .order_by(SatietyCheckin.checkin_offset_hours)
+    )
+    return list(db.execute(stmt).scalars())

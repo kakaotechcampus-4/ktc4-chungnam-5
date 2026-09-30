@@ -146,7 +146,7 @@ def test_unknown_task_type_raises():
 
 @pytest.mark.parametrize(
     "task_type",
-    ["feedback.meal", "feedback.long"],
+    ["feedback.long"],
 )
 def test_task_types_are_not_implemented_yet(task_type):
     """파이프라인이 붙으면 이 테스트를 지운다."""

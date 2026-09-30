@@ -12,7 +12,7 @@ from app.core.deps import get_current_user_id
 from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
 from app.infra.storage import FileStorage, get_file_storage
-from app.models.enums import MealType
+from app.models.enums import MealStatus, MealType
 from app.schemas.meal import (
     MealCalendarResponse,
     MealCreateResponse,
@@ -20,6 +20,7 @@ from app.schemas.meal import (
     MealDetailResponse,
     MealListResponse,
 )
+from app.services import feedback as feedback_service
 from app.services import meal as meal_service
 from app.services import nutrition as nutrition_service
 
@@ -270,9 +271,9 @@ def get_meal(
 
     없는 식사·남의 식사·삭제된 식사는 전부 404 로 동일하게 응답한다.
 
-    항목별 영양정보는 여기서 계산해서 넘긴다 — services 끼리 서로 부르지 않는
-    규칙(README 절대 규칙 5) 때문에, meal(services/meal.py)과 nutrition
-    (services/nutrition.py)을 엮는 건 이 api 레이어의 일이다.
+    항목별 영양정보와 피드백 제안은 여기서 계산해서 넘긴다 — services 끼리 서로
+    부르지 않는 규칙(README 절대 규칙 5) 때문에, meal(services/meal.py)과 nutrition
+    (services/nutrition.py) · feedback(services/feedback.py)을 엮는 건 이 api 레이어의 일이다.
     """
     try:
         meal = meal_service.get_meal_for_detail(db, user_id=user_id, meal_id=meal_id)
@@ -289,7 +290,18 @@ def get_meal(
             db, food_ref_id=item.food_ref_id, amount_g=amount_g
         )
 
-    return ok(meal_service.build_meal_detail(db, meal=meal, nutrition_by_item=nutrition_by_item))
+    # 확정 전에는 상세가 피드백을 싣지 않는다 — 제안 조회도 하지 않는다.
+    suggestions = (
+        feedback_service.build_meal_suggestions(db, meal.id)
+        if meal.status is MealStatus.EVALUATED
+        else []
+    )
+
+    return ok(
+        meal_service.build_meal_detail(
+            db, meal=meal, nutrition_by_item=nutrition_by_item, suggestions=suggestions
+        )
+    )
 
 
 @router.delete(

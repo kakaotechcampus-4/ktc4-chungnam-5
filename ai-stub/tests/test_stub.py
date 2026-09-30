@@ -114,3 +114,18 @@ def test_bad_request_is_rejected():
     assert client.post("/analyze-meal", json=no_input).status_code == 422
 
     assert client.post("/short-feedback", json={**SHORT_MEAL, "mealId": None}).status_code == 422
+
+
+def test_unscored_axes_may_be_null():
+    """BE Rule Engine 은 근거가 없는 축(성분 미확인·체중 기록 없음 등)을 null 로 둔다 — 0 으로 채우면 '못 쟀다' 가 '바닥이다' 가 된다."""
+    payload = {**SHORT_MEAL, "qqs": {"quantity": None, "quality": None, "satiety": 68}}
+    assert client.post("/short-feedback", json=payload).status_code == 200
+
+
+def test_item_without_amount_is_accepted():
+    """양을 모르는 음식도 빼지 않고 보낸다 — amount · unit 이 null 이다."""
+    payload = {
+        **SHORT_MEAL,
+        "items": [{"displayName": "엄마표 반찬", "amount": None, "unit": None, "nutrition": None}],
+    }
+    assert client.post("/short-feedback", json=payload).status_code == 200

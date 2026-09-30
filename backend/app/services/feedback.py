@@ -116,6 +116,20 @@ def _build_suggestions(db: Session, stored: object) -> list[FeedbackSuggestion]:
     ]
 
 
+def build_meal_suggestions(db: Session, meal_id: uuid.UUID) -> list[FeedbackSuggestion]:
+    """이 식사의 저장된 제안에 성분을 채워 돌려준다. 행이 없으면 `[]`.
+
+    `GET /meals/{mealId}` 상세가 쓴다. services 끼리는 서로 부르지 않으므로 api 레이어가
+    이걸 불러 `services/meal.py::build_meal_detail` 에 넘긴다 — 제안 조립이 여기 한 곳이라
+    두 화면이 같은 모양 · 같은 거르기 규칙을 쓴다.
+
+    **노출 판정(SAFE)은 하지 않는다.** 상세는 `_build_feedback` 이, 피드백 화면은
+    `MealFeedbackResponse.from_row` 가 가린다.
+    """
+    row = feedback_crud.get_by_meal(db, meal_id)
+    return [] if row is None else _build_suggestions(db, row.suggestions)
+
+
 def _expected_satiety(db: Session, meal_id: uuid.UUID) -> ExpectedSatiety | None:
     """`expectedSatietyPct` 를 만든다. 점수가 없으면 `None`.
 
@@ -153,37 +167,18 @@ def get_feedback(
     명세가 주는 것은 값 목록(`:46`)과 예시 둘(`POST /confirm` → `PENDING`, 여기 →
     `READY`)뿐이고 **유도 규칙은 없다.** 그 둘은 이미 만족한다.
 
-    🔗 TODO(`worker/` 담당 @leekh2002 · FE 와 합의 후): **큐 등록과
-    `GENERATING`/`FAILED` 를 여기서 맡는다.** 방향은 정해졌고 구현만 남았다.
+    **이 GET 은 쓰기를 하지 않는다.** `feedback.meal` 은 확인 API 가 채점과 같은
+    트랜잭션에서 넣고(`services/evaluation/__init__.py::confirm`), 워커가 채우면 여기서
+    `READY` 가 된다. FE 는 `PENDING` 인 동안 폴링만 한다.
 
-      1. **큐에 넣는 건 이 GET 이다.** `worker/dispatch.py` 가 "사용자가 '다음 끼니
-         제안 보기' 를 눌렀을 때 그 API 가 `feedback.meal` 을 넣는다" 고 정해 두었고,
-         명세에서 그 화면에 대응하는 엔드포인트가 이것뿐이다. FE 의
-         `meal_evaluation_screen.dart` 에도 같은 자리에 TODO 가 있다. 확정됐는데
-         내용이 없으면 `enqueue` + `db.commit()` 한다 — **조회가 쓰기를 하게 되므로
-         이 서비스는 더 이상 읽기 전용이 아니다.**
+    제안 화면을 열 때(이 GET) 넣지 않는 이유: 하루 피드백이 끼니 피드백을 근거로 쓰므로
+    (`crud/daily_feedback.py::list_day_evidence`), 화면을 안 연 끼니가 하루 요약에서
+    조용히 빠진다.
 
-      2. **중복은 DB 제약으로 막는다.** FE 가 1.5 초 간격으로 폴링하므로 조회 후
-         삽입으로는 경쟁을 못 막는다. `task_queue` 에 부분 유니크를 건다:
-
-             UNIQUE ((payload->>'mealId'))
-             WHERE type = 'feedback.meal' AND status = 'PENDING'
-
-         `type` 으로 좁혀 다른 작업에 영향이 없고, `PENDING` 조건이라 끝나면 풀려서
-         재확정 후 다시 걸린다. 넣을 때 `ON CONFLICT DO NOTHING`.
-         `task_queue` 는 공용이라 담당자 확인이 먼저다.
-
-      3. **`FAILED` 는 재시도 진입점도 여기다.** 워커는 `QUEUE_MAX_ATTEMPTS` 까지
-         자동 재시도하고 그 뒤 DLQ 로 격리한다(`worker/loop.py`). 명세 에러표의
-         `FEEDBACK_GENERATION_FAILED`(200, "점수 유지, 피드백만 재시도")는 **FE 처리**
-         열이므로, 사용자가 다시 시도할 때 새 작업을 넣는 쪽은 서버다. 부분 유니크가
-         `PENDING` 만 걸어 `FAILED` 행은 방해하지 않는다.
-
-      4. **⚠️ 서버는 폴링과 재시도 버튼을 구분하지 못한다.** GET 하나뿐이라
-         `FAILED` 를 볼 때마다 새로 넣으면 폴링이 AI 를 무한히 부른다. **FE 가
-         `FAILED` 에서 폴링을 멈추고 사용자가 누를 때만 다시 부르기로 한다** — 분석
-         화면(`meal_analysis_screen.dart`)이 이미 같은 규칙으로 돈다. 서버 쪽
-         안전장치(실패 횟수 상한)는 필요해지면 그때 넣는다.
+    🔗 TODO: 명세의 `GENERATING` · `FAILED` 는 아직 내지 않는다. 워커는
+    `QUEUE_MAX_ATTEMPTS` 까지 재시도한 뒤 DLQ 로 격리하는데(`worker/loop.py`), 그 상태를
+    여기서 `task_queue` 로 읽어 `FAILED` 를 낼지는 FE 와 합의 후 정한다. 그때까지
+    재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣는다.
     """
     meal = _owned_meal(db, user_id, meal_id)
 
@@ -200,8 +195,9 @@ def get_feedback(
     # 행을 지우면 일일 피드백의 출처 링크가 조용히 사라지고 문장만 남는다.
     # 점수 테이블에는 그런 자식이 없어 지워도 잃을 게 없었다.
     #
-    # 🔗 명세상 `GET /meals/{mealId}` 상세도 같은 행을 싣는다(담당 박준혁, 미구현).
-    # 그쪽도 `status: EVALUATED` 일 때만 `feedback` 을 내보내야 한다.
+    # 🔗 `GET /meals/{mealId}` 상세도 같은 행을 싣는다 — 그쪽도 `status: EVALUATED`
+    # 일 때만 `feedback` 을 내보내고(`services/meal.py::build_meal_detail`), 제안은
+    # 아래 `build_meal_suggestions` 로 같은 모양을 만든다.
     if meal.status is not MealStatus.EVALUATED:
         return MealFeedbackResponse.pending()
 
