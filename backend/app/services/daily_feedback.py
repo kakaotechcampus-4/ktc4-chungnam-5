@@ -18,6 +18,7 @@ from app.crud import daily_feedback as daily_feedback_crud
 from app.crud import user as user_crud
 from app.infra.queue import enqueue
 from app.models.enums import FeedbackStatus, TaskStatus
+from app.schemas.daily_feedbacks import DailyFeedbackResponse
 from app.schemas.insights import InsightRefreshResponse
 
 
@@ -65,3 +66,10 @@ def request_refresh(
     db.commit()
 
     return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)
+
+
+def get_daily_feedback(
+    db: Session, *, user_id: uuid.UUID, target_date: date
+) -> DailyFeedbackResponse:
+    """그날(KST) 하루 피드백을 상태·stale 판정과 함께 돌려준다. 읽기 전용 — 커밋하지 않는다."""
+    raise NotImplementedError("get_daily_feedback 미구현")

@@ -46,6 +46,18 @@ def get_latest_refresh_task(
     ).scalar_one_or_none()
 
 
+def get_for_day(
+    db: Session, *, user_id: uuid.UUID, feedback_date: date
+) -> DailyFeedback | None:
+    """이 사용자의 그날 하루 피드백 행. 없으면 None."""
+    raise NotImplementedError("get_for_day 미구현")
+
+
+def list_source_meal_ids(db: Session, *, daily_feedback_id: uuid.UUID) -> list[uuid.UUID]:
+    """이 하루 피드백 행의 근거 끼니 meal_id 목록. soft delete 된 식사는 뺀다."""
+    raise NotImplementedError("list_source_meal_ids 미구현")
+
+
 def list_day_evidence(
     db: Session,
     *,
