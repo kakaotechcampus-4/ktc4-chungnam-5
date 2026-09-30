@@ -11,6 +11,7 @@ from pydantic import ConfigDict
 from app.models.enums import FeedbackStatus, SafetyStatus
 from app.schemas.base import CamelModel, KstDatetime
 from app.schemas.insights import StaleReason
+from app.schemas.meal import MealScores
 
 
 class DailyFeedbackRefreshRequest(CamelModel):
@@ -25,14 +26,6 @@ class DailyFeedbackRefreshRequest(CamelModel):
     date: date
 
 
-class DailyFeedbackScores(CamelModel):
-    """하루 Q/Q/S 점수 (0~100 정수). 값이 없는 축은 None."""
-
-    quantity: int | None
-    quality: int | None
-    satiety: int | None
-
-
 class DailyFeedbackResponse(CamelModel):
     """GET /insights/daily 응답.
 
@@ -45,7 +38,7 @@ class DailyFeedbackResponse(CamelModel):
     feedback_date: date
     feedback_status: FeedbackStatus
     summary: str | None
-    scores: DailyFeedbackScores | None
+    scores: MealScores | None  # 끼니 점수와 같은 Q/Q/S 모양 — schemas/dashboard.py 도 재사용한다
     source_meal_ids: list[uuid.UUID]
     safety_status: SafetyStatus | None
     generated_at: KstDatetime | None

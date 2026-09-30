@@ -49,13 +49,38 @@ def get_latest_refresh_task(
 def get_for_day(
     db: Session, *, user_id: uuid.UUID, feedback_date: date
 ) -> DailyFeedback | None:
-    """이 사용자의 그날 하루 피드백 행. 없으면 None."""
-    raise NotImplementedError("get_for_day 미구현")
+    """이 사용자의 그날 하루 피드백 행. 없으면 None.
+
+    `(user_id, feedback_date)` UNIQUE 라 많아야 한 행이다. user_id 조건이 빠지면
+    같은 날 다른 사용자의 행이 보인다.
+    """
+    return db.execute(
+        select(DailyFeedback).where(
+            DailyFeedback.user_id == user_id,
+            DailyFeedback.feedback_date == feedback_date,
+        )
+    ).scalar_one_or_none()
 
 
 def list_source_meal_ids(db: Session, *, daily_feedback_id: uuid.UUID) -> list[uuid.UUID]:
-    """이 하루 피드백 행의 근거 끼니 meal_id 목록. soft delete 된 식사는 뺀다."""
-    raise NotImplementedError("list_source_meal_ids 미구현")
+    """이 하루 피드백 행의 근거 끼니 meal_id 목록. soft delete 된 식사는 뺀다.
+
+    `daily_feedback_sources` → `meal_feedbacks` → `meals` 를 따라간다. 근거 링크는 행을
+    만든 시점의 것이라, 그 뒤에 지워진 식사도 링크에 남아 있다 — `meals` 를 join 해 거른다.
+    순서는 eaten_at 순(같으면 id) — 응답 순서가 호출마다 흔들리지 않게.
+    """
+    stmt = (
+        select(Meal.id)
+        .select_from(DailyFeedbackSource)
+        .join(MealFeedback, MealFeedback.id == DailyFeedbackSource.meal_feedback_id)
+        .join(Meal, Meal.id == MealFeedback.meal_id)
+        .where(
+            DailyFeedbackSource.daily_feedback_id == daily_feedback_id,
+            Meal.deleted_at.is_(None),
+        )
+        .order_by(Meal.eaten_at, Meal.id)
+    )
+    return list(db.execute(stmt).scalars().all())
 
 
 def list_day_evidence(
