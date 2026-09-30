@@ -136,8 +136,8 @@ class LongTermFeedback(Base):
     이 값을 쓴다 — `created_at`은 최초 INSERT 시각에 고정돼 재확정 때 안 바뀐다.
 
     **주의**: `ON CONFLICT DO UPDATE`로 upsert 하면 SQLAlchemy 의 `onupdate`가
-    자동으로 안 걸린다 — SET 목록에 `updated_at=func.now()`를 직접 넣어야 한다
-    (`worker/jobs/feedback_long.py` 구현 시 챙길 것)."""
+    자동으로 안 걸린다 — `crud/long_term_feedback.py::upsert` 의 `set_` 에
+    `updated_at=func.now()` 를 직접 넣어야 한다."""
 
     sources: Mapped[list["LongTermFeedbackSource"]] = relationship(
         back_populates="long_term_feedback", cascade="all, delete-orphan"
