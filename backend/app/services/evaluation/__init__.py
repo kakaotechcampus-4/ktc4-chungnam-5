@@ -15,10 +15,6 @@ Q/Q/S 는 순수 함수라 0.01 초면 끝난다(절대 규칙 2). 확정은 200
 하루 피드백이 끼니 피드백을 근거로 쓴다(`crud/daily_feedback.py::list_day_evidence`).
 화면을 연 끼니에만 문장이 생기면 안 연 끼니가 하루 요약에서 조용히 빠진다. 대가는
 아무도 안 볼 문장에도 AI 를 부른다는 것이다.
-
-⚠️ 지금은 그 근거가 발동하지 않는다 — `list_day_evidence` 는 세 점수가 모두 있어야
-근거로 쓰는데 Rule Engine 이 Quantity · Quality 를 아직 NULL 로 둔다. 기준선이
-정해지면 그때부터 효력이 생긴다.
 """
 
 from __future__ import annotations

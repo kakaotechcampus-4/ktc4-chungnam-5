@@ -117,7 +117,7 @@ def test_bad_request_is_rejected():
 
 
 def test_unscored_axes_may_be_null():
-    """BE Rule Engine 은 기준선이 없는 축을 null 로 둔다 — 0 으로 채우면 '못 쟀다' 가 '바닥이다' 가 된다."""
+    """BE Rule Engine 은 근거가 없는 축(성분 미확인·체중 기록 없음 등)을 null 로 둔다 — 0 으로 채우면 '못 쟀다' 가 '바닥이다' 가 된다."""
     payload = {**SHORT_MEAL, "qqs": {"quantity": None, "quality": None, "satiety": 68}}
     assert client.post("/short-feedback", json=payload).status_code == 200
 

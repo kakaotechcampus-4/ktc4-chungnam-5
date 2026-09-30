@@ -592,8 +592,9 @@ def test_scores_changed_during_ai_call_are_not_written(db):
 def test_evaluation_replaced_during_ai_call_is_not_written(db):
     """음식을 고치고 재확정까지 AI 호출 중에 끝나면 평가 행이 새로 생긴다 — 점수가 같아도 쓰지 않는다.
 
-    음식을 고치면 `mark_recalculating` 이 평가 행을 지우고 재확정이 새로 넣는다. 지금은
-    Quantity · Quality 가 NULL 이라 점수가 같게 나오므로 id 로만 잡힌다.
+    음식을 고치면 `mark_recalculating` 이 평가 행을 지우고 재확정이 새로 넣는다. 점수는
+    같게 나올 수 있어서(Quantity 는 구간 안이면 100, 체중이 없으면 Quality 는 None)
+    id 로만 잡힌다.
     """
     user = make_user(db)
     meal = _evaluated_meal(db, user, scores=(None, None, 68))

@@ -53,8 +53,9 @@ class PeriodType(str, Enum):
 class QQS(_Camel):
     """BE Rule Engine 의 점수. **null 은 "못 쟀다" 다** — 0(바닥)과 다르다.
 
-    기준선이 미정인 축은 BE 가 채점하지 않고 null 로 둔다(`backend/app/services/
-    evaluation/rule_engine.py`). AI 는 null 인 축을 평가하는 문장을 쓰지 않는다.
+    근거가 없는 축은 BE 가 채점하지 않고 null 로 둔다 — 성분을 못 구했거나 체중 기록이
+    없는 경우 등(`backend/app/services/evaluation/rule_engine.py`). AI 는 null 인 축을
+    평가하는 문장을 쓰지 않는다.
     """
 
     quantity: float | None

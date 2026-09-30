@@ -9,8 +9,7 @@
 이 작업은 **확인 API(`POST /meals/{mealId}/confirm`)가 큐에 넣는다** — 채점과 같은
 트랜잭션이다(`services/evaluation/__init__.py::confirm`). 제안 화면을 열 때 넣지 않는
 이유는 하루 피드백이 끼니 피드백을 근거로 쓰기 때문이다 — 화면을 안 연 끼니가 하루
-요약에서 조용히 빠진다(`crud/daily_feedback.py::list_day_evidence`). 지금은 그 근거가
-세 점수를 모두 요구해 Quantity · Quality 기준선이 정해진 뒤부터 효력이 생긴다.
+요약에서 조용히 빠진다(`crud/daily_feedback.py::list_day_evidence`).
 
 BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ShortFeedbackRequest` · `ShortFeedbackResponse` 다.
 """
@@ -65,8 +64,9 @@ def _scored_as(evaluation: QQSEvaluation) -> tuple[Any, ...]:
     """문장이 딛고 선 채점 — 쓰기 직전에 이게 그대로인지 본다.
 
     **id 도 넣는다.** 음식을 고치면 `mark_recalculating` 이 평가 행을 지우고 재확정이
-    새로 넣는데, 지금은 Quantity · Quality 가 NULL 이라 점수가 같게 나온다. 점수만
-    비교하면 음식이 바뀐 끼니에 옛 음식으로 쓴 문장이 들어간다.
+    새로 넣는데, 점수는 같게 나올 수 있다 — Quantity 는 구간 안이면 100 에 머물고,
+    체중이 없으면 Quality 는 None 이다. 점수만 비교하면 음식이 바뀐 끼니에 옛 음식으로
+    쓴 문장이 들어간다.
     """
     return (
         evaluation.id,

@@ -1008,7 +1008,7 @@ def test_reconfirm_with_changed_satiety_enqueues_again(client: TestClient, db: S
 
 
 def test_reconfirm_after_editing_food_enqueues_again(client: TestClient, db: Session) -> None:
-    """음식을 고친 뒤 재확정 — 점수는 그대로여도(Quantity · Quality 가 NULL) 문장은 무효다."""
+    """음식을 고친 뒤 재확정 — 점수가 그대로여도(구간 안 Quantity 100 등) 문장은 무효다."""
     user, meal = _ready_meal(db)
     _post_confirm(client, user, meal)
     make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
