@@ -53,7 +53,7 @@ class InsightRefreshRequest(CamelModel):
 
 
 class InsightRefreshResponse(CamelModel):
-    """POST /insights/long-term/refresh 202 응답."""
+    """POST /insights/long-term/refresh · /insights/daily/refresh 202 응답."""
 
-    status: FeedbackStatus
+    feedback_status: FeedbackStatus
     poll_interval_ms: int = INSIGHT_REFRESH_POLL_INTERVAL_MS

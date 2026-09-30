@@ -38,14 +38,16 @@ from sqlalchemy.orm import Session
 
 from app.infra.ai import AiClient
 from app.infra.queue import ClaimedTask
+from app.worker.jobs import feedback_daily
 
-_HANDLERS: dict[str, Callable[[Session, ClaimedTask, AiClient], dict[str, Any] | None]] = {}
+_HANDLERS: dict[str, Callable[[Session, ClaimedTask, AiClient], dict[str, Any] | None]] = {
+    "feedback.daily": feedback_daily.run,
+}
 
 # 계약은 정해졌지만 아직 구현이 없는 것들. 알 수 없는 타입과 구분해서 알려 준다.
 _NOT_IMPLEMENTED = {
     "meal.analyze": "사진·텍스트 → meal_items 인식 (crud/ 재작성 대기)",
     "feedback.meal": "끼니 피드백 (/short-feedback scope=MEAL → meal_feedbacks)",
-    "feedback.daily": "일일 피드백 (/short-feedback scope=DAILY → daily_feedbacks)",
     "feedback.long": "장기 피드백 (/long-feedback → long_term_feedbacks)",
 }
 

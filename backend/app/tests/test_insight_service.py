@@ -251,7 +251,7 @@ def test_refresh_enqueues_feedback_long_task_and_commits(monkeypatch):
     )
 
     fake_db.commit.assert_called_once()
-    assert result.status == FeedbackStatus.GENERATING
+    assert result.feedback_status == FeedbackStatus.GENERATING
     assert captured["task_type"] == "feedback.long"
     assert captured["payload"] == {
         "userId": str(user_id),
@@ -319,7 +319,7 @@ def test_refresh_skips_enqueue_when_already_pending(monkeypatch):
 
     assert enqueue_calls == []
     fake_db.commit.assert_not_called()
-    assert result.status == FeedbackStatus.GENERATING
+    assert result.feedback_status == FeedbackStatus.GENERATING
 
 
 def test_refresh_enqueues_when_latest_task_already_done(monkeypatch):
