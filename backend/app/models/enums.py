@@ -109,6 +109,9 @@ class SafetyStatus(str, enum.Enum):
 class FeedbackPeriodType(str, enum.Enum):
     WEEKLY = "WEEKLY"
     MONTHLY = "MONTHLY"
+    ALL = "ALL"
+    """전체 기간. `period_start` 가 무엇을 뜻하는지(가입일? 첫 식사일?)는 아직
+    미정 — `worker/jobs/feedback_long.py` 구현 시 정한다."""
 
 
 class TaskStatus(str, enum.Enum):

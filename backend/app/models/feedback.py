@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import FeedbackPeriodType, SafetyStatus, pg_enum
-from app.models.mixins import created_at, uuid_pk
+from app.models.mixins import created_at, updated_at, uuid_pk
 
 
 class MealFeedback(Base):
@@ -89,6 +89,15 @@ class DailyFeedback(Base):
     __table_args__ = (UniqueConstraint("user_id", "feedback_date"),)
 
 
+ALL_PERIOD_START = date(1970, 1, 1)
+"""period_type=ALL 행의 period_start 고정값.
+
+실제 분석 시작일이 아니라, UNIQUE(user_id, period_type, period_start) 를
+사용자당 한 행으로 만드는 키다. `date.min` 은 쓰지 않는다 — KST 로 만든
+aware datetime 을 UTC 로 바꾸면 범위를 벗어나 OverflowError 가 난다.
+"""
+
+
 class LongTermFeedback(Base):
     """주간·월간 Q/Q/S 추이와 장기 행동 제안."""
 
@@ -116,6 +125,13 @@ class LongTermFeedback(Base):
         server_default=SafetyStatus.REVIEW_REQUIRED.value,
     )
     created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = updated_at()
+    """마지막으로 생성/재생성된 시각. `GET /insights/long-term`의 `generatedAt`이
+    이 값을 쓴다 — `created_at`은 최초 INSERT 시각에 고정돼 재확정 때 안 바뀐다.
+
+    **주의**: `ON CONFLICT DO UPDATE`로 upsert 하면 SQLAlchemy 의 `onupdate`가
+    자동으로 안 걸린다 — SET 목록에 `updated_at=func.now()`를 직접 넣어야 한다
+    (`worker/jobs/feedback_long.py` 구현 시 챙길 것)."""
 
     sources: Mapped[list["LongTermFeedbackSource"]] = relationship(
         back_populates="long_term_feedback", cascade="all, delete-orphan"
