@@ -20,6 +20,7 @@ from app.services.insight import (
     _check_stale,
     _determine_status,
     _resolve_period,
+    _superseded_by_insufficient_run,
     _to_kst_range,
     get_long_term_insight,
     refresh_long_term_insight,
@@ -337,3 +338,27 @@ def test_refresh_enqueues_when_latest_task_already_done(monkeypatch):
     )
 
     assert len(enqueue_calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("status", "task_period_start", "expected"),
+    [
+        # 최근 작업이 더 새 창을 돌려 DONE 인데 그 창의 행이 없다 → 데이터 부족으로 끝난 것
+        (TaskStatus.DONE, "2026-08-26", True),
+        # 같은 창이면 이 행이 그 작업의 결과다
+        (TaskStatus.DONE, "2026-08-25", False),
+        # 아직 만드는 중 · 실패는 부족 판정이 아니다 — 기존 행을 계속 보여 준다
+        (TaskStatus.PENDING, "2026-08-26", False),
+        (TaskStatus.FAILED, "2026-08-26", False),
+    ],
+)
+def test_superseded_by_insufficient_run(status, task_period_start, expected):
+    row = _feedback_row(period_start=date(2026, 8, 25))
+    task = SimpleNamespace(status=status, payload={"periodStart": task_period_start})
+
+    assert _superseded_by_insufficient_run(row, task) is expected
+
+
+def test_superseded_is_false_without_row_or_task():
+    assert _superseded_by_insufficient_run(None, _task(TaskStatus.DONE)) is False
+    assert _superseded_by_insufficient_run(_feedback_row(), None) is False

@@ -6,7 +6,7 @@
 """
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -22,7 +22,7 @@ from app.models.enums import (
     SafetyStatus,
 )
 from app.models.evaluation import QQSEvaluation
-from app.models.feedback import MealFeedback
+from app.models.feedback import DailyFeedback, MealFeedback
 from app.models.food import FoodRef
 from app.models.meal import Meal, MealItem
 from app.models.medication import MedicationSnapshot
@@ -215,6 +215,30 @@ def make_meal_feedback(
         body=body,
         safety_status=safety_status,
         model_version=model_version,
+    )
+    db.add(feedback)
+    db.flush()
+    return feedback
+
+
+def make_daily_feedback(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    feedback_date: date,
+    summary: str | None = "오늘은 단백질을 챙기셨어요.",
+    safety_status: SafetyStatus = SafetyStatus.SAFE,
+) -> DailyFeedback:
+    """하루 피드백 행. flush 까지만 하고 커밋하지 않는다.
+
+    장기 피드백의 근거가 되는 모양이 SAFE 라 기본값을 SAFE 로 둔다 (모델의 server_default
+    는 REVIEW_REQUIRED 다). 점수는 장기 피드백이 읽지 않으므로 채우지 않는다.
+    """
+    feedback = DailyFeedback(
+        user_id=user_id,
+        feedback_date=feedback_date,
+        summary=summary,
+        safety_status=safety_status,
     )
     db.add(feedback)
     db.flush()
