@@ -1,0 +1,253 @@
+{
+  "POST /api/v1/users/profile": {
+    "201": {
+      "success": true,
+      "data": {
+        "userId": "00000000-0000-0000-0000-000000000001",
+        "nickname": "영우",
+        "heightCm": 175.0,
+        "weightKg": 78.4,
+        "baselineIntake": 700.0,
+        "onboardingStatus": "READY",
+        "createdAt": "{{today-68}}T09:00:00+09:00"
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/users/me": {
+    "200": {
+      "success": true,
+      "data": {
+        "userId": "00000000-0000-0000-0000-000000000001",
+        "nickname": "영우",
+        "heightCm": 175.0,
+        "weightKg": 78.4,
+        "baselineIntake": 700.0,
+        "onboardingStatus": "READY"
+      },
+      "error": null
+    }
+  },
+  "PATCH /api/v1/users/me": {
+    "200": {
+      "success": true,
+      "data": {
+        "userId": "00000000-0000-0000-0000-000000000001",
+        "nickname": "영우",
+        "heightCm": 175.0,
+        "weightKg": 78.4,
+        "baselineIntake": 700.0,
+        "onboardingStatus": "READY"
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/medications/current": {
+    "200": {
+      "success": true,
+      "data": {
+        "medicationId": "00000000-0000-0000-0000-0000000000a1",
+        "drugName": "위고비",
+        "doseMg": 1.0,
+        "startedAt": "{{today-68}}",
+        "doseCount": 10,
+        "nextDoseDate": "{{today+2}}",
+        "daysUntilNextDose": 2,
+        "stage": "MAINTENANCE",
+        "stageReason": "약효가 줄고 식욕이 돌아오는 구간",
+        "ruleVersion": "v1",
+        "doseChanged": false,
+        "doseEvent": null,
+        "stageChanged": false,
+        "decidedAt": "{{today}}T09:12:00+09:00"
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/medications": {
+    "200": {
+      "success": true,
+      "data": {
+        "medicationId": "00000000-0000-0000-0000-0000000000a1",
+        "drugName": "위고비",
+        "doseMg": 1.0,
+        "startedAt": "{{today-68}}",
+        "doseCount": 10,
+        "nextDoseDate": "{{today+2}}",
+        "daysUntilNextDose": 2,
+        "stage": "MAINTENANCE",
+        "stageReason": "약효가 줄고 식욕이 돌아오는 구간",
+        "ruleVersion": "v1",
+        "doseChanged": false,
+        "doseEvent": null,
+        "stageChanged": false,
+        "decidedAt": "{{today}}T09:12:00+09:00"
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/medications/dose-events": {
+    "200": {
+      "success": true,
+      "data": {
+        "events": [
+          {
+            "doseEventId": "00000000-0000-0000-0000-0000000000d1",
+            "doseMg": 0.25,
+            "direction": "MAINTAIN",
+            "effectiveFrom": "{{today-68}}"
+          },
+          {
+            "doseEventId": "00000000-0000-0000-0000-0000000000d2",
+            "doseMg": 0.5,
+            "direction": "INCREASE",
+            "effectiveFrom": "{{today-40}}"
+          },
+          {
+            "doseEventId": "00000000-0000-0000-0000-0000000000d3",
+            "doseMg": 1.0,
+            "direction": "INCREASE",
+            "effectiveFrom": "{{today-12}}"
+          }
+        ]
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/user-states/latest": {
+    "200": {
+      "success": true,
+      "data": {
+        "userStateId": "00000000-0000-0000-0000-0000000000b1",
+        "weightKg": 78.4,
+        "weightChangeKg": -0.6,
+        "weightChangeBaseline": "LAST_WEEK",
+        "appetiteLevel": 3,
+        "giSymptoms": [],
+        "note": null,
+        "recordedAt": "{{today-1}}T21:00:00+09:00"
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/user-states": {
+    "201": {
+      "success": true,
+      "data": {
+        "userStateId": "00000000-0000-0000-0000-0000000000b2",
+        "weightKg": 78.4,
+        "weightChangeKg": -0.6,
+        "weightChangeBaseline": "LAST_WEEK",
+        "appetiteLevel": 3,
+        "giSymptoms": [],
+        "note": null,
+        "recordedAt": "{{today}}T09:00:00+09:00"
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/meals/calendar": {
+    "200": {
+      "success": true,
+      "data": {
+        "month": "{{month}}",
+        "days": [
+          {
+            "date": "{{today-2}}",
+            "count": 3,
+            "recordedMealTypes": ["BREAKFAST", "LUNCH", "DINNER"],
+            "stage": "MAINTENANCE"
+          },
+          {
+            "date": "{{today-1}}",
+            "count": 1,
+            "recordedMealTypes": ["LUNCH"],
+            "stage": "MAINTENANCE"
+          },
+          {
+            "date": "{{today}}",
+            "count": 2,
+            "recordedMealTypes": ["BREAKFAST", "LUNCH"],
+            "stage": "MAINTENANCE"
+          }
+        ],
+        "summary": {
+          "totalMeals": 6,
+          "avgScores": { "quantity": 74, "quality": 81, "satiety": 65 }
+        }
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/meals": {
+    "200": {
+      "success": true,
+      "data": {
+        "items": [
+          {
+            "mealId": "00000000-0000-0000-0000-000000000456",
+            "mealType": "LUNCH",
+            "eatenAt": "{{today}}T12:40:00+09:00",
+            "stage": "MAINTENANCE",
+            "displayName": "현미밥, 된장국, 두부조림",
+            "thumbnailUrl": null,
+            "scores": { "quantity": 76, "quality": 80, "satiety": 68 }
+          },
+          {
+            "mealId": "00000000-0000-0000-0000-000000000450",
+            "mealType": "BREAKFAST",
+            "eatenAt": "{{today}}T08:20:00+09:00",
+            "stage": "MAINTENANCE",
+            "displayName": "토스트, 그릭요거트",
+            "thumbnailUrl": null,
+            "scores": { "quantity": 74, "quality": 90, "satiety": 80 }
+          }
+        ],
+        "nextCursor": null,
+        "hasMore": false
+      },
+      "error": null
+    }
+  },
+  "DELETE /api/v1/meals/{meal_id}": {
+    "200": {
+      "success": true,
+      "data": {
+        "mealId": "00000000-0000-0000-0000-000000000456",
+        "deletedAt": "{{today}}T13:00:00+09:00",
+        "affectedInsights": []
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/dashboard": {
+    "200": {
+      "success": true,
+      "data": {
+        "period": { "type": "7d", "from": "{{today-6}}", "to": "{{today}}" },
+        "series": [
+          { "date": "{{today-6}}", "quantity": 60, "quality": 70, "satiety": 58, "stage": "MAINTENANCE" },
+          { "date": "{{today-5}}", "quantity": 68, "quality": 74, "satiety": 66, "stage": "MAINTENANCE" },
+          { "date": "{{today-4}}", "quantity": 72, "quality": 78, "satiety": 60, "stage": "MAINTENANCE" },
+          { "date": "{{today-3}}", "quantity": 75, "quality": 80, "satiety": 64, "stage": "MAINTENANCE" },
+          { "date": "{{today-2}}", "quantity": 75, "quality": 83, "satiety": 68, "stage": "MAINTENANCE" },
+          { "date": "{{today-1}}", "quantity": 70, "quality": 76, "satiety": 62, "stage": "MAINTENANCE" },
+          { "date": "{{today}}", "quantity": 75, "quality": 85, "satiety": 74, "stage": "MAINTENANCE" }
+        ],
+        "averages": { "quantity": 71, "quality": 78, "satiety": 65 },
+        "byMealType": {
+          "BREAKFAST": { "quantity": 70, "quality": 88, "satiety": 78 },
+          "LUNCH": { "quantity": 76, "quality": 80, "satiety": 66 },
+          "DINNER": { "quantity": 78, "quality": 74, "satiety": 58 }
+        },
+        "monthlyAverages": [],
+        "weightSeries": [
+          { "date": "{{today-7}}", "weightKg": 79.0 },
+          { "date": "{{today}}", "weightKg": 78.4 }
+        ],
+        "stageChanges": []
+      },
+      "error": null
+    }
+  }
+}

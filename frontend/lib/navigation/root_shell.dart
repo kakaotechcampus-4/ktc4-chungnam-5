@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../api/api_client.dart';
-import '../api/user_api.dart';
 import '../popups/popup_gate.dart';
 import '../screens/long_term_feedback_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/medication_info_screen.dart';
 import '../screens/my_screen.dart';
 import '../screens/meal_history_screen.dart';
+import '../state/profile_state.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 
@@ -27,10 +26,6 @@ class RootShell extends StatefulWidget {
 }
 
 class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
-  /// 온보딩에서 투약을 저장하고 돌아오면 바꿔서 홈을 새로 만든다 — 홈은
-  /// 온보딩 화면 아래에서 이미 "투약 미등록"으로 불러와 둔 상태다.
-  Key _homeKey = UniqueKey();
-
   @override
   void initState() {
     super.initState();
@@ -48,10 +43,14 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// 투약 입력으로 이어 보낸다. 백엔드 온보딩 순서가 프로필 → 투약이라
   /// 프로필 화면이 아니라 여기서 확인한다(프로필 저장 즉시 이 화면으로 바뀜).
   /// 확인에 실패하면 막지 않는다 — 홈 투약 카드로도 들어갈 수 있다.
+  /// 막 가입했으면 ProfileState 에 가입 응답이 있어 서버에 다시 묻지 않는다.
+  ///
+  /// 아래에 깔린 홈은 "미등록"으로 그려져 있지만, 저장하면 MedicationState 가
+  /// 바뀌어 같이 바뀐다.
   Future<void> _continueOnboarding() async {
     final String status;
     try {
-      final me = await UserApiService(context.read<ApiClient>()).fetchMe();
+      final me = await context.read<ProfileState>().ensureLoaded();
       status = me.onboardingStatus;
     } catch (_) {
       return;
@@ -60,7 +59,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const MedicationInfoScreen()),
     );
-    if (mounted) setState(() => _homeKey = UniqueKey());
   }
 
   @override
@@ -86,7 +84,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       body: IndexedStack(
         index: selectedIndex,
         children: [
-          HomeScreen(key: _homeKey),
+          const HomeScreen(),
           const LongTermFeedbackScreen(),
           const MealHistoryScreen(),
           const MyScreen(),

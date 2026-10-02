@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
-import '../api/api_exception.dart';
-import '../api/dummy_store.dart';
+import '../api/medication_api.dart';
 import '../common/api_format.dart';
+import '../state/medication_state.dart';
+import '../state/profile_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -58,8 +59,8 @@ enum SymptomSeverity {
   final String code;
 }
 
-/// 팝업 헤더·체중 초기값. `GET /medications/current` + `GET /user-states/latest`
-/// (+ 컨디션 기록이 없으면 `GET /users/me` 의 체중) 조합.
+/// 팝업 헤더·체중 초기값. [MedicationState] + `GET /user-states/latest`
+/// (+ 컨디션 기록이 없으면 [ProfileState] 의 체중) 조합.
 ///
 /// 투약 미등록이면 투약 필드 넷이 모두 null 이고 헤더는 날짜만 보인다.
 class ConditionPrefill {
@@ -86,70 +87,39 @@ class ConditionPrefill {
 
 // ── API 서비스 ─────────────────────────────────────────────
 
-/// 컨디션 팝업이 쓰는 엔드포인트. `ApiConfig.useRealApi` 가 false 면 더미를 돌려준다.
+/// 컨디션 팝업이 쓰는 엔드포인트.
 class ConditionApiService {
   ConditionApiService(this._client);
 
   final ApiClient _client;
 
-  Future<ConditionPrefill> fetchPrefill() async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      // 회원가입을 거친 더미 사용자면 그때 넣은 체중·투약을 보여 준다.
-      final profile = await DummyStore.readProfile();
-      if (profile != null) {
-        final (_, medication) = await DummyStore.readMedication();
-        return ConditionPrefill(
-          drugName: medication?['drugName'] as String?,
-          doseMg: (medication?['doseMg'] as num?)?.toDouble(),
-          doseCount: medication?['doseCount'] as int?,
-          stage: medication?['stage'] as String?,
-          weightKg: (profile['weightKg'] as num?)?.toDouble(),
-          weeklyWeightDeltaKg: null,
-        );
-      }
-      return const ConditionPrefill(
-        drugName: '위고비',
-        doseMg: 1.0,
-        doseCount: 12,
-        stage: 'MAINTENANCE',
-        weightKg: 78.4,
-        weeklyWeightDeltaKg: -0.6,
-      );
-    }
-    final results = await Future.wait([
-      _fetchMedication(),
+  /// 투약·프로필은 [medicationState] · [profileState] 에 받아 둔 값을 쓴다
+  /// (없을 때만 서버에 묻는다).
+  Future<ConditionPrefill> fetchPrefill(
+    MedicationState medicationState,
+    ProfileState profileState,
+  ) async {
+    final results = await Future.wait<Object?>([
+      medicationState.ensureLoaded(),
       _client.get('/user-states/latest'),
     ]);
-    final medication = results[0] as Map<String, dynamic>?;
+    final medication = results[0] as MedicationCurrent?;
     // 컨디션 기록이 없으면 200 + data: null 이다.
     final latest = (results[1] as ApiResult).data as Map<String, dynamic>?;
 
-    var weightKg = (latest?['weightKg'] as num?)?.toDouble();
-    if (weightKg == null) {
-      // 첫 기록이면 프로필에 적은 체중에서 시작한다.
-      final me = await _client.get('/users/me');
-      weightKg = (me.dataMap['weightKg'] as num?)?.toDouble();
-    }
+    // 첫 기록이면 프로필에 적은 체중에서 시작한다.
+    final weightKg =
+        (latest?['weightKg'] as num?)?.toDouble() ??
+        (await profileState.ensureLoaded()).weightKg;
     return ConditionPrefill(
-      drugName: medication?['drugName'] as String?,
-      doseMg: (medication?['doseMg'] as num?)?.toDouble(),
-      doseCount: medication?['doseCount'] as int?,
-      stage: medication?['stage'] as String?,
+      drugName: medication?.drugName,
+      doseMg: medication?.doseMg,
+      doseCount: medication?.doseCount,
+      stage: medication?.stage,
       weightKg: weightKg,
       // 지난주 기록이 없으면 null 이다(0 이 아니다). 뱃지를 숨긴다.
       weeklyWeightDeltaKg: (latest?['weightChangeKg'] as num?)?.toDouble(),
     );
-  }
-
-  /// 투약 미등록(409 `STAGE_NOT_SET`)이면 null.
-  Future<Map<String, dynamic>?> _fetchMedication() async {
-    try {
-      return (await _client.get('/medications/current')).dataMap;
-    } on ApiException catch (e) {
-      if (e.code == 'STAGE_NOT_SET') return null;
-      rethrow;
-    }
   }
 
   /// `POST /user-states` — 오늘 컨디션 저장.
@@ -162,10 +132,6 @@ class ConditionApiService {
     required Set<GiSymptom> symptoms,
     required SymptomSeverity? severity,
   }) async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return;
-    }
     await _client.post(
       '/user-states',
       body: {
@@ -230,7 +196,10 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
   /// 사용자가 이미 체중을 만졌으면 덮어쓰지 않는다.
   Future<void> _loadPrefill() async {
     try {
-      final prefill = await _api.fetchPrefill();
+      final prefill = await _api.fetchPrefill(
+        context.read<MedicationState>(),
+        context.read<ProfileState>(),
+      );
       if (!mounted) return;
       setState(() {
         _prefill = prefill;
@@ -289,6 +258,8 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
         severity: _severity,
       );
       if (!mounted) return;
+      // 서버가 최근 체중을 이 기록으로 바꾼다. 마이 탭 체중도 맞춘다.
+      context.read<ProfileState>().refreshInBackground();
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;

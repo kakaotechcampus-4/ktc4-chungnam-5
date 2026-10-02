@@ -1,5 +1,4 @@
 import 'api_client.dart';
-import 'dummy_store.dart';
 
 /// 회원 정보. `POST /users/profile` · `GET /users/me` 응답(`data` 안쪽).
 ///
@@ -37,7 +36,7 @@ class UserProfile {
   );
 }
 
-/// 회원 API. `ApiConfig.useRealApi` 가 false 면 더미를 돌려준다.
+/// 회원 API.
 class UserApiService {
   UserApiService(this._client);
 
@@ -50,19 +49,6 @@ class UserApiService {
     required double weightKg,
     required double baselineIntake,
   }) async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      final profile = {
-        ..._sample,
-        'nickname': nickname,
-        'heightCm': heightCm,
-        'weightKg': weightKg,
-        'baselineIntake': baselineIntake,
-      };
-      await DummyStore.writeProfile(profile);
-      await DummyStore.markMedicationNotRegistered();
-      return UserProfile.fromJson(await _withDummyStatus(profile));
-    }
     final result = await _client.post(
       '/users/profile',
       body: {
@@ -91,45 +77,13 @@ class UserApiService {
       'weightKg': ?weightKg,
       'baselineIntake': ?baselineIntake,
     };
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      final profile = {...await DummyStore.readProfile() ?? _sample, ...body};
-      await DummyStore.writeProfile(profile);
-      return UserProfile.fromJson(await _withDummyStatus(profile));
-    }
     final result = await _client.patch('/users/me', body: body);
     return UserProfile.fromJson(result.dataMap);
   }
 
   /// `GET /users/me`
   Future<UserProfile> fetchMe() async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      final profile = await DummyStore.readProfile() ?? _sample;
-      return UserProfile.fromJson(await _withDummyStatus(profile));
-    }
     final result = await _client.get('/users/me');
     return UserProfile.fromJson(result.dataMap);
   }
-
-  /// 더미 `onboardingStatus` — 서버처럼 투약 등록 여부로 정한다.
-  static Future<Map<String, dynamic>> _withDummyStatus(
-    Map<String, dynamic> profile,
-  ) async {
-    final (stored, medication) = await DummyStore.readMedication();
-    final registered = !stored || medication != null;
-    return {
-      ...profile,
-      'onboardingStatus': registered ? 'READY' : 'MEDICATION_REQUIRED',
-    };
-  }
-
-  static const Map<String, dynamic> _sample = {
-    'userId': '00000000-0000-0000-0000-000000000001',
-    'nickname': '영우',
-    'heightCm': 175.0,
-    'weightKg': 78.4,
-    'baselineIntake': 700.0,
-    'onboardingStatus': 'READY',
-  };
 }

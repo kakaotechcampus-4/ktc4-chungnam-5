@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../api/api_client.dart';
 import '../api/user_api.dart';
-import '../state/user_session.dart';
+import '../state/profile_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -13,7 +12,7 @@ import '../theme/app_typography.dart';
 /// 프로필 입력 — 온보딩 첫 화면. Figma 노드가 없어 간단히 구성했다.
 ///
 /// 저장된 `userId` 가 없으면 `main.dart` 가 이 화면으로 시작한다. 저장에
-/// 성공하면 [UserSession] 에 `userId` 가 들어가고, `main.dart` 가 알아서
+/// 성공하면 `UserSession` 에 `userId` 가 들어가고, `main.dart` 가 알아서
 /// 탭 화면(`RootShell`)으로 바꾼다 — 여기서 직접 이동하지 않는다.
 ///
 /// 백엔드는 프로필 → 투약 정보 순서다(`onboardingStatus`:
@@ -46,7 +45,8 @@ class _ProfileInputScreenState extends State<ProfileInputScreen> {
     text: _numberText(widget.initial?.baselineIntake),
   );
 
-  late final UserApiService _api = UserApiService(context.read<ApiClient>());
+  /// 저장하면 여기 값이 바뀌어 마이 탭 등도 같이 바뀐다.
+  late final ProfileState _profile = context.read<ProfileState>();
 
   bool get _editing => widget.initial != null;
 
@@ -75,14 +75,13 @@ class _ProfileInputScreenState extends State<ProfileInputScreen> {
       final baselineIntake = double.parse(_baselineIntake.text);
       final initial = widget.initial;
       if (initial == null) {
-        final profile = await _api.createProfile(
+        // userId 를 세션에 저장하면 main.dart 가 탭 화면으로 바꾼다.
+        await _profile.create(
           nickname: nickname,
           heightCm: heightCm,
           weightKg: weightKg,
           baselineIntake: baselineIntake,
         );
-        if (!mounted) return;
-        await context.read<UserSession>().setUserId(profile.userId);
         return;
       }
       // 바꾼 칸만 보낸다. 체중은 보낼 때마다 새 기록이 되므로 특히 그렇다.
@@ -92,7 +91,7 @@ class _ProfileInputScreenState extends State<ProfileInputScreen> {
           weightKg != initial.weightKg ||
           baselineIntake != initial.baselineIntake;
       final profile = changed
-          ? await _api.updateProfile(
+          ? await _profile.update(
               nickname: nickname != initial.nickname ? nickname : null,
               heightCm: heightCm != initial.heightCm ? heightCm : null,
               weightKg: weightKg != initial.weightKg ? weightKg : null,

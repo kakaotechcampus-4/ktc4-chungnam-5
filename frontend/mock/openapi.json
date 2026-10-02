@@ -1,0 +1,6736 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GLP-1 Meal Coach API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/meals": {
+      "post": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Create Meal",
+        "description": "사진 또는 텍스트로 식사를 등록한다. 실제 분석은 워커가 비동기로 한다 (202).\n\n**일부러 `def` 다.** body 파싱(진짜 비동기 I/O)은 `parse_meal_input` 의존성이\n이미 끝내고 넘겨주고, 여기 남은 건 DB 쓰기·디스크 저장(둘 다 동기)뿐이다.\n`async def` 였다면 그 동기 작업이 끝날 때까지 이벤트 루프 전체가 막혀 다른\n요청도 같이 기다렸을 것이다 — `def` 면 FastAPI 가 스레드풀에서 돌려준다.\n\n사진 인식·`meal_items` 채우기(`worker/jobs/analyze_meal.py`)는 이번 범위 밖이다\n— 큐에 작업만 넣고, 실제 AI 연동 로직은 아직 스켈레톤(TODO) 상태로 남겨둔다.",
+        "operationId": "create_meal_api_v1_meals_post",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealCreateResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "List Meals",
+        "operationId": "list_meals_api_v1_meals_get",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealListResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "잘못된 요청 — BAD_REQUEST",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/calendar": {
+      "get": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Get Meals Calendar",
+        "operationId": "get_meals_calendar_api_v1_meals_calendar_get",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealCalendarResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "잘못된 요청 — BAD_REQUEST",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/{meal_id}": {
+      "get": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Get Meal",
+        "description": "식사 상세 — status 에 따라 폴링·확인·상세 조회에 모두 쓰인다.\n\n없는 식사·남의 식사·삭제된 식사는 전부 404 로 동일하게 응답한다.\n\n항목별 영양정보와 피드백 제안은 여기서 계산해서 넘긴다 — services 끼리 서로\n부르지 않는 규칙(README 절대 규칙 5) 때문에, meal(services/meal.py)과 nutrition\n(services/nutrition.py) · feedback(services/feedback.py)을 엮는 건 이 api 레이어의 일이다.",
+        "operationId": "get_meal_api_v1_meals__meal_id__get",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealDetailResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Delete Meal",
+        "description": "식사를 soft delete 한다.\n\n없는 식사 · 남의 식사 · 이미 삭제된 식사는 전부 404 로 동일하게 응답한다 —\n\"남의 mealId 는 존재는 한다\" 는 정보조차 흘리지 않기 위해서다(crud 의 단일 WHERE).",
+        "operationId": "delete_meal_api_v1_meals__meal_id__delete",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealDeleteResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/{meal_id}/items": {
+      "post": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Add Meal Item",
+        "description": "사용자가 빠진 음식을 직접 더한다.\n\nAI 가 준 후보(`candidateFoodRefId`)가 없으므로 공공 DB 를 이름으로 찾는다.\n`matched` 는 API 명세서의 정의대로 **\"영양정보가 함께 나가는가\"** 이지\n\"공공 DB 에서 음식을 찾았는가\" 가 아니다. 세 갈래다:\n\n| 결과 | `matched` | `nutrition` | DB `food_ref_id` |\n|---|---|---|---|\n| 하나로 좁혀짐 + g 환산 가능 | `true` | 있음 | 연결 |\n| 하나로 좁혀짐 + 환산 불가(\"2개\") | `false` | `null` | **연결 유지** |\n| 못 좁힘 (없음 · \"김치찌개\" 28건) | `false` | `null` | `NULL` |\n\n두 번째가 링크를 남기는 건 사용자가 나중에 양을 g 으로 고치면 곧바로 환산되기\n때문이다. 매칭 규칙은 `crud.food.find_unique_by_name` 참고.\n\n## `matched: false` 는 에러가 아니라 폴백 신호다\n\n항목은 **정상 저장된다(201).** 영양정보만 비어 있다. FE 는 이 값을 보고 API\n명세서의 \"영양정보 폴백\" 으로 넘어간다:\n\n    matched: false\n      → GET /nutrition/candidates?q=<displayName>&limit=5   후보 검색\n      → 사용자가 고르거나 직접 입력\n      → PUT /meals/{mealId}/items/{itemId}/nutrition\n\n이름 매칭을 일부러 좁게 잡았다 — 틀린 영양성분이 `food_ref_id` 로 박제돼\nQ/Q/S 채점까지 흘러가는 것보다 비어 있는 편이 낫기 때문이다(`quality_score`\n가 NULL 허용인 이유). 그래서 흔한 음식도 이 경로로 간다: 실측하면\n`김치찌개` · `미역국` · `제육볶음` · `현미밥` 이 전부 여기 해당한다.\n\n두 엔드포인트 모두 붙어 있다 — 이 파일의 `set_meal_item_nutrition` 과\n`endpoints/nutrition.py` 의 `search_nutrition_candidates` 다.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다\n(`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).\n\n여기서 조합한다: g 환산 → 공공 DB 매칭 → 저장. `services/` 끼리는 서로 부르지\n않으므로(README 절대 규칙 5) 순서를 아는 건 이 레이어뿐이다.\n\n## ANALYZING 은 \"워커가 도는 중\" 이 아니다\n\n응답의 `status: ANALYZING` · `isRecalculation: true` 는 API 명세서\n(`contracts/API.md` POST /meals/{mealId}/items)를 그대로 따른다. 항목 하나가\n아니라 **식사 전체**의 상태이며, 여기서는 **\"점수가 아직 유효하지 않다\"** 는\n뜻이다 — 백그라운드 작업이 도는 중이라는 뜻이 아니다.\n\n명세서의 비동기 규약은 `202 + 폴링` 이고 그 자리는 `POST /meals` 다(사진에서\n음식을 인식하는 진짜 AI 작업, `steps` 배열로 진행상황까지 준다). 이 엔드포인트는\n`201` 이라 폴링 대상이 아니다. 사용자는 확인 화면에 그대로 머물러 음식을 계속\n고치고, 다 되면 [확인] 을 누른다.\n\n그래서 여기서는 큐에 아무것도 넣지 않는다. 사용자가 음식명과 양을 직접\n알려줬으므로 AI 에게 물을 것이 없고, 다시 계산할 Q/Q/S 는 순수 함수라\n0.01 초면 끝난다(README 절대 규칙 2). 확인 화면은 [확인] 전까지 점수를 보여\n주지도 않는다.\n\n## 🔗 의존성 — `POST /meals/{mealId}/confirm` 이 이 상태를 해소한다\n\n**confirm 은 `status = ANALYZING` + `is_recalculation = true` 인 식사를 정상\n입력으로 받아 채점하고 `EVALUATED` 로 옮겨야 한다.**\n\n이 조합은 \"사용자가 확인 화면에서 음식을 고쳤다\" 는 뜻이지 \"워커가 분석 중\"\n이 아니다. confirm 이 `ANALYZING` 을 통째로 막으면(예: 409 NOT_CONFIRMED)\n**사용자는 음식을 고친 뒤 영원히 확정하지 못한다** — 이 상태를 풀어 줄 다른\n경로가 없기 때문이다. confirm 작업에 이 문단을 함께 전달할 것.\n\n최초 분석(`is_recalculation = false`)의 `ANALYZING` 은 반대로 워커가 푼다\n(`jobs/analyze_meal.py` 8단계). 두 `ANALYZING` 의 해소 주체가 다르다 —\n가르는 건 `is_recalculation` 이다(`services.meal._is_editable` 참고).",
+        "operationId": "add_meal_item_api_v1_meals__meal_id__items_post",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MealItemCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealItemCreateResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Update Meal Items",
+        "description": "사용자가 확인 화면에서 AI 인식 결과를 고친다.\n\n고친 항목만 배열에 담아 보낸다. 항목 하나는 통째로 교체된다 — 세 필드가 모두\n필수다(`MealItemUpdate` 참고).\n\n## 이름이 바뀌거나 링크가 없을 때 공공 DB 를 다시 찾는다\n\n**이름이 그대로고 `food_ref_id` 가 이미 있으면** 그 링크를 지킨다. 이름 매칭\n(`crud.food.find_unique_by_name`)은 일부러 보수적이라 `김치찌개` 같은 흔한\n음식에 `None` 을 주는데, AI 가 `candidateFoodRefId` 로 정확히 연결해 둔 링크를\n\"250g → 220g\" 같은 수정이 끊어 버리면 영양정보가 이유 없이 사라진다.\n\n**이름이 그대로여도 `food_ref_id` 가 NULL 이면 새로 찾은 결과를 건다.** AI 가\n후보를 주지 못했다는 뜻이고 이름 매칭은 워커가 쓰지 않는 별개의 신호라, 지킬\n링크가 없는데 버릴 이유가 없다. \"미역국 2개 → 200g\" 처럼 이제 g 으로 환산되는\n수정이 영양정보를 얻는 경로다. 이름으로도 못 좁히면 NULL 그대로다.\n\n이름이 바뀌면 다른 음식이 된 것이므로 다시 찾고, 못 찾으면 링크를 끊는다\n(`matched: false` 폴백 경로로 간다 — `add_meal_item` 독스트링 참고).\n\n이름을 바꾸면 `confidence` 도 지운다 — AI 가 다른 이름에 매긴 신뢰도다. 남겨 두면\n사용자가 직접 써 넣은 이름이 FE 에서 `< 0.8` 로 강조된다. 지운 값은\n`user_corrections.original_value` 에 남아 인식 성능 평가에 쓸 수 있다.\n\n## g 으로 환산되지 않는 양도 버리지 않는다\n\n`confirmed_amount_g` 는 환산된 값만 담으므로 \"2개\" 는 NULL 이 된다. 사용자가\n입력한 숫자·단위는 `confirmed_amount` · `confirmed_unit` 에 그대로 남는다 —\n출처(MODEL/USER)와 무관하게 같은 자리다. 이 컬럼들이 없으면 \"계란 2개 → 3개\" 같은\n수정이 200 을 받고도 아무 데도 남지 않는다.\n\n## 값이 하나도 안 바뀌어도 재계산 대기로 옮긴다\n\n확인 화면이 고치지 않은 항목까지 보내면 `EVALUATED` 식사가 `ANALYZING` 으로\n되돌아가 점수가 무효 표시되고, 사용자는 [확인] 을 다시 눌러야 한다. 그래도 이렇게\n두는 건 명세서 응답이 `status: ANALYZING` 으로 고정이기 때문이다 — 바뀐 게 없을\n때만 상태를 유지하면 그 응답은 `status: EVALUATED` 인데 `steps` 는\n`DB_MATCHING: RUNNING` 이라, FE 가 믿을 값이 하나도 남지 않는다.\n\n**FE 는 고친 항목만 보낸다** — 명세서의 요청 모양(`items` 배열)이 이미 그 전제다.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다. 요청한 항목 중\n하나라도 이 식사의 것이 아닐 때도 404 이며, 이 경우 **아무 항목도 반영되지\n않는다**(`services.meal.update_items` 참고).\n\n## ⚠️ 이름을 바꾸면 영양정보가 조용히 비워질 수 있다\n\n새 이름을 공공 DB 에서 못 좁히면 링크가 끊기는데(위 참고) **이 응답에는 그 사실을\n알리는 필드가 없다** — 명세서가 `matched` 를 POST 응답에만 두기 때문이다. FE 는\n`GET /meals/{mealId}` 로 다시 읽어야 알 수 있다.\n\n**이름이나 양이 실제로 바뀌면 직접 입력한 영양정보(`PUT .../nutrition` 의\n`manual`)도 함께 지워진다.** 그 값은 섭취량 기준 총량이라 양이 바뀌면 거짓이\n되고, 이름이 바뀌면 다른 음식의 값이 된다(`services.meal.update_items` 참고).\n고치지 않은 항목을 그대로 되돌려보내는 정상 경로에서는 지워지지 않는다.\n\n## ⚠️ 응답의 `steps` 는 고정값이다\n\n명세서(`contracts/API.md`)의 예시를 그대로 돌려준다 — 실시간 진행상황이\n아니다. POST 와 마찬가지로 여기서는 큐에 아무것도 넣지 않으므로\n(`schemas.meal.RECALCULATION_STEPS` 참고) `DB_MATCHING: RUNNING` 이라고 나가도\n실제로 도는 작업은 없다. 공공 DB 매칭은 이 요청을 처리하는 동안 끝난다.\n\n**FE 가 이 응답을 보고 `GET /meals/{mealId}` 폴링을 시작하면 상태는 영원히\n바뀌지 않는다.** `ANALYZING` + `is_recalculation = true` 를 푸는 것은 워커가\n아니라 사용자가 [확인] 을 누를 때 불리는 `POST /meals/{mealId}/confirm` 이다.",
+        "operationId": "update_meal_items_api_v1_meals__meal_id__items_patch",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MealItemsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealItemsUpdateResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/{meal_id}/items/{item_id}": {
+      "delete": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Delete Meal Item",
+        "description": "사용자가 AI 가 잘못 인식한 음식을 확인 화면에서 뺀다.\n\n없는 식사 · 남의 식사 · 삭제된 식사 · 이 식사의 것이 아닌 `itemId` 는 전부 404 로\n같게 응답한다 (`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지). 이미\n지운 항목을 다시 지우려는 요청도 여기 해당한다 — 멱등이 아니다.\n\n⚠️ 다만 **같은 항목에 DELETE 두 건이 동시에 오면 둘 다 200 이다.** 각자 자기\n트랜잭션에서 `get_item` 을 통과한 뒤 DELETE 를 날리고, 뒤늦은 쪽은 0 행을\n지우는데 SQLAlchemy 는 이를 경고로만 처리한다(version_id_col 이 없는 DELETE 의\nrowcount 불일치는 raise 하지 않는다). 즉 \"이미 지워진 항목\" 요청의 응답이\n타이밍에 따라 404 도 200 도 된다. 데이터는 안전하고 사용자 영향은 확인 화면\n더블탭 시 에러 토스트가 뜰까 말까 하는 정도라 지금은 그대로 둔다 — FE 가 404 를\n보고 버그로 의심하기 전에 여기를 먼저 읽으라고 적어 둔다.\n\n## ⚠️ hard delete 다 — 그 항목의 인식 이력이 함께 사라진다\n\n`meal_items` 에는 `deleted_at` 이 없다. 행을 지우면 `user_corrections` 도 따라\n사라지고(`MealItem.corrections` 관계의 `cascade=\"all, delete-orphan\"` 이 먼저\n지운다 — `crud.meal.delete_item` 참고), `original_food_name` · `estimated_*` 에\n담긴 **AI 최초 추정값도 함께 없어진다.**\n\n그래서 **\"AI 가 없는 음식을 인식했다\" 는 오인식 신호는 어디에도 남지 않는다** —\n사용자가 이름이나 양을 고친 경우(PATCH)는 `user_corrections` 에 남는데, 통째로\n지운 경우만 증거가 없다. 인식 성능을 집계할 때 이 구멍을 기억해야 한다. 메우려면\nsoft delete 로 바꾸거나 별도 감사 로그를 두어야 하고, 둘 다 이 엔드포인트만의\n변경으로 끝나지 않는다(모든 조회가 필터를 기억해야 한다).\n\n## 응답에 `steps` 가 없다\n\n명세서(`contracts/API.md`)가 `{ status, isRecalculation }` 만 준다. PATCH 와\n달리 진행 단계 배열이 없는 건 이 응답의 정직한 모양이다 — 어차피 여기서도 큐에\n아무것도 넣지 않으므로(`add_meal_item` 독스트링의 \"ANALYZING 은 '워커가 도는\n중' 이 아니다\" 참고) 폴링할 작업 자체가 없다.\n\n## 마지막 항목도 지울 수 있다 — 항목 0 개 식사가 남는다\n\n막으면 \"잘못 인식된 유일한 항목을 지우고 올바른 걸 넣기\" 가 POST 를 먼저 해야\n하는 순서 제약이 된다. 식사를 통째로 지우는 경로는 `DELETE /meals/{mealId}` 다.\n\n이 상태를 보는 곳이 둘이다.\n\n- **`GET /meals`** — 이미 돌고 있다. `crud.get_display_names` 가 항목 없는\n  식사를 넣지 않아 `displayName` 이 `\"\"` 로 나간다. 새 동작은 아니다 —\n  `FAILED` 식사도 항목이 0 개라 목록은 전부터 이 경로를 탄다. 제목 없는 카드가\n  문제라면 고칠 자리는 `services.meal.list_meals` 이지 여기가 아니다\n  (`test_meal_with_no_items_left_still_lists_with_an_empty_name` 이 고정).\n- 🔗 **`POST /meals/{mealId}/confirm`** — 아직 없다. 항목 0 개 식사로 Q/Q/S 를\n  채점하면 0 kcal 짜리 점수가 나가므로 이 경우를 따로 정해야 한다(거부할지,\n  `FAILED` 로 보낼지). confirm 작업에 이 문단을 함께 전달할 것 —\n  `add_meal_item` 독스트링의 의존성 항목과 같은 자리다.",
+        "operationId": "delete_meal_item_api_v1_meals__meal_id__items__item_id__delete",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealItemDeleteResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/{meal_id}/items/{item_id}/nutrition": {
+      "put": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Set Meal Item Nutrition",
+        "description": "`matched: false` 로 나간 항목에 사용자가 영양정보를 붙인다.\n\n영양정보 폴백의 마지막 단계다 — 앞 단계는 `GET /nutrition/candidates` 이고,\n이 경로로 오는 이유는 `add_meal_item` 독스트링의 \"`matched: false` 는 에러가\n아니라 폴백 신호다\" 에 적어 두었다.\n\n여기서 조합한다: 항목 확인 → 공공 DB 환산 → 저장. `services/` 끼리는 서로\n부르지 않으므로(README 절대 규칙 5) 순서를 아는 건 이 레이어뿐이다.",
+        "operationId": "set_meal_item_nutrition_api_v1_meals__meal_id__items__item_id__nutrition_put",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NutritionUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_NutritionUpdateResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nutrition/candidates": {
+      "get": {
+        "tags": [
+          "nutrition"
+        ],
+        "summary": "Search Nutrition Candidates",
+        "description": "사용자가 고를 공공 DB 후보를 검색한다.\n\n`matched: false` 로 나간 음식(`POST /meals/{mealId}/items` 독스트링 참고)에\n영양정보를 붙이는 폴백의 첫 단계다. 사용자가 여기서 고른 `foodRefId` 는\n`PUT /meals/{mealId}/items/{itemId}/nutrition` 으로 간다.\n\n## 검색은 두 단계다\n\n1. **부분일치** — `q` 를 공백으로 쪼갠 토큰이 전부 들어간 이름\n2. **퍼지 폴백** — 1단계가 `limit` 을 못 채웠을 때만, 두 글자 조각이 겹치는\n   순으로 채운다. `김치찌게` 같은 오타를 구제한다\n\n둘 다 33만건 순차 스캔이다 — `LIKE '%…%'` 는 인덱스를 타지 못한다. 1단계가\n목록을 채우면 2단계 쿼리는 아예 돌지 않으므로, 흔한 검색어일수록 싸다.\n왜 `pg_trgm` 이 아닌지는 `crud.food.search_by_bigrams` 에 적어 두었다.\n\n## ⚠️ 비용 상한은 인증이 아니라 쿼리 쪽에 있다\n\n`X-User-Id` 는 **인증이 아니다** — `core.deps.get_current_user_id` 는 헤더의\nUUID 형식만 보고 DB 를 조회하지 않는다. 즉 아무 UUID 나 넣으면 통과하므로,\n\"인증이 있으니 비싼 요청을 못 돌린다\" 는 말은 성립하지 않는다.\n\n그래서 상한을 요청 내용에 직접 건다 — 단어 수(`MAX_QUERY_TOKENS`)와 퍼지 조각\n수(`MAX_FUZZY_FRAGMENTS`)다. 상한이 없을 때 48자 검색어 한 줄이 4.2초를 썼고,\n`limit` 은 이 비용을 전혀 줄이지 못한다(정렬 전에 모든 행을 평가해야 한다).\n\n## ⚠️ 동의어를 모른다\n\n`계란` 과 `달걀` 은 다른 글자다. 공공 DB 의 삶은 달걀은 `달걀_삶은것` 이라\n`q=계란` 으로는 **어떤 방식으로도 나오지 않는다** — 명세서\n(`contracts/API.md`)의 예시가 정확히 이 경우다. 동의어 사전은 이 엔드포인트\n밖의 별도 작업이고, 그때까지 FE 는 사용자가 다른 이름으로 다시 검색하거나\n직접 입력으로 넘어갈 수 있게 두어야 한다.\n\n## ⚠️ 같은 이름이 여러 건 나온다 — FE 가 구분해 보여줘야 한다\n\n공공 DB 에는 이름이 똑같고 성분이 다른 행이 흔하다(`김치찌개` 는 GENERAL 만\n5건, `미역국` 14건의 열량이 7~450 kcal). 그게 애초에 이름 매칭이 포기하고\n이 화면으로 넘어온 이유이므로 서버가 임의로 하나로 합치지 않는다\n(`crud.food.find_unique_by_name` 참고). **후보 목록에 이름만 띄우면 사용자는\n똑같은 줄 다섯 개를 보게 된다** — `nutrition.kcal` 을 함께 보여줘야 고를 수\n있다. 그 값이 `servingSizeG` 기준량이라는 점도 함께 적어야 한다\n(`schemas.nutrition.FoodCandidate`).\n\n## 인증 이음새를 타는 이유\n\n공개 데이터를 읽을 뿐이지만 다른 모든 라우트와 같은 이음새를 탄다(README 절대\n규칙 6). JWT 가 붙으면 이 라우트도 함께 진짜 인증이 된다 — 그때까지 이 헤더는\n비용 방어가 아니라 자리만 잡아 두는 것이다(위 문단 참고).",
+        "operationId": "search_nutrition_candidates_api_v1_nutrition_candidates_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 5,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_NutritionCandidatesResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/profile": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Create Profile",
+        "description": "프로필 최초 등록. 인증이 없는 지금은 이 호출이 곧 사용자 생성이다.",
+        "operationId": "create_profile_api_v1_users_profile_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ProfileCreatedResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Get Me",
+        "operationId": "get_me_api_v1_users_me_get",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_UserProfileResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Update Me",
+        "operationId": "update_me_api_v1_users_me_patch",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_UserProfileResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Dashboard",
+        "operationId": "get_dashboard_api_v1_dashboard_get",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(7d|28d|all)$",
+              "default": "7d",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_DashboardResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "잘못된 요청 — BAD_REQUEST",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user-states": {
+      "post": {
+        "tags": [
+          "user-states"
+        ],
+        "summary": "Create User State",
+        "description": "오늘 컨디션(체중·식욕·위장관 증상) 기록.",
+        "operationId": "create_user_state_api_v1_user_states_post",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserStateCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_UserStateResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user-states/latest": {
+      "get": {
+        "tags": [
+          "user-states"
+        ],
+        "summary": "Get Latest User State",
+        "description": "가장 최근 컨디션 기록 조회 (홈 컨디션 기록 팝업 미리 채우기).\n\n기록이 하나도 없으면 404 가 아니라 200 + data: null 이다.",
+        "operationId": "get_latest_user_state_api_v1_user_states_latest_get",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_UserStateResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications": {
+      "post": {
+        "tags": [
+          "medications"
+        ],
+        "summary": "투약 정보 등록",
+        "operationId": "register_medication_api_v1_medications_post",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicationRegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MedicationRegisterResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/{record_id}": {
+      "patch": {
+        "tags": [
+          "medications"
+        ],
+        "summary": "투약 정보 정정",
+        "description": "**정정 전용.** 잘못 넣은 값을 고친다. 이력을 만들지 않는다.\n\n`POST` 가 행을 더한다면(INSERT) 여기는 있는 행을 고친다(UPDATE). 한 번도 맞은 적\n없는 용량이 `dose-events` 에 남으면 안 되기 때문이다.\n\n과거 행도 고칠 수 있다. 이미 나온 끼니 평가·피드백은 안 바뀐다 — 식사는 만들 때\n복사해 둔 스냅샷을 보고, 장기 피드백은 일일 피드백에서 나온다. 바뀌는 건\n대시보드와 `dose-events` 처럼 **기록을 그대로 보여주는 화면**뿐이다.\n\n**응답이 `POST` 와 다르다.** 그쪽은 \"지금 투약이 어떤 상태인가\" 를 말하지만\n여기는 \"그 기록이 어떻게 고쳐졌나\" 라서, 고친 행 자체를 돌려준다.",
+        "operationId": "correct_medication_api_v1_medications__record_id__patch",
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Record Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicationCorrectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MedicationCorrectResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/current": {
+      "get": {
+        "tags": [
+          "medications"
+        ],
+        "summary": "현재 투약 · 단계 · 회차 · D-day",
+        "description": "지금 무슨 약을 얼마로 맞고 있는지, 몇 회차이고 다음이 언제인지.\n\n응답은 `POST /medications` 와 같은 14필드다 (명세: \"동일 구조\"). 그중\n`doseChanged` · `doseEvent` · `stageChanged` 는 조회에서 늘 고정값이다 —\n쓰기 결과를 담는 자리라 대응물이 없다.\n\n**단계는 매번 다시 판정한다.** 용량을 안 바꿔도 날짜가 지나면 단계가 옮겨가는데,\n그 순간에는 아무 요청도 없어서 저장값만 읽으면 옛 단계가 나간다.\n\n투약 미등록은 409 `STAGE_NOT_SET` 이다 (명세). 없는 사용자는 404 다.",
+        "operationId": "get_current_medication_api_v1_medications_current_get",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CurrentMedicationResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/dose-events": {
+      "get": {
+        "tags": [
+          "medications"
+        ],
+        "summary": "용량 변경 이력",
+        "description": "용량을 바꿔 온 이력 전체. 오래된 순이다.\n\n**기록이 없어도 200 이다** — `events: []`. \"아직 투약 전\"은 에러가 아니고,\n빈 목록이 그 사실을 그대로 말한다. 없는 사용자만 404 다.\n\n페이지네이션이 없다 — 명세에 커서가 없고, 한 사용자의 용량 변경은 주 단위라\n수십 줄을 넘지 않는다. 필요해지면 `DoseEventsResponse` 에 커서를 더한다.",
+        "operationId": "list_dose_events_api_v1_medications_dose_events_get",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_DoseEventsResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/{meal_id}/confirm": {
+      "post": {
+        "tags": [
+          "evaluations"
+        ],
+        "summary": "식사 확정 → Q·Q·S 채점",
+        "description": "사용자가 확인 화면에서 [확인] 을 누른다. 점수는 여기서 확정된다.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다\n(`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).\n\n확정할 수 없는 상태면 409 `CONFLICT` 다. 명세의 `NOT_CONFIRMED` 는 \"아직 확정\n안 됨\" 이라 조회 쪽 코드이고, 이쪽은 \"지금은 확정 못 함\" 이라 뜻이 다르다.\n\n**200 으로 즉답한다.** Q/Q/S 는 순수 함수라 비동기로 뺄 이유가 없다\n(절대 규칙 2). 명세의 `202 + 폴링` 은 `POST /meals` 자리다.",
+        "operationId": "confirm_meal_api_v1_meals__meal_id__confirm_post",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MealConfirmRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealConfirmResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/{meal_id}/evaluation": {
+      "get": {
+        "tags": [
+          "evaluations"
+        ],
+        "summary": "평가 재조회",
+        "description": "확정된 평가를 다시 본다. 응답은 confirm 과 같고 `feedbackStatus` 만 없다.\n\n확정 전 호출은 409 `NOT_CONFIRMED` 다 (명세). FE 는 이 코드를 보고 확인\n화면으로 되돌린다 — 에러 표의 \"확인 화면으로 되돌림\" 이 그 뜻이다.\n\n**다시 채점하지 않는다.** 확정 시점에 저장된 점수를 읽는다. 재채점하면\n기준선을 튜닝했을 때 같은 식사가 조회할 때마다 다른 점수를 낸다.",
+        "operationId": "get_meal_evaluation_api_v1_meals__meal_id__evaluation_get",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealEvaluationResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/{meal_id}/feedback": {
+      "get": {
+        "tags": [
+          "feedbacks"
+        ],
+        "summary": "단기 피드백 + 다음 끼니 추천",
+        "description": "이 끼니에 대한 AI 피드백과 다음 끼니 제안.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다\n(`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).\n\n**아직 피드백이 없어도 200 이다** — `feedbackStatus: PENDING`. 에러가 아니라\n\"아직\" 이고, 404 로 내리면 FE 가 \"없는 식사\" 와 구분하지 못한다.\n\n`safetyStatus` 가 `SAFE` 가 아니면 `summary` · `suggestions` 가 비어 나간다\n(명세: \"상담 안내로 대체\"). FE 는 그 필드를 보고 안내 화면으로 바꾼다.",
+        "operationId": "get_meal_feedback_api_v1_meals__meal_id__feedback_get",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealFeedbackResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/{meal_id}/satiety-checkins": {
+      "post": {
+        "tags": [
+          "feedbacks"
+        ],
+        "summary": "사후 포만감",
+        "description": "식후 몇 시간 뒤의 포만감을 남긴다.\n\n**같은 시점을 다시 보내면 덮는다.** \"식후 3시간 포만감\" 은 하나이고, 더블탭이\n그래프에 점 두 개를 만들면 안 된다. 그래서 새로 만들든 고치든 201 이다 —\n사용자에게는 \"이 시점의 기록이 생겼다\" 로 같다.\n\n**상태를 보지 않는다.** 포만감은 확정 여부와 무관하게 실제로 겪는 일이고,\n명세에도 상태 조건이 없다.",
+        "operationId": "add_satiety_checkin_api_v1_meals__meal_id__satiety_checkins_post",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SatietyCheckinRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_SatietyCheckinResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/insights/long-term": {
+      "get": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "Get Long Term Insight",
+        "operationId": "get_long_term_insight_api_v1_insights_long_term_get",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(7d|28d|all)$",
+              "default": "7d",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_LongTermInsightResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "잘못된 요청 — BAD_REQUEST",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/insights/long-term/refresh": {
+      "post": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "Refresh Long Term Insight",
+        "operationId": "refresh_long_term_insight_api_v1_insights_long_term_refresh_post",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightRefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_InsightRefreshResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/insights/daily": {
+      "get": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "Get Daily Feedback",
+        "description": "그날 하루 피드백 조회. 읽기 전용 — FE 는 refresh 202 뒤 이 API 를 폴링한다.",
+        "operationId": "get_daily_feedback_api_v1_insights_daily_get",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Date"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_DailyFeedbackResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/insights/daily/refresh": {
+      "post": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "Refresh Daily Feedback",
+        "description": "그날 하루 피드백 재생성 요청. 작업만 등록하고 202 를 돌려준다.",
+        "operationId": "refresh_daily_feedback_api_v1_insights_daily_refresh_post",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailyFeedbackRefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_InsightRefreshResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/home": {
+      "get": {
+        "tags": [
+          "home"
+        ],
+        "summary": "홈 — 투약 상태 · 위 게이지 · 오늘의 식사",
+        "description": "홈 화면이 한 번에 필요한 데이터.\n\nmedication 은 GET /medications/current 와 같은 계산이다 — 투약 미등록이면 409 가 아니라\n`medication: null` 로 200 이다. 기준 식사가 없으면 `stomach: null` 이다.\n없는 사용자는 404 `USER_NOT_FOUND` 다. 읽기 전용.",
+        "operationId": "get_home_api_v1_home_get",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_HomeResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AffectedInsight": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "staleReason": {
+            "type": "string",
+            "title": "Stalereason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "stale",
+          "staleReason"
+        ],
+        "title": "AffectedInsight",
+        "description": "식사 삭제로 낡은 정보가 된 장기 피드백 하나. (7·8번 insights 구현 전까지는 항상 빈 배열)"
+      },
+      "AnalysisStep": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "FOOD_RECOGNITION",
+              "DB_MATCHING",
+              "STAGE_RULE_APPLY"
+            ],
+            "title": "Key"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DONE",
+              "RUNNING",
+              "PENDING"
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "state"
+        ],
+        "title": "AnalysisStep",
+        "description": "분석 진행 단계 하나. 명세서의 `steps` 배열 원소.\n\n`frozen=True` 다 — 아래 `RECALCULATION_STEPS` 가 인스턴스를 모든 응답이\n공유하므로, 누군가 한 응답에서 고치면 그 뒤 모든 응답이 바뀐다."
+      },
+      "ApiResponse_CurrentMedicationResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrentMedicationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[CurrentMedicationResponse]"
+      },
+      "ApiResponse_DailyFeedbackResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DailyFeedbackResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[DailyFeedbackResponse]"
+      },
+      "ApiResponse_DashboardResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[DashboardResponse]"
+      },
+      "ApiResponse_DoseEventsResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoseEventsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[DoseEventsResponse]"
+      },
+      "ApiResponse_HomeResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[HomeResponse]"
+      },
+      "ApiResponse_InsightRefreshResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InsightRefreshResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[InsightRefreshResponse]"
+      },
+      "ApiResponse_LongTermInsightResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LongTermInsightResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[LongTermInsightResponse]"
+      },
+      "ApiResponse_MealCalendarResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealCalendarResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealCalendarResponse]"
+      },
+      "ApiResponse_MealConfirmResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealConfirmResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealConfirmResponse]"
+      },
+      "ApiResponse_MealCreateResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealCreateResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealCreateResponse]"
+      },
+      "ApiResponse_MealDeleteResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealDeleteResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealDeleteResponse]"
+      },
+      "ApiResponse_MealDetailResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealDetailResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealDetailResponse]"
+      },
+      "ApiResponse_MealEvaluationResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealEvaluationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealEvaluationResponse]"
+      },
+      "ApiResponse_MealFeedbackResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealFeedbackResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealFeedbackResponse]"
+      },
+      "ApiResponse_MealItemCreateResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealItemCreateResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealItemCreateResponse]"
+      },
+      "ApiResponse_MealItemDeleteResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealItemDeleteResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealItemDeleteResponse]"
+      },
+      "ApiResponse_MealItemsUpdateResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealItemsUpdateResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealItemsUpdateResponse]"
+      },
+      "ApiResponse_MealListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealListResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MealListResponse]"
+      },
+      "ApiResponse_MedicationCorrectResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MedicationCorrectResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MedicationCorrectResponse]"
+      },
+      "ApiResponse_MedicationRegisterResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MedicationRegisterResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[MedicationRegisterResponse]"
+      },
+      "ApiResponse_NutritionCandidatesResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NutritionCandidatesResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[NutritionCandidatesResponse]"
+      },
+      "ApiResponse_NutritionUpdateResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NutritionUpdateResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[NutritionUpdateResponse]"
+      },
+      "ApiResponse_ProfileCreatedResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfileCreatedResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[ProfileCreatedResponse]"
+      },
+      "ApiResponse_SatietyCheckinResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SatietyCheckinResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[SatietyCheckinResponse]"
+      },
+      "ApiResponse_UserProfileResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserProfileResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[UserProfileResponse]"
+      },
+      "ApiResponse_UserStateResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserStateResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[UserStateResponse]"
+      },
+      "CalendarDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "recordedMealTypes": {
+            "items": {
+              "$ref": "#/components/schemas/MealType"
+            },
+            "type": "array",
+            "title": "Recordedmealtypes"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "count",
+          "recordedMealTypes",
+          "stage"
+        ],
+        "title": "CalendarDay",
+        "description": "달력의 날짜 하나 (KST 기준 하루)."
+      },
+      "CalendarSummary": {
+        "properties": {
+          "totalMeals": {
+            "type": "integer",
+            "title": "Totalmeals"
+          },
+          "avgScores": {
+            "$ref": "#/components/schemas/MealScores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "totalMeals",
+          "avgScores"
+        ],
+        "title": "CalendarSummary",
+        "description": "그 달 전체 요약."
+      },
+      "CurrentMedicationResponse": {
+        "properties": {
+          "medicationId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Medicationid",
+            "description": "방금 반영된 `medication_records` 행 id."
+          },
+          "drugName": {
+            "$ref": "#/components/schemas/DrugName"
+          },
+          "doseMg": {
+            "type": "number",
+            "title": "Dosemg"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date",
+            "title": "Startedat",
+            "description": "전체 투약 시작일"
+          },
+          "doseCount": {
+            "type": "integer",
+            "title": "Dosecount",
+            "description": "floor((today - startedAt) / 7) + 1"
+          },
+          "nextDoseDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Nextdosedate",
+            "description": "startedAt + 7 x doseCount"
+          },
+          "daysUntilNextDose": {
+            "type": "integer",
+            "title": "Daysuntilnextdose",
+            "description": "nextDoseDate - today. 구조상 1~7"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          },
+          "stageReason": {
+            "type": "string",
+            "title": "Stagereason",
+            "description": "단계를 사용자에게 설명하는 한 줄"
+          },
+          "ruleVersion": {
+            "type": "string",
+            "title": "Ruleversion",
+            "description": "판정에 쓰인 규칙 버전"
+          },
+          "doseChanged": {
+            "type": "boolean",
+            "title": "Dosechanged",
+            "description": "조회는 아무것도 바꾸지 않는다 — 늘 false 다."
+          },
+          "doseEvent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoseEvent"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "이번 요청으로 생긴 변경이 없다 — 늘 null 이다."
+          },
+          "stageChanged": {
+            "type": "boolean",
+            "title": "Stagechanged",
+            "description": "조회는 아무것도 바꾸지 않는다 — 늘 false 다."
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decidedat",
+            "description": "단계를 판정한 시각 = 조회 시각. 저장된 단계를 읽는 게 아니라 **매 조회마다 오늘 기준으로 다시 판정**하기 때문에 지금이 맞다 (`get_current_view`)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "medicationId",
+          "drugName",
+          "doseMg",
+          "startedAt",
+          "doseCount",
+          "nextDoseDate",
+          "daysUntilNextDose",
+          "stage",
+          "stageReason",
+          "ruleVersion",
+          "doseChanged",
+          "doseEvent",
+          "stageChanged",
+          "decidedAt"
+        ],
+        "title": "CurrentMedicationResponse",
+        "description": "`GET /medications/current`.\n\n명세가 한 줄로 끝낸다 — **\"`POST /medications` 응답과 동일 구조.\"** 그래서 필드를\n새로 적지 않고 **상속한다.** 따로 나열하면 두 스키마가 조용히 갈라진다. 실제로\n갈라져 있었다 — 이쪽만 `effectiveFrom` 을 들고 있었고 명세 14필드 중 7개가 없었다.\n\n`medicationId` 가 필수라 **투약 기록이 있어야 만들 수 있다.** 기록이 없는 사용자는\n이 응답을 만들 수 없고 `STAGE_NOT_SET` 으로 나간다 (명세 `GET /medications/current`).\n\n아래 넷은 **구조상 늘 같은 값이다.** 쓰기 결과를 담는 자리라 조회에는 대응물이\n없다. 빼지 않는 건 FE 가 파서를 하나만 쓰게 하려고 명세가 같은 모양을 요구해서다.\n설명을 덮어써 두는 건 상속한 문구(\"이번 요청으로 …\")가 조회에서는 거짓이라\nopenapi.json 이 FE 에게 잘못 말하기 때문이다.\n\n**기본값을 주지 않는다.** 값이 정해져 있다고 `= False` 를 달면 openapi 의\n`required` 에서 빠져 FE 코드 생성기가 선택 필드로 만든다 — 늘 실려 나가는데\nFE 만 `undefined` 분기를 떠안는다. 서비스가 매번 명시적으로 채운다."
+      },
+      "DailyFeedbackRefreshRequest": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "date"
+        ],
+        "title": "DailyFeedbackRefreshRequest",
+        "description": "POST /insights/daily/refresh 요청.\n\nextra=\"forbid\": 오타난 필드(예: dat)를 조용히 무시하지 않는다 —\nschemas/user_state.py UserStateCreateRequest 와 같은 이유."
+      },
+      "DailyFeedbackResponse": {
+        "properties": {
+          "dailyFeedbackId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dailyfeedbackid"
+          },
+          "feedbackDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Feedbackdate"
+          },
+          "feedbackStatus": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "scores": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealScores"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceMealIds": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Sourcemealids"
+          },
+          "safetyStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SafetyStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "generatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generatedat"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "staleReason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StaleReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "dailyFeedbackId",
+          "feedbackDate",
+          "feedbackStatus",
+          "summary",
+          "scores",
+          "sourceMealIds",
+          "safetyStatus",
+          "generatedAt",
+          "stale",
+          "staleReason"
+        ],
+        "title": "DailyFeedbackResponse",
+        "description": "GET /insights/daily 응답.\n\n그날 행이 없으면 daily_feedback_id · summary · scores · safety_status · generated_at ·\nstale_reason 은 None, source_meal_ids 는 [], stale 은 False 다.\nsummary 는 safety_status 가 SAFE 일 때만 채운다."
+      },
+      "DashboardPeriod": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "7d",
+              "28d",
+              "all"
+            ],
+            "title": "Type"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "title": "To"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "from",
+          "to"
+        ],
+        "title": "DashboardPeriod",
+        "description": "조회 기간 정보. period=all 이면 from 이 None."
+      },
+      "DashboardResponse": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/DashboardPeriod"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardSeriesPoint"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "averages": {
+            "$ref": "#/components/schemas/MealScores"
+          },
+          "byMealType": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MealScores"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/MealType"
+            },
+            "type": "object",
+            "title": "Bymealtype"
+          },
+          "monthlyAverages": {
+            "items": {
+              "$ref": "#/components/schemas/MonthlyAverage"
+            },
+            "type": "array",
+            "title": "Monthlyaverages"
+          },
+          "weightSeries": {
+            "items": {
+              "$ref": "#/components/schemas/WeightPoint"
+            },
+            "type": "array",
+            "title": "Weightseries"
+          },
+          "stageChanges": {
+            "items": {
+              "$ref": "#/components/schemas/StageChange"
+            },
+            "type": "array",
+            "title": "Stagechanges"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "series",
+          "averages",
+          "byMealType",
+          "monthlyAverages",
+          "weightSeries",
+          "stageChanges"
+        ],
+        "title": "DashboardResponse",
+        "description": "GET /dashboard 응답."
+      },
+      "DashboardSeriesPoint": {
+        "properties": {
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "satiety": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satiety"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quantity",
+          "quality",
+          "satiety",
+          "date",
+          "stage"
+        ],
+        "title": "DashboardSeriesPoint",
+        "description": "날짜 하나의 Q/Q/S 평균 (MealScores 의 quantity/quality/satiety 를 그대로 물려받는다)."
+      },
+      "DoseDirection": {
+        "type": "string",
+        "enum": [
+          "INCREASE",
+          "DECREASE",
+          "MAINTAIN"
+        ],
+        "title": "DoseDirection",
+        "description": "이전 용량 대비 방향. 명세 `doseEvent.direction` 이다.\n\nDB 에 저장하지 않는다 — 이전 행의 용량과 비교하면 언제든 다시 나오는 값이라\n컬럼으로 두면 두 진실이 생긴다."
+      },
+      "DoseEvent": {
+        "properties": {
+          "doseEventId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Doseeventid"
+          },
+          "doseMg": {
+            "type": "number",
+            "title": "Dosemg"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/DoseDirection"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "title": "Effectivefrom",
+            "description": "이 용량으로 바꾼 날"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doseEventId",
+          "doseMg",
+          "direction",
+          "effectiveFrom"
+        ],
+        "title": "DoseEvent",
+        "description": "용량 변경 1건. `medication_records` 행 하나가 그대로 한 이벤트다.\n\n명세에 `dose_events` 라는 별도 테이블이 있는 것처럼 적혀 있지만, 우리 모델은\n**행 하나가 곧 용량 변경 1건**이라 `medication_records` 가 그 테이블이다\n(「행 하나 = 용량 변경 1건」 참고). `doseEventId` 는 그 행의 id 다."
+      },
+      "DoseEventsResponse": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/DoseEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "DoseEventsResponse",
+        "description": "`GET /medications/dose-events`.\n\n명세가 `{ \"events\": [...] }` 로 감싼다 — 배열을 그대로 내보내지 않는다. 나중에\n커서나 요약을 붙일 자리가 남고, `data` 가 항상 객체라 FE 파싱이 한결같다.\n\n**오래된 순이다** (명세 예시의 `de_001 → de_003`). 용량 사다리를 위에서 아래로\n읽는 화면이라 역순으로 주면 FE 가 뒤집어야 한다."
+      },
+      "DrugName": {
+        "type": "string",
+        "enum": [
+          "위고비",
+          "마운자로"
+        ],
+        "title": "DrugName",
+        "description": "지원 약물.\n\n**DB native ENUM 이 아니다** — `medication_records.drug_name` 은 VARCHAR 이고\n여기 값이 문자열로 저장된다. API 경계에서 값 집합을 막으려고 두는 것이라,\n약물을 추가하려면 여기와 `services/medication.py` 의 DOSE_LADDERS 두 곳을 고친다.\n\n**값이 한글인 이유:** FE 가 `\"위고비\"` 로 보내고 받는다 (투약 화면의 약 선택 탭).\nAPI 명세에 DrugName 열거형이 없어 FE 표기를 따랐다. 멤버 이름은 영문이라\n내부 코드(`DOSE_LADDERS` 등)는 값이 바뀌어도 그대로다."
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody"
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "PROFILE_REQUIRED",
+          "STAGE_NOT_SET",
+          "NOT_CONFIRMED",
+          "FOOD_NOT_RECOGNIZED",
+          "ANALYSIS_TIMEOUT",
+          "LOW_CONFIDENCE",
+          "NUTRITION_NOT_MATCHED",
+          "MEDICAL_QUESTION_DETECTED",
+          "FEEDBACK_GENERATION_FAILED",
+          "UNAUTHORIZED",
+          "FORBIDDEN",
+          "USER_NOT_FOUND",
+          "NOT_FOUND",
+          "CONFLICT",
+          "BAD_REQUEST",
+          "VALIDATION_ERROR",
+          "INTERNAL_ERROR"
+        ],
+        "title": "ErrorCode"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": false
+          },
+          "data": {
+            "type": "null",
+            "title": "Data"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "description": "에러 응답 전용 스키마. OpenAPI 문서에만 쓰인다.\n\n실제 직렬화는 `_error_response` 가 dict 로 한다 — 이 모델은 그 dict 와 같은\n모양을 문서에 약속하기 위한 것이다. 둘이 어긋나면 문서가 거짓말이 된다."
+      },
+      "EvaluationEvidence": {
+        "properties": {
+          "dbSource": {
+            "type": "string",
+            "title": "Dbsource"
+          },
+          "stageRuleVersion": {
+            "type": "string",
+            "title": "Stageruleversion"
+          },
+          "weightProfileVersion": {
+            "type": "string",
+            "title": "Weightprofileversion"
+          },
+          "nutritionSources": {
+            "items": {
+              "$ref": "#/components/schemas/NutritionSource"
+            },
+            "type": "array",
+            "title": "Nutritionsources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dbSource",
+          "stageRuleVersion",
+          "weightProfileVersion",
+          "nutritionSources"
+        ],
+        "title": "EvaluationEvidence",
+        "description": "점수의 출처. 나중에 \"왜 이 점수였나\" 를 추적하려면 필요하다."
+      },
+      "ExpectedSatiety": {
+        "properties": {
+          "current": {
+            "type": "integer",
+            "title": "Current"
+          },
+          "after": {
+            "type": "integer",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "after"
+        ],
+        "title": "ExpectedSatiety",
+        "description": "`expectedSatietyPct`. `current` 는 지금 포만감, `after` 는 **제안을 따랐을 때의\n예상치**다 — 명세 예시가 `{current: 62, after: 79}` 를 제안 바로 아래 둔다.\n\n⚠️ **지금은 `after` 에 `current` 를 그대로 넣는다.** 예측을 만들 소스가 없다 —\n`ai-stub` 계약에 해당 필드가 없고, \"두부를 먹으면 17%p 오른다\" 를 BE 가 계산하면\n절대 규칙 1(의료 판단 금지)에 걸린다. 그렇다고 객체째 `null` 로 두면 FE 가 게이지를\n아예 못 그려서, 우선 같은 값으로 채워 \"변화 없음\" 으로 보이게 한다. 예측 소스가\n생기면 `after` 만 갈아 끼우면 된다."
+      },
+      "FeedbackStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "GENERATING",
+          "READY",
+          "FAILED"
+        ],
+        "title": "FeedbackStatus",
+        "description": "피드백 문장의 생성 상태. 점수(Q/Q/S)와 별개다 — AI 가 죽어도 점수는 남는다."
+      },
+      "FeedbackSuggestion": {
+        "properties": {
+          "foodName": {
+            "type": "string",
+            "title": "Foodname"
+          },
+          "nutrients": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionNutrient"
+            },
+            "type": "array",
+            "title": "Nutrients"
+          },
+          "advice": {
+            "type": "string",
+            "title": "Advice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "foodName",
+          "nutrients",
+          "advice"
+        ],
+        "title": "FeedbackSuggestion",
+        "description": "다음 끼니 제안 한 건.\n\n`nutrients` 는 **저장돼 있지 않다.** AI 는 `candidateFoodRefId` 만 주고\n(`ai-stub/schemas.py::Suggestion`: \"nutrients 는 여기 없다 — BE 가 food_refs 에서\n채운다\"), 응답을 만들 때 그 id 로 조회해 채운다. 저장하면 `food_refs` 가 갱신될 때\n낡는다.\n\n참조를 못 찾으면 `nutrients` 는 `[]` 다 — 제안 문구는 그대로 쓸모가 있어서\n항목을 통째로 버리지 않는다."
+      },
+      "FoodCandidate": {
+        "properties": {
+          "foodRefId": {
+            "type": "string",
+            "title": "Foodrefid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "servingSizeG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servingsizeg"
+          },
+          "nutrition": {
+            "$ref": "#/components/schemas/NutritionInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "foodRefId",
+          "name",
+          "servingSizeG",
+          "nutrition"
+        ],
+        "title": "FoodCandidate",
+        "description": "`GET /nutrition/candidates` 의 후보 한 건.\n\n⚠️ **여기의 `nutrition` 은 `servingSizeG` 기준량의 값이다** — 사용자가 먹은\n양으로 환산된 값이 아니다. 같은 `NutritionInfo` 모델을 쓰지만 의미가 다르다:\nmeal item 응답의 `nutrition` 은 이미 섭취량만큼 환산돼 있다\n(`services.nutrition.resolve_by_name`).\n\n이 엔드포인트는 사용자가 무엇을 얼마나 먹었는지 모른다. 양이 붙는 건 후보를\n고른 뒤 `PUT /meals/{mealId}/items/{itemId}/nutrition` 에서다. FE 가 후보\n목록에 열량을 보여줄 때 \"100g 당\" 같은 기준을 함께 적어야 하는 이유다."
+      },
+      "GiSeverity": {
+        "type": "string",
+        "enum": [
+          "MILD",
+          "MODERATE",
+          "SEVERE"
+        ],
+        "title": "GiSeverity",
+        "description": "증상 강도. 화면의 약함 / 보통 / 심함."
+      },
+      "GiSymptom": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/GiSymptomCode"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/GiSeverity"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "severity"
+        ],
+        "title": "GiSymptom",
+        "description": "위장관 증상 하나. 증상마다 강도를 따로 받는다.\n\nextra=\"forbid\": 증상 항목 안의 오타 필드도 조용히 버리지 않는다."
+      },
+      "GiSymptomCode": {
+        "type": "string",
+        "enum": [
+          "NAUSEA",
+          "VOMITING",
+          "HEARTBURN",
+          "CONSTIPATION",
+          "DIARRHEA",
+          "BLOATING",
+          "ABDOMINAL_PAIN"
+        ],
+        "title": "GiSymptomCode",
+        "description": "위장관 증상 종류."
+      },
+      "HomeMeal": {
+        "properties": {
+          "mealId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mealid"
+          },
+          "mealType": {
+            "$ref": "#/components/schemas/MealType"
+          },
+          "eatenAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Eatenat"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "Displayname"
+          },
+          "thumbnailUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnailurl"
+          },
+          "scores": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealScores"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "mealId",
+          "mealType",
+          "eatenAt",
+          "displayName",
+          "thumbnailUrl",
+          "scores"
+        ],
+        "title": "HomeMeal",
+        "description": "오늘의 식사 항목 하나. 평가 전이면 scores 는 None."
+      },
+      "HomeMedication": {
+        "properties": {
+          "drugName": {
+            "$ref": "#/components/schemas/DrugName"
+          },
+          "doseMg": {
+            "type": "number",
+            "title": "Dosemg"
+          },
+          "doseCount": {
+            "type": "integer",
+            "title": "Dosecount"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          },
+          "nextDoseDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Nextdosedate"
+          },
+          "daysUntilNextDose": {
+            "type": "integer",
+            "title": "Daysuntilnextdose"
+          },
+          "doseChangeScheduled": {
+            "type": "boolean",
+            "title": "Dosechangescheduled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "drugName",
+          "doseMg",
+          "doseCount",
+          "stage",
+          "nextDoseDate",
+          "daysUntilNextDose",
+          "doseChangeScheduled"
+        ],
+        "title": "HomeMedication",
+        "description": "투약 카드. 값은 GET /medications/current 와 같은 계산에서 나온다."
+      },
+      "HomeResponse": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "medication": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeMedication"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stomach": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeStomach"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "today": {
+            "$ref": "#/components/schemas/HomeToday"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "medication",
+          "stomach",
+          "today"
+        ],
+        "title": "HomeResponse",
+        "description": "GET /home 응답.\n\n투약 미등록이면 medication 은 None, 기준 식사가 없으면 stomach 는 None 이다."
+      },
+      "HomeStomach": {
+        "properties": {
+          "satietyPct": {
+            "type": "integer",
+            "title": "Satietypct"
+          },
+          "sourceMealId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sourcemealid"
+          },
+          "sourceMealAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Sourcemealat"
+          },
+          "minutesSinceMeal": {
+            "type": "integer",
+            "title": "Minutessincemeal"
+          },
+          "feedbackSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedbacksummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "satietyPct",
+          "sourceMealId",
+          "sourceMealAt",
+          "minutesSinceMeal",
+          "feedbackSummary"
+        ],
+        "title": "HomeStomach",
+        "description": "위 게이지. satiety_after 가 기록된 가장 최근 식사 기준.\n\nfeedback_summary 는 그 식사의 피드백이 SAFE 일 때만 채운다."
+      },
+      "HomeToday": {
+        "properties": {
+          "recordedCount": {
+            "type": "integer",
+            "title": "Recordedcount"
+          },
+          "meals": {
+            "items": {
+              "$ref": "#/components/schemas/HomeMeal"
+            },
+            "type": "array",
+            "title": "Meals"
+          },
+          "missingMealTypes": {
+            "items": {
+              "$ref": "#/components/schemas/MealType"
+            },
+            "type": "array",
+            "title": "Missingmealtypes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recordedCount",
+          "meals",
+          "missingMealTypes"
+        ],
+        "title": "HomeToday",
+        "description": "오늘(KST) 기록한 식사와 아직 기록하지 않은 끼니."
+      },
+      "InsightPeriod": {
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "title": "To"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "InsightPeriod"
+      },
+      "InsightRefreshRequest": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "enum": [
+              "7d",
+              "28d",
+              "all"
+            ],
+            "title": "Period"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period"
+        ],
+        "title": "InsightRefreshRequest",
+        "description": "POST /insights/long-term/refresh 요청."
+      },
+      "InsightRefreshResponse": {
+        "properties": {
+          "feedbackStatus": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          },
+          "pollIntervalMs": {
+            "type": "integer",
+            "title": "Pollintervalms",
+            "default": 1500
+          }
+        },
+        "type": "object",
+        "required": [
+          "feedbackStatus"
+        ],
+        "title": "InsightRefreshResponse",
+        "description": "POST /insights/long-term/refresh · /insights/daily/refresh 202 응답."
+      },
+      "LongTermInsightResponse": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/InsightPeriod"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          },
+          "dataSufficient": {
+            "type": "boolean",
+            "title": "Datasufficient"
+          },
+          "trendSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trendsummary"
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation"
+          },
+          "generatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generatedat"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "staleReason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StaleReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "status",
+          "dataSufficient",
+          "trendSummary",
+          "recommendation",
+          "generatedAt",
+          "stale",
+          "staleReason"
+        ],
+        "title": "LongTermInsightResponse",
+        "description": "GET /insights/long-term 응답."
+      },
+      "ManualNutrition": {
+        "properties": {
+          "kcal": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kcal"
+          },
+          "proteinG": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proteing"
+          },
+          "fatG": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fatg"
+          },
+          "carbG": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carbg"
+          },
+          "fiberG": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiberg"
+          },
+          "sodiumMg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sodiummg"
+          }
+        },
+        "type": "object",
+        "title": "ManualNutrition",
+        "description": "사용자가 직접 적어 넣은 영양성분.\n\n⚠️ **섭취량 기준 총량이다** — `FoodCandidate.nutrition` 과 달리 기준량\n(`servingSizeG`) 기준이 아니다. 사용자는 자기가 먹은 만큼의 값을 적으므로\n서버가 환산하지 않는다.\n\n여섯 필드가 모두 선택이다 — 포장지에 나트륨이 없는 경우처럼 사용자가 모르는\n성분이 있다. 모르는 값은 0 이 아니라 `null` 이어야 한다(`NutritionInfo` 와 같은\n규약). 다만 **전부 비어 있으면 거절한다**(`NutritionUpdateRequest`) — 그 요청은\n폴백을 해소하지 못한 채 200 을 받는다."
+      },
+      "MealCalendarResponse": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarDay"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CalendarSummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "days",
+          "summary"
+        ],
+        "title": "MealCalendarResponse",
+        "description": "GET /meals/calendar 응답."
+      },
+      "MealConfirmRequest": {
+        "properties": {
+          "satietyAfterPct": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Satietyafterpct"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "satietyAfterPct"
+        ],
+        "title": "MealConfirmRequest",
+        "description": "확정 요청. 식후 포만감만 받는다.\n\nextra=\"forbid\": 오타난 필드를 조용히 무시하지 않는다 (`schemas/user.py` 와\n같은 이유). 이 요청은 필드가 하나뿐이라, 오타가 나면 그 하나가 통째로\n빠진 것으로 처리돼 포만감 없이 확정된다."
+      },
+      "MealConfirmResponse": {
+        "properties": {
+          "mealId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mealid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MealStatus"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          },
+          "scores": {
+            "$ref": "#/components/schemas/QqsScores"
+          },
+          "stageEmphasis": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreAxis"
+            },
+            "type": "array",
+            "title": "Stageemphasis"
+          },
+          "nutrients": {
+            "items": {
+              "$ref": "#/components/schemas/NutrientRow"
+            },
+            "type": "array",
+            "title": "Nutrients"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/EvaluationEvidence"
+          },
+          "feedbackStatus": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mealId",
+          "status",
+          "stage",
+          "scores",
+          "stageEmphasis",
+          "nutrients",
+          "evidence",
+          "feedbackStatus"
+        ],
+        "title": "MealConfirmResponse",
+        "description": "`POST /meals/{mealId}/confirm` 응답. 위에 `feedbackStatus` 만 더한다.\n\n확정 직후에는 피드백 문장이 아직 없다 — 점수(Rule Engine)와 문장(AI)은\n분리돼 있어서(README) 확정은 점수까지만 끝내고 문장은 뒤따라온다."
+      },
+      "MealCreateResponse": {
+        "properties": {
+          "mealId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mealid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MealStatus"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "pollIntervalMs": {
+            "type": "integer",
+            "title": "Pollintervalms"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeoutms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mealId",
+          "status",
+          "steps",
+          "pollIntervalMs",
+          "timeoutMs"
+        ],
+        "title": "MealCreateResponse",
+        "description": "POST /meals 응답 (202)."
+      },
+      "MealDeleteResponse": {
+        "properties": {
+          "mealId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mealid"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deletedat"
+          },
+          "affectedInsights": {
+            "items": {
+              "$ref": "#/components/schemas/AffectedInsight"
+            },
+            "type": "array",
+            "title": "Affectedinsights"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mealId",
+          "deletedAt",
+          "affectedInsights"
+        ],
+        "title": "MealDeleteResponse",
+        "description": "DELETE /meals/{mealId} 응답."
+      },
+      "MealDetailResponse": {
+        "properties": {
+          "mealId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mealid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MealStatus"
+          },
+          "isRecalculation": {
+            "type": "boolean",
+            "title": "Isrecalculation"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          },
+          "mealType": {
+            "$ref": "#/components/schemas/MealType"
+          },
+          "eatenAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Eatenat"
+          },
+          "imageUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imageurl"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "clarifyQuestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarifyquestion"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MealItemDetail"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "scores": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealScores"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nutrients": {
+            "items": {
+              "$ref": "#/components/schemas/NutrientStatus"
+            },
+            "type": "array",
+            "title": "Nutrients"
+          },
+          "satiety": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SatietyDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealFeedbackSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "mealId",
+          "status",
+          "isRecalculation",
+          "stage",
+          "mealType",
+          "eatenAt",
+          "imageUrl",
+          "steps",
+          "clarifyQuestion",
+          "items",
+          "scores",
+          "nutrients",
+          "satiety",
+          "feedback"
+        ],
+        "title": "MealDetailResponse",
+        "description": "GET /meals/{mealId} 응답. status 에 따라 EVALUATED 전용 필드가 채워진다."
+      },
+      "MealEvaluationResponse": {
+        "properties": {
+          "mealId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mealid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MealStatus"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          },
+          "scores": {
+            "$ref": "#/components/schemas/QqsScores"
+          },
+          "stageEmphasis": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreAxis"
+            },
+            "type": "array",
+            "title": "Stageemphasis"
+          },
+          "nutrients": {
+            "items": {
+              "$ref": "#/components/schemas/NutrientRow"
+            },
+            "type": "array",
+            "title": "Nutrients"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/EvaluationEvidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mealId",
+          "status",
+          "stage",
+          "scores",
+          "stageEmphasis",
+          "nutrients",
+          "evidence"
+        ],
+        "title": "MealEvaluationResponse",
+        "description": "`GET /meals/{mealId}/evaluation` 응답."
+      },
+      "MealFeedbackResponse": {
+        "properties": {
+          "feedbackStatus": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackSuggestion"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "expectedSatietyPct": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpectedSatiety"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "safetyStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SafetyStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "feedbackStatus",
+          "summary",
+          "reasoning",
+          "suggestions",
+          "expectedSatietyPct",
+          "safetyStatus"
+        ],
+        "title": "MealFeedbackResponse",
+        "description": "`GET /meals/{mealId}/feedback`. 명세 6필드.\n\n**nullable 필드에 기본값을 주지 않는다.** `= None` 을 달면 openapi 의 `required`\n에서 빠져 생성 클라이언트가 `summary?: string` 으로 받는다. 값이 `null` 로 올\n뿐 키는 항상 있다 (`schemas/evaluation.py` 와 같은 판단)."
+      },
+      "MealFeedbackSummary": {
+        "properties": {
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackSuggestion"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "suggestions"
+        ],
+        "title": "MealFeedbackSummary",
+        "description": "status: EVALUATED 일 때만 채워지는 단기 피드백 요약.\n\n`suggestions` 는 `GET /meals/{mealId}/feedback` 과 **같은 객체 배열**이다\n(`FeedbackSuggestion`). 명세는 여기서 `[ … ]` 라고만 적어 원소 모양을 정하지 않았고,\n같은 끼니의 같은 제안이 화면마다 다른 모양이면 FE 가 두 벌로 파싱해야 한다.\n컬럼(`meal_feedbacks.suggestions`)은 워커가 AI 제안을 담는 JSONB 배열이고,\n`nutrients` 는 읽을 때 채운다 (`services/feedback.py::build_meal_suggestions`)."
+      },
+      "MealItemCreateRequest": {
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Displayname"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 999999.99,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Amount"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "displayName",
+          "amount",
+          "unit"
+        ],
+        "title": "MealItemCreateRequest",
+        "description": "POST /meals/{mealId}/items 요청.\n\n`amount` + `unit` 은 항상 함께 온다. g 으로 환산할 수 있는지는 서버가 판단한다\n(`services.meal.to_grams`) — \"2개\" 처럼 환산 근거가 없는 단위도 유효한 입력이다."
+      },
+      "MealItemCreateResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid"
+          },
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "nutrition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NutritionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/MealStatus"
+          },
+          "isRecalculation": {
+            "type": "boolean",
+            "title": "Isrecalculation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itemId",
+          "matched",
+          "nutrition",
+          "status",
+          "isRecalculation"
+        ],
+        "title": "MealItemCreateResponse",
+        "description": "POST /meals/{mealId}/items 응답.\n\n`status` · `isRecalculation` 은 추가된 항목이 아니라 **식사 전체**의 상태다.\n항목 추가가 재분석을 유발하므로 FE 가 곧바로 폴링으로 넘어갈 수 있게 함께 싣는다."
+      },
+      "MealItemDeleteResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/MealStatus"
+          },
+          "isRecalculation": {
+            "type": "boolean",
+            "title": "Isrecalculation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "isRecalculation"
+        ],
+        "title": "MealItemDeleteResponse",
+        "description": "DELETE /meals/{mealId}/items/{itemId} 응답.\n\n**`steps` 가 없다.** 명세서(`contracts/API.md`)가 PATCH 응답에만 그 배열을\n두기 때문이다. 형제라고 `MealItemsUpdateResponse` 를 재사용하면 명세에 없는\n필드가 따라 나가고, 그 값이 `DB_MATCHING: RUNNING` 이라 FE 는 돌지도 않는\n작업을 폴링할 근거로 읽는다."
+      },
+      "MealItemDetail": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "Displayname"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "nutritionSource": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PUBLIC_DB",
+                  "USER_INPUT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nutritionsource"
+          },
+          "userConfirmed": {
+            "type": "boolean",
+            "title": "Userconfirmed"
+          },
+          "nutrition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NutritionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "itemId",
+          "displayName",
+          "amount",
+          "unit",
+          "confidence",
+          "matched",
+          "nutritionSource",
+          "userConfirmed",
+          "nutrition"
+        ],
+        "title": "MealItemDetail",
+        "description": "GET /meals/{mealId} 의 items 항목 하나."
+      },
+      "MealItemUpdate": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid"
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Displayname"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 999999.99,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Amount"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itemId",
+          "displayName",
+          "amount",
+          "unit"
+        ],
+        "title": "MealItemUpdate",
+        "description": "PATCH /meals/{mealId}/items 요청의 항목 하나.\n\n세 필드가 모두 필수다 — 항목 하나를 통째로 교체하는 모양이다. FE 는 확인 화면에\n이미 세 값을 다 들고 있고, `amount` 와 `unit` 이 짝이라 한쪽만 오는 애매한 입력이\n생기지 않는다. 부분 수정은 **항목 단위**로 이뤄진다: 고친 항목만 배열에 담는다."
+      },
+      "MealItemsUpdateRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MealItemUpdate"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "MealItemsUpdateRequest",
+        "description": "PATCH /meals/{mealId}/items 요청."
+      },
+      "MealItemsUpdateResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/MealStatus"
+          },
+          "isRecalculation": {
+            "type": "boolean",
+            "title": "Isrecalculation"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "isRecalculation",
+          "steps"
+        ],
+        "title": "MealItemsUpdateResponse",
+        "description": "PATCH /meals/{mealId}/items 응답.\n\nPOST 와 달리 고친 항목을 되돌려주지 않는다 — 명세서가 식사 전체의 상태만\n요구한다. 항목의 최신 모양이 필요하면 FE 는 `GET /meals/{mealId}` 를 부른다."
+      },
+      "MealListItem": {
+        "properties": {
+          "mealId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mealid"
+          },
+          "mealType": {
+            "$ref": "#/components/schemas/MealType"
+          },
+          "eatenAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Eatenat"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "Displayname"
+          },
+          "thumbnailUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnailurl"
+          },
+          "scores": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealScores"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "mealId",
+          "mealType",
+          "eatenAt",
+          "stage",
+          "displayName",
+          "thumbnailUrl",
+          "scores"
+        ],
+        "title": "MealListItem",
+        "description": "GET /meals 목록의 항목 하나."
+      },
+      "MealListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MealListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          },
+          "hasMore": {
+            "type": "boolean",
+            "title": "Hasmore"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor",
+          "hasMore"
+        ],
+        "title": "MealListResponse",
+        "description": "GET /meals 응답 전체."
+      },
+      "MealScores": {
+        "properties": {
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "satiety": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satiety"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quantity",
+          "quality",
+          "satiety"
+        ],
+        "title": "MealScores",
+        "description": "Q/Q/S 점수. 아직 평가 전이면 통째로 None."
+      },
+      "MealStatus": {
+        "type": "string",
+        "enum": [
+          "ANALYZING",
+          "REVIEW_REQUIRED",
+          "EVALUATED",
+          "FAILED"
+        ],
+        "title": "MealStatus",
+        "description": "이 4개가 전부다. 중간 상태를 추가하지 않는다."
+      },
+      "MealType": {
+        "type": "string",
+        "enum": [
+          "BREAKFAST",
+          "LUNCH",
+          "DINNER",
+          "SNACK"
+        ],
+        "title": "MealType"
+      },
+      "MedicationCorrectRequest": {
+        "properties": {
+          "drugName": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DrugName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doseMg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 999.999,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,3}0*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dosemg"
+          },
+          "injectionCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Injectioncount"
+          },
+          "effectiveFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectivefrom",
+            "description": "그 구간이 시작한 날."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MedicationCorrectRequest",
+        "description": "`PATCH /medications/{medicationId}` — **정정 전용.** 잘못 넣은 값을 고친다.\n\n`POST` 와 나누는 이유가 여기 있다. 같은 날 들어온 `0.5` 가 \"정말 용량을 내렸다\"\n인지 \"`1.0` 을 잘못 쳐서 고친다\" 인지 **요청만 봐서는 모른다.** 앞은 감량기\n판정을 낳고 뒤는 낳으면 안 되는데 시간으로는 갈리지 않는다. 그래서 엔드포인트로\n가른다 — `POST` 는 행을 **더하고**(INSERT), 여기는 있는 행을 **고친다**(UPDATE).\n\n**전부 선택 항목이지만 하나는 보내야 한다.** 빈 몸통은 아무 뜻이 없는데 200 을\n내리면 클라이언트가 뭔가 반영된 줄 안다.\n\n`effectiveFrom` 은 **그 행의 구간 시작일**이다. `POST` 요청의 `startedAt`(전체 투약\n시작일)과 다르고, 응답도 그 행의 값을 그대로 돌려주므로 이름이 어긋나지 않는다."
+      },
+      "MedicationCorrectResponse": {
+        "properties": {
+          "recordId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Recordid",
+            "description": "고친 `medication_records` 행 id."
+          },
+          "drugName": {
+            "$ref": "#/components/schemas/DrugName"
+          },
+          "doseMg": {
+            "type": "number",
+            "title": "Dosemg"
+          },
+          "injectionCount": {
+            "type": "integer",
+            "title": "Injectioncount"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "title": "Effectivefrom",
+            "description": "그 구간이 시작한 날"
+          },
+          "effectiveTo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectiveto",
+            "description": "그 구간이 끝난 날. 현재 구간이면 null"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          },
+          "stageReason": {
+            "type": "string",
+            "title": "Stagereason"
+          },
+          "stageChanged": {
+            "type": "boolean",
+            "title": "Stagechanged",
+            "description": "정정으로 단계 판정이 달라졌는가"
+          },
+          "ruleVersion": {
+            "type": "string",
+            "title": "Ruleversion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recordId",
+          "drugName",
+          "doseMg",
+          "injectionCount",
+          "effectiveFrom",
+          "effectiveTo",
+          "stage",
+          "stageReason",
+          "stageChanged",
+          "ruleVersion"
+        ],
+        "title": "MedicationCorrectResponse",
+        "description": "`PATCH /medications/{recordId}` 응답. 명세의 10필드다.\n\n**`POST` 응답과 다르다.** 그쪽은 \"지금 투약이 어떤 상태인가\" 를 말하므로 전체\n투약 시작일 · 회차 · 다음 투약일이 들어간다. 여기는 \"그 기록이 어떻게 고쳐졌나\"\n라서 고친 행 자체(`recordId` · `effectiveFrom` · `effectiveTo`)를 돌려준다.\n\n그래서 `doseChanged` · `doseEvent` 가 없다. 정정은 용량을 바꾼 사건이 아니라\n이미 있던 기록을 고친 것이고, `dose-events` 에 새 점을 찍지 않는다."
+      },
+      "MedicationRegisterRequest": {
+        "properties": {
+          "drugName": {
+            "$ref": "#/components/schemas/DrugName"
+          },
+          "doseMg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 999.999,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,3}0*$"
+              }
+            ],
+            "title": "Dosemg"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat",
+            "description": "**전체 투약 시작일.** 회차를 여기서 역산한다. 생략하면 기존 시작일을 그대로 둔다 — 첫 등록일 때만 오늘."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "drugName",
+          "doseMg"
+        ],
+        "title": "MedicationRegisterRequest",
+        "description": "투약 정보 등록. 정정은 `PATCH /medications/{id}` 다.\n\n`startedAt` 은 **이번에 맞은 날이 아니라 전체 투약 시작일**이다. 명세의 서버 계산\n항목이 여기서 나온다 — `doseCount = floor((today - startedAt) / 7) + 1`.\nFE 의 회차 스테퍼도 이 값을 역산해서 보낸다.\n\n단계(stage)는 받지 않는다. 서버가 용량으로 판정한다 — 사용자가 고르게 하면\n아키텍처의 Stage Rule Engine 이 사라진다.\n\nextra=\"forbid\": 오타난 필드(예: `startedAtt`)를 조용히 무시하지 않는다. 무시하면\n`startedAt` 이 빠진 것으로 처리돼 **첫 등록이 오늘 날짜로 들어가고 회차가 1 이 된다** —\n클라이언트는 200 을 받고 저장됐다고 믿는다. `schemas/user.py` 의 요청 스키마들과\n같은 이유다."
+      },
+      "MedicationRegisterResponse": {
+        "properties": {
+          "medicationId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Medicationid",
+            "description": "방금 반영된 `medication_records` 행 id."
+          },
+          "drugName": {
+            "$ref": "#/components/schemas/DrugName"
+          },
+          "doseMg": {
+            "type": "number",
+            "title": "Dosemg"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date",
+            "title": "Startedat",
+            "description": "전체 투약 시작일"
+          },
+          "doseCount": {
+            "type": "integer",
+            "title": "Dosecount",
+            "description": "floor((today - startedAt) / 7) + 1"
+          },
+          "nextDoseDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Nextdosedate",
+            "description": "startedAt + 7 x doseCount"
+          },
+          "daysUntilNextDose": {
+            "type": "integer",
+            "title": "Daysuntilnextdose",
+            "description": "nextDoseDate - today. 구조상 1~7"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/MedicationStage"
+          },
+          "stageReason": {
+            "type": "string",
+            "title": "Stagereason",
+            "description": "단계를 사용자에게 설명하는 한 줄"
+          },
+          "ruleVersion": {
+            "type": "string",
+            "title": "Ruleversion",
+            "description": "판정에 쓰인 규칙 버전"
+          },
+          "doseChanged": {
+            "type": "boolean",
+            "title": "Dosechanged",
+            "description": "이번 요청으로 약·용량이 바뀌었는지"
+          },
+          "doseEvent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoseEvent"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "바뀌었다면 그 변경 1건. 아니면 null"
+          },
+          "stageChanged": {
+            "type": "boolean",
+            "title": "Stagechanged",
+            "description": "이번 요청으로 단계 판정이 달라졌는지"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decidedat",
+            "description": "판정 시각. `+09:00` 으로 나간다 (규약: ISO 8601 +09:00)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "medicationId",
+          "drugName",
+          "doseMg",
+          "startedAt",
+          "doseCount",
+          "nextDoseDate",
+          "daysUntilNextDose",
+          "stage",
+          "stageReason",
+          "ruleVersion",
+          "doseChanged",
+          "stageChanged",
+          "decidedAt"
+        ],
+        "title": "MedicationRegisterResponse",
+        "description": "`POST /medications` 응답. 명세의 14필드다.\n\n`GET /medications/current` 이 **이걸 상속한다** (명세: \"동일 구조\"). 그래서 필드가\n같고, 조회에 대응물이 없는 `doseChanged` · `doseEvent` · `stageChanged` 는\n그쪽에서 고정값이 된다 (`CurrentMedicationResponse` 참고).\n\n명세에 없는 `effectiveFrom` 은 내리지 않는다. 현재 용량으로 바꾼 날은\n`GET /medications/dose-events` 와 `doseEvent.effectiveFrom` 에 들어 있다."
+      },
+      "MedicationStage": {
+        "type": "string",
+        "enum": [
+          "PRE_DOSE",
+          "INITIAL",
+          "TITRATION",
+          "MAINTENANCE",
+          "REDUCED"
+        ],
+        "title": "MedicationStage",
+        "description": "포즈 단계. 여기까지가 분류의 전부이고, 용량 판단은 하지 않는다 (규칙 1).\n\n판정 규칙은 `docs/be-medication-stage-rule.md`. TITRATION 은 \"증량기\"가 아니라\n**조정기**다 — 중간 용량인데 아직 정착 전이라는 뜻이고, 방향을 함의하지 않는다."
+      },
+      "MonthlyAverage": {
+        "properties": {
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "satiety": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satiety"
+          },
+          "month": {
+            "type": "string",
+            "title": "Month"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quantity",
+          "quality",
+          "satiety",
+          "month"
+        ],
+        "title": "MonthlyAverage",
+        "description": "월 하나의 평균 Q/Q/S."
+      },
+      "NutrientCode": {
+        "type": "string",
+        "enum": [
+          "CALORIE",
+          "PROTEIN",
+          "FAT",
+          "CARB",
+          "FIBER",
+          "SODIUM"
+        ],
+        "title": "NutrientCode",
+        "description": "명세 「열거형」의 NutrientCode. 응답 `nutrients[].code` 다."
+      },
+      "NutrientRow": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NutrientCode"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NutrientState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label",
+          "current",
+          "target",
+          "unit",
+          "state"
+        ],
+        "title": "NutrientRow",
+        "description": "명세 `nutrients[]` 한 줄.\n\n`target` · `state` 는 null 허용이다 — 명세가 \"미확정 시 게이지 미표시\" 라고\n적어 두었고, 단계별 목표치가 아직 팀 확정 전이다\n(`services/evaluation/stage_profile.py`).\n\n**기본값을 두지 않는다.** `= None` 을 붙이면 OpenAPI 의 `required` 에서 빠져\n생성 클라이언트가 `current?: number | null` 로 받는다. 명세는 이 키들이 값이\n없어도 **항상 있고 명시적으로 null** 이라고 정한다."
+      },
+      "NutrientState": {
+        "type": "string",
+        "enum": [
+          "SHORT",
+          "OK",
+          "OVER"
+        ],
+        "title": "NutrientState",
+        "description": "목표 대비 현재 위치. 목표가 미정이면 None 이고 이 값은 안 나간다."
+      },
+      "NutrientStatus": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "SHORT",
+                  "OK",
+                  "OVER"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label",
+          "current",
+          "target",
+          "unit",
+          "state"
+        ],
+        "title": "NutrientStatus",
+        "description": "영양소 하나의 목표 대비 현재. (Rule Engine 미구현이라 항상 빈 배열 — TODO)"
+      },
+      "NutritionCandidatesResponse": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/FoodCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidates"
+        ],
+        "title": "NutritionCandidatesResponse",
+        "description": "후보가 없어도 빈 배열로 나간다 — 에러가 아니다.\n\n\"공공 DB 에 없는 음식\" 은 정상 흐름이고, 그때 사용자는 직접 입력으로 간다\n(`PUT .../nutrition` 의 `manual`). 404 로 응답하면 FE 가 그 갈래를 에러 화면과\n구분하지 못한다."
+      },
+      "NutritionInfo": {
+        "properties": {
+          "kcal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kcal"
+          },
+          "proteinG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proteing"
+          },
+          "fatG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fatg"
+          },
+          "carbG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carbg"
+          },
+          "fiberG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiberg"
+          },
+          "sodiumMg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sodiummg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kcal",
+          "proteinG",
+          "fatG",
+          "carbG",
+          "fiberG",
+          "sodiumMg"
+        ],
+        "title": "NutritionInfo",
+        "description": "섭취량만큼 환산된 영양성분. 공공 DB 에 값이 없는 항목은 None."
+      },
+      "NutritionSource": {
+        "type": "string",
+        "enum": [
+          "PUBLIC_DB",
+          "USER_INPUT"
+        ],
+        "title": "NutritionSource",
+        "description": "성분값의 출처. 명세 `evidence.nutritionSources` 다.\n\n`meal_items` 에 컬럼이 없어 지금은 응답 조립 시점에 판단한다 — food_refs 에서\n온 것은 PUBLIC_DB, 사용자가 직접 넣은 것은 USER_INPUT."
+      },
+      "NutritionUpdateRequest": {
+        "properties": {
+          "foodRefId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foodrefid"
+          },
+          "manual": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManualNutrition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "NutritionUpdateRequest",
+        "description": "PUT /meals/{mealId}/items/{itemId}/nutrition 요청.\n\n명세서(`contracts/API.md`)의 두 갈래를 그대로 받는다 — 후보 선택(`foodRefId`)\n이거나 직접 입력(`manual`) 이다."
+      },
+      "NutritionUpdateResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid"
+          },
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "nutritionSource": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PUBLIC_DB",
+                  "USER_INPUT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nutritionsource"
+          },
+          "nutrition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NutritionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/MealStatus"
+          },
+          "isRecalculation": {
+            "type": "boolean",
+            "title": "Isrecalculation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itemId",
+          "matched",
+          "nutritionSource",
+          "nutrition",
+          "status",
+          "isRecalculation"
+        ],
+        "title": "NutritionUpdateResponse",
+        "description": "PUT /meals/{mealId}/items/{itemId}/nutrition 응답.\n\n`status` · `isRecalculation` 은 항목이 아니라 **식사 전체**의 상태다 — 형제\n엔드포인트(`POST`/`PATCH`/`DELETE /meals/{mealId}/items`)와 같은 규약이다."
+      },
+      "OnboardingStatus": {
+        "type": "string",
+        "enum": [
+          "PROFILE_REQUIRED",
+          "MEDICATION_REQUIRED",
+          "READY"
+        ],
+        "title": "OnboardingStatus",
+        "description": "FE 의 진입 화면을 정한다. DB 컬럼이 아니라 파생값이다."
+      },
+      "ProfileCreateRequest": {
+        "properties": {
+          "nickname": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Nickname"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 300,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "weightKg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 500,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weightkg"
+          },
+          "baselineIntake": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10000,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Baselineintake"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nickname",
+          "heightCm",
+          "weightKg",
+          "baselineIntake"
+        ],
+        "title": "ProfileCreateRequest",
+        "description": "POST /users/profile 요청.\n\nextra=\"forbid\": 오타난 필드(예: weigthKg)를 조용히 무시하지 않는다. 무시하면\n클라이언트는 200/201을 받고 \"저장됐다\"고 믿지만 실제로는 그 필드가 반영되지\n않는다. model_config 는 CamelModel 의 값과 병합된다(별도로 확인됨) — alias_generator\n등은 그대로 유지되고 extra 만 덮어써진다."
+      },
+      "ProfileCreatedResponse": {
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Userid"
+          },
+          "nickname": {
+            "type": "string",
+            "title": "Nickname"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "weightKg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weightkg"
+          },
+          "baselineIntake": {
+            "type": "number",
+            "title": "Baselineintake"
+          },
+          "onboardingStatus": {
+            "$ref": "#/components/schemas/OnboardingStatus"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "userId",
+          "nickname",
+          "heightCm",
+          "weightKg",
+          "baselineIntake",
+          "onboardingStatus",
+          "createdAt"
+        ],
+        "title": "ProfileCreatedResponse",
+        "description": "POST /users/profile 201 응답. 생성 시각이 하나 더 붙는다."
+      },
+      "ProfileUpdateRequest": {
+        "properties": {
+          "nickname": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nickname"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 300,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "weightKg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 500,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weightkg"
+          },
+          "baselineIntake": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10000,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baselineintake"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ProfileUpdateRequest",
+        "description": "PATCH /users/me 요청. 준 필드만 바꾼다.\n\nextra=\"forbid\": 오타난 필드(예: weigthKg)를 조용히 무시하지 않는다 — 그러면\n200과 함께 예전 값이 담긴 응답이 나가 \"저장됐다\"는 착각을 준다."
+      },
+      "QqsScores": {
+        "properties": {
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "satiety": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satiety"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quantity",
+          "quality",
+          "satiety"
+        ],
+        "title": "QqsScores",
+        "description": "세 축의 점수. 0~100 정수이고, 근거가 없으면 null 이다.\n\n합계도 가중치도 없다 (절대 규칙 3 · D9)."
+      },
+      "SafetyStatus": {
+        "type": "string",
+        "enum": [
+          "SAFE",
+          "BLOCKED",
+          "REVIEW_REQUIRED"
+        ],
+        "title": "SafetyStatus",
+        "description": "생성된 피드백을 그대로 노출해도 되는지."
+      },
+      "SatietyCheckin": {
+        "properties": {
+          "checkinOffsetHours": {
+            "type": "integer",
+            "title": "Checkinoffsethours"
+          },
+          "satietyPct": {
+            "type": "integer",
+            "title": "Satietypct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checkinOffsetHours",
+          "satietyPct"
+        ],
+        "title": "SatietyCheckin",
+        "description": "식사 후 추가 포만감 체크인 하나. (satiety-checkins 저장소 미구현이라 항상 빈 배열)"
+      },
+      "SatietyCheckinRequest": {
+        "properties": {
+          "checkinOffsetHours": {
+            "type": "integer",
+            "maximum": 48,
+            "minimum": 0,
+            "title": "Checkinoffsethours"
+          },
+          "satietyPct": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Satietypct"
+          },
+          "hungerReturnMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2880,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hungerreturnminutes"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "checkinOffsetHours",
+          "satietyPct"
+        ],
+        "title": "SatietyCheckinRequest",
+        "description": "`POST /meals/{mealId}/satiety-checkins` 요청.\n\nextra=\"forbid\": 오타난 필드를 조용히 무시하지 않는다. 이 요청은 선택 필드가 둘이라\n`hungerReturnMinute` 같은 오타가 나면 그 값이 통째로 사라진다."
+      },
+      "SatietyCheckinResponse": {
+        "properties": {
+          "checkinId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Checkinid"
+          },
+          "mealId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mealid"
+          },
+          "checkinOffsetHours": {
+            "type": "integer",
+            "title": "Checkinoffsethours"
+          },
+          "satietyPct": {
+            "type": "integer",
+            "title": "Satietypct"
+          },
+          "hungerReturnMinutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hungerreturnminutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checkinId",
+          "mealId",
+          "checkinOffsetHours",
+          "satietyPct",
+          "hungerReturnMinutes"
+        ],
+        "title": "SatietyCheckinResponse",
+        "description": "명세 5필드.\n\n`comment` 는 응답에 없다 — 명세 예시가 그렇고, 사용자가 방금 보낸 값이라\n돌려줄 이유가 없다. `satiety_logs` 에는 저장된다."
+      },
+      "SatietyDetail": {
+        "properties": {
+          "beforePct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beforepct"
+          },
+          "afterPct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Afterpct"
+          },
+          "checkins": {
+            "items": {
+              "$ref": "#/components/schemas/SatietyCheckin"
+            },
+            "type": "array",
+            "title": "Checkins"
+          },
+          "hungerReturnMinutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hungerreturnminutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "beforePct",
+          "afterPct",
+          "checkins",
+          "hungerReturnMinutes"
+        ],
+        "title": "SatietyDetail",
+        "description": "status: EVALUATED 일 때만 채워지는 포만감 정보."
+      },
+      "ScoreAxis": {
+        "type": "string",
+        "enum": [
+          "QUANTITY",
+          "QUALITY",
+          "SATIETY"
+        ],
+        "title": "ScoreAxis",
+        "description": "Q/Q/S 세 축. 응답 `stageEmphasis` 가 이 값들의 부분집합이다.\n\n명세 「열거형」에 이름이 없어서 여기서 정의한다 — `stageEmphasis` 예시\n(`[\"SATIETY\", \"QUALITY\"]`)의 원소가 곧 점수 축이다."
+      },
+      "StageChange": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "from": {
+            "$ref": "#/components/schemas/MedicationStage"
+          },
+          "to": {
+            "$ref": "#/components/schemas/MedicationStage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "from",
+          "to"
+        ],
+        "title": "StageChange",
+        "description": "투약 단계가 바뀐 시점 하나."
+      },
+      "StaleReason": {
+        "type": "string",
+        "enum": [
+          "MEAL_DELETED",
+          "MEAL_EDITED",
+          "STAGE_CHANGED",
+          "NEW_MEALS"
+        ],
+        "title": "StaleReason",
+        "description": "생성 시점 이후 무엇이 바뀌어서 낡은 정보가 됐는지."
+      },
+      "SuggestionNutrient": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NutrientCode"
+          },
+          "amountG": {
+            "type": "number",
+            "title": "Amountg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "amountG"
+        ],
+        "title": "SuggestionNutrient",
+        "description": "제안 음식이 채워 주는 성분 한 줄. 명세 `suggestions[].nutrients[]`."
+      },
+      "UserProfileResponse": {
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Userid"
+          },
+          "nickname": {
+            "type": "string",
+            "title": "Nickname"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "weightKg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weightkg"
+          },
+          "baselineIntake": {
+            "type": "number",
+            "title": "Baselineintake"
+          },
+          "onboardingStatus": {
+            "$ref": "#/components/schemas/OnboardingStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "userId",
+          "nickname",
+          "heightCm",
+          "weightKg",
+          "baselineIntake",
+          "onboardingStatus"
+        ],
+        "title": "UserProfileResponse",
+        "description": "GET /users/me · PATCH /users/me 응답."
+      },
+      "UserStateCreateRequest": {
+        "properties": {
+          "weightKg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 500,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weightkg"
+          },
+          "appetiteLevel": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appetitelevel"
+          },
+          "giSymptoms": {
+            "items": {
+              "$ref": "#/components/schemas/GiSymptom"
+            },
+            "type": "array",
+            "title": "Gisymptoms",
+            "default": []
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "recordedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recordedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "weightKg"
+        ],
+        "title": "UserStateCreateRequest",
+        "description": "POST /user-states 요청.\n\nextra=\"forbid\": 오타난 필드(예: weigthKg)를 조용히 무시하지 않는다 —\nschemas/user.py ProfileCreateRequest 와 같은 이유."
+      },
+      "UserStateResponse": {
+        "properties": {
+          "userStateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Userstateid"
+          },
+          "weightKg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weightkg"
+          },
+          "weightChangeKg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weightchangekg"
+          },
+          "weightChangeBaseline": {
+            "type": "string",
+            "const": "LAST_WEEK",
+            "title": "Weightchangebaseline",
+            "default": "LAST_WEEK"
+          },
+          "appetiteLevel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appetitelevel"
+          },
+          "giSymptoms": {
+            "items": {
+              "$ref": "#/components/schemas/GiSymptom"
+            },
+            "type": "array",
+            "title": "Gisymptoms"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recordedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "userStateId",
+          "weightKg",
+          "weightChangeKg",
+          "appetiteLevel",
+          "giSymptoms",
+          "note",
+          "recordedAt"
+        ],
+        "title": "UserStateResponse",
+        "description": "POST /user-states 201 응답. GET /user-states/latest 가 재사용한다."
+      },
+      "WeightPoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "weightKg": {
+            "type": "number",
+            "title": "Weightkg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "weightKg"
+        ],
+        "title": "WeightPoint",
+        "description": "날짜 하나의 대표 체중 (그날 마지막 기록 기준)."
+      }
+    }
+  }
+}

@@ -111,94 +111,27 @@ class LongTermInsight {
   }
 }
 
-/// 장기 피드백 화면이 쓰는 엔드포인트. `ApiConfig.useRealApi` 가 false 면
-/// 더미를 돌려준다.
+/// 장기 피드백 화면이 쓰는 엔드포인트.
 class LongTermApiService {
   LongTermApiService(this._client);
 
   final ApiClient _client;
 
-  final List<Map<String, dynamic>> _dummySeries = [
-    {'date': '2026-07-25', 'quantity': 60, 'quality': 70, 'satiety': 58},
-    {'date': '2026-07-26', 'quantity': 68, 'quality': 74, 'satiety': 66},
-    {'date': '2026-07-27', 'quantity': 72, 'quality': 78, 'satiety': 60},
-    {'date': '2026-07-28', 'quantity': 75, 'quality': 80, 'satiety': 64},
-    {'date': '2026-07-29', 'quantity': 75, 'quality': 83, 'satiety': 68},
-    {'date': '2026-07-30', 'quantity': 60, 'quality': 70, 'satiety': 58},
-    {'date': '2026-07-31', 'quantity': 68, 'quality': 74, 'satiety': 66},
-    {'date': '2026-08-01', 'quantity': 72, 'quality': 78, 'satiety': 60},
-    {'date': '2026-08-02', 'quantity': 75, 'quality': 80, 'satiety': 64},
-    {'date': '2026-08-03', 'quantity': 75, 'quality': 83, 'satiety': 68},
-    {'date': '2026-08-04', 'quantity': 60, 'quality': 70, 'satiety': 58},
-    {'date': '2026-08-05', 'quantity': 68, 'quality': 74, 'satiety': 66},
-    {'date': '2026-08-06', 'quantity': 72, 'quality': 78, 'satiety': 60},
-    {'date': '2026-08-07', 'quantity': 75, 'quality': 80, 'satiety': 64},
-    {'date': '2026-08-08', 'quantity': 75, 'quality': 83, 'satiety': 68},
-  ];
-
   /// `GET /dashboard?period=7d|28d|all`
   Future<DashboardData> fetchDashboard(String period) async {
-    if (ApiConfig.useRealApi) {
-      final result = await _client.get('/dashboard', query: {'period': period});
-      return DashboardData.fromJson(result.dataMap);
-    }
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    final all = _dummySeries;
-    final sliced = switch (period) {
-      '7d' => all.length > 7 ? all.sublist(all.length - 7) : all,
-      '28d' => all.length > 28 ? all.sublist(all.length - 28) : all,
-      _ => all,
-    };
-
-    final quantities = sliced.map((e) => e['quantity'] as int).toList();
-    final qualities = sliced.map((e) => e['quality'] as int).toList();
-    final satieties = sliced.map((e) => e['satiety'] as int).toList();
-
-    return DashboardData.fromJson({
-      'series': sliced,
-      'averages': {
-        'quantity': (quantities.reduce((a, b) => a + b) / quantities.length)
-            .round(),
-        'quality': (qualities.reduce((a, b) => a + b) / qualities.length)
-            .round(),
-        'satiety': (satieties.reduce((a, b) => a + b) / satieties.length)
-            .round(),
-      },
-      'byMealType': {
-        'BREAKFAST': {'quantity': 70, 'quality': 88, 'satiety': 78},
-        'LUNCH': {'quantity': 76, 'quality': 80, 'satiety': 66},
-        'DINNER': {'quantity': 78, 'quality': 74, 'satiety': 58},
-      },
-    });
+    final result = await _client.get('/dashboard', query: {'period': period});
+    return DashboardData.fromJson(result.dataMap);
   }
 
   /// `GET /medications/dose-events` — 오래된 순. 투약 전이면 빈 목록.
   Future<List<DoseEvent>> fetchDoseEvents() async {
-    if (ApiConfig.useRealApi) {
-      final result = await _client.get('/medications/dose-events');
-      return (result.dataMap['events'] as List<dynamic>)
-          .map((e) => DoseEvent.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    await Future.delayed(const Duration(milliseconds: 200));
-    return [
-      {
-        'doseEventId': 'de_001',
-        'doseMg': 0.25,
-        'direction': 'MAINTAIN',
-        'effectiveFrom': '2026-06-14',
-      },
-      {
-        'doseEventId': 'de_002',
-        'doseMg': 0.5,
-        'direction': 'INCREASE',
-        'effectiveFrom': '2026-08-01',
-      },
-    ].map((e) => DoseEvent.fromJson(e)).toList();
+    final result = await _client.get('/medications/dose-events');
+    return (result.dataMap['events'] as List<dynamic>)
+        .map((e) => DoseEvent.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  /// TODO(FE-14): `GET /insights/long-term` 은 BE 미머지라 실제 모드에서도 더미다.
+  /// TODO(FE-13): `GET /insights/long-term` 연동 전이라 고정 값이다.
   Future<LongTermInsight> fetchInsight(String period) async {
     await Future.delayed(const Duration(milliseconds: 300));
     return LongTermInsight.fromJson({

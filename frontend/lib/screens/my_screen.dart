@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../api/api_client.dart';
 import '../api/user_api.dart';
+import '../state/profile_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -11,8 +11,9 @@ import 'shared_meal_widgets.dart';
 
 /// 마이 탭 — 회원 정보 조회·수정. Figma 노드가 없어 간단히 구성했다.
 ///
-/// 조회는 `GET /users/me`, 수정은 프로필 입력 화면을 수정 모드로 띄워
-/// `PATCH /users/me` 한다.
+/// 프로필은 [ProfileState] 에서 읽는다(처음 열 때만 `GET /users/me`). 수정은
+/// 프로필 입력 화면을 수정 모드로 띄워 `PATCH /users/me` 하고, 그 응답으로
+/// [ProfileState] 가 바뀌어 여기도 같이 바뀐다.
 class MyScreen extends StatefulWidget {
   const MyScreen({super.key});
 
@@ -21,10 +22,7 @@ class MyScreen extends StatefulWidget {
 }
 
 class _MyScreenState extends State<MyScreen> {
-  late final UserApiService _api = UserApiService(context.read<ApiClient>());
-
   LoadState _state = LoadState.loading;
-  UserProfile? _profile;
   String? _errorMessage;
 
   @override
@@ -33,7 +31,9 @@ class _MyScreenState extends State<MyScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  /// [refresh] 면 서버에서 다시 받는다(당겨서 새로고침·재시도).
+  Future<void> _load({bool refresh = false}) async {
+    final profileState = context.read<ProfileState>();
     if (_state != LoadState.loading) {
       setState(() {
         _state = LoadState.loading;
@@ -41,12 +41,9 @@ class _MyScreenState extends State<MyScreen> {
       });
     }
     try {
-      final profile = await _api.fetchMe();
+      await (refresh ? profileState.refresh() : profileState.ensureLoaded());
       if (!mounted) return;
-      setState(() {
-        _profile = profile;
-        _state = LoadState.ready;
-      });
+      setState(() => _state = LoadState.ready);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -56,20 +53,22 @@ class _MyScreenState extends State<MyScreen> {
     }
   }
 
-  Future<void> _openEdit(UserProfile profile) async {
-    final updated = await Navigator.of(context).push<UserProfile>(
+  void _openEdit(UserProfile profile) {
+    Navigator.of(context).push<UserProfile>(
       MaterialPageRoute(builder: (_) => ProfileInputScreen(initial: profile)),
     );
-    if (!mounted || updated == null) return;
-    setState(() => _profile = updated);
   }
 
   @override
   Widget build(BuildContext context) {
-    final profile = _profile;
+    final profile = context.watch<ProfileState>().current;
+    // 사용자가 바뀌어 값이 비는 순간(세션 삭제)에도 카드를 그리지 않는다.
+    final state = _state == LoadState.ready && profile == null
+        ? LoadState.loading
+        : _state;
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(refresh: true),
         color: AppColors.primary,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -82,13 +81,13 @@ class _MyScreenState extends State<MyScreen> {
           children: [
             Text('마이', style: AppTypography.screenTitle),
             const SizedBox(height: AppSpacing.xl),
-            switch (_state) {
+            switch (state) {
               LoadState.loading => const Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),
               LoadState.failed => RetryBlock(
                 message: _errorMessage ?? '잠시 후 다시 시도해 주세요',
-                onRetry: _load,
+                onRetry: () => _load(refresh: true),
               ),
               LoadState.ready => _ProfileCard(
                 profile: profile!,

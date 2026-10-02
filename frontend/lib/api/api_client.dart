@@ -3,25 +3,44 @@ import 'package:dio/dio.dart';
 import '../state/user_session.dart';
 import 'api_exception.dart';
 
+/// 앱이 붙는 환경. 같은 phase 의 서버하고만 통신한다.
+///
+/// - [local]: `frontend/mock` 의 mock 서버. BE 스키마대로 **정해진 응답만**
+///   돌려준다 — 저장해도 다음 조회 값이 바뀌지 않는다.
+/// - [dev]: 실제 BE + 개발 DB. 지금은 각자 PC 에 Docker 로 띄운 BE 다.
+/// - [prod]: 운영 서버. 아직 없다.
+enum AppPhase { local, dev, prod }
+
 /// API 연결 설정. 값은 빌드할 때 `--dart-define` 으로 바꾼다.
 ///
 /// ```
-/// flutter run -d chrome \
-///   --dart-define=USE_REAL_API=true \
-///   --dart-define=API_BASE_URL=http://localhost:8000/api/v1
+/// flutter run --dart-define=APP_PHASE=dev
 /// ```
-/// Android 에뮬레이터에서 PC 의 서버는 `localhost` 가 아니라 `10.0.2.2` 다.
+/// 화면 코드는 phase 를 모른다 — 바뀌는 건 서버 주소뿐이다.
+///
+/// `API_BASE_URL` 을 주면 phase 주소 대신 쓴다. Android 에뮬레이터에서 PC 의
+/// 서버는 `localhost` 가 아니라 `10.0.2.2` 다.
 class ApiConfig {
   ApiConfig._();
 
-  static const baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:8000/api/v1',
+  /// 잘못 적은 이름은 앱 시작 때 바로 터진다(조용히 local 로 가지 않게).
+  static final phase = AppPhase.values.byName(
+    const String.fromEnvironment('APP_PHASE', defaultValue: 'local'),
   );
 
-  /// false(기본)면 각 화면의 API 서비스가 더미 응답을 돌려준다.
-  /// 백엔드 없이도 화면을 확인할 수 있게 하려는 것이다.
-  static const useRealApi = bool.fromEnvironment('USE_REAL_API');
+  static const _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
+
+  static String get baseUrl {
+    if (_baseUrlOverride.isNotEmpty) return _baseUrlOverride;
+    return switch (phase) {
+      AppPhase.local => 'http://localhost:4010/api/v1',
+      // TODO: 팀 dev 서버가 생기면 그 주소로 바꾼다.
+      AppPhase.dev => 'http://localhost:8000/api/v1',
+      AppPhase.prod => throw StateError(
+        'prod 서버 주소가 아직 없어요. --dart-define=API_BASE_URL 로 넣어 주세요',
+      ),
+    };
+  }
 
   static const timeout = Duration(seconds: 10);
 }
@@ -50,6 +69,7 @@ class ApiResult {
 ///   비면 `main.dart` 가 쌓인 화면을 닫고 프로필 입력으로 돌린다.
 ///
 /// 각 화면의 `XxxApiService` 는 이 클라이언트를 받아 메서드 본문만 채운다.
+/// 더미 분기를 두지 않는다 — 서버 없이 볼 때는 local phase(mock 서버)를 쓴다.
 class ApiClient {
   ApiClient({required UserSession session, Dio? dio})
     : _session = session,
