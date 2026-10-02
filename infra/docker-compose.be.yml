@@ -19,7 +19,9 @@ x-be-env: &be-env
   QUEUE_POLL_INTERVAL_SEC: "1.0"
   QUEUE_MAX_ATTEMPTS: "3"
   QUEUE_BACKOFF_BASE_SEC: "30"
-  AI_SERVICE_BASE_URL: http://ai-stub:8000
+  # 기본은 ai-stub. 실제 AI(docker-compose.ai.yml)에 붙이려면
+  #   BE_AI_SERVICE_BASE_URL=http://ai:8000 docker compose -f docker-compose.be.yml up -d
+  AI_SERVICE_BASE_URL: ${BE_AI_SERVICE_BASE_URL:-http://ai-stub:8000}
   # 실패 경로를 보고 싶을 때만 채운다. 예: ERROR_500
   AI_STUB_SCENARIO: ""
   # 워커가 AI 에 넘기는 imageUrl 의 앞부분. AI 컨테이너가 사진을 받아 가는 주소라
