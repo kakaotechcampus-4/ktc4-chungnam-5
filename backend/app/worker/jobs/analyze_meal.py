@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.crud import food as food_crud
 from app.crud import meal as meal_crud
 from app.infra.ai import AiClient
-from app.infra.queue import ClaimedTask, QueueSettings
+from app.infra.queue import ClaimedTask, NonRetryableError, QueueSettings
 from app.infra.storage import build_file_storage
 from app.models.enums import MealStatus
 from app.models.meal import Meal
@@ -62,9 +62,9 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
          뒤 재계산 대기다 — 여기서 분석하면 사용자가 고친 항목을 AI 결과로 덮는다
       3. AI 호출 + 응답 검증. **DB 쓰기보다 먼저 전부 끝낸다** — 그래야 실패했을 때
          반쯤 쓴 흔적 없이 `FAILED` 로 바꿀 수 있다
-      4. 실패하면 마지막 시도 전에는 raise(큐가 재시도), 마지막 시도면 `FAILED`
-         로 두고 정상 반환한다. raise 로 끝내면 큐는 작업을 격리하지만 식사는
-         영원히 `ANALYZING` 이고, FE 는 45초 뒤 타임아웃만 본다
+      4. 실패하면 마지막 시도 전에는 raise(큐가 재시도), 마지막 시도거나 재시도해도
+         같은 실패(AI 4xx)면 `FAILED` 로 두고 정상 반환한다. raise 로 끝내면 큐는
+         작업을 격리하지만 식사는 영원히 `ANALYZING` 이고, FE 는 45초 뒤 타임아웃만 본다
       5. 항목이 없으면 `FAILED` — 확인할 음식이 없다(`services/meal.py::_is_editable`).
          `safetyStatus` 는 상태 판단에 쓰지 않는다. `raw_ai_result` 에만 남긴다
       6. `candidateFoodRefId` 는 `food_refs` 에 실재하는 것만 남긴다. 없는 FK 를
@@ -144,8 +144,12 @@ def _should_skip(meal: Meal) -> bool:
 
 
 def _fail_or_raise(db: Session, meal: Meal, task: ClaimedTask, exc: Exception) -> dict[str, Any]:
-    """마지막 시도 전이면 다시 올려 큐의 재시도에 맡기고, 마지막이면 FAILED 로 끝낸다."""
-    if not _is_last_attempt(task):
+    """마지막 시도 전이면 다시 올려 큐의 재시도에 맡기고, 마지막이면 FAILED 로 끝낸다.
+
+    재시도해도 같은 실패(`NonRetryableError`, 예: AI 4xx)는 마지막 시도로 본다 — 올리면
+    큐가 바로 격리하는데 식사는 `ANALYZING` 에 남는다.
+    """
+    if not _is_last_attempt(task) and not isinstance(exc, NonRetryableError):
         raise exc
     # 예외 메시지에 AI 응답 일부가 섞일 수 있어 타입만 남긴다(규칙 6).
     logger.warning(

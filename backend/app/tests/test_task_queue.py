@@ -222,6 +222,26 @@ def test_task_is_quarantined_after_max_attempts(sessions, queue):
         assert claim is None
 
 
+def test_non_retryable_failure_is_quarantined_on_the_first_attempt(sessions, queue):
+    """다시 해도 같은 결과인 실패(AI 4xx 등)는 attempts 를 기다리지 않고 바로 FAILED 다."""
+    from app.infra.queue import NonRetryableError
+
+    put = _put(sessions)
+
+    with pytest.raises(NonRetryableError):
+        with queue.claim() as claim:
+            raise NonRetryableError("AI 가 422 를 냈다")
+
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.FAILED
+        assert row.attempts == 1
+        assert "NonRetryableError" in row.last_error
+
+    with queue.claim() as claim:
+        assert claim is None
+
+
 def test_task_scheduled_in_the_future_is_not_claimed(sessions, queue):
     _put(sessions, next_run_at=datetime.now(timezone.utc) + timedelta(hours=1))
 
