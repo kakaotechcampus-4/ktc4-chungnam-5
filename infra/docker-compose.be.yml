@@ -19,9 +19,15 @@ x-be-env: &be-env
   QUEUE_POLL_INTERVAL_SEC: "1.0"
   QUEUE_MAX_ATTEMPTS: "3"
   QUEUE_BACKOFF_BASE_SEC: "30"
-  AI_SERVICE_BASE_URL: http://ai-stub:8000
+  # 기본은 ai-stub. 실제 AI(docker-compose.ai.yml)에 붙이려면
+  #   BE_AI_SERVICE_BASE_URL=http://ai:8000 docker compose -f docker-compose.be.yml up -d
+  AI_SERVICE_BASE_URL: ${BE_AI_SERVICE_BASE_URL:-http://ai-stub:8000}
   # 실패 경로를 보고 싶을 때만 채운다. 예: ERROR_500
   AI_STUB_SCENARIO: ""
+  # 워커가 AI 에 넘기는 imageUrl 의 앞부분. AI 컨테이너가 사진을 받아 가는 주소라
+  # 서비스 이름(api)이어야 한다 — 기본값 127.0.0.1 은 AI 컨테이너 자기 자신을 가리킨다.
+  # FE 가 보는 썸네일 경로(/media/...)는 이 값을 쓰지 않는다(services/meal.py).
+  LOCAL_STORAGE_BASE_URL: http://api:8000/media
 
 services:
   api:
@@ -32,6 +38,11 @@ services:
     ports:
       - "8000:8000"
     environment: *be-env
+    # 업로드한 사진. 볼륨이 없으면 컨테이너를 다시 만들 때마다 사라지고, 큐에 남은
+    # 분석 작업의 imageUrl 이 404 가 된다. 워커는 파일을 읽지 않고 URL 만 만든다 —
+    # 파일은 api 가 /media 로 서빙한다.
+    volumes:
+      - media:/srv/var/media
     healthcheck:
       test:
         - CMD
@@ -58,3 +69,6 @@ services:
     # 아니라 attempts 도 오르지 않으므로 같은 작업이 곧바로 다시 집힌다.
     stop_grace_period: 60s
     restart: unless-stopped
+
+volumes:
+  media:

@@ -73,6 +73,15 @@ logger = logging.getLogger("queue")
 _ERROR_MAX_CHARS = 500
 
 
+class NonRetryableError(Exception):
+    """다시 해도 같은 결과인 실패. 핸들러가 이걸 올리면 attempts 를 기다리지 않고
+    곧바로 FAILED 로 격리한다.
+
+    예: AI 가 4xx 로 요청을 거부했다 — 같은 요청은 몇 번을 보내도 같은 4xx 이고,
+    실제 AI 에서는 시도마다 LLM 비용이 든다.
+    """
+
+
 @dataclass(frozen=True)
 class ClaimedTask:
     id: uuid.UUID
@@ -211,6 +220,9 @@ class DbTaskQueue:
             ),
             status_type,
         )
+        if isinstance(exc, NonRetryableError):
+            # 재시도해도 같은 실패다. 상한까지 태우지 않고 바로 격리한다.
+            status = TaskStatus.FAILED
         # 30s → 60s. 실패할 때마다 두 배로 민다. make_interval 의 인자는
         # (years, months, weeks, days, hours, mins, secs) 순이라 초만 채운다.
         backoff_secs = self._settings.QUEUE_BACKOFF_BASE_SEC * func.pow(2, Task.attempts)
