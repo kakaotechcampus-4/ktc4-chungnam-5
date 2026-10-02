@@ -5,6 +5,7 @@ import '../api/api_exception.dart';
 import '../api/medication_api.dart';
 import '../common/api_format.dart';
 import '../state/medication_state.dart';
+import '../state/profile_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -159,6 +160,8 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       );
       if (!mounted) return;
       setState(() => _current = saved);
+      // 첫 등록이면 서버의 onboardingStatus 가 READY 로 바뀐다. 프로필도 맞춘다.
+      context.read<ProfileState>().refreshInBackground();
       // 저장 완료 → 연 곳으로 돌아간다. 홈 투약 카드는 MedicationState 로
       // 이미 바뀌어 있고, 온보딩(프로필 다음)에서 열었으면 RootShell 이
       // 이어서 하루 팝업을 확인한다.

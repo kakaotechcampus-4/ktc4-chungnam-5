@@ -265,6 +265,7 @@ frontend/lib/
 ├─ state/
 │  ├─ app_state.dart      화면 2개 이상이 공유하는 상태 (ChangeNotifier) 예시
 │  ├─ medication_state.dart 현재 투약 — 홈·컨디션 팝업·투약 화면이 같이 본다
+│  ├─ profile_state.dart  내 프로필 — 마이 탭·컨디션 팝업·온보딩 확인이 같이 본다
 │  ├─ tab_state.dart      현재 탭
 │  └─ user_session.dart   현재 사용자(userId) — 기기에 저장
 ├─ navigation/

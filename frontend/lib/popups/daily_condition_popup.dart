@@ -5,6 +5,7 @@ import '../api/api_client.dart';
 import '../api/medication_api.dart';
 import '../common/api_format.dart';
 import '../state/medication_state.dart';
+import '../state/profile_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -59,7 +60,7 @@ enum SymptomSeverity {
 }
 
 /// 팝업 헤더·체중 초기값. [MedicationState] + `GET /user-states/latest`
-/// (+ 컨디션 기록이 없으면 `GET /users/me` 의 체중) 조합.
+/// (+ 컨디션 기록이 없으면 [ProfileState] 의 체중) 조합.
 ///
 /// 투약 미등록이면 투약 필드 넷이 모두 null 이고 헤더는 날짜만 보인다.
 class ConditionPrefill {
@@ -92,8 +93,12 @@ class ConditionApiService {
 
   final ApiClient _client;
 
-  /// 투약은 [medicationState] 에 받아 둔 값을 쓴다(없을 때만 서버에 묻는다).
-  Future<ConditionPrefill> fetchPrefill(MedicationState medicationState) async {
+  /// 투약·프로필은 [medicationState] · [profileState] 에 받아 둔 값을 쓴다
+  /// (없을 때만 서버에 묻는다).
+  Future<ConditionPrefill> fetchPrefill(
+    MedicationState medicationState,
+    ProfileState profileState,
+  ) async {
     final results = await Future.wait<Object?>([
       medicationState.ensureLoaded(),
       _client.get('/user-states/latest'),
@@ -102,12 +107,10 @@ class ConditionApiService {
     // 컨디션 기록이 없으면 200 + data: null 이다.
     final latest = (results[1] as ApiResult).data as Map<String, dynamic>?;
 
-    var weightKg = (latest?['weightKg'] as num?)?.toDouble();
-    if (weightKg == null) {
-      // 첫 기록이면 프로필에 적은 체중에서 시작한다.
-      final me = await _client.get('/users/me');
-      weightKg = (me.dataMap['weightKg'] as num?)?.toDouble();
-    }
+    // 첫 기록이면 프로필에 적은 체중에서 시작한다.
+    final weightKg =
+        (latest?['weightKg'] as num?)?.toDouble() ??
+        (await profileState.ensureLoaded()).weightKg;
     return ConditionPrefill(
       drugName: medication?.drugName,
       doseMg: medication?.doseMg,
@@ -195,6 +198,7 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
     try {
       final prefill = await _api.fetchPrefill(
         context.read<MedicationState>(),
+        context.read<ProfileState>(),
       );
       if (!mounted) return;
       setState(() {
@@ -254,6 +258,8 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
         severity: _severity,
       );
       if (!mounted) return;
+      // 서버가 최근 체중을 이 기록으로 바꾼다. 마이 탭 체중도 맞춘다.
+      context.read<ProfileState>().refreshInBackground();
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;

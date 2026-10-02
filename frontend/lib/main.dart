@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 
 import 'api/api_client.dart';
 import 'api/medication_api.dart';
+import 'api/user_api.dart';
 import 'navigation/root_shell.dart';
 import 'popups/popup_gate.dart';
 import 'screens/profile_input_screen.dart';
 import 'state/app_state.dart';
 import 'state/medication_state.dart';
+import 'state/profile_state.dart';
 import 'state/tab_state.dart';
 import 'state/user_session.dart';
 import 'theme/app_theme.dart';
@@ -36,6 +38,12 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: session),
         Provider(create: (_) => ApiClient(session: session, dio: dio)),
+        ChangeNotifierProvider(
+          create: (context) => ProfileState(
+            UserApiService(context.read<ApiClient>()),
+            session: session,
+          ),
+        ),
         ChangeNotifierProvider(
           create: (context) => MedicationState(
             MedicationApiService(context.read<ApiClient>()),

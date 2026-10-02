@@ -11,6 +11,7 @@ import 'package:frontend/popups/daily_condition_popup.dart';
 import 'package:frontend/screens/long_term_feedback_screen.dart';
 import 'package:frontend/screens/meal_history_screen.dart';
 import 'package:frontend/state/medication_state.dart';
+import 'package:frontend/state/profile_state.dart';
 import 'package:frontend/state/user_session.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -96,7 +97,27 @@ Map<String, Object?> _medication({
 };
 
 Future<MedicationState> _medicationState(ApiClient client) async =>
-    MedicationState(MedicationApiService(client), session: await UserSession.load());
+    MedicationState(
+      MedicationApiService(client),
+      session: await UserSession.load(),
+    );
+
+/// `GET /users/me` 응답(`data` 안쪽).
+Map<String, Object?> _profile({
+  String nickname = '영우',
+  double weightKg = 78.4,
+  String onboardingStatus = 'READY',
+}) => {
+  'userId': 'user-1',
+  'nickname': nickname,
+  'heightCm': 175.0,
+  'weightKg': weightKg,
+  'baselineIntake': 700.0,
+  'onboardingStatus': onboardingStatus,
+};
+
+Future<ProfileState> _profileState(ApiClient client) async =>
+    ProfileState(UserApiService(client), session: await UserSession.load());
 
 void main() {
   group('api client', () {
@@ -180,7 +201,9 @@ void main() {
           }),
         ),
       );
-      final updated = await UserApiService(client).updateProfile(weightKg: 77.9);
+      final updated = await UserApiService(
+        client,
+      ).updateProfile(weightKg: 77.9);
       expect(updated.weightKg, 77.9);
       final request = adapter.requests.single;
       expect(request.method, 'PATCH');
@@ -324,19 +347,83 @@ void main() {
     });
   });
 
+  group('profile state', () {
+    test('sign-up saves the user and keeps the answer', () async {
+      SharedPreferences.setMockInitialValues({});
+      final session = await UserSession.load();
+      final adapter = _RoutingAdapter(
+        (_) => (201, _ok(_profile(onboardingStatus: 'MEDICATION_REQUIRED'))),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'http://test/api/v1'))
+        ..httpClientAdapter = adapter;
+      final state = ProfileState(
+        UserApiService(ApiClient(session: session, dio: dio)),
+        session: session,
+      );
+      await state.create(
+        nickname: '영우',
+        heightCm: 175,
+        weightKg: 78.4,
+        baselineIntake: 700,
+      );
+      expect(session.userId, 'user-1');
+      // 가입 응답을 들고 있어 온보딩 확인은 서버에 다시 묻지 않는다.
+      final me = await state.ensureLoaded();
+      expect(me.onboardingStatus, 'MEDICATION_REQUIRED');
+      expect(adapter.requests, hasLength(1));
+    });
+
+    test('editing replaces the value and tells the listeners', () async {
+      final (client, _) = await _client(
+        (o) =>
+            (200, _ok(_profile(nickname: o.method == 'PATCH' ? '종호' : '영우'))),
+      );
+      final state = await _profileState(client);
+      await state.ensureLoaded();
+      var notified = 0;
+      state.addListener(() => notified++);
+      await state.update(nickname: '종호');
+      expect(state.current?.nickname, '종호');
+      expect(notified, 1);
+    });
+
+    test('background refresh keeps the value when it fails', () async {
+      var fail = false;
+      final (client, _) = await _client(
+        (_) => fail ? (500, _error('INTERNAL_ERROR')) : (200, _ok(_profile())),
+      );
+      final state = await _profileState(client);
+      await state.ensureLoaded();
+      fail = true;
+      state.refreshInBackground();
+      await Future<void>.delayed(Duration.zero);
+      expect(state.current?.nickname, '영우');
+    });
+
+    test('a new user starts empty', () async {
+      final (client, _) = await _client((_) => (200, _ok(_profile())));
+      final session = await UserSession.load();
+      final state = ProfileState(UserApiService(client), session: session);
+      await state.ensureLoaded();
+      await session.clear();
+      expect(state.current, isNull);
+    });
+  });
+
   group('condition popup', () {
     test('first-time user: no medication, no state → profile weight', () async {
       final (client, _) = await _client(
         (o) => switch (o.path) {
           '/medications/current' => (409, _error('STAGE_NOT_SET')),
           '/user-states/latest' => (200, _ok(null)),
-          '/users/me' => (200, _ok({'weightKg': 80.5})),
+          '/users/me' => (200, _ok(_profile(weightKg: 80.5))),
           _ => (404, _error('NOT_FOUND')),
         },
       );
-      final prefill = await ConditionApiService(
-        client,
-      ).fetchPrefill(await _medicationState(client));
+      final prefill = await ConditionApiService(client).fetchPrefill(
+        await _medicationState(client),
+        await _profileState(client),
+      );
       expect(prefill.drugName, isNull);
       expect(prefill.weightKg, 80.5);
       expect(prefill.weeklyWeightDeltaKg, isNull);
@@ -363,9 +450,10 @@ void main() {
           _ => (404, _error('NOT_FOUND')),
         },
       );
-      final prefill = await ConditionApiService(
-        client,
-      ).fetchPrefill(await _medicationState(client));
+      final prefill = await ConditionApiService(client).fetchPrefill(
+        await _medicationState(client),
+        await _profileState(client),
+      );
       expect(prefill.drugName, '마운자로');
       expect(prefill.weightKg, 77.9);
       expect(prefill.weeklyWeightDeltaKg, -0.4);
