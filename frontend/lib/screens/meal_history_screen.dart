@@ -167,7 +167,7 @@ String _formatTime(DateTime d) =>
 
 // ── API ─────────────────────────────────────────────────────
 
-/// 기록 화면이 쓰는 엔드포인트. `ApiConfig.useRealApi` 가 false 면 더미를 돌려준다.
+/// 기록 화면이 쓰는 엔드포인트.
 class MealHistoryApiService {
   MealHistoryApiService(this._client);
 
@@ -178,10 +178,6 @@ class MealHistoryApiService {
 
   /// `GET /meals/calendar?month=YYYY-MM`
   Future<CalendarMonth> fetchCalendar(DateTime month) async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return CalendarMonth.fromJson(_sampleCalendar);
-    }
     final result = await _client.get(
       '/meals/calendar',
       query: {'month': formatApiMonth(month)},
@@ -196,12 +192,6 @@ class MealHistoryApiService {
   /// 나오면 멈춘다. 오래된 날일수록 페이지를 많이 넘긴다.
   /// TODO(BE 요청): `GET /meals?date=YYYY-MM-DD` 가 생기면 한 번 호출로 바꾼다.
   Future<List<HistoryMeal>> fetchMealsByDate(DateTime date) async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return (_sampleMeals['items'] as List<dynamic>)
-          .map((e) => HistoryMeal.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
     final day = DateTime(date.year, date.month, date.day);
     final meals = <HistoryMeal>[];
     String? cursor;
@@ -229,72 +219,8 @@ class MealHistoryApiService {
   /// 응답의 `affectedInsights`(장기 피드백 stale 표시)는 장기 피드백 화면이
   /// 다시 조회할 때 `stale` 로 받으므로 여기서는 쓰지 않는다.
   Future<void> deleteMeal(String mealId) async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return;
-    }
     await _client.delete('/meals/$mealId');
   }
-
-  /// 명세의 `GET /meals/calendar` 예시. 하루만 오던 걸 화면 확인용으로 늘렸다.
-  static const Map<String, dynamic> _sampleCalendar = {
-    'month': '2026-08',
-    'days': [
-      {
-        'date': '2026-08-01',
-        'count': 1,
-        'recordedMealTypes': ['BREAKFAST'],
-        'stage': 'MAINTENANCE',
-      },
-      {
-        'date': '2026-08-14',
-        'count': 3,
-        'recordedMealTypes': ['BREAKFAST', 'LUNCH', 'DINNER'],
-        'stage': 'MAINTENANCE',
-      },
-      {
-        'date': '2026-08-20',
-        'count': 2,
-        'recordedMealTypes': ['LUNCH', 'DINNER'],
-        'stage': 'MAINTENANCE',
-      },
-      {
-        'date': '2026-08-21',
-        'count': 2,
-        'recordedMealTypes': ['BREAKFAST', 'LUNCH'],
-        'stage': 'MAINTENANCE',
-      },
-    ],
-    'summary': {
-      'totalMeals': 42,
-      'avgScores': {'quantity': 74, 'quality': 81, 'satiety': 65},
-    },
-  };
-
-  /// 명세의 `GET /meals` 예시.
-  static const Map<String, dynamic> _sampleMeals = {
-    'items': [
-      {
-        'mealId': 'meal_450',
-        'mealType': 'BREAKFAST',
-        'eatenAt': '2026-08-21T08:20:00+09:00',
-        'stage': 'MAINTENANCE',
-        'displayName': '토스트, 그릭요거트',
-        'thumbnailUrl': null,
-        'scores': {'quantity': 74, 'quality': 90, 'satiety': 80},
-      },
-      {
-        'mealId': 'meal_456',
-        'mealType': 'LUNCH',
-        'eatenAt': '2026-08-21T12:40:00+09:00',
-        'stage': 'MAINTENANCE',
-        'displayName': '현미밥, 된장국, 두부조림',
-        'thumbnailUrl': null,
-        'scores': {'quantity': 76, 'quality': 80, 'satiety': 68},
-      },
-    ],
-    'nextCursor': null,
-  };
 }
 
 // ── 화면 ────────────────────────────────────────────────────

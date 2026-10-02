@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../api/api_client.dart';
+import '../api/medication_api.dart';
 import '../common/api_format.dart';
 import '../popups/popup_gate.dart';
+import '../state/medication_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -67,8 +68,8 @@ class HomeMedication {
   /// 카드는 그 줄을 숨긴다.
   final bool? doseChangeScheduled;
 
-  /// `GET /medications/current` 응답으로 만든다. `/home` 이 BE 에 없는
-  /// 동안(FE-14) 홈 투약 카드는 이걸로 채운다.
+  /// [MedicationState] 의 값으로 만든다. `/home` 을 연동하기 전까지(FE-13)
+  /// 홈 투약 카드는 이걸로 채운다.
   factory HomeMedication.fromCurrent(MedicationCurrent current) =>
       HomeMedication(
         drugName: current.drugName,
@@ -159,21 +160,13 @@ class HomeSummary {
 
   final DateTime date;
 
-  /// 투약 미등록이면 null — 카드 대신 입력 안내를 보인다.
+  /// 투약 미등록이면 null. 지금 홈 투약 카드는 이 값이 아니라 `MedicationState`
+  /// 를 본다. `/home` 을 연동할 때(FE-13) 둘을 어떻게 맞출지 정한다.
   final HomeMedication? medication;
   final HomeStomach stomach;
   final int recordedCount;
   final List<HomeMeal> meals;
   final List<String> missingMealTypes;
-
-  HomeSummary withMedication(HomeMedication? medication) => HomeSummary(
-    date: date,
-    medication: medication,
-    stomach: stomach,
-    recordedCount: recordedCount,
-    meals: meals,
-    missingMealTypes: missingMealTypes,
-  );
 
   factory HomeSummary.fromJson(Map<String, dynamic> json) {
     final today = json['today'] as Map<String, dynamic>;
@@ -227,8 +220,8 @@ String _formatDose(double mg) => '${mg}mg';
 class HomeApiService {
   /// `GET /home`
   Future<HomeSummary> fetchHome() async {
-    // TODO(FE-14): `GET /home` 은 BE 미구현(명세 🕓)이라 실제 모드에서도 더미다.
-    //   생기면 ApiClient 로 부르고, 투약 카드도 그 `medication` 으로 되돌린다.
+    // TODO(FE-13): `GET /home` 연동 전이라 화면 안 예시를 돌려준다.
+    //   ApiClient 로 부르고, 투약 카드는 MedicationState 를 그대로 쓴다.
     //   error.code 분기: PROFILE_REQUIRED -> 프로필 입력,
     //                    STAGE_NOT_SET   -> 투약 정보 입력.
     //   둘 다 실패가 아니라 이동이라 재시도 블록을 띄우지 않는다.
@@ -296,13 +289,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final HomeApiService _api = HomeApiService();
 
-  /// 투약 카드는 `/home` 대신 이미 구현된 `GET /medications/current` 로
-  /// 채운다. 그래야 온보딩·투약 화면에서 저장한 값이 홈에 보인다.
-  /// TODO(FE-14): `GET /home` 이 BE 에 생기면 그 `medication` 으로 되돌린다.
-  late final MedicationApiService _medicationApi = MedicationApiService(
-    context.read<ApiClient>(),
-  );
-
   HomeSummary? _home;
   LoadState _state = LoadState.loading;
   String? _errorMessage;
@@ -313,7 +299,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  /// [refreshMedication] 이면 투약도 서버에서 다시 받는다(당겨서 새로고침).
+  /// 아니면 [MedicationState] 에 이미 있는 값을 쓴다.
+  Future<void> _load({bool refreshMedication = false}) async {
+    final medication = context.read<MedicationState>();
     setState(() {
       _state = LoadState.loading;
       _errorMessage = null;
@@ -322,15 +311,11 @@ class _HomeScreenState extends State<HomeScreen> {
       // Future.wait 은 먼저 난 에러 하나를 그대로 던진다(재시도 블록 문구용).
       final results = await Future.wait<Object?>([
         _api.fetchHome(),
-        _medicationApi.fetchCurrent(),
+        refreshMedication ? medication.refresh() : medication.ensureLoaded(),
       ]);
-      final home = results[0] as HomeSummary;
-      final medication = results[1] as MedicationCurrent?;
       if (!mounted) return;
       setState(() {
-        _home = home.withMedication(
-          medication == null ? null : HomeMedication.fromCurrent(medication),
-        );
+        _home = results[0] as HomeSummary;
         _state = LoadState.ready;
       });
     } catch (e) {
@@ -363,23 +348,27 @@ class _HomeScreenState extends State<HomeScreen> {
     _load();
   }
 
-  /// 투약 카드 탭 → 투약 정보 화면(1번). 돌아오면 투약 정보가 바뀌었을 수
-  /// 있으니 홈을 다시 불러온다.
-  Future<void> _openMedicationInfo() async {
-    await Navigator.of(context).push(
+  /// 투약 카드 탭 → 투약 정보 화면(1번). 저장하면 [MedicationState] 가
+  /// 바뀌어 카드도 같이 바뀌므로 돌아와서 다시 불러오지 않는다.
+  void _openMedicationInfo() {
+    Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const MedicationInfoScreen()),
     );
-    if (!mounted) return;
-    _load();
   }
 
   @override
   Widget build(BuildContext context) {
     final home = _home;
+    // 투약은 홈 응답이 아니라 MedicationState 에서 읽는다 — 다른 화면에서
+    // 저장해도 여기서 바로 바뀐다.
+    final current = context.watch<MedicationState>().current;
+    final medication = current == null
+        ? null
+        : HomeMedication.fromCurrent(current);
 
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(refreshMedication: true),
         color: AppColors.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -406,7 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ...switch (_state) {
                 LoadState.loading => _buildLoading(),
                 LoadState.failed => _buildFailed(),
-                LoadState.ready => _buildReady(home!),
+                LoadState.ready => _buildReady(home!, medication),
               },
             ],
           ),
@@ -433,17 +422,16 @@ class _HomeScreenState extends State<HomeScreen> {
     const SizedBox(height: AppSpacing.xxl),
     RetryBlock(
       message: _errorMessage ?? '잠시 후 다시 시도해 주세요',
-      onRetry: _load,
+      onRetry: () => _load(refreshMedication: true),
     ),
   ];
 
-  List<Widget> _buildReady(HomeSummary home) {
+  List<Widget> _buildReady(HomeSummary home, HomeMedication? medication) {
     final hasMeals = home.meals.isNotEmpty;
     final nextMealType = home.missingMealTypes.isEmpty
         ? null
         : mealTypeLabel(home.missingMealTypes.first);
 
-    final medication = home.medication;
     return [
       if (medication == null)
         AddMealCard(label: '＋ 투약 정보 입력하기', onTap: _openMedicationInfo)

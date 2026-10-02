@@ -5,24 +5,16 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/api/api_client.dart';
 import 'package:frontend/api/api_exception.dart';
+import 'package:frontend/api/medication_api.dart';
 import 'package:frontend/api/user_api.dart';
 import 'package:frontend/popups/daily_condition_popup.dart';
 import 'package:frontend/screens/long_term_feedback_screen.dart';
 import 'package:frontend/screens/meal_history_screen.dart';
-import 'package:frontend/screens/medication_info_screen.dart';
+import 'package:frontend/state/medication_state.dart';
 import 'package:frontend/state/user_session.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 각 화면 API 서비스의 **실제 호출 경로**를 서버 응답 예시로 확인한다.
-///
-/// `ApiConfig.useRealApi` 는 컴파일 상수라, 이 파일은 실제 모드로 따로 돌린다.
-/// ```
-/// flutter test --dart-define=USE_REAL_API=true test/real_api_services_test.dart
-/// ```
-/// 기본 `flutter test` 에서는 건너뛴다(더미 응답이 나오므로).
-const _skip = ApiConfig.useRealApi
-    ? null
-    : '--dart-define=USE_REAL_API=true 로 실행할 때만 돈다';
+/// 각 화면 API 서비스가 보내는 요청과 응답 해석을 서버 응답 예시로 확인한다.
 
 /// 요청마다 [respond] 로 응답을 만들고, 받은 요청을 [requests] 에 남긴다.
 class _RoutingAdapter implements HttpClientAdapter {
@@ -85,8 +77,28 @@ Map<String, Object?> _listItem(String id, String eatenAt, {Object? scores}) => {
   'scores': scores,
 };
 
+/// `GET /medications/current` 응답(`data` 안쪽).
+Map<String, Object?> _medication({
+  String drugName = '위고비',
+  double doseMg = 1.0,
+  int doseCount = 4,
+  String stage = 'INITIAL',
+}) => {
+  'medicationId': 'm1',
+  'drugName': drugName,
+  'doseMg': doseMg,
+  'startedAt': '2026-09-01',
+  'doseCount': doseCount,
+  'nextDoseDate': '2026-09-29',
+  'daysUntilNextDose': 1,
+  'stage': stage,
+  'stageReason': '',
+};
+
+Future<MedicationState> _medicationState(ApiClient client) async =>
+    MedicationState(MedicationApiService(client), session: await UserSession.load());
+
 void main() {
-  // ApiClient 자체 동작이라 더미 모드와 무관하게 돈다.
   group('api client', () {
     test('USER_NOT_FOUND clears the saved user and still throws', () async {
       final (client, _) = await _client((_) => (404, _error('USER_NOT_FOUND')));
@@ -142,7 +154,7 @@ void main() {
         'weightKg': 78.4,
         'baselineIntake': 700,
       });
-    }, skip: _skip);
+    });
 
     test('me reads the profile', () async {
       final (client, adapter) = await _client(
@@ -152,7 +164,7 @@ void main() {
       expect(me.nickname, '영우');
       expect(me.onboardingStatus, 'READY');
       expect(adapter.requests.single.path, '/users/me');
-    }, skip: _skip);
+    });
 
     test('profile update sends only the changed fields', () async {
       final (client, adapter) = await _client(
@@ -174,14 +186,14 @@ void main() {
       expect(request.method, 'PATCH');
       expect(request.path, '/users/me');
       expect(request.data, {'weightKg': 77.9});
-    }, skip: _skip);
+    });
   });
 
   group('medication', () {
     test('not registered yet (STAGE_NOT_SET) is null, not a failure', () async {
       final (client, _) = await _client((_) => (409, _error('STAGE_NOT_SET')));
       expect(await MedicationApiService(client).fetchCurrent(), isNull);
-    }, skip: _skip);
+    });
 
     test('save posts drug, dose and start date', () async {
       final (client, adapter) = await _client(
@@ -217,7 +229,7 @@ void main() {
         'doseMg': 0.5,
         'startedAt': '2026-09-01',
       });
-    }, skip: _skip);
+    });
 
     test('after registration the start date is left out', () async {
       final (client, adapter) = await _client(
@@ -243,7 +255,73 @@ void main() {
       );
       await MedicationApiService(client).save(drugName: '위고비', doseMg: 1.0);
       expect(adapter.requests.single.data, {'drugName': '위고비', 'doseMg': 1.0});
-    }, skip: _skip);
+    });
+  });
+
+  group('medication state', () {
+    test('screens asking at once share one request', () async {
+      final (client, adapter) = await _client((_) => (200, _ok(_medication())));
+      final state = await _medicationState(client);
+      await Future.wait([state.ensureLoaded(), state.ensureLoaded()]);
+      expect(adapter.requests, hasLength(1));
+      // 받아 둔 뒤에는 서버에 다시 묻지 않는다.
+      await state.ensureLoaded();
+      expect(adapter.requests, hasLength(1));
+      expect(state.current?.drugName, '위고비');
+    });
+
+    test('asks again once the day has changed', () async {
+      final (client, adapter) = await _client((_) => (200, _ok(_medication())));
+      var now = DateTime(2026, 10, 2, 23, 50);
+      final state = MedicationState(
+        MedicationApiService(client),
+        session: await UserSession.load(),
+        clock: () => now,
+      );
+      await state.ensureLoaded();
+      await state.ensureLoaded();
+      expect(adapter.requests, hasLength(1));
+      now = DateTime(2026, 10, 3, 0, 10);
+      await state.ensureLoaded();
+      expect(adapter.requests, hasLength(2));
+    });
+
+    test('not registered is loaded with no value', () async {
+      final (client, _) = await _client((_) => (409, _error('STAGE_NOT_SET')));
+      final state = await _medicationState(client);
+      expect(state.isLoaded, isFalse);
+      await state.ensureLoaded();
+      expect(state.isLoaded, isTrue);
+      expect(state.current, isNull);
+    });
+
+    test('saving replaces the value and tells the listeners', () async {
+      final (client, _) = await _client(
+        (o) => o.method == 'POST'
+            ? (200, _ok(_medication(doseMg: 0.5)))
+            : (409, _error('STAGE_NOT_SET')),
+      );
+      final state = await _medicationState(client);
+      await state.ensureLoaded();
+      var notified = 0;
+      state.addListener(() => notified++);
+      await state.save(drugName: '위고비', doseMg: 0.5);
+      expect(state.current?.doseMg, 0.5);
+      expect(notified, 1);
+    });
+
+    test('a new user starts empty', () async {
+      final (client, _) = await _client((_) => (200, _ok(_medication())));
+      final session = await UserSession.load();
+      final state = MedicationState(
+        MedicationApiService(client),
+        session: session,
+      );
+      await state.ensureLoaded();
+      await session.clear();
+      expect(state.isLoaded, isFalse);
+      expect(state.current, isNull);
+    });
   });
 
   group('condition popup', () {
@@ -256,23 +334,27 @@ void main() {
           _ => (404, _error('NOT_FOUND')),
         },
       );
-      final prefill = await ConditionApiService(client).fetchPrefill();
+      final prefill = await ConditionApiService(
+        client,
+      ).fetchPrefill(await _medicationState(client));
       expect(prefill.drugName, isNull);
       expect(prefill.weightKg, 80.5);
       expect(prefill.weeklyWeightDeltaKg, isNull);
-    }, skip: _skip);
+    });
 
     test('uses the latest state weight and weekly change', () async {
       final (client, adapter) = await _client(
         (o) => switch (o.path) {
           '/medications/current' => (
             200,
-            _ok({
-              'drugName': '마운자로',
-              'doseMg': 5.0,
-              'doseCount': 3,
-              'stage': 'TITRATION',
-            }),
+            _ok(
+              _medication(
+                drugName: '마운자로',
+                doseMg: 5.0,
+                doseCount: 3,
+                stage: 'TITRATION',
+              ),
+            ),
           ),
           '/user-states/latest' => (
             200,
@@ -281,13 +363,15 @@ void main() {
           _ => (404, _error('NOT_FOUND')),
         },
       );
-      final prefill = await ConditionApiService(client).fetchPrefill();
+      final prefill = await ConditionApiService(
+        client,
+      ).fetchPrefill(await _medicationState(client));
       expect(prefill.drugName, '마운자로');
       expect(prefill.weightKg, 77.9);
       expect(prefill.weeklyWeightDeltaKg, -0.4);
       // 최근 기록이 있으면 프로필은 다시 묻지 않는다.
       expect(adapter.requests.map((r) => r.path), isNot(contains('/users/me')));
-    }, skip: _skip);
+    });
 
     test(
       'save sends one severity per symptom, codes the server accepts',
@@ -310,7 +394,6 @@ void main() {
           ],
         });
       },
-      skip: _skip,
     );
 
     test('no symptom is an empty list', () async {
@@ -322,7 +405,7 @@ void main() {
         severity: null,
       );
       expect((adapter.requests.single.data as Map)['giSymptoms'], isEmpty);
-    }, skip: _skip);
+    });
   });
 
   group('history', () {
@@ -341,7 +424,7 @@ void main() {
       final request = adapter.requests.single;
       expect(request.method, 'DELETE');
       expect(request.path, '/meals/meal-1');
-    }, skip: _skip);
+    });
 
     test('collects one day across pages, oldest first, then stops', () async {
       final firstPage = _ok({
@@ -379,7 +462,7 @@ void main() {
       // 그날보다 이전 식사를 만나면 page3 은 부르지 않는다.
       expect(adapter.requests, hasLength(2));
       expect(adapter.requests.last.queryParameters['cursor'], 'page2');
-    }, skip: _skip);
+    });
 
     test('calendar with no evaluated meals has null averages', () async {
       final (client, adapter) = await _client(
@@ -400,7 +483,7 @@ void main() {
       ).fetchCalendar(DateTime(2026, 9));
       expect(adapter.requests.single.queryParameters['month'], '2026-09');
       expect(calendar.summary.avgScores.quality, isNull);
-    }, skip: _skip);
+    });
   });
 
   group('long-term dashboard', () {
@@ -440,7 +523,7 @@ void main() {
       expect(data.series.map((s) => s.date), ['2026-09-28']);
       expect(data.averages, {'quantity': 70, 'quality': 80});
       expect(data.byMealType['LUNCH'], {'quality': 80, 'satiety': 60});
-    }, skip: _skip);
+    });
 
     test('dose events come from the events wrapper', () async {
       final (client, adapter) = await _client(
@@ -461,6 +544,6 @@ void main() {
       final events = await LongTermApiService(client).fetchDoseEvents();
       expect(adapter.requests.single.path, '/medications/dose-events');
       expect(events.single.doseMg, 0.25);
-    }, skip: _skip);
+    });
   });
 }

@@ -50,7 +50,7 @@ class PopupGate {
   /// 사후 포만감 체크인. 저장했으면 `true`.
   ///
   /// 진입점은 [mealId] 하나뿐이다(멘토 리뷰 PR #9 "알림 진입 화면은 id 로
-  /// 생성"). 홈 게이지 탭과 알림(`NotificationRouter`, FE-15) 모두 이걸 부른다.
+  /// 생성"). 홈 게이지 탭과 알림(`NotificationRouter`, FE-14) 모두 이걸 부른다.
   Future<bool> showSatietyCheckin(
     BuildContext context, {
     required String mealId,

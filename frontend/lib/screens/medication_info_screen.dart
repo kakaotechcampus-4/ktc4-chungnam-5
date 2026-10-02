@@ -1,176 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../api/api_client.dart';
 import '../api/api_exception.dart';
-import '../api/dummy_store.dart';
+import '../api/medication_api.dart';
 import '../common/api_format.dart';
+import '../state/medication_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'shared_meal_widgets.dart';
-
-// ── 모델 ────────────────────────────────────────────────────
-
-/// `POST /medications` · `GET /medications/current` 응답.
-class MedicationCurrent {
-  const MedicationCurrent({
-    required this.medicationId,
-    required this.drugName,
-    required this.doseMg,
-    required this.startedAt,
-    required this.doseCount,
-    required this.nextDoseDate,
-    required this.daysUntilNextDose,
-    required this.stage,
-    this.stageReason,
-  });
-
-  final String medicationId;
-  final String drugName;
-  final double doseMg;
-  final DateTime startedAt;
-
-  /// 서버 계산: `floor((today − startedAt) / 7) + 1`.
-  final int doseCount;
-
-  final DateTime nextDoseDate;
-  final int daysUntilNextDose;
-
-  /// `INITIAL` · `TITRATION` · `MAINTENANCE` · `REDUCED`. 투약 기록이 있을 때만
-  /// 이 응답이 오므로 `PRE_DOSE` 는 여기 안 온다(미등록은 409 `STAGE_NOT_SET`).
-  final String stage;
-
-  /// `약효가 줄고 식욕이 돌아오는 구간` 같은 한 줄 설명.
-  final String? stageReason;
-
-  factory MedicationCurrent.fromJson(Map<String, dynamic> json) =>
-      MedicationCurrent(
-        medicationId: json['medicationId'] as String,
-        drugName: json['drugName'] as String,
-        doseMg: (json['doseMg'] as num).toDouble(),
-        startedAt: DateTime.parse(json['startedAt'] as String),
-        doseCount: json['doseCount'] as int,
-        nextDoseDate: DateTime.parse(json['nextDoseDate'] as String),
-        daysUntilNextDose: json['daysUntilNextDose'] as int,
-        stage: json['stage'] as String,
-        stageReason: json['stageReason'] as String?,
-      );
-}
-
-// ── API ─────────────────────────────────────────────────────
-
-/// 투약 화면이 쓰는 엔드포인트. `ApiConfig.useRealApi` 가 false 면 더미를 돌려준다.
-class MedicationApiService {
-  MedicationApiService(this._client);
-
-  final ApiClient _client;
-
-  /// `GET /medications/current`
-  ///
-  /// 미등록이면 409 `STAGE_NOT_SET` 이 온다. 이건 실패가 아니라
-  /// "아직 입력 안 함" 이므로 null 로 바꿔 돌려주고 화면은 빈 폼을 보여 준다.
-  Future<MedicationCurrent?> fetchCurrent() async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 250));
-      // 회원가입을 거친 더미 사용자는 저장한 값(없으면 미등록), 아니면 예시.
-      final (stored, medication) = await DummyStore.readMedication();
-      if (!stored) return MedicationCurrent.fromJson(_sample);
-      return medication == null ? null : MedicationCurrent.fromJson(medication);
-    }
-    try {
-      final result = await _client.get('/medications/current');
-      return MedicationCurrent.fromJson(result.dataMap);
-    } on ApiException catch (e) {
-      if (e.code == 'STAGE_NOT_SET') return null;
-      rethrow;
-    }
-  }
-
-  /// `POST /medications` — **등록 전용**이다.
-  ///
-  /// - `doseMg` 가 현재 값과 다르면 서버가 용량 변경 1건을 기록한다. 그래서
-  ///   미리보기 용도로는 절대 부르면 안 된다.
-  /// - [startedAt] 은 첫 등록에만 보낸다. null 이면 서버가 기존 시작일을
-  ///   그대로 둔다. 등록 후 다른 값을 보내면 409 `CONFLICT` 다.
-  /// - 오늘 등록·변경한 용량을 오늘 또 바꿔도 409 `CONFLICT` 다.
-  ///   정정은 `PATCH /medications/{recordId}`(BE 미머지, FE-14).
-  Future<MedicationCurrent> save({
-    required String drugName,
-    required double doseMg,
-    DateTime? startedAt,
-  }) async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      final saved = await _dummySave(drugName, doseMg, startedAt);
-      return MedicationCurrent.fromJson(saved);
-    }
-    final result = await _client.post(
-      '/medications',
-      body: {
-        'drugName': drugName,
-        'doseMg': doseMg,
-        if (startedAt != null) 'startedAt': formatApiDate(startedAt),
-      },
-    );
-    return MedicationCurrent.fromJson(result.dataMap);
-  }
-
-  /// 더미 저장. 서버 공식(명세 `POST /medications`)대로 회차·다음 투약일을
-  /// 계산해 [DummyStore] 에 남긴다. 단계 판정 규칙은 흉내 내지 않는다.
-  static Future<Map<String, dynamic>> _dummySave(
-    String drugName,
-    double doseMg,
-    DateTime? startedAt,
-  ) async {
-    final (_, previous) = await DummyStore.readMedication();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final start =
-        startedAt ??
-        (previous == null
-            ? today
-            : DateTime.parse(previous['startedAt'] as String));
-    final doseCount = today.difference(start).inDays ~/ 7 + 1;
-    final nextDoseDate = start.add(Duration(days: 7 * doseCount));
-    final saved = {
-      ..._sample,
-      'drugName': drugName,
-      'doseMg': doseMg,
-      'startedAt': formatApiDate(start),
-      'doseCount': doseCount,
-      'nextDoseDate': formatApiDate(nextDoseDate),
-      'daysUntilNextDose': nextDoseDate.difference(today).inDays,
-      'stage': previous == null ? 'INITIAL' : previous['stage'],
-      'stageReason': previous == null
-          ? '처음 용량에 몸이 적응하는 구간'
-          : previous['stageReason'],
-    };
-    await DummyStore.writeMedication(saved);
-    return saved;
-  }
-
-  /// 명세의 `POST /medications` 예시 응답(`data` 안쪽).
-  static const Map<String, dynamic> _sample = {
-    'medicationId': 'med_01H8',
-    'drugName': '위고비',
-    'doseMg': 1.0,
-    'startedAt': '2026-06-14',
-    'doseCount': 10,
-    'nextDoseDate': '2026-08-23',
-    'daysUntilNextDose': 2,
-    'stage': 'MAINTENANCE',
-    'stageReason': '약효가 줄고 식욕이 돌아오는 구간',
-    'ruleVersion': 'v1',
-    'doseChanged': false,
-    'doseEvent': null,
-    'stageChanged': false,
-    'decidedAt': '2026-08-21T09:12:00+09:00',
-  };
-}
-
-// ── 화면 ────────────────────────────────────────────────────
 
 /// 투약 정보 입력 — 온보딩 1/2 단계.
 ///
@@ -188,9 +27,8 @@ class MedicationInfoScreen extends StatefulWidget {
 }
 
 class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
-  late final MedicationApiService _api = MedicationApiService(
-    context.read<ApiClient>(),
-  );
+  /// 저장하면 여기 값이 바뀌어 홈 투약 카드·컨디션 팝업도 같이 바뀐다.
+  late final MedicationState _medication = context.read<MedicationState>();
 
   /// 약별 1회 용량 스텝(mg, 주 1회). 약을 바꾸면 값도 개수도 달라진다.
   /// Figma 에는 위고비 5칸만 그려져 있어 마운자로는 가로 스크롤로 받는다.
@@ -224,7 +62,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
   MedicationCurrent? _current;
 
   /// 이미 등록했는지. 등록 후에는 시작일·회차를 잠근다 — `POST` 는 등록
-  /// 전용이라 둘을 바꾸면 409 이고, 고치는 건 정정(`PATCH`, FE-14)이다.
+  /// 전용이라 둘을 바꾸면 409 이고, 고치는 건 정정(`PATCH`)이다.
   /// 약·용량은 "오늘부터 이 용량으로 바꿈"이라 그대로 열어 둔다.
   bool get _registered => _current != null;
 
@@ -242,7 +80,8 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
 
   Future<void> _loadCurrent() async {
     try {
-      final current = await _api.fetchCurrent();
+      // 이미 받아 둔 값이 있으면 서버에 다시 묻지 않는다.
+      final current = await _medication.ensureLoaded();
       if (!mounted || current == null) return;
       setState(() {
         _current = current;
@@ -313,15 +152,15 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       _saveError = null;
     });
     try {
-      final saved = await _api.save(
+      final saved = await _medication.save(
         drugName: _drug,
         doseMg: _dose,
         startedAt: _registered ? null : _startedAt,
       );
       if (!mounted) return;
       setState(() => _current = saved);
-      // 저장 완료 → 연 곳으로 돌아간다. 홈 투약 카드에서 열었으면 홈이
-      // 투약 정보를 다시 불러오고, 온보딩(프로필 다음)에서 열었으면 RootShell 이
+      // 저장 완료 → 연 곳으로 돌아간다. 홈 투약 카드는 MedicationState 로
+      // 이미 바뀌어 있고, 온보딩(프로필 다음)에서 열었으면 RootShell 이
       // 이어서 하루 팝업을 확인한다.
       Navigator.of(context).pop();
     } on ApiException catch (e) {

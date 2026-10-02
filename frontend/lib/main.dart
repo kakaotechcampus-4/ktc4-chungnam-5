@@ -1,11 +1,14 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'api/api_client.dart';
+import 'api/medication_api.dart';
 import 'navigation/root_shell.dart';
 import 'popups/popup_gate.dart';
 import 'screens/profile_input_screen.dart';
 import 'state/app_state.dart';
+import 'state/medication_state.dart';
 import 'state/tab_state.dart';
 import 'state/user_session.dart';
 import 'theme/app_theme.dart';
@@ -18,9 +21,12 @@ Future<void> main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, required this.session});
+  const MyApp({super.key, required this.session, this.dio});
 
   final UserSession session;
+
+  /// 테스트가 가짜 응답을 넣을 때만 준다. 앱은 `ApiConfig` 주소로 만든다.
+  final Dio? dio;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +35,13 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: session),
-        Provider(create: (_) => ApiClient(session: session)),
+        Provider(create: (_) => ApiClient(session: session, dio: dio)),
+        ChangeNotifierProvider(
+          create: (context) => MedicationState(
+            MedicationApiService(context.read<ApiClient>()),
+            session: session,
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => AppState()),
         ChangeNotifierProvider(create: (_) => TabState()),
         // 팝업은 전부 이 하나를 거친다 — 여러 개면 "한 번에 하나" 잠금이 나뉜다.
