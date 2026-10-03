@@ -9,6 +9,7 @@ from pydantic import AfterValidator, Field, StringConstraints, field_validator
 
 from app.models.enums import MealStatus, MealType, MedicationStage
 from app.schemas.base import CamelModel, KstDatetime
+from app.schemas.feedback import FeedbackSuggestion
 from app.schemas.nutrition import NutritionInfo
 
 
@@ -303,13 +304,15 @@ class SatietyDetail(CamelModel):
 class MealFeedbackSummary(CamelModel):
     """status: EVALUATED 일 때만 채워지는 단기 피드백 요약.
 
-    `suggestions` 는 명세상 배열이다. DB(`meal_feedbacks.suggestions`)는 아직
-    Text 컬럼 하나라 실제로는 문장 하나뿐이지만, 응답 모양은 명세를 따른다 —
-    AI 가 여러 개의 제안을 실제로 만들게 되면 그때 DB 구조도 같이 정리한다.
+    `suggestions` 는 `GET /meals/{mealId}/feedback` 과 **같은 객체 배열**이다
+    (`FeedbackSuggestion`). 명세는 여기서 `[ … ]` 라고만 적어 원소 모양을 정하지 않았고,
+    같은 끼니의 같은 제안이 화면마다 다른 모양이면 FE 가 두 벌로 파싱해야 한다.
+    컬럼(`meal_feedbacks.suggestions`)은 워커가 AI 제안을 담는 JSONB 배열이고,
+    `nutrients` 는 읽을 때 채운다 (`services/feedback.py::build_meal_suggestions`).
     """
 
     summary: str | None
-    suggestions: list[str]
+    suggestions: list[FeedbackSuggestion]
 
 
 class NutrientStatus(CamelModel):

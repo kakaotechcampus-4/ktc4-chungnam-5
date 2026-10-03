@@ -1,10 +1,16 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'api/api_client.dart';
+import 'api/medication_api.dart';
+import 'api/user_api.dart';
 import 'navigation/root_shell.dart';
+import 'popups/popup_gate.dart';
 import 'screens/profile_input_screen.dart';
 import 'state/app_state.dart';
+import 'state/medication_state.dart';
+import 'state/profile_state.dart';
 import 'state/tab_state.dart';
 import 'state/user_session.dart';
 import 'theme/app_theme.dart';
@@ -17,9 +23,12 @@ Future<void> main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, required this.session});
+  const MyApp({super.key, required this.session, this.dio});
 
   final UserSession session;
+
+  /// 테스트가 가짜 응답을 넣을 때만 준다. 앱은 `ApiConfig` 주소로 만든다.
+  final Dio? dio;
 
   @override
   Widget build(BuildContext context) {
@@ -28,9 +37,23 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: session),
-        Provider(create: (_) => ApiClient(session: session)),
+        Provider(create: (_) => ApiClient(session: session, dio: dio)),
+        ChangeNotifierProvider(
+          create: (context) => ProfileState(
+            UserApiService(context.read<ApiClient>()),
+            session: session,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => MedicationState(
+            MedicationApiService(context.read<ApiClient>()),
+            session: session,
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => AppState()),
         ChangeNotifierProvider(create: (_) => TabState()),
+        // 팝업은 전부 이 하나를 거친다 — 여러 개면 "한 번에 하나" 잠금이 나뉜다.
+        Provider(create: (_) => PopupGate()),
       ],
       child: MaterialApp(
         // TODO: 알림 기능 착수 시 navigatorKey(GlobalKey<NavigatorState>) 추가.
@@ -47,12 +70,35 @@ class MyApp extends StatelessWidget {
 
 /// 저장된 사용자가 없으면 프로필 입력(온보딩), 있으면 탭 화면.
 /// 프로필을 저장하면 [UserSession] 이 바뀌어 자동으로 탭 화면으로 넘어간다.
-class _StartScreen extends StatelessWidget {
+///
+/// 반대로 사용 중에 세션이 지워지면(서버에 사용자가 없음 — `ApiClient` 참고)
+/// 이 화면만 바뀌고 그 위에 push 한 화면·팝업은 남는다. 그래서 그때는
+/// 첫 화면까지 닫고 이유를 알린다.
+class _StartScreen extends StatefulWidget {
   const _StartScreen();
+
+  @override
+  State<_StartScreen> createState() => _StartScreenState();
+}
+
+class _StartScreenState extends State<_StartScreen> {
+  late bool _hadProfile = context.read<UserSession>().hasProfile;
 
   @override
   Widget build(BuildContext context) {
     final hasProfile = context.select<UserSession, bool>((s) => s.hasProfile);
+    if (_hadProfile && !hasProfile) _onSessionLost();
+    _hadProfile = hasProfile;
     return hasProfile ? const RootShell() : const ProfileInputScreen();
+  }
+
+  void _onSessionLost() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('사용자 정보를 찾지 못해 처음부터 다시 시작해요')),
+      );
+    });
   }
 }

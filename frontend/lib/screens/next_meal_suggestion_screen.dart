@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../common/api_format.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -340,7 +341,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
       children: [
         Text('현재 영양소 상태', style: AppTypography.sectionHead),
         Text(
-          '${_stageLabel(stage)} 1끼 기준',
+          '${stageLabel(stage)} 1끼 기준',
           style: AppTypography.caption.copyWith(color: AppColors.textTertiary),
         ),
       ],
@@ -366,19 +367,6 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
         ],
       ),
     );
-  }
-
-  String _stageLabel(String stage) {
-    switch (stage) {
-      case 'INITIAL':
-        return '초기';
-      case 'TITRATION':
-        return '증량기';
-      case 'MAINTENANCE':
-        return '유지기';
-      default:
-        return stage;
-    }
   }
 
   Color _stateColor(String? state) {

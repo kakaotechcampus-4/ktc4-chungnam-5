@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
+import '../api/medication_api.dart';
 import '../common/api_format.dart';
+import '../state/medication_state.dart';
+import '../state/profile_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -9,8 +14,7 @@ import 'popup_widgets.dart';
 
 // ── 모델 ────────────────────────────────────────────────────
 
-/// 식욕 5단계. 서버 `user_states.appetite_level` 에 [level] 로 저장한다.
-// TODO(백엔드 확인): appetite_level 범위가 1~5 인지 확정.
+/// 식욕 5단계. 서버 `appetiteLevel` 에 [level] 로 보낸다(서버도 없음=1 ~ 매우 강함=5).
 enum Appetite {
   none('없음', 1),
   weak('약함', 2),
@@ -25,12 +29,16 @@ enum Appetite {
 }
 
 /// GI 증상. "없음"은 선택지로만 보이고 서버에는 빈 목록으로 보낸다.
+///
+/// 목록·순서는 BE `GiSymptomCode`(`backend/app/schemas/user_state.py`) 7종과
+/// 같다. Figma 는 6칸(트림·가스, 구토 없음)이라 BE 에 맞춰 바꿨다.
 enum GiSymptom {
   nausea('메스꺼움', 'NAUSEA'),
+  vomiting('구토', 'VOMITING'),
   heartburn('속 쓰림', 'HEARTBURN'),
   constipation('변비', 'CONSTIPATION'),
   diarrhea('설사', 'DIARRHEA'),
-  burpingGas('트림·가스', 'BURPING_GAS'),
+  bloating('더부룩함·가스', 'BLOATING'),
   abdominalPain('복통', 'ABDOMINAL_PAIN');
 
   const GiSymptom(this.label, this.code);
@@ -51,21 +59,24 @@ enum SymptomSeverity {
   final String code;
 }
 
-/// 팝업 헤더·체중 초기값. `GET /medications/current` + `GET /users/me` 조합.
+/// 팝업 헤더·체중 초기값. [MedicationState] + `GET /user-states/latest`
+/// (+ 컨디션 기록이 없으면 [ProfileState] 의 체중) 조합.
+///
+/// 투약 미등록이면 투약 필드 넷이 모두 null 이고 헤더는 날짜만 보인다.
 class ConditionPrefill {
   const ConditionPrefill({
-    required this.drugName,
-    required this.doseMg,
-    required this.doseCount,
-    required this.stage,
+    this.drugName,
+    this.doseMg,
+    this.doseCount,
+    this.stage,
     required this.weightKg,
     required this.weeklyWeightDeltaKg,
   });
 
-  final String drugName;
-  final double doseMg;
-  final int doseCount;
-  final String stage;
+  final String? drugName;
+  final double? doseMg;
+  final int? doseCount;
+  final String? stage;
 
   /// 최근 기록 체중. 기록이 없으면 null — 스테퍼는 기본값에서 시작한다.
   final double? weightKg;
@@ -76,50 +87,71 @@ class ConditionPrefill {
 
 // ── API 서비스 ─────────────────────────────────────────────
 
+/// 컨디션 팝업이 쓰는 엔드포인트.
 class ConditionApiService {
-  Future<ConditionPrefill> fetchPrefill() async {
-    // TODO(http|dio 결정 후): GET /medications/current · GET /users/me 로 교체.
-    //   "지난주 대비"는 아직 내려주는 API 가 없다.
-    await Future.delayed(const Duration(milliseconds: 300));
-    return const ConditionPrefill(
-      drugName: '위고비',
-      doseMg: 1.0,
-      doseCount: 12,
-      stage: 'MAINTENANCE',
-      weightKg: 78.4,
-      weeklyWeightDeltaKg: -0.6,
+  ConditionApiService(this._client);
+
+  final ApiClient _client;
+
+  /// 투약·프로필은 [medicationState] · [profileState] 에 받아 둔 값을 쓴다
+  /// (없을 때만 서버에 묻는다).
+  Future<ConditionPrefill> fetchPrefill(
+    MedicationState medicationState,
+    ProfileState profileState,
+  ) async {
+    final results = await Future.wait<Object?>([
+      medicationState.ensureLoaded(),
+      _client.get('/user-states/latest'),
+    ]);
+    final medication = results[0] as MedicationCurrent?;
+    // 컨디션 기록이 없으면 200 + data: null 이다.
+    final latest = (results[1] as ApiResult).data as Map<String, dynamic>?;
+
+    // 첫 기록이면 프로필에 적은 체중에서 시작한다.
+    final weightKg =
+        (latest?['weightKg'] as num?)?.toDouble() ??
+        (await profileState.ensureLoaded()).weightKg;
+    return ConditionPrefill(
+      drugName: medication?.drugName,
+      doseMg: medication?.doseMg,
+      doseCount: medication?.doseCount,
+      stage: medication?.stage,
+      weightKg: weightKg,
+      // 지난주 기록이 없으면 null 이다(0 이 아니다). 뱃지를 숨긴다.
+      weeklyWeightDeltaKg: (latest?['weightChangeKg'] as num?)?.toDouble(),
     );
   }
 
-  /// 오늘 컨디션 저장.
+  /// `POST /user-states` — 오늘 컨디션 저장.
+  ///
+  /// Figma 는 강도 선택이 하나라 고른 증상 전체에 같은 강도를 붙인다.
+  /// "증상 없음"은 빈 목록이다(null 은 422).
   Future<void> save({
     required double weightKg,
     required Appetite appetite,
     required Set<GiSymptom> symptoms,
     required SymptomSeverity? severity,
   }) async {
-    // TODO(백엔드 API 생기면): user_states 저장 API 로 교체. 경로·gi_symptoms
-    //   형식은 미정 — 지금 가정은 [{code, severity}] 목록.
-    await Future.delayed(const Duration(milliseconds: 300));
+    await _client.post(
+      '/user-states',
+      body: {
+        'weightKg': weightKg,
+        'appetiteLevel': appetite.level,
+        'giSymptoms': [
+          for (final s in symptoms)
+            {'code': s.code, 'severity': severity!.code},
+        ],
+      },
+    );
   }
 }
 
 // ── 팝업 ────────────────────────────────────────────────────
 
-/// 오늘 컨디션 기록 팝업을 띄운다. 기록을 저장했으면 `true`,
-/// "나중에"·닫기·바깥 탭이면 `false`.
-Future<bool> showDailyConditionPopup(BuildContext context) async {
-  final saved = await showDialog<bool>(
-    context: context,
-    barrierColor: AppColors.overlay,
-    builder: (_) => const DailyConditionPopup(),
-  );
-  return saved ?? false;
-}
-
 /// 오늘 컨디션 기록 — Figma `hOxrHBitBpjwIBBg2GO49y` node `74:8` (2-a).
 ///
-/// 하루 한 번, 오늘 첫 접속 때 `RootShell` 이 띄운다(`PopupGate` 참고).
+/// 하루 한 번, 오늘 첫 접속 때 `PopupGate.showDailyPopupsIfDue` 로 뜬다.
+/// 직접 `showDialog` 하지 않는다.
 ///
 /// NOTE: 체중 뱃지(질 초록)·식욕(포만감 주황)·GI(양 갈색)의 Q·Q·S 색
 /// 재사용은 Figma 그대로다(§0 메타 규칙). 팝업 틀은 `popup_widgets.dart`.
@@ -136,7 +168,9 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
   static const _minWeightTenths = 200;
   static const _maxWeightTenths = 3000;
 
-  final ConditionApiService _api = ConditionApiService();
+  late final ConditionApiService _api = ConditionApiService(
+    context.read<ApiClient>(),
+  );
 
   ConditionPrefill? _prefill;
   int _weightTenths = _defaultWeightTenths;
@@ -162,7 +196,10 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
   /// 사용자가 이미 체중을 만졌으면 덮어쓰지 않는다.
   Future<void> _loadPrefill() async {
     try {
-      final prefill = await _api.fetchPrefill();
+      final prefill = await _api.fetchPrefill(
+        context.read<MedicationState>(),
+        context.read<ProfileState>(),
+      );
       if (!mounted) return;
       setState(() {
         _prefill = prefill;
@@ -221,6 +258,8 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
         severity: _severity,
       );
       if (!mounted) return;
+      // 서버가 최근 체중을 이 기록으로 바꾼다. 마이 탭 체중도 맞춘다.
+      context.read<ProfileState>().refreshInBackground();
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -236,13 +275,20 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
     final now = DateTime.now();
     final date = '${now.month}월 ${now.day}일';
     final p = _prefill;
-    if (p == null) return date;
+    final (drug, doseMg, doseCount, stage) = (
+      p?.drugName,
+      p?.doseMg,
+      p?.doseCount,
+      p?.stage,
+    );
+    if (drug == null || doseMg == null || doseCount == null || stage == null) {
+      return date;
+    }
     // 1.0 → "1.0", 0.25 → "0.25", 1.7 → "1.7"
-    final dose = p.doseMg % 1 == 0
-        ? p.doseMg.toStringAsFixed(1)
-        : p.doseMg.toString();
-    return '$date · ${p.drugName} ${dose}mg · ${p.doseCount}회차 · '
-        '${stageLabel(p.stage)}';
+    final dose = doseMg % 1 == 0
+        ? doseMg.toStringAsFixed(1)
+        : doseMg.toString();
+    return '$date · $drug ${dose}mg · $doseCount회차 · ${stageLabel(stage)}';
   }
 
   @override

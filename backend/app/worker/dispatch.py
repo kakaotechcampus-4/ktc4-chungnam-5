@@ -15,8 +15,10 @@
 확인 화면이 점수를 **곧바로** 보여 준다 — 큐에 넣으면 그 화면에 로딩이 생긴다.
 확인 API 가 동기로 채점해 응답에 담는다.
 
-피드백도 자동으로 이어 붙이지 않는다. 사용자가 "다음 끼니 제안 보기" 를 눌렀을 때
-그 API 가 `feedback.meal` 을 넣는다. 이어 붙이면 아무도 안 볼 피드백까지 AI 를 부른다.
+끼니 피드백은 확인 API 가 채점과 **같은 트랜잭션에서** `feedback.meal` 을 넣는다. 채점과
+달리 AI 를 불러야 해서 큐로 보낸다. 제안 화면을 열 때 넣지 않는 이유는 하루 피드백이
+끼니 피드백을 근거로 쓰기 때문이다 — 화면을 안 연 끼니가 하루 요약에서 빠진다
+(근거 조건과 현재 한계는 `services/evaluation/__init__.py` 독스트링).
 
 여기 있는 건 **AI 를 부르는 작업뿐이다.**
 
@@ -38,16 +40,17 @@ from sqlalchemy.orm import Session
 
 from app.infra.ai import AiClient
 from app.infra.queue import ClaimedTask
+from app.worker.jobs import analyze_meal, feedback_daily, feedback_long, feedback_meal
 
-_HANDLERS: dict[str, Callable[[Session, ClaimedTask, AiClient], dict[str, Any] | None]] = {}
+_HANDLERS: dict[str, Callable[[Session, ClaimedTask, AiClient], dict[str, Any] | None]] = {
+    "meal.analyze": analyze_meal.run,
+    "feedback.daily": feedback_daily.run,
+    "feedback.meal": feedback_meal.run,
+    "feedback.long": feedback_long.run,
+}
 
 # 계약은 정해졌지만 아직 구현이 없는 것들. 알 수 없는 타입과 구분해서 알려 준다.
-_NOT_IMPLEMENTED = {
-    "meal.analyze": "사진·텍스트 → meal_items 인식 (crud/ 재작성 대기)",
-    "feedback.meal": "끼니 피드백 (/short-feedback scope=MEAL → meal_feedbacks)",
-    "feedback.daily": "일일 피드백 (/short-feedback scope=DAILY → daily_feedbacks)",
-    "feedback.long": "장기 피드백 (/long-feedback → long_term_feedbacks)",
-}
+_NOT_IMPLEMENTED: dict[str, str] = {}
 
 
 def handle(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:

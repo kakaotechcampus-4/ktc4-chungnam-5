@@ -6,23 +6,27 @@
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from app.crud import user as user_crud
+from app.crud import user_state as user_state_crud
 from app.models.enums import (
     FoodCategory,
     MealItemSource,
     MealStatus,
     MealType,
     MedicationStage,
+    SafetyStatus,
 )
+from app.models.evaluation import QQSEvaluation
+from app.models.feedback import DailyFeedback, MealFeedback
 from app.models.food import FoodRef
 from app.models.meal import Meal, MealItem
 from app.models.medication import MedicationSnapshot
-from app.models.user import User
+from app.models.user import User, UserState
 from app.services.meal import to_grams
 
 EATEN_AT = datetime(2026, 8, 22, 12, 30, tzinfo=UTC)
@@ -44,6 +48,7 @@ def make_meal(
     eaten_at: datetime = EATEN_AT,
     stage: MedicationStage = MedicationStage.MAINTENANCE,
     status: MealStatus | None = MealStatus.REVIEW_REQUIRED,
+    meal_type: MealType = MealType.LUNCH,
 ) -> Meal:
     """식사 하나와 거기 딸린 투약 스냅샷을 만든다. flush 까지만 하고 커밋하지 않는다.
 
@@ -52,6 +57,9 @@ def make_meal(
 
     `status=None` 이면 INSERT 에서 컬럼을 빼 DB 의 server_default 를 태운다 —
     기본값 자체를 검증하는 테스트가 쓴다.
+
+    `stage` 는 식사마다 새로 만드는 투약 스냅샷의 단계다 — 같은 날 단계가 다른 두 식사를
+    만들 수 있다. `meal_type` 은 하루 피드백처럼 끼니 구분이 결과에 드러나는 테스트가 쓴다.
     """
     snapshot = MedicationSnapshot(user_id=user_id, stage=stage)
     db.add(snapshot)
@@ -60,7 +68,7 @@ def make_meal(
     meal = Meal(
         user_id=user_id,
         medication_snapshot_id=snapshot.id,
-        meal_type=MealType.LUNCH,
+        meal_type=meal_type,
         raw_text="김치찌개",
         eaten_at=eaten_at,
         **({} if status is None else {"status": status}),
@@ -157,3 +165,96 @@ def make_meal_item(
     db.add(item)
     db.flush()
     return item
+
+
+def make_qqs_evaluation(
+    db: Session,
+    *,
+    meal_id: uuid.UUID,
+    quantity_score: Decimal | int | None = 60,
+    quality_score: Decimal | int | None = 60,
+    satiety_score: Decimal | int | None = 60,
+    stage_at_evaluation: MedicationStage = MedicationStage.MAINTENANCE,
+) -> QQSEvaluation:
+    """식사 하나의 Q/Q/S 점수 행. flush 까지만 하고 커밋하지 않는다.
+
+    점수는 Rule Engine 을 거치지 않고 그대로 넣는다 — 이걸 읽는 쪽(집계·피드백)의
+    테스트가 채점 규칙에 묶이지 않게 하려는 것이다. 점수 하나를 None 으로 두면
+    "채점 못 한 축" 이 있는 식사가 된다.
+    """
+    evaluation = QQSEvaluation(
+        meal_id=meal_id,
+        stage_at_evaluation=stage_at_evaluation,
+        quantity_score=quantity_score,
+        quality_score=quality_score,
+        satiety_score=satiety_score,
+    )
+    db.add(evaluation)
+    db.flush()
+    return evaluation
+
+
+def make_meal_feedback(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_id: uuid.UUID,
+    body: str | None = "채소를 먼저 드셔서 좋았어요.",
+    safety_status: SafetyStatus = SafetyStatus.SAFE,
+    model_version: str | None = "stub-short-0",
+    suggestions: list[dict] | None = None,
+) -> MealFeedback:
+    """식사 하나의 끼니 피드백 행. flush 까지만 하고 커밋하지 않는다.
+
+    프로덕션에서는 `feedback.meal` 워커가 AI 를 불러 이 행을 채운다. 여기서는 AI 없이
+    모델을 직접 조립한다. 기본값이 `SAFE` 인 건 하루 피드백의 근거가 되는 모양이
+    그것이기 때문이다 (모델의 server_default 는 REVIEW_REQUIRED 다).
+    """
+    feedback = MealFeedback(
+        user_id=user_id,
+        meal_id=meal_id,
+        body=body,
+        safety_status=safety_status,
+        model_version=model_version,
+        suggestions=suggestions,
+    )
+    db.add(feedback)
+    db.flush()
+    return feedback
+
+
+def make_daily_feedback(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    feedback_date: date,
+    summary: str | None = "오늘은 단백질을 챙기셨어요.",
+    safety_status: SafetyStatus = SafetyStatus.SAFE,
+) -> DailyFeedback:
+    """하루 피드백 행. flush 까지만 하고 커밋하지 않는다.
+
+    장기 피드백의 근거가 되는 모양이 SAFE 라 기본값을 SAFE 로 둔다 (모델의 server_default
+    는 REVIEW_REQUIRED 다). 점수는 장기 피드백이 읽지 않으므로 채우지 않는다.
+    """
+    feedback = DailyFeedback(
+        user_id=user_id,
+        feedback_date=feedback_date,
+        summary=summary,
+        safety_status=safety_status,
+    )
+    db.add(feedback)
+    db.flush()
+    return feedback
+
+
+def make_weight(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    weight_kg: Decimal = Decimal("70.00"),
+    recorded_at: datetime = EATEN_AT - timedelta(days=1),
+) -> UserState:
+    """체중 기록 1건. 기본값은 **식사 하루 전** — 먹을 때의 체중으로 읽히는 시각이다."""
+    return user_state_crud.create(
+        db, user_id=user_id, weight_kg=weight_kg, recorded_at=recorded_at
+    )

@@ -1,0 +1,10 @@
+{
+  "name": "glp1-frontend-mock",
+  "private": true,
+  "description": "local phase 용 mock API 서버 (BE openapi.json + 고정 응답, Prism)",
+  "type": "module",
+  "scripts": {
+    "start": "node start.mjs",
+    "update-spec": "node update-spec.mjs"
+  }
+}

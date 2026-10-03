@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import FeedbackPeriodType, SafetyStatus, pg_enum
-from app.models.mixins import created_at, uuid_pk
+from app.models.mixins import created_at, updated_at, uuid_pk
 
 
 class MealFeedback(Base):
@@ -31,7 +31,19 @@ class MealFeedback(Base):
     )
 
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
-    suggestions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    suggestions: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
+    """다음 끼니 제안. **AI 계약(`ai-stub/schemas.py::Suggestion`) 모양 그대로** 담는다.
+
+        [{"foodName": "두부 반 모", "advice": "단백질을 10g 더 채워요",
+          "candidateFoodRefId": "KFD_01023"}]
+
+    `nutrients` 는 **여기 없다.** AI 계약이 "BE 가 food_refs 에서 채운다" 고 적어
+    두었고, 저장해 두면 `food_refs` 가 갱신될 때 낡는다. 읽을 때
+    `candidateFoodRefId` 로 조회해 채운다.
+
+    TEXT 가 아니라 JSONB 인 이유: 명세 응답이 객체 배열이고 AI 도 배열로 준다.
+    문자열로 담으면 컬럼 타입이 내용을 안 말해 주고, 깨진 JSON 이 들어가도 DB 가
+    안 막는다. `raw_ai_result` 가 이미 JSONB 라 선례도 있다."""
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     model_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
@@ -69,12 +81,27 @@ class DailyFeedback(Base):
         server_default=SafetyStatus.REVIEW_REQUIRED.value,
     )
     created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = updated_at()
+    """마지막으로 생성/재생성된 시각. `created_at` 은 최초 INSERT 시각에 고정된다.
+
+    **주의**: `ON CONFLICT DO UPDATE` 로 upsert 하면 SQLAlchemy 의 `onupdate` 가
+    자동으로 안 걸린다 — `crud/daily_feedback.py::upsert` 의 `set_` 에
+    `updated_at=func.now()` 를 직접 넣어야 한다."""
 
     sources: Mapped[list["DailyFeedbackSource"]] = relationship(
         back_populates="daily_feedback", cascade="all, delete-orphan"
     )
 
     __table_args__ = (UniqueConstraint("user_id", "feedback_date"),)
+
+
+ALL_PERIOD_START = date(1970, 1, 1)
+"""period_type=ALL 행의 period_start 고정값.
+
+실제 분석 시작일이 아니라, UNIQUE(user_id, period_type, period_start) 를
+사용자당 한 행으로 만드는 키다. `date.min` 은 쓰지 않는다 — KST 로 만든
+aware datetime 을 UTC 로 바꾸면 범위를 벗어나 OverflowError 가 난다.
+"""
 
 
 class LongTermFeedback(Base):
@@ -104,6 +131,13 @@ class LongTermFeedback(Base):
         server_default=SafetyStatus.REVIEW_REQUIRED.value,
     )
     created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = updated_at()
+    """마지막으로 생성/재생성된 시각. `GET /insights/long-term`의 `generatedAt`이
+    이 값을 쓴다 — `created_at`은 최초 INSERT 시각에 고정돼 재확정 때 안 바뀐다.
+
+    **주의**: `ON CONFLICT DO UPDATE`로 upsert 하면 SQLAlchemy 의 `onupdate`가
+    자동으로 안 걸린다 — `crud/long_term_feedback.py::upsert` 의 `set_` 에
+    `updated_at=func.now()` 를 직접 넣어야 한다."""
 
     sources: Mapped[list["LongTermFeedbackSource"]] = relationship(
         back_populates="long_term_feedback", cascade="all, delete-orphan"

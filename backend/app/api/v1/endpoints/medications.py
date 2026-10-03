@@ -12,9 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
+from app.core.errors import ApiError, ErrorCode
 from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
 from app.schemas.medication import (
+    MedicationCorrectRequest,
+    MedicationCorrectResponse,
     CurrentMedicationResponse,
     DoseEventsResponse,
     MedicationRegisterRequest,
@@ -61,6 +64,37 @@ def register_medication(
     # 응답 스키마가 GET /medications/current 와 다르다 — 이쪽은 현재 상태에 더해
     # 이번 요청으로 무엇이 바뀌었는지까지 내린다 (명세 POST /medications).
     return ok(medication_service.build_register_view(db, user_id, result))
+
+
+@router.patch(
+    "/medications/{record_id}",
+    response_model=ApiResponse[MedicationCorrectResponse],
+    summary="투약 정보 정정",
+    # 422 를 빠뜨리면 openapi.json 에 깨진 $ref 가 남는다 — 위 POST 주석 참고.
+    responses=error_responses(401, 404, 409, 422),
+)
+def correct_medication(
+    record_id: uuid.UUID,
+    payload: MedicationCorrectRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[MedicationCorrectResponse]:
+    """**정정 전용.** 잘못 넣은 값을 고친다. 이력을 만들지 않는다.
+
+    `POST` 가 행을 더한다면(INSERT) 여기는 있는 행을 고친다(UPDATE). 한 번도 맞은 적
+    없는 용량이 `dose-events` 에 남으면 안 되기 때문이다.
+
+    과거 행도 고칠 수 있다. 이미 나온 끼니 평가·피드백은 안 바뀐다 — 식사는 만들 때
+    복사해 둔 스냅샷을 보고, 장기 피드백은 일일 피드백에서 나온다. 바뀌는 건
+    대시보드와 `dose-events` 처럼 **기록을 그대로 보여주는 화면**뿐이다.
+
+    **응답이 `POST` 와 다르다.** 그쪽은 "지금 투약이 어떤 상태인가" 를 말하지만
+    여기는 "그 기록이 어떻게 고쳐졌나" 라서, 고친 행 자체를 돌려준다.
+    """
+    try:
+        return ok(medication_service.correct(db, user_id, record_id, payload))
+    except medication_service.MedicationNotFoundError as exc:
+        raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None
 
 
 @router.get(

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'shared_meal_widgets.dart' show EmptyBlock;
 
 class DailyScore {
   final String date;
@@ -38,17 +41,31 @@ class DashboardData {
     required this.byMealType,
   });
 
+  /// 서버는 평가된 식사가 없는 자리를 null 로 준다(`GET /dashboard`).
+  /// 점수가 빠진 날은 그래프에 그릴 수 없어 [series] 에서 뺀다. 평균도 null
+  /// 항목은 뺀다 — 0 으로 채우면 "0점"으로 읽힌다.
   factory DashboardData.fromJson(Map<String, dynamic> json) {
     return DashboardData(
-      series: (json['series'] as List<dynamic>)
-          .map((e) => DailyScore.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      averages: Map<String, int>.from(json['averages'] as Map),
+      series: [
+        for (final e in json['series'] as List<dynamic>)
+          if (_hasAllScores(e as Map<String, dynamic>)) DailyScore.fromJson(e),
+      ],
+      averages: _nonNullScores(json['averages'] as Map),
       byMealType: (json['byMealType'] as Map).map(
-        (k, v) => MapEntry(k as String, Map<String, int>.from(v as Map)),
+        (k, v) => MapEntry(k as String, _nonNullScores(v as Map)),
       ),
     );
   }
+
+  static bool _hasAllScores(Map<String, dynamic> json) =>
+      json['quantity'] != null &&
+      json['quality'] != null &&
+      json['satiety'] != null;
+
+  static Map<String, int> _nonNullScores(Map<dynamic, dynamic> json) => {
+    for (final MapEntry(:key, :value) in json.entries)
+      if (value is int) key as String: value,
+  };
 }
 
 class DoseEvent {
@@ -94,75 +111,27 @@ class LongTermInsight {
   }
 }
 
+/// 장기 피드백 화면이 쓰는 엔드포인트.
 class LongTermApiService {
-  final List<Map<String, dynamic>> _dummySeries = [
-    {'date': '2026-07-25', 'quantity': 60, 'quality': 70, 'satiety': 58},
-    {'date': '2026-07-26', 'quantity': 68, 'quality': 74, 'satiety': 66},
-    {'date': '2026-07-27', 'quantity': 72, 'quality': 78, 'satiety': 60},
-    {'date': '2026-07-28', 'quantity': 75, 'quality': 80, 'satiety': 64},
-    {'date': '2026-07-29', 'quantity': 75, 'quality': 83, 'satiety': 68},
-    {'date': '2026-07-30', 'quantity': 60, 'quality': 70, 'satiety': 58},
-    {'date': '2026-07-31', 'quantity': 68, 'quality': 74, 'satiety': 66},
-    {'date': '2026-08-01', 'quantity': 72, 'quality': 78, 'satiety': 60},
-    {'date': '2026-08-02', 'quantity': 75, 'quality': 80, 'satiety': 64},
-    {'date': '2026-08-03', 'quantity': 75, 'quality': 83, 'satiety': 68},
-    {'date': '2026-08-04', 'quantity': 60, 'quality': 70, 'satiety': 58},
-    {'date': '2026-08-05', 'quantity': 68, 'quality': 74, 'satiety': 66},
-    {'date': '2026-08-06', 'quantity': 72, 'quality': 78, 'satiety': 60},
-    {'date': '2026-08-07', 'quantity': 75, 'quality': 80, 'satiety': 64},
-    {'date': '2026-08-08', 'quantity': 75, 'quality': 83, 'satiety': 68},
-  ];
+  LongTermApiService(this._client);
 
+  final ApiClient _client;
+
+  /// `GET /dashboard?period=7d|28d|all`
   Future<DashboardData> fetchDashboard(String period) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    final all = _dummySeries;
-    final sliced = switch (period) {
-      '7d' => all.length > 7 ? all.sublist(all.length - 7) : all,
-      '28d' => all.length > 28 ? all.sublist(all.length - 28) : all,
-      _ => all,
-    };
-
-    final quantities = sliced.map((e) => e['quantity'] as int).toList();
-    final qualities = sliced.map((e) => e['quality'] as int).toList();
-    final satieties = sliced.map((e) => e['satiety'] as int).toList();
-
-    return DashboardData.fromJson({
-      'series': sliced,
-      'averages': {
-        'quantity': (quantities.reduce((a, b) => a + b) / quantities.length)
-            .round(),
-        'quality': (qualities.reduce((a, b) => a + b) / qualities.length)
-            .round(),
-        'satiety': (satieties.reduce((a, b) => a + b) / satieties.length)
-            .round(),
-      },
-      'byMealType': {
-        'BREAKFAST': {'quantity': 70, 'quality': 88, 'satiety': 78},
-        'LUNCH': {'quantity': 76, 'quality': 80, 'satiety': 66},
-        'DINNER': {'quantity': 78, 'quality': 74, 'satiety': 58},
-      },
-    });
+    final result = await _client.get('/dashboard', query: {'period': period});
+    return DashboardData.fromJson(result.dataMap);
   }
 
+  /// `GET /medications/dose-events` — 오래된 순. 투약 전이면 빈 목록.
   Future<List<DoseEvent>> fetchDoseEvents() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    return [
-      {
-        'doseEventId': 'de_001',
-        'doseMg': 0.25,
-        'direction': 'MAINTAIN',
-        'effectiveFrom': '2026-06-14',
-      },
-      {
-        'doseEventId': 'de_002',
-        'doseMg': 0.5,
-        'direction': 'INCREASE',
-        'effectiveFrom': '2026-08-01',
-      },
-    ].map((e) => DoseEvent.fromJson(e)).toList();
+    final result = await _client.get('/medications/dose-events');
+    return (result.dataMap['events'] as List<dynamic>)
+        .map((e) => DoseEvent.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
+  /// TODO(FE-13): `GET /insights/long-term` 연동 전이라 고정 값이다.
   Future<LongTermInsight> fetchInsight(String period) async {
     await Future.delayed(const Duration(milliseconds: 300));
     return LongTermInsight.fromJson({
@@ -182,7 +151,9 @@ class LongTermFeedbackScreen extends StatefulWidget {
 }
 
 class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
-  final LongTermApiService _api = LongTermApiService();
+  late final LongTermApiService _api = LongTermApiService(
+    context.read<ApiClient>(),
+  );
 
   String period = '7d';
   DashboardData? dashboard;
@@ -253,9 +224,14 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
               vertical: AppSpacing.lg,
             ),
             children: [
-              _buildTrendChartCard(),
-              SizedBox(height: AppSpacing.cardGap),
-              _buildQqsTrendCard(),
+              // 평가된 식사가 없는 기간이면 그래프를 그릴 값이 없다.
+              if (dashboard!.series.isEmpty)
+                const EmptyBlock(message: '이 기간에 평가된 식사가 없어요')
+              else ...[
+                _buildTrendChartCard(),
+                SizedBox(height: AppSpacing.cardGap),
+                _buildQqsTrendCard(),
+              ],
               SizedBox(height: AppSpacing.cardGap),
               if (insight != null) _buildInsightBanner(insight!),
             ],

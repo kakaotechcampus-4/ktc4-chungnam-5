@@ -1,0 +1,222 @@
+"""insights(장기 피드백) 도메인 로직. DB 세션은 crud 를 통해서만 접근한다."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+from sqlalchemy.orm import Session
+
+from app.crud import insight as insight_crud
+from app.crud import meal as meal_crud
+from app.crud import medication as medication_crud
+from app.infra.queue import enqueue
+from app.models.enums import FeedbackPeriodType, FeedbackStatus, SafetyStatus, TaskStatus
+from app.models.feedback import ALL_PERIOD_START, LongTermFeedback
+from app.models.task import Task
+from app.schemas.insights import (
+    InsightPeriod,
+    InsightRefreshResponse,
+    LongTermInsightResponse,
+    StaleReason,
+)
+
+_KST = ZoneInfo("Asia/Seoul")
+
+_PERIOD_TYPES: dict[str, FeedbackPeriodType] = {
+    "7d": FeedbackPeriodType.WEEKLY,
+    "28d": FeedbackPeriodType.MONTHLY,
+    "all": FeedbackPeriodType.ALL,
+}
+
+
+def _resolve_period(period: str, today: date) -> tuple[date | None, date]:
+    """"7d"/"28d"/"all" 을 [시작일, 종료일] 로 바꾼다. 종료일은 항상 오늘(KST).
+
+    all 은 하한이 없다(`dashboard.py::_resolve_period` 와 같은 규칙). 큐 payload 에는
+    `ALL_PERIOD_START` 를 싣고, 워커(`feedback_long.py`)는 ALL 이면 하한 없이 모은다.
+    """
+    if period == "7d":
+        return today - timedelta(days=6), today
+    if period == "28d":
+        return today - timedelta(days=27), today
+    if period == "all":
+        return None, today
+    raise ValueError(f"알 수 없는 period 입니다: {period!r}")
+
+
+def _to_kst_range(date_from: date, date_to: date) -> tuple[datetime, datetime]:
+    """[date_from, date_to] (양끝 포함, 달력 날짜) 를 [start, end) 순간 구간으로 바꾼다."""
+    range_start = datetime(date_from.year, date_from.month, date_from.day, tzinfo=_KST)
+    range_end = datetime(date_to.year, date_to.month, date_to.day, tzinfo=_KST) + timedelta(days=1)
+    return range_start, range_end
+
+
+def _determine_status(row: LongTermFeedback | None, latest_task: Task | None) -> FeedbackStatus:
+    """행·작업 상태를 조합해 하나의 status 로 만든다.
+
+    자체 enum 이 아니라 `FeedbackStatus`(PENDING/GENERATING/READY/FAILED)를
+    재사용한다 — MealConfirmResponse.feedback_status 와 같은 개념이다(PR #46 리뷰).
+
+    우선순위: 대기 중인 작업이 있으면(갱신 중) 낡은 행이 있어도 GENERATING —
+    폴링 중인 FE 에게 지금 새로 만드는 중이라는 걸 알려야 한다.
+    """
+    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+        return FeedbackStatus.GENERATING
+    if row is not None:
+        return FeedbackStatus.READY
+    if latest_task is not None and latest_task.status == TaskStatus.FAILED:
+        return FeedbackStatus.FAILED
+    if latest_task is not None and latest_task.status == TaskStatus.DONE:
+        # 워커가 데이터 부족으로 행을 안 만들고 정상 종료한 경우 (dataSufficient=false).
+        return FeedbackStatus.READY
+    return FeedbackStatus.PENDING
+
+
+def _superseded_by_insufficient_run(row: LongTermFeedback | None, latest_task: Task | None) -> bool:
+    """가장 최근 작업이 이 행보다 새 창을 돌리고 행 없이 끝났는가(데이터 부족).
+
+    워커는 부족하면 **같은 창**(period_start)의 행만 지운다. 그런데 `get_latest` 는 창과
+    상관없이 가장 늦은 행을 주므로, 7d·28d 처럼 날마다 창이 밀리는 유형은 어제 창의 행이
+    남아 "오늘 창은 부족" 이라는 결과를 가린다. 최근 DONE 작업의 `periodStart` 가 행보다
+    늦으면 그 작업이 행을 못 만든 것이다 — 행이 없는 것으로 본다.
+
+    DONE 만 본다. PENDING 이면 아직 만드는 중이고(GENERATING), FAILED 면 부족 판정이 난 게
+    아니다 — 둘 다 기존 행을 계속 보여 준다. ALL 은 period_start 가 고정값이라 걸리지 않는다
+    (같은 키 행을 워커가 이미 지운다).
+    """
+    if row is None or latest_task is None or latest_task.status != TaskStatus.DONE:
+        return False
+    return date.fromisoformat(latest_task.payload["periodStart"]) > row.period_start
+
+
+def _check_stale(
+    db: Session, *, user_id: uuid.UUID, row: LongTermFeedback, requested_to: date
+) -> tuple[bool, StaleReason | None]:
+    """마지막 생성 시점(row.updated_at) 이후 그 기간 안에서 뭐가 바뀌었는지 확인한다.
+
+    `created_at` 이 아니라 `updated_at` 을 기준으로 삼는다 — 재생성된 행은
+    `updated_at` 이 갱신되므로, 옛 `created_at` 을 계속 기준으로 두면 이미 반영된
+    변화까지 매번 낡음으로 잘못 판단한다.
+
+    검사 범위의 끝은 행의 `period_end` 가 아니라 **요청 기준 종료일**(`requested_to`,
+    보통 오늘)이다 — 7d/28d 는 날마다 창이 밀리는데 행의 period_end 는 그 행이
+    생성됐을 때 값으로 고정돼 있어서, 그것만 보면 생성 다음 날부터 새로 쌓인
+    변화를 영영 못 잡는다(PR #46 리뷰).
+
+    우선순위(삭제 > 항목 수정 > 단계 변경 > 새 식사)는 응답에 미치는 영향이 큰
+    순서다 — 삭제는 이미 반영된 데이터 자체가 사라진 것이라 가장 치명적이고,
+    새 식사 추가는 "더 볼 게 생겼다" 정도라 가장 가볍다. 여러 개 겹쳐도
+    staleReason 은 하나만 보여줄 수 있어 이 순서로 고른다.
+    """
+    range_start, range_end = _to_kst_range(row.period_start, requested_to)
+
+    if meal_crud.has_deleted_meals_since(
+        db, user_id=user_id, since=row.updated_at, range_start=range_start, range_end=range_end
+    ):
+        return True, StaleReason.MEAL_DELETED
+
+    if meal_crud.has_edited_items_since(
+        db, user_id=user_id, since=row.updated_at, range_start=range_start, range_end=range_end
+    ):
+        return True, StaleReason.MEAL_EDITED
+
+    if medication_crud.has_stage_change_since(
+        db,
+        user_id=user_id,
+        since=row.updated_at,
+        date_from=row.period_start,
+        date_to=requested_to,
+    ):
+        return True, StaleReason.STAGE_CHANGED
+
+    if meal_crud.has_new_meals_since(
+        db, user_id=user_id, since=row.updated_at, range_start=range_start, range_end=range_end
+    ):
+        return True, StaleReason.NEW_MEALS
+
+    return False, None
+
+
+def get_long_term_insight(
+    db: Session, *, user_id: uuid.UUID, period: str, today: date
+) -> LongTermInsightResponse:
+    period_type = _PERIOD_TYPES[period]  # period 는 endpoint 의 Query pattern 이 먼저 검증한다.
+    date_from, date_to = _resolve_period(period, today)
+
+    row = insight_crud.get_latest(db, user_id=user_id, period_type=period_type)
+    latest_task = insight_crud.get_latest_refresh_task(db, user_id=user_id, period_type=period_type)
+    if _superseded_by_insufficient_run(row, latest_task):
+        row = None
+    status = _determine_status(row, latest_task)
+
+    if row is None:
+        return LongTermInsightResponse(
+            period=InsightPeriod(from_=date_from, to=date_to),
+            status=status,
+            data_sufficient=False,
+            trend_summary=None,
+            recommendation=None,
+            generated_at=None,
+            stale=False,
+            stale_reason=None,
+        )
+
+    # SAFE 만 노출한다 — REVIEW_REQUIRED(가드레일 전)도 BLOCKED 와 똑같이 숨긴다
+    # (services/meal.py::_build_feedback 와 같은 규칙, PR #36 리뷰로 확정됨).
+    is_safe = row.safety_status is SafetyStatus.SAFE
+    stale, stale_reason = _check_stale(db, user_id=user_id, row=row, requested_to=date_to)
+
+    # ALL 행의 period_start 는 사용자에게 보여줄 실제 날짜가 아니라 DB 유니크 키를
+    # 채우기 위한 고정값(ALL_PERIOD_START)이다 — 그대로 내보내면 FE 에 "1970-01-01"이
+    # 나간다(PR #46 리뷰).
+    period_from = None if row.period_type is FeedbackPeriodType.ALL else row.period_start
+
+    return LongTermInsightResponse(
+        period=InsightPeriod(from_=period_from, to=row.period_end),
+        status=status,
+        data_sufficient=True,
+        trend_summary=row.trend_summary if is_safe else None,
+        recommendation=row.recommendation if is_safe else None,
+        generated_at=row.updated_at,
+        stale=stale,
+        stale_reason=stale_reason,
+    )
+
+
+def refresh_long_term_insight(
+    db: Session, *, user_id: uuid.UUID, period: str, today: date
+) -> InsightRefreshResponse:
+    """`feedback.long` 작업을 큐에 넣는다. 실제 생성은 워커(`worker/jobs/feedback_long.py`)가 한다.
+
+    payload 키(userId/periodType/periodStart/periodEnd)는
+    `worker/jobs/feedback_long.py` 가 이미 정해둔 이름 그대로 맞춘다.
+
+    **이미 대기 중인 작업이 있으면 새로 넣지 않는다.** 안 그러면 사용자가 새로고침을
+    연타할 때마다 큐에 쌓여서 (1) AI 를 여러 번 불러 비용이 늘고, (2) 워커 여러 대가
+    같은 `(user_id, period_type, period_start)` 행을 동시에 upsert 하면서 근거
+    링크(`long_term_feedback_sources`)가 꼬일 수 있고, (3) `_determine_status`가
+    가장 최근 작업만 보므로 먼저 끝난 작업의 결과를 뒤늦은 작업이 GENERATING 으로
+    계속 가려서 사용자가 이미 나온 결과를 늦게 보게 된다(PR #46 리뷰).
+    """
+    period_type = _PERIOD_TYPES[period]
+    date_from, date_to = _resolve_period(period, today)
+
+    latest_task = insight_crud.get_latest_refresh_task(db, user_id=user_id, period_type=period_type)
+    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+        return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)
+
+    enqueue(
+        db,
+        insight_crud.REFRESH_TASK_TYPE,
+        {
+            "userId": str(user_id),
+            "periodType": period_type.value,
+            "periodStart": (date_from or ALL_PERIOD_START).isoformat(),
+            "periodEnd": date_to.isoformat(),
+        },
+    )
+    db.commit()
+
+    return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)

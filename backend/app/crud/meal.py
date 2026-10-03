@@ -89,7 +89,9 @@ def get_display_names(db: Session, meal_ids: list[uuid.UUID]) -> dict[uuid.UUID,
     return {meal_id: ", ".join(names) for meal_id, names in names_by_meal.items()}
 
 
-def get_owned_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal | None:
+def get_owned_meal(
+    db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID, for_update: bool = False
+) -> Meal | None:
     """user_id 소유의 살아있는 meal_id 를 가져온다.
 
     없거나, 남의 것이거나, 이미 삭제됐으면 None — 셋을 구분하지 않는다.
@@ -100,11 +102,74 @@ def get_owned_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Me
 
     이름이 "owned" 인 것에 주의: 존재·소유·미삭제만 본다. 지금 고칠 수 있는
     상태인지(`status`)는 보지 않는다 — 그건 `services/meal.py` 의 판단이다.
+
+    `for_update=True` 면 행을 `FOR UPDATE` 로 잠근다. 확정(`services/evaluation`)이 쓴다 —
+    `feedback.meal` 워커가 `meals` 를 먼저 잠그고 `meal_feedbacks` 를 쓰므로, 확정도
+    `meals` 부터 잡아야 두 트랜잭션의 잠금 순서가 같아져 교착이 안 난다. 조건을 복사한
+    잠금 버전 함수를 따로 두지 않으려고 인자로 받는다.
     """
     stmt = select(Meal).where(
         Meal.id == meal_id,
         Meal.user_id == user_id,
         Meal.deleted_at.is_(None),
+    )
+    if for_update:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def get_meal_for_worker(db: Session, meal_id: uuid.UUID) -> Meal | None:
+    """워커 전용 — 소유자도 삭제 여부도 보지 않고 행을 그대로 가져온다.
+
+    워커에는 "요청한 사용자" 가 없어 `get_owned_meal` 을 쓸 수 없다. 대신
+    **`deleted_at` 을 거르지 않으므로 호출부가 직접 확인해야 한다** — meals 는 soft
+    delete 라 지운 식사도 여기서 나온다. API 경로에서는 쓰지 말 것.
+    """
+    return db.execute(select(Meal).where(Meal.id == meal_id)).scalar_one_or_none()
+
+
+def lock_meal_for_worker(db: Session, meal_id: uuid.UUID) -> Meal | None:
+    """워커 전용 — 행을 `FOR UPDATE` 로 잠그고 **DB 의 최신 값으로** 다시 읽는다.
+
+    `get_meal_for_worker` 로 읽은 뒤 AI 를 부르는 동안(최대 45초) 사용자가 식사를
+    지울 수 있다. 쓰기 직전에 이걸로 다시 확인한다. `populate_existing` 이 없으면
+    identity map 의 옛 객체가 그대로 나와 그 사이의 변경을 못 본다.
+
+    처음부터 잠그지 않는 이유: AI 를 부르는 내내 사용자의 삭제 요청이 막힌다.
+    """
+    stmt = (
+        select(Meal)
+        .where(Meal.id == meal_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def get_meal_for_worker(db: Session, meal_id: uuid.UUID) -> Meal | None:
+    """워커 전용 — 소유자도 삭제 여부도 보지 않고 행을 그대로 가져온다.
+
+    워커에는 "요청한 사용자" 가 없어 `get_owned_meal` 을 쓸 수 없다. 대신
+    **`deleted_at` 을 거르지 않으므로 호출부가 직접 확인해야 한다** — meals 는 soft
+    delete 라 지운 식사도 여기서 나온다. API 경로에서는 쓰지 말 것.
+    """
+    return db.execute(select(Meal).where(Meal.id == meal_id)).scalar_one_or_none()
+
+
+def lock_meal_for_worker(db: Session, meal_id: uuid.UUID) -> Meal | None:
+    """워커 전용 — 행을 `FOR UPDATE` 로 잠그고 **DB 의 최신 값으로** 다시 읽는다.
+
+    `get_meal_for_worker` 로 읽은 뒤 AI 를 부르는 동안(최대 45초) 사용자가 식사를
+    지울 수 있다. 쓰기 직전에 이걸로 다시 확인한다. `populate_existing` 이 없으면
+    identity map 의 옛 객체가 그대로 나와 그 사이의 변경을 못 본다.
+
+    처음부터 잠그지 않는 이유: AI 를 부르는 내내 사용자의 삭제 요청이 막힌다.
+    """
+    stmt = (
+        select(Meal)
+        .where(Meal.id == meal_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     return db.execute(stmt).scalar_one_or_none()
 
@@ -273,6 +338,58 @@ def add_item(
     db.add(item)
     db.flush()
     return item
+
+
+def add_model_item(
+    db: Session,
+    *,
+    meal_id: uuid.UUID,
+    original_food_name: str,
+    amount: Decimal,
+    unit: str,
+    amount_g: Decimal | None,
+    confidence: Decimal,
+    food_ref_id: str | None,
+    raw_ai_result: dict,
+) -> MealItem:
+    """AI 가 인식한 음식 1건을 넣는다. add + flush 까지만 하고 커밋하지 않는다.
+
+    `add_item`(사용자 추가)과 반대로 양은 `estimated_*` 로 들어가고 `confirmed_*` 는
+    전부 NULL 이다 — 사용자가 확인하기 전이다. `display_name` 은 사용자가 고치기
+    전까지 AI 가 말한 이름 그대로다.
+    """
+    item = MealItem(
+        meal_id=meal_id,
+        food_ref_id=food_ref_id,
+        original_food_name=original_food_name,
+        display_name=original_food_name,
+        estimated_amount=amount,
+        estimated_unit=unit,
+        estimated_amount_g=amount_g,
+        confidence=confidence,
+        source=MealItemSource.MODEL,
+        raw_ai_result=raw_ai_result,
+    )
+    db.add(item)
+    db.flush()
+    return item
+
+
+def delete_model_items(db: Session, meal_id: uuid.UUID) -> None:
+    """이 식사의 AI 인식 항목(`source=MODEL`)을 지운다. 커밋하지 않는다.
+
+    **`source=USER` 는 남긴다** — 사용자가 직접 넣은 음식이다. 한 건씩 ORM 으로
+    지우는 이유는 `delete_item` 과 같다(`user_corrections` cascade). flush 까지 해서
+    뒤이은 INSERT 보다 DELETE 가 먼저 나가게 한다.
+    """
+    items = db.execute(
+        select(MealItem).where(
+            MealItem.meal_id == meal_id, MealItem.source == MealItemSource.MODEL
+        )
+    ).scalars()
+    for item in items:
+        db.delete(item)
+    db.flush()
 
 
 def mark_recalculating(db: Session, meal: Meal) -> None:
@@ -459,6 +576,96 @@ def add_correction(
     return correction
 
 
+def has_new_meals_since(
+    db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
+) -> bool:
+    """[range_start, range_end) 안에서 since 이후에 기록된(살아있는) 식사가 있는지.
+
+    장기 피드백이 그 뒤로 낡았는지(stale) 판단하는 데 쓴다 — GET /insights/long-term.
+    """
+    stmt = (
+        select(Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+            Meal.created_at > since,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
+def has_deleted_meals_since(
+    db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
+) -> bool:
+    """[range_start, range_end) 안의 식사 중 since 이후에 soft delete 된 것이 있는지.
+
+    `Meal.created_at <= since` 를 같이 본다 — since 이후에 만들어졌다가 since
+    이후에 지워진 식사는 애초에 분석에 들어간 적이 없어서, 지워져도 "이미
+    반영된 데이터가 사라졌다"가 아니다(PR #46 리뷰).
+    """
+    stmt = (
+        select(Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_not(None),
+            Meal.deleted_at > since,
+            Meal.created_at <= since,
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
+def has_edited_items_since(
+    db: Session, *, user_id: uuid.UUID, since: datetime, range_start: datetime, range_end: datetime
+) -> bool:
+    """[range_start, range_end) 안의 식사 중 since 이후에 재확정됐거나 재계산 대기 중인 것이 있는지.
+
+    `UserCorrection` 만 보면 놓친다 — 그 테이블은 식사를 고치는 4가지 경로(항목
+    수정·추가·삭제·영양정보 직접입력) 중 일부만 반영하는 불완전한 상태다(PR #46
+    리뷰). 네 경로 전부 `mark_recalculating`을 거쳐 `qqs_evaluations` 행을
+    지우고(`evaluation_crud.delete_by_meal`) 재확정 전까지 없는 상태로 두므로,
+    그 자리를 보는 게 더 안정적이다.
+
+    **주의**: `QQSEvaluation.computed_at`은 재확정(upsert) 시 갱신되지 않는다
+    (`crud/evaluation.py::upsert`가 `computed_at`을 SET 목록에 안 둠, 모델도
+    `onupdate` 없는 `created_at()` 믹스인). 그래서 재확정 직후 짧은 구간은 이
+    함수가 그 수정을 못 잡을 수 있다 — 평가 도메인 쪽 문제라 팀에 공유만 하고
+    일단 이대로 둔다.
+
+    **`is_recalculation` 도 같이 봐야 한다.** `QQSEvaluation` 행이 없는 것만으로는
+    "평가됐다가 수정 중이라 지워짐"과 "애초에 한 번도 평가된 적 없음"(막 올라와서
+    분석 대기 중인 평범한 식사)을 구분 못 한다 — 후자는 `mark_recalculating` 을
+    거친 적이 없어 `is_recalculation` 이 기본값 False 다. 이걸 빠뜨리면 평가 전
+    식사가 하나만 있어도 항상 낡음(stale)으로 잘못 나온다.
+    """
+    stmt = (
+        select(Meal.id)
+        .outerjoin(QQSEvaluation, QQSEvaluation.meal_id == Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+            Meal.created_at <= since,  # 새 식사는 NEW_MEALS 몫
+            or_(
+                QQSEvaluation.computed_at > since,  # 수정 후 재확정됨
+                and_(
+                    QQSEvaluation.id.is_(None),
+                    Meal.is_recalculation.is_(True),
+                ),  # 수정 중(아직 재확인 전) — 한 번도 평가 안 된 식사는 제외
+            ),
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
 def create_meal(
     db: Session,
     *,
@@ -498,3 +705,49 @@ def create_satiety_log(
     db.add(log)
     db.flush()
     return log
+
+
+def list_meals_in_range(
+    db: Session, *, user_id: uuid.UUID, range_start: datetime, range_end: datetime
+) -> list[Row]:
+    """user_id 의 살아있는 식사 중 eaten_at 이 [range_start, range_end) 인 것을 조회한다.
+
+    각 행은 (Meal, quantity_score, quality_score, satiety_score) 튜플이다 — 평가 전이면 점수는 None.
+    eaten_at · id 오름차순. 커서용 `list_meals` 와 달리 하루 범위(홈의 "오늘의 식사")용이다.
+    """
+    stmt = (
+        select(
+            Meal,
+            QQSEvaluation.quantity_score,
+            QQSEvaluation.quality_score,
+            QQSEvaluation.satiety_score,
+        )
+        .outerjoin(QQSEvaluation, QQSEvaluation.meal_id == Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+        )
+        .order_by(Meal.eaten_at.asc(), Meal.id.asc())
+    )
+    return list(db.execute(stmt).all())
+
+
+def get_latest_meal_with_satiety_after(db: Session, *, user_id: uuid.UUID) -> Row | None:
+    """user_id 의 살아있는 식사 중 satiety_after 가 기록된 가장 최근 1건을 돌려준다.
+
+    행은 (Meal, satiety_after) 튜플이다. 날짜로 한정하지 않는다. 없으면 None.
+    """
+    stmt = (
+        select(Meal, SatietyLog.satiety_after)
+        .join(SatietyLog, SatietyLog.meal_id == Meal.id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            SatietyLog.satiety_after.is_not(None),
+        )
+        .order_by(Meal.eaten_at.desc(), Meal.id.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).first()

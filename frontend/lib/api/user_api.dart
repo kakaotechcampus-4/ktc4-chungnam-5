@@ -36,7 +36,7 @@ class UserProfile {
   );
 }
 
-/// 회원 API. `ApiConfig.useRealApi` 가 false 면 더미를 돌려준다.
+/// 회원 API.
 class UserApiService {
   UserApiService(this._client);
 
@@ -49,17 +49,6 @@ class UserApiService {
     required double weightKg,
     required double baselineIntake,
   }) async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return UserProfile.fromJson({
-        ..._sample,
-        'nickname': nickname,
-        'heightCm': heightCm,
-        'weightKg': weightKg,
-        'baselineIntake': baselineIntake,
-        'onboardingStatus': 'MEDICATION_REQUIRED',
-      });
-    }
     final result = await _client.post(
       '/users/profile',
       body: {
@@ -72,22 +61,29 @@ class UserApiService {
     return UserProfile.fromJson(result.dataMap);
   }
 
-  /// `GET /users/me`
-  Future<UserProfile> fetchMe() async {
-    if (!ApiConfig.useRealApi) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return UserProfile.fromJson(_sample);
-    }
-    final result = await _client.get('/users/me');
+  /// `PATCH /users/me` — 준 필드만 바꾼다. 응답은 `GET /users/me` 와 같다.
+  ///
+  /// 체중은 덮어쓰기가 아니라 **새 체중 기록**이다 — 서버는 체중을
+  /// `user_states` 에만 두고, 여기서 온 값도 그날의 기록 1건으로 남긴다.
+  Future<UserProfile> updateProfile({
+    String? nickname,
+    double? heightCm,
+    double? weightKg,
+    double? baselineIntake,
+  }) async {
+    final body = {
+      'nickname': ?nickname,
+      'heightCm': ?heightCm,
+      'weightKg': ?weightKg,
+      'baselineIntake': ?baselineIntake,
+    };
+    final result = await _client.patch('/users/me', body: body);
     return UserProfile.fromJson(result.dataMap);
   }
 
-  static const Map<String, dynamic> _sample = {
-    'userId': '00000000-0000-0000-0000-000000000001',
-    'nickname': '영우',
-    'heightCm': 175.0,
-    'weightKg': 78.4,
-    'baselineIntake': 700.0,
-    'onboardingStatus': 'READY',
-  };
+  /// `GET /users/me`
+  Future<UserProfile> fetchMe() async {
+    final result = await _client.get('/users/me');
+    return UserProfile.fromJson(result.dataMap);
+  }
 }

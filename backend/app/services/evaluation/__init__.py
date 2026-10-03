@@ -4,31 +4,42 @@
 채점 자체는 순수 함수(`rule_engine`)가 하고 여기서는 **입력을 모아 주고 결과를
 저장**한다.
 
-## 여기서 비동기 작업을 만들지 않는다
+## 채점은 동기, 문장만 큐로
 
 Q/Q/S 는 순수 함수라 0.01 초면 끝난다(절대 규칙 2). 확정은 200 으로 즉답한다 —
 명세의 `202 + 폴링` 은 `POST /meals`(사진 인식) 자리다. 피드백 **문장**은 AI 가
-따로 만들고, 그래서 응답의 `feedbackStatus` 가 `PENDING` 으로 나간다.
+따로 만든다 — `confirm` 이 채점과 같은 트랜잭션에서 `feedback.meal` 을 넣고, 그래서
+응답의 `feedbackStatus` 가 `PENDING` 으로 나간다.
+
+**제안 화면을 열 때(`GET /meals/{mealId}/feedback`) 넣지 않고 여기서 넣는 이유:**
+하루 피드백이 끼니 피드백을 근거로 쓴다(`crud/daily_feedback.py::list_day_evidence`).
+화면을 연 끼니에만 문장이 생기면 안 연 끼니가 하루 요약에서 조용히 빠진다. 대가는
+아무도 안 볼 문장에도 AI 를 부른다는 것이다.
 """
 
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Final, NamedTuple
 
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
+from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.crud import satiety as satiety_crud
+from app.crud import user as user_crud
+from app.crud import user_state as user_state_crud
 from app.crud.evaluation import NutrientTotals
+from app.infra.queue import enqueue
 from app.models.enums import (
     FeedbackStatus,
     MealStatus,
     MedicationStage,
     NutrientCode,
+    NutrientState,
     NutritionSource,
 )
 from app.models.meal import Meal
@@ -40,8 +51,9 @@ from app.schemas.evaluation import (
     NutrientRow,
     QqsScores,
 )
-from app.services.evaluation.rule_engine import evaluate
-from app.services.evaluation.stage_profile import emphasis_for
+from app.models.evaluation import QQSEvaluation
+from app.services.evaluation.rule_engine import MealTargets, Scores, evaluate, meal_targets
+from app.services.evaluation.stage_profile import emphasis_for, profile_for
 
 
 class MealNotFoundError(Exception):
@@ -75,9 +87,12 @@ class EvaluationResult(NamedTuple):
 
 
 DB_SOURCE: Final = "식품안전나라 식품영양성분DB"
-STAGE_RULE_VERSION: Final = "v1"
-WEIGHT_PROFILE_VERSION: Final = "v1"
-"""명세 `evidence` 의 상수들. 채점 기준선(`stage_profile`)을 바꾸면 올린다."""
+STAGE_RULE_VERSION: Final = "v2"
+WEIGHT_PROFILE_VERSION: Final = "v2"
+"""명세 `evidence` 의 상수들. 채점 기준선(`stage_profile`)을 바꾸면 올린다.
+
+v2: Quantity · Quality 채점 도입 (`docs/be-qqs-scoring-rule.md`).
+"""
 
 _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATED})
 """상태만 보고 확정 가능한 것들. `_is_confirmable` 이 쓴다.
@@ -86,12 +101,44 @@ _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATE
 고치면 점수가 다시 매겨져야 하고, `qqs_evaluations` 가 식사당 1행(upsert)인 것도
 그 전제다.
 
-🔗 TODO(`feedbacks.py` 구현 시): **재확정이 `meal_feedbacks` 를 건드리지 않는다.**
-점수는 upsert 로 덮이는데 AI 가 쓴 문장은 옛 점수 기준으로 남아, 확정 응답은
-`feedbackStatus: PENDING` 인데 `GET /meals/{mealId}/feedback` 은 낡은 문장을 준다.
-지금은 `endpoints/feedbacks.py` 가 비어 있어 드러나지 않는다. 무효화 방식(행 삭제 ·
-stale 플래그 · 상태 되돌리기)이 그 엔드포인트 설계에 달려 있어 거기서 함께 정한다.
+🔗 **재확정은 `meal_feedbacks` 도 무효화한다** — `_is_stale_feedback`(아래) 이 판정하고
+`crud/feedback.py::invalidate_by_meal` 이 내용을 비운다. 점수는 upsert 로 덮이는데 AI 가
+쓴 문장은 아무도 안 건드려서, 그냥 두면 닭가슴살을 더해 재확정해도 "단백질 비중이
+낮았어요" 가 그대로 나갔다. **여기서 또 구현하지 말 것.**
 """
+
+
+def _is_stale_feedback(
+    meal: Meal, previous: QQSEvaluation | None, scores: Scores
+) -> bool:
+    """이번 확정이 옛 AI 문장을 무효로 만드는가.
+
+    **무조건 지우면 안 된다.** `_CONFIRMABLE` 에 `EVALUATED` 가 있어 아무것도 고치지
+    않은 재확정(확정 버튼 더블탭 · FE 타임아웃 재시도 · 같은 값 재전송)도 허용되는데,
+    그때까지 지우면 멀쩡한 문장이 날아가고, 새 문장을 만드느라 AI 를 한 번 더 부른다
+    (`confirm` 은 비운 끼니에 `feedback.meal` 을 다시 넣는다).
+
+    두 가지를 본다. **하나만으로는 부족하다:**
+
+    - **상태가 `EVALUATED` 가 아니다** — 음식을 고쳐 `mark_recalculating` 을 거쳐
+      왔다는 뜻이다. 성분이 달라졌으니 그 성분을 보고 쓴 문장은 낡았다.
+      점수 비교로는 다 못 잡는다 — 체중이 없으면 Quality 가 `None` 이고, 음식을 바꿔도
+      Quantity 가 같은 점수(구간 안이면 100)에 머물 수 있다. **점수가 같아도 성분은 바뀌었다.**
+    - **점수가 달라졌다** — 사용자가 `satietyAfterPct` 를 고쳐 다시 확정했다.
+      상태로는 못 잡는다. 음식을 안 고쳤으면 `EVALUATED` 그대로 들어온다.
+      Quantity·Quality 의 변화(예: 체중을 새로 기록해 목표가 바뀜)도 여기서 잡힌다.
+
+    첫 확정은 `previous` 가 없어 True 다 — 지울 행도 없어 0 행 UPDATE 다.
+    """
+    if meal.status is not MealStatus.EVALUATED:
+        return True
+    if previous is None:
+        return True
+    return (
+        previous.quantity_score != scores.quantity
+        or previous.quality_score != scores.quality
+        or previous.satiety_score != scores.satiety
+    )
 
 
 def _is_confirmable(meal: Meal) -> bool:
@@ -119,6 +166,58 @@ _NUTRIENT_ROWS: Final[tuple[tuple[NutrientCode, str, str, str], ...]] = (
 )
 """명세 `nutrients[]` 의 세 줄 — (코드, 합계 필드, 라벨, 단위). 순서·라벨·단위가 명세 그대로다."""
 
+_TARGET_STEP: Final = Decimal("0.1")
+
+_LIMIT_KEYS: Final = frozenset({"sodium_mg"})
+"""목표가 아니라 **한도**인 성분. 넘으면 `OVER`, 모자란 건 문제가 아니다."""
+
+
+def _weight_at(db: Session, meal: Meal) -> Decimal | None:
+    """먹을 때의 체중. 그 이전 기록이 없으면 가장 최근 체중으로 대신한다.
+
+    투약 단계를 "먹을 때의 단계" 로 읽는 것과 같은 원칙이다(`_stage_of`). 대신하는
+    경우는 가입 직후 과거 시각으로 식사를 적었을 때다 — 그때 체중이 없다고 Quality 를
+    비우면, 온보딩에서 받은 체중이 있는데도 점수가 안 나온다.
+    """
+    weight = user_state_crud.get_latest_weight_before(
+        db, user_id=meal.user_id, before=meal.eaten_at
+    )
+    if weight is None:
+        weight = user_state_crud.get_latest_weight(db, meal.user_id)
+    return weight
+
+
+def _targets(
+    stage: MedicationStage, weight_kg: Decimal | None
+) -> MealTargets:
+    """그 단계 · 그때 체중의 끼니 목표. confirm 과 조회가 **같은 함수**로 구한다."""
+    return meal_targets(profile_for(stage).daily, weight_kg)
+
+
+def _usable(totals: NutrientTotals, key: str) -> Decimal | None:
+    """채점에 쓰는 성분 합계. **화면의 `current` 와 같은 기준이다.**
+
+    합산된 음식 중 그 성분 컬럼이 비어 있던 게 있으면(`missing`) None — 화면도 그
+    합계를 안 내보낸다.
+
+    **빠진 음식(`excluded > 0`)이 있어도 있는 것만으로 쓴다** (2026-09-30 결정).
+    그 경우 응답에 `NUTRITION_NOT_MATCHED` 경고가 이미 붙는다
+    (`api/v1/endpoints/evaluations.py::_respond`). 감수하는 것: 빠진 만큼 낮게 나온다.
+    """
+    if totals.missing.get(key):
+        return None
+    return getattr(totals, key)
+
+
+def _state(
+    current: Decimal | None, target: Decimal | None, *, is_limit: bool
+) -> NutrientState | None:
+    if current is None or target is None:
+        return None
+    if is_limit:
+        return NutrientState.OVER if current > target else NutrientState.OK
+    return NutrientState.SHORT if current < target else NutrientState.OK
+
 
 def _stage_of(db: Session, meal: Meal) -> MedicationStage:
     """그 식사 시점의 투약 단계.
@@ -139,11 +238,21 @@ def _as_float(value: Decimal | None) -> float | None:
     return None if value is None else float(value)
 
 
+def _shown_target(value: Decimal | None) -> Decimal | None:
+    """화면에 내보내는 목표치 — 소수 1자리. 표시와 `state` 판정이 **같은 값**을 쓴다.
+
+    8.333… g 을 그대로 주면 화면이 자리수를 다뤄야 하고, 표시만 반올림하면
+    보이는 숫자와 판정이 어긋난다.
+    """
+    return None if value is None else value.quantize(_TARGET_STEP, rounding=ROUND_HALF_UP)
+
+
 def _build_view(
     meal: Meal,
     *,
     stage: MedicationStage,
     totals: NutrientTotals,
+    targets: MealTargets,
     scores: QqsScores,
     model: type[MealEvaluationResponse] = MealEvaluationResponse,
     **extra: object,
@@ -166,20 +275,21 @@ def _build_view(
             NutrientRow(
                 code=code,
                 label=label,
-                # **결측이 있으면 합계를 안 내보낸다.** 그 성분값이 비어 있던 항목은
-                # SUM 이 조용히 건너뛰어서, 숫자를 주면 부분합이 완전한 값으로 읽힌다.
-                # 같은 응답 안에서 단백질만 부분합이고 식이섬유는 완전한 상태가 되는데
-                # 겉으로는 구분이 안 된다 (`NutrientTotals.missing`).
+                # **결측이 있으면 합계를 안 내보낸다.** (기존 주석 유지)
                 current=(
                     None
                     if totals.missing.get(key)
                     else _as_float(getattr(totals, key))
                 ),
-                # 단계별 목표치가 팀 확정 전이라 null 이다.
-                # 명세: "target · state 는 null 허용. 미확정 시 게이지 미표시."
-                target=None,
+                target=_as_float(_shown_target(getattr(targets, key))),
                 unit=unit,
-                state=None,
+                # 상태는 **화면에 보이는 목표**와 비교한다. 반올림 전 값과 비교하면
+                # `8.3 / 8.3` 인데 SHORT 가 나간다. 채점(`rule_engine`)은 반올림 전 값을 쓴다.
+                state=_state(
+                    _usable(totals, key),
+                    _shown_target(getattr(targets, key)),
+                    is_limit=key in _LIMIT_KEYS,
+                ),
             )
             for code, key, label, unit in _NUTRIENT_ROWS
         ],
@@ -208,8 +318,34 @@ def _sources_of(totals: NutrientTotals) -> list[NutritionSource]:
     return [NutritionSource.PUBLIC_DB] if totals.counted > 0 else []
 
 
-def _owned_meal(db: Session, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal:
-    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
+FEEDBACK_TASK_TYPE: Final = "feedback.meal"
+
+
+def _has_feedback_text(db: Session, meal_id: uuid.UUID) -> bool:
+    """이 식사에 쓸 만한 끼니 피드백 문장이 이미 있는가.
+
+    **없으면 아무것도 안 고친 재확정도 작업을 다시 넣는다.** 앞선 작업이 재시도를 다
+    쓰고 DLQ 로 갔으면 문장이 영영 `PENDING` 에 고착되는데, 사용자가 다시 확정하는 것
+    말고는 되살릴 길이 없다. 대가로 작업이 도는 중에 더블탭하면 작업이 둘 들어가지만,
+    워커가 upsert 라 결과는 같고 AI 호출만 한 번 는다.
+
+    판정은 `services/feedback.py::get_feedback` 의 `PENDING` 조건과 같다 — 본문이
+    비었으면(NULL · 빈 문자열) 없는 것이다.
+
+    🔗 TODO(가드레일이 붙을 때): **안전 판정은 보지 않는다.** AI 가 본문과 함께
+    `REVIEW_REQUIRED` 를 주면 재확정해도 다시 넣지 않아 계속 가려진 채 남는다.
+    검수 대기를 재시도 대상으로 볼지는 가드레일 흐름이 정해지면 정한다.
+    """
+    row = feedback_crud.get_by_meal(db, meal_id)
+    return row is not None and bool((row.body or "").strip())
+
+
+def _owned_meal(
+    db: Session, user_id: uuid.UUID, meal_id: uuid.UUID, *, for_update: bool = False
+) -> Meal:
+    meal = meal_crud.get_owned_meal(
+        db, user_id=user_id, meal_id=meal_id, for_update=for_update
+    )
     if meal is None:
         raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
     return meal
@@ -222,8 +358,14 @@ def confirm(
     meal_id: uuid.UUID,
     request: MealConfirmRequest,
 ) -> EvaluationResult:
-    """식사를 확정하고 Q/Q/S 를 매긴다. 커밋까지 한다."""
-    meal = _owned_meal(db, user_id, meal_id)
+    """식사를 확정하고 Q/Q/S 를 매긴다. 커밋까지 한다.
+
+    **식사 행부터 잠근다.** `feedback.meal` 워커가 `meals` → `meal_feedbacks` 순으로
+    잠그므로 여기도 같은 순서여야 한다 — 거꾸로 잡으면(`invalidate_by_meal` 이 먼저)
+    둘이 겹칠 때 교착이 난다. 잠가 두면 워커의 "쓰기 직전 재확인" 도 이 확정이 커밋된
+    뒤의 점수를 본다.
+    """
+    meal = _owned_meal(db, user_id, meal_id, for_update=True)
     if not _is_confirmable(meal):
         raise MealNotConfirmableError(
             f"{meal.status.value} 상태의 식사는 확정할 수 없습니다."
@@ -233,8 +375,24 @@ def confirm(
 
     stage = _stage_of(db, meal)
     totals = evaluation_crud.sum_nutrients(db, meal.id)
-    # 기준선이 미정이라 Quantity·Quality 는 None 이다 (`rule_engine` 독스트링).
-    scores = evaluate(satiety_after_pct=request.satiety_after_pct)
+    user = user_crud.get(db, user_id)
+    if user is None:  # _owned_meal 을 통과했으니 도달 불가. assert 는 -O 에서 지워진다
+        raise RuntimeError(f"user {user_id} 가 없습니다.")
+    weight = _weight_at(db, meal)
+    targets = _targets(stage, weight)
+    scores = evaluate(
+        profile=profile_for(stage),
+        satiety_after_pct=request.satiety_after_pct,
+        meal_kcal=_usable(totals, "kcal"),
+        baseline_meal_kcal=user.baseline_meal_kcal,
+        protein_g=_usable(totals, "protein_g"),
+        fiber_g=_usable(totals, "fiber_g"),
+        sodium_mg=_usable(totals, "sodium_mg"),
+        weight_kg=weight,
+    )
+
+    # `upsert` 보다 **먼저** 읽는다 — 덮고 나면 비교할 옛 점수가 없다.
+    stale = _is_stale_feedback(meal, evaluation_crud.get_by_meal(db, meal.id), scores)
 
     evaluation_crud.upsert(
         db,
@@ -244,6 +402,14 @@ def confirm(
         quality_score=scores.quality,
         satiety_score=scores.satiety,
     )
+    if stale:
+        # 행이 아니라 내용만 비운다 — `daily_feedback_sources` 가 CASCADE 라 지우면
+        # 일일 피드백의 출처 링크가 사라진다. 자세한 근거는 `crud/feedback.py` 참고.
+        feedback_crud.invalidate_by_meal(db, meal.id)
+    if stale or not _has_feedback_text(db, meal.id):
+        # 채점과 **같은 트랜잭션**에 넣는다 — 점수는 저장됐는데 작업은 없는 상태가
+        # 생기지 않는다. 제안 화면을 열 때가 아니라 여기서 넣는 이유는 모듈 독스트링 참고.
+        enqueue(db, FEEDBACK_TASK_TYPE, {"mealId": str(meal.id)})
     meal_crud.set_status(db, meal, MealStatus.EVALUATED)
     db.commit()
 
@@ -252,6 +418,7 @@ def confirm(
             meal,
             stage=stage,
             totals=totals,
+            targets=targets,
             scores=QqsScores(**scores._asdict()),
             model=MealConfirmResponse,
             # 점수는 났지만 문장은 아직이다. AI 가 따로 만든다.
@@ -303,6 +470,8 @@ def get_view(
             # 조회도 하나 줄어든다.
             stage=row.stage_at_evaluation,
             totals=totals,
+            targets=_targets(row.stage_at_evaluation, _weight_at(db, meal)),
+
             scores=QqsScores(
                 quantity=_int(row.quantity_score),
                 quality=_int(row.quality_score),

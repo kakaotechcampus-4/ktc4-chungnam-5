@@ -144,16 +144,6 @@ def test_unknown_task_type_raises():
         handle(None, _task("nope"), FakeAi())
 
 
-@pytest.mark.parametrize(
-    "task_type",
-    ["meal.analyze", "feedback.meal", "feedback.daily", "feedback.long"],
-)
-def test_task_types_are_not_implemented_yet(task_type):
-    """파이프라인이 붙으면 이 테스트를 지운다."""
-    with pytest.raises(NotImplementedError):
-        handle(None, _task(task_type), FakeAi())
-
-
 def test_feedback_types_are_not_collapsed_into_one():
     """피드백 셋을 한 타입으로 묶지 않는다 — 모으는 데이터도 쓰는 테이블도 다르다."""
     with pytest.raises(ValueError, match="알 수 없는 작업 타입"):

@@ -9,7 +9,7 @@
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -63,11 +63,93 @@ def get_first(db: Session, user_id: uuid.UUID) -> MedicationRecord | None:
     return db.execute(stmt).scalars().first()
 
 
+def get_owned(
+    db: Session, *, user_id: uuid.UUID, medication_id: uuid.UUID
+) -> MedicationRecord | None:
+    """그 사용자의 행만 골라 온다. 남의 행 id 를 넣어도 여기서 None 이 된다.
+
+    `user_id` 를 WHERE 에 함께 넣는 게 핵심이다 — id 로만 찾고 나중에 소유자를
+    비교하면, 그 비교를 빠뜨린 경로 하나가 그대로 누출이 된다.
+
+    **행을 잠근다.** 정정은 읽고-검사하고-쓰는 흐름이라, 그 사이에 같은 행을
+    건드리는 요청(`POST /medications` 의 `close_current`, 또 다른 정정)이 끼면 검사가
+    이미 낡은 값 위에서 돈 것이 된다. SQLAlchemy 의 UPDATE 는 바뀐 컬럼만 쓰므로
+    두 트랜잭션이 서로 다른 칸을 건드리면 **둘 다 반영된 합성 행**이 남는다 —
+    `effective_from > effective_to` 가 그렇게 만들어진다.
+    """
+    stmt = (
+        select(MedicationRecord)
+        .where(
+            MedicationRecord.id == medication_id,
+            MedicationRecord.user_id == user_id,
+        )
+        .with_for_update()
+    )
+    return db.execute(stmt).scalars().first()
+
+
+def get_previous(db: Session, record: MedicationRecord) -> MedicationRecord | None:
+    """이 행 **바로 앞** 구간. 없으면 None (= 이 행이 첫 행이다).
+
+    `effective_from` 을 옮길 때 앞 구간과 겹치는지 보려면 이 한 행만 있으면 된다 —
+    더 앞은 이미 이 행보다 앞이라 새 날짜가 그 사이로 들어갈 수 없다.
+    """
+    stmt = (
+        select(MedicationRecord)
+        .where(
+            MedicationRecord.user_id == record.user_id,
+            MedicationRecord.effective_from < record.effective_from,
+        )
+        .order_by(MedicationRecord.effective_from.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalars().first()
+
+
+def get_next(db: Session, record: MedicationRecord) -> MedicationRecord | None:
+    """이 행 **바로 뒤** 구간. 없으면 None (= 이 행이 현재 구간이다)."""
+    stmt = (
+        select(MedicationRecord)
+        .where(
+            MedicationRecord.user_id == record.user_id,
+            MedicationRecord.effective_from > record.effective_from,
+        )
+        .order_by(MedicationRecord.effective_from.asc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalars().first()
+
+
+def lock_from(
+    db: Session, *, user_id: uuid.UUID, effective_from: date
+) -> list[MedicationRecord]:
+    """그 날짜 이후 구간을 **전부 잠근다.** 정정이 쓰게 될 행들이다.
+
+    `get_owned` 는 대상 행 하나만 잠그는데, 정정은 뒤 행들의 `stage` 와
+    `injection_count` 도 다시 쓴다. 안 잠그면 그 사이에 다른 정정이 끼어 계산해 둔
+    값을 덮어쓴다 — 사다리 최상단 용량이 "조정기" 로 저장되는 식이다.
+
+    `effective_from` 오름차순으로 잠가 순서를 단조하게 둔다. 정정이 항상 한 방향으로
+    잠그므로 순환이 생기지 않는다.
+    """
+    stmt = (
+        select(MedicationRecord)
+        .where(
+            MedicationRecord.user_id == user_id,
+            MedicationRecord.effective_from >= effective_from,
+        )
+        .order_by(MedicationRecord.effective_from.asc())
+        .with_for_update()
+    )
+    return list(db.execute(stmt).scalars())
+
+
 def list_doses_desc(
     db: Session,
     user_id: uuid.UUID,
     *,
     exclude_id: uuid.UUID | None = None,
+    before: date | None = None,
 ) -> list[tuple[str, Decimal]]:
     """(약물, 용량) 목록. **최신 회차가 먼저다.**
 
@@ -80,12 +162,18 @@ def list_doses_desc(
 
     `exclude_id` 는 같은 날 재등록(정정) 때 **고치고 있는 행 자신**을 빼기 위한 것이다.
     자기 자신과 비교하면 "직전의 다른 용량"이 어긋난다.
+
+    `before` 는 **그 날짜보다 앞선 구간만** 남긴다. 과거 행을 판정할 때 필요하다 —
+    안 자르면 목록 맨 앞이 그 행보다 **뒤에 있는 행**이라, "직전의 다른 용량" 으로
+    아직 오지도 않은 용량을 집는다. 현재 행은 이력의 끝이라 잘라도 결과가 같다.
     """
     stmt = select(MedicationRecord.drug_name, MedicationRecord.dose_mg).where(
         MedicationRecord.user_id == user_id
     )
     if exclude_id is not None:
         stmt = stmt.where(MedicationRecord.id != exclude_id)
+    if before is not None:
+        stmt = stmt.where(MedicationRecord.effective_from < before)
     stmt = stmt.order_by(
         MedicationRecord.effective_from.desc(), MedicationRecord.created_at.desc()
     )
@@ -135,6 +223,30 @@ def create(
     db.add(record)
     db.flush()
     return record
+
+
+def has_stage_change_since(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    since: datetime,
+    date_from: date,
+    date_to: date,
+) -> bool:
+    """[date_from, date_to] 안에서 시작된 투약 기록 변경이 since 이후에 등록됐는지.
+
+    장기 피드백이 그 뒤로 낡았는지(stale) 판단하는 데 쓴다 — GET /insights/long-term.
+    """
+    stmt = (
+        select(MedicationRecord.id)
+        .where(
+            MedicationRecord.user_id == user_id,
+            MedicationRecord.effective_from.between(date_from, date_to),
+            MedicationRecord.created_at > since,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
 
 
 def get_snapshot(db: Session, snapshot_id: uuid.UUID) -> MedicationSnapshot | None:

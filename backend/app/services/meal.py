@@ -24,6 +24,7 @@ from app.infra.queue import enqueue
 from app.models.enums import MealItemSource, MealStatus, MealType, NutrientCode, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.models.meal import Meal, MealItem, SatietyLog
+from app.schemas.feedback import FeedbackSuggestion
 from app.schemas.meal import (
     EVALUATED_STEPS,
     INITIAL_ANALYSIS_STEPS,
@@ -699,13 +700,15 @@ def _build_nutrients(totals: NutrientTotals) -> list[NutrientStatus]:
     ]
 
 
-def _build_feedback(feedback: MealFeedback | None) -> MealFeedbackSummary | None:
+def _build_feedback(
+    feedback: MealFeedback | None, suggestions: list[FeedbackSuggestion]
+) -> MealFeedbackSummary | None:
     # SAFE 만 노출한다 — REVIEW_REQUIRED(가드레일 전)도 BLOCKED 와 똑같이 숨긴다.
     if feedback is None or feedback.safety_status is not SafetyStatus.SAFE:
         return None
-    # DB 는 아직 문장 하나(Text)뿐이라 배열로 감싼다 — 명세는 배열을 요구한다
-    # (PR #36 리뷰). 값이 없으면 다른 배열 필드들과 같이 빈 배열이지 null 이 아니다.
-    suggestions = [feedback.suggestions] if feedback.suggestions else []
+    # 제안은 호출부(api)가 `services/feedback.py::build_meal_suggestions` 로 조립해 넘긴다
+    # — 컬럼이 JSONB 객체 배열이라 문자열로 감쌀 수 없고, 성분 채우기는 그쪽 일이다.
+    # 없으면 다른 배열 필드들과 같이 빈 배열이지 null 이 아니다 (PR #36 리뷰).
     return MealFeedbackSummary(summary=feedback.body, suggestions=suggestions)
 
 
@@ -714,8 +717,9 @@ def build_meal_detail(
     *,
     meal: Meal,
     nutrition_by_item: dict[uuid.UUID, NutritionInfo | None],
+    suggestions: list[FeedbackSuggestion],
 ) -> MealDetailResponse:
-    """`get_meal_for_detail` 로 얻은 meal 과 미리 계산된 영양정보로 응답을 조립한다."""
+    """`get_meal_for_detail` 로 얻은 meal 과 미리 계산된 영양정보 · 제안으로 응답을 조립한다."""
     stage = meal_crud.get_stage(db, meal.medication_snapshot_id)
     items = [_build_item_detail(item, nutrition_by_item.get(item.id)) for item in meal.items]
     steps = _resolve_steps(meal.status, meal.is_recalculation)
@@ -733,7 +737,7 @@ def build_meal_detail(
             )
         nutrients = _build_nutrients(evaluation_crud.sum_nutrients(db, meal.id))
         satiety = _build_satiety(meal.satiety_log)
-        feedback = _build_feedback(meal_crud.get_feedback(db, meal.id))
+        feedback = _build_feedback(meal_crud.get_feedback(db, meal.id), suggestions)
 
     return MealDetailResponse(
         meal_id=meal.id,

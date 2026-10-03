@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
 import '../common/api_format.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -11,7 +13,8 @@ import 'shared_meal_widgets.dart';
 
 // ── 모델 ────────────────────────────────────────────────────
 
-/// Q·Q·S 점수. 셋 다 0~100 정수다.
+/// Q·Q·S 점수. 0~100 정수이고, **평가 전이면 null** 이다(서버가 `scores`
+/// 자체를 null 로 주거나, 달력 평균처럼 항목별로 null 을 준다).
 class MealScores {
   const MealScores({
     required this.quantity,
@@ -20,9 +23,9 @@ class MealScores {
     this.quantityLabel,
   });
 
-  final int quantity;
-  final int quality;
-  final int satiety;
+  final int? quantity;
+  final int? quality;
+  final int? satiety;
 
   /// 양 라벨(`부족` · `적정` · `과다`).
   ///
@@ -32,13 +35,13 @@ class MealScores {
   final String? quantityLabel;
 
   factory MealScores.fromJson(Map<String, dynamic> json) => MealScores(
-    quantity: json['quantity'] as int,
-    quality: json['quality'] as int,
-    satiety: json['satiety'] as int,
+    quantity: json['quantity'] as int?,
+    quality: json['quality'] as int?,
+    satiety: json['satiety'] as int?,
     quantityLabel: json['quantityLabel'] as String?,
   );
 
-  String get quantityDisplay => quantityLabel ?? '$quantity';
+  String? get quantityDisplay => quantityLabel ?? quantity?.toString();
 }
 
 /// `GET /meals/calendar` 의 `days[]` 하루.
@@ -131,7 +134,9 @@ class HistoryMeal {
   final String mealType;
   final DateTime eatenAt;
   final String displayName;
-  final MealScores scores;
+
+  /// 평가 전(분석 중·확인 대기)이면 null.
+  final MealScores? scores;
   final String? stage;
   final String? thumbnailUrl;
 
@@ -142,21 +147,15 @@ class HistoryMeal {
     displayName: json['displayName'] as String,
     stage: json['stage'] as String?,
     thumbnailUrl: json['thumbnailUrl'] as String?,
-    scores: MealScores.fromJson(json['scores'] as Map<String, dynamic>),
+    scores: switch (json['scores']) {
+      final Map<String, dynamic> s => MealScores.fromJson(s),
+      _ => null,
+    },
   );
 }
 
 // 표시 문구·날짜 파싱(stageLabel · mealTypeLabel · parseApiDate*)은
 // `common/api_format.dart` 에 있다.
-
-/// `2026-08` 형식. 요청 쿼리에 쓴다.
-String formatApiMonth(DateTime d) =>
-    '${d.year}-${d.month.toString().padLeft(2, '0')}';
-
-/// `2026-08-21` 형식. 요청 쿼리에 쓴다.
-String formatApiDate(DateTime d) =>
-    '${d.year}-${d.month.toString().padLeft(2, '0')}-'
-    '${d.day.toString().padLeft(2, '0')}';
 
 const List<String> _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -169,88 +168,59 @@ String _formatTime(DateTime d) =>
 // ── API ─────────────────────────────────────────────────────
 
 /// 기록 화면이 쓰는 엔드포인트.
-///
-/// 지금은 명세 예시를 그대로 돌려준다. 통신 라이브러리가 정해지면
-/// 메서드 본문만 교체하면 되고 화면은 건드리지 않는다.
 class MealHistoryApiService {
+  MealHistoryApiService(this._client);
+
+  final ApiClient _client;
+
+  /// 하루치를 찾으며 넘길 한 페이지 크기(서버 최대 100).
+  static const _pageSize = 100;
+
   /// `GET /meals/calendar?month=YYYY-MM`
   Future<CalendarMonth> fetchCalendar(DateTime month) async {
-    // TODO(http|dio 결정 후): 실제 GET 요청으로 교체.
-    await Future.delayed(const Duration(milliseconds: 300));
-    return CalendarMonth.fromJson(_sampleCalendar);
+    final result = await _client.get(
+      '/meals/calendar',
+      query: {'month': formatApiMonth(month)},
+    );
+    return CalendarMonth.fromJson(result.dataMap);
   }
 
-  /// `GET /meals?date=YYYY-MM-DD`
+  /// [date] 하루의 식사. 먹은 시각 순(아침 → 저녁)이다.
   ///
-  /// 목록 응답에는 `nextCursor` 도 있다. 하루치는 한 페이지로 충분해서
-  /// 지금은 쓰지 않지만, 기간 조회를 붙일 때 필요하다.
+  /// **서버 `GET /meals` 에는 날짜 필터가 없다**(cursor · limit 만, 최신순).
+  /// 그래서 최신부터 페이지를 넘기며 그날 것만 모으고, 그날보다 이전 식사가
+  /// 나오면 멈춘다. 오래된 날일수록 페이지를 많이 넘긴다.
+  /// TODO(BE 요청): `GET /meals?date=YYYY-MM-DD` 가 생기면 한 번 호출로 바꾼다.
   Future<List<HistoryMeal>> fetchMealsByDate(DateTime date) async {
-    // TODO(http|dio 결정 후): 실제 GET 요청으로 교체.
-    await Future.delayed(const Duration(milliseconds: 300));
-    return (_sampleMeals['items'] as List<dynamic>)
-        .map((e) => HistoryMeal.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final day = DateTime(date.year, date.month, date.day);
+    final meals = <HistoryMeal>[];
+    String? cursor;
+    while (true) {
+      final page = (await _client.get(
+        '/meals',
+        query: {'limit': _pageSize, 'cursor': ?cursor},
+      )).dataMap;
+      for (final item in page['items'] as List<dynamic>) {
+        final meal = HistoryMeal.fromJson(item as Map<String, dynamic>);
+        final eaten = meal.eatenAt;
+        final eatenDay = DateTime(eaten.year, eaten.month, eaten.day);
+        if (eatenDay.isBefore(day)) return meals.reversed.toList();
+        if (eatenDay == day) meals.add(meal);
+      }
+      cursor = page['nextCursor'] as String?;
+      if (page['hasMore'] != true || cursor == null) {
+        return meals.reversed.toList();
+      }
+    }
   }
 
-  /// 명세의 `GET /meals/calendar` 예시. 하루만 오던 걸 화면 확인용으로 늘렸다.
-  static const Map<String, dynamic> _sampleCalendar = {
-    'month': '2026-08',
-    'days': [
-      {
-        'date': '2026-08-01',
-        'count': 1,
-        'recordedMealTypes': ['BREAKFAST'],
-        'stage': 'MAINTENANCE',
-      },
-      {
-        'date': '2026-08-14',
-        'count': 3,
-        'recordedMealTypes': ['BREAKFAST', 'LUNCH', 'DINNER'],
-        'stage': 'MAINTENANCE',
-      },
-      {
-        'date': '2026-08-20',
-        'count': 2,
-        'recordedMealTypes': ['LUNCH', 'DINNER'],
-        'stage': 'MAINTENANCE',
-      },
-      {
-        'date': '2026-08-21',
-        'count': 2,
-        'recordedMealTypes': ['BREAKFAST', 'LUNCH'],
-        'stage': 'MAINTENANCE',
-      },
-    ],
-    'summary': {
-      'totalMeals': 42,
-      'avgScores': {'quantity': 74, 'quality': 81, 'satiety': 65},
-    },
-  };
-
-  /// 명세의 `GET /meals` 예시.
-  static const Map<String, dynamic> _sampleMeals = {
-    'items': [
-      {
-        'mealId': 'meal_450',
-        'mealType': 'BREAKFAST',
-        'eatenAt': '2026-08-21T08:20:00+09:00',
-        'stage': 'MAINTENANCE',
-        'displayName': '토스트, 그릭요거트',
-        'thumbnailUrl': null,
-        'scores': {'quantity': 74, 'quality': 90, 'satiety': 80},
-      },
-      {
-        'mealId': 'meal_456',
-        'mealType': 'LUNCH',
-        'eatenAt': '2026-08-21T12:40:00+09:00',
-        'stage': 'MAINTENANCE',
-        'displayName': '현미밥, 된장국, 두부조림',
-        'thumbnailUrl': null,
-        'scores': {'quantity': 76, 'quality': 80, 'satiety': 68},
-      },
-    ],
-    'nextCursor': null,
-  };
+  /// `DELETE /meals/{mealId}` — soft delete. 되돌리는 API 는 없다.
+  ///
+  /// 응답의 `affectedInsights`(장기 피드백 stale 표시)는 장기 피드백 화면이
+  /// 다시 조회할 때 `stale` 로 받으므로 여기서는 쓰지 않는다.
+  Future<void> deleteMeal(String mealId) async {
+    await _client.delete('/meals/$mealId');
+  }
 }
 
 // ── 화면 ────────────────────────────────────────────────────
@@ -269,11 +239,14 @@ class MealHistoryScreen extends StatefulWidget {
 }
 
 class _MealHistoryScreenState extends State<MealHistoryScreen> {
-  final MealHistoryApiService _api = MealHistoryApiService();
+  late final MealHistoryApiService _api = MealHistoryApiService(
+    context.read<ApiClient>(),
+  );
 
-  /// 더미 응답이 2026년 8월 기준이라 화면 확인용으로 그 날짜를 쓴다.
-  /// 연동하면 `DateTime.now()` 로 바꾼다.
-  static final DateTime _today = DateTime(2026, 8, 21);
+  static DateTime get _today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
 
   late DateTime _focusedMonth = DateTime(_today.year, _today.month);
   late DateTime _selectedDay = _today;
@@ -380,6 +353,52 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     if (!mounted) return;
     _loadCalendar();
     _loadMeals();
+  }
+
+  /// 카드를 왼쪽으로 밀면 확인 후 삭제한다. 서버 삭제가 끝나야 카드가
+  /// 사라진다 — 실패하면 카드는 제자리로 돌아온다.
+  ///
+  /// TODO(FE-11 머지 후): 확인 창을 PopupGate 경유로 옮긴다(멘토 리뷰 —
+  /// 모든 팝업은 PopupGate). 이 브랜치엔 아직 PopupGate 통로가 없다.
+  Future<bool> _confirmDelete(HistoryMeal meal) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('식사 기록을 삭제할까요?'),
+        content: Text(
+          '${mealTypeLabel(meal.mealType)} · ${meal.displayName}\n'
+          '삭제하면 되돌릴 수 없어요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return false;
+    try {
+      await _api.deleteMeal(meal.mealId);
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('삭제하지 못했어요: $e')));
+      }
+      return false;
+    }
+  }
+
+  void _onDeleted(HistoryMeal meal) {
+    setState(() => _meals = [..._meals]..remove(meal));
+    // 달력 점·월 요약이 바뀐다. 목록은 이미 뺐으니 다시 받지 않는다.
+    _loadCalendar();
   }
 
   static const List<String> _weekdayLabels = [
@@ -522,22 +541,51 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
         }
         return [
           // 기록 탭의 카드는 탭하면 결과 상세로 간다 → 우측 `>` 를 켠다.
+          // 왼쪽으로 밀면 삭제.
           for (final meal in _meals) ...[
-            MealCard(
-              mealTypeLabel: mealTypeLabel(meal.mealType),
-              time: _formatTime(meal.eatenAt),
-              foodNames: meal.displayName,
-              quantityLabel: meal.scores.quantityDisplay,
-              quality: meal.scores.quality,
-              satiety: meal.scores.satiety,
-              showChevron: true,
-              onTap: () => _openEvaluation(meal),
+            Dismissible(
+              key: ValueKey(meal.mealId),
+              direction: DismissDirection.endToStart,
+              confirmDismiss: (_) => _confirmDelete(meal),
+              onDismissed: (_) => _onDeleted(meal),
+              background: const _DeleteSwipeBackground(),
+              child: MealCard(
+                mealTypeLabel: mealTypeLabel(meal.mealType),
+                time: _formatTime(meal.eatenAt),
+                foodNames: meal.displayName,
+                quantityLabel: meal.scores?.quantityDisplay,
+                quality: meal.scores?.quality,
+                satiety: meal.scores?.satiety,
+                showChevron: true,
+                onTap: () => _openEvaluation(meal),
+              ),
             ),
             const SizedBox(height: AppSpacing.cardGap),
           ],
           AddMealCard(label: '＋ 저녁 식사 기록하기', onTap: _openMealInput),
         ];
     }
+  }
+}
+
+/// 끼니 카드를 밀 때 뒤에 보이는 삭제 표시.
+class _DeleteSwipeBackground extends StatelessWidget {
+  const _DeleteSwipeBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+      decoration: const BoxDecoration(
+        color: AppColors.primaryTint,
+        borderRadius: AppRadius.lgRadius,
+      ),
+      child: Text(
+        '삭제',
+        style: AppTypography.cardTitle.copyWith(color: AppColors.primaryStrong),
+      ),
+    );
   }
 }
 
@@ -800,9 +848,9 @@ class _MonthSummaryBar extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '평균 양 ${s.avgScores.quantity} · '
-                  '질 ${s.avgScores.quality} · '
-                  '포만감 ${s.avgScores.satiety}',
+                  '평균 양 ${s.avgScores.quantity ?? '-'} · '
+                  '질 ${s.avgScores.quality ?? '-'} · '
+                  '포만감 ${s.avgScores.satiety ?? '-'}',
                   style: AppTypography.caption,
                 ),
               ],
