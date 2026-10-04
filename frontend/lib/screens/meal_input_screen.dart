@@ -3,7 +3,10 @@ import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
+import '../api/meal_api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -23,10 +26,17 @@ class MealInputScreen extends StatefulWidget {
 }
 
 class _MealInputScreenState extends State<MealInputScreen> {
-  int _selectedTab = 0; // 0: 사진으로, 1: 검색
+  int _selectedTab = 0; // 0: 사진으로, 1: 직접 입력
   int _selectedMealType = 2; // 0: 아침, 1: 점심, 2: 저녁
+
+  /// [_selectedMealType] 순서의 서버 값.
+  static const _mealTypes = ['BREAKFAST', 'LUNCH', 'DINNER'];
   DateTime _eatenAt = DateTime.now();
-  double _satiety = 20;
+
+  late final MealApiService _api = MealApiService(context.read<ApiClient>());
+
+  /// 분석 요청을 보내는 중. 버튼을 막는다.
+  bool _submitting = false;
 
   final TextEditingController _searchController = TextEditingController();
 
@@ -114,19 +124,51 @@ class _MealInputScreenState extends State<MealInputScreen> {
     super.dispose();
   }
 
-  /// 분석 시작 → AI 분석 진행 화면(4번)으로 교체 이동.
+  /// 분석 시작(`POST /meals`) → AI 분석 진행 화면(4번)으로 교체 이동.
   ///
   /// 교체(`pushReplacement`)라서 분석 이후 화면에서 뒤로 가면 입력 화면이 아니라
   /// 이 화면을 연 탭으로 바로 돌아간다.
-  void _startAnalysis() {
-    // TODO: `POST /meals` 가 생기면 [_photo] 를 올리고 응답의 mealId 를 넘긴다.
-    //   지금은 더미.
-    const mealId = 'meal_dummy';
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => const MealAnalysisScreen(mealId: mealId),
-      ),
-    );
+  Future<void> _startAnalysis() async {
+    final photo = _photoBytes;
+    final text = _searchController.text.trim();
+    final usePhoto = _selectedTab == 0;
+    if (usePhoto ? photo == null : text.isEmpty) {
+      _showError(usePhoto ? '사진을 골라 주세요' : '먹은 음식을 적어 주세요');
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final mealType = _mealTypes[_selectedMealType];
+      final created = usePhoto
+          ? await _api.createWithPhoto(
+              mealType: mealType,
+              eatenAt: _eatenAt,
+              photo: photo!,
+              fileName: _photo?.name ?? 'meal.jpg',
+            )
+          : await _api.createWithText(
+              mealType: mealType,
+              eatenAt: _eatenAt,
+              text: text,
+            );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => MealAnalysisScreen(
+            meal: created,
+            photo: usePhoto ? photo : null,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showError('분석을 시작하지 못했어요: $e');
+      setState(() => _submitting = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -163,7 +205,7 @@ class _MealInputScreenState extends State<MealInputScreen> {
                     ),
                     Expanded(
                       child: _SegmentTab(
-                        label: '검색',
+                        label: '직접 입력',
                         selected: _selectedTab == 1,
                         onTap: () => setState(() => _selectedTab = 1),
                       ),
@@ -173,7 +215,7 @@ class _MealInputScreenState extends State<MealInputScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // 사진으로 / 검색 — 탭에 따라 내용을 바꾼다.
+              // 사진으로 / 직접 입력 — 탭에 따라 내용을 바꾼다.
               if (_selectedTab == 0)
                 _buildPhotoUpload()
               else
@@ -230,68 +272,28 @@ class _MealInputScreenState extends State<MealInputScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // 포만감
-              Text('식사 후 포만감', style: AppTypography.sectionHead),
-              const SizedBox(height: AppSpacing.sm),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '식사 직전 배부른 정도예요. 알림을 놓쳤다면 여기에 입력해요.',
-                        style: AppTypography.bodySecondary,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Slider(
-                              value: _satiety,
-                              min: 0,
-                              max: 100,
-                              divisions: 20,
-                              onChanged: (v) => setState(() => _satiety = v),
-                              activeColor: AppColors.primary,
-                              inactiveColor: AppColors.surfaceMuted,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Container(
-                            width: 56,
-                            height: 36,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: AppRadius.mdRadius,
-                            ),
-                            child: Text(
-                              '${_satiety.toInt()}%',
-                              style: AppTypography.cardTitle,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-
               // 분석 버튼
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _startAnalysis,
+                  onPressed: _submitting ? null : _startAnalysis,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: AppRadius.lgRadius,
                     ),
                   ),
-                  child: Text('분석 시작', style: AppTypography.buttonLabel),
+                  child: _submitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.textInverse,
+                          ),
+                        )
+                      : Text('분석 시작', style: AppTypography.buttonLabel),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -389,7 +391,7 @@ class _MealInputScreenState extends State<MealInputScreen> {
           child: Row(
             children: [
               const Icon(
-                Icons.search,
+                Icons.edit_outlined,
                 size: AppLayout.tabIconSize,
                 color: AppColors.inactive,
               ),
@@ -399,7 +401,7 @@ class _MealInputScreenState extends State<MealInputScreen> {
                   controller: _searchController,
                   style: AppTypography.body,
                   decoration: InputDecoration(
-                    hintText: '음식 이름으로 검색해요',
+                    hintText: '먹은 음식을 적어 주세요 (예: 현미밥, 된장국)',
                     hintStyle: AppTypography.bodySecondary,
                     border: InputBorder.none,
                     isDense: true,
@@ -412,9 +414,10 @@ class _MealInputScreenState extends State<MealInputScreen> {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.xl),
-        Center(
-          child: Text('검색 결과가 여기에 표시돼요', style: AppTypography.bodySecondary),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'AI 가 음식과 양을 알아봐요. 다음 화면에서 고칠 수 있어요.',
+          style: AppTypography.bodySecondary,
         ),
       ],
     );
