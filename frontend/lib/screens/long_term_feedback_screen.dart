@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
+import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -89,20 +90,31 @@ class DoseEvent {
 }
 
 class LongTermInsight {
+  /// `PENDING` · `GENERATING` · `READY` · `FAILED`.
+  final String status;
   final bool dataSufficient;
   final String? trendSummary;
   final String? recommendation;
+
+  /// 만든 뒤 식사가 바뀌어 다시 만들어야 하는지.
   final bool stale;
 
   LongTermInsight({
+    required this.status,
     required this.dataSufficient,
     required this.stale,
     this.trendSummary,
     this.recommendation,
   });
 
+  /// 새로 만들어 달라고 할지. 데이터가 모자라면 만들어도 소용없다.
+  bool get needsRefresh => dataSufficient && (status == 'PENDING' || stale);
+
+  bool get isGenerating => status == 'PENDING' || status == 'GENERATING';
+
   factory LongTermInsight.fromJson(Map<String, dynamic> json) {
     return LongTermInsight(
+      status: json['status'] as String,
       dataSufficient: json['dataSufficient'] as bool,
       trendSummary: json['trendSummary'] as String?,
       recommendation: json['recommendation'] as String?,
@@ -131,15 +143,25 @@ class LongTermApiService {
         .toList();
   }
 
-  /// TODO(FE-13): `GET /insights/long-term` 연동 전이라 고정 값이다.
+  /// `GET /insights/long-term?period=`
   Future<LongTermInsight> fetchInsight(String period) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return LongTermInsight.fromJson({
-      'dataSufficient': true,
-      'trendSummary': null,
-      'recommendation': null,
-      'stale': false,
-    });
+    final result = await _client.get(
+      '/insights/long-term',
+      query: {'period': period},
+    );
+    return LongTermInsight.fromJson(result.dataMap);
+  }
+
+  /// `POST /insights/long-term/refresh` — 새로 만들어 달라고 한다(202).
+  /// 다음에 다시 물어볼 간격을 돌려준다.
+  Future<Duration> refreshInsight(String period) async {
+    final result = await _client.post(
+      '/insights/long-term/refresh',
+      body: {'period': period},
+    );
+    return Duration(
+      milliseconds: result.dataMap['pollIntervalMs'] as int? ?? 1500,
+    );
   }
 }
 
@@ -162,10 +184,24 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
   bool isLoading = true;
   String? errorMessage;
 
+  /// 식사를 기록·삭제하면 그래프가 바뀐다. 탭이 다시 보일 때 새로 불러온다.
+  late final TabState _tabs = context.read<TabState>();
+
+  void _onTabChanged() {
+    if (_tabs.currentIndex == TabState.feedback) _load();
+  }
+
   @override
   void initState() {
     super.initState();
+    _tabs.addListener(_onTabChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _tabs.removeListener(_onTabChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -177,17 +213,45 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
       final results = await Future.wait([
         _api.fetchDashboard(period),
         _api.fetchDoseEvents(),
-        _api.fetchInsight(period),
       ]);
       setState(() {
         dashboard = results[0] as DashboardData;
         doseEvents = results[1] as List<DoseEvent>;
-        insight = results[2] as LongTermInsight;
+        insight = null;
       });
+      // 인사이트 문장은 AI 가 만들어 늦다. 그래프를 먼저 보이고 따로 채운다.
+      _loadInsight(period);
     } catch (e) {
       setState(() => errorMessage = '불러오는 데 실패했어요: $e');
     } finally {
       setState(() => isLoading = false);
+    }
+  }
+
+  /// 인사이트를 받고, 없거나 낡았으면 새로 만들어 달라고 한 뒤 준비될
+  /// 때까지 잠깐씩 다시 묻는다(약 30초). 실패해도 그래프는 그대로 둔다.
+  Future<void> _loadInsight(String forPeriod) async {
+    const pollLimit = 20;
+    try {
+      var result = await _api.fetchInsight(forPeriod);
+      if (!mounted || forPeriod != period) return;
+      setState(() => insight = result);
+      // 데이터가 모자라면 서버가 PENDING 으로 줘도 기다려 봐야 만들어지지 않는다.
+      if (!result.dataSufficient) return;
+      if (!result.needsRefresh && !result.isGenerating) return;
+      final interval = result.needsRefresh
+          ? await _api.refreshInsight(forPeriod)
+          : const Duration(milliseconds: 1500);
+      for (var i = 0; i < pollLimit; i++) {
+        await Future.delayed(interval);
+        if (!mounted || forPeriod != period) return;
+        result = await _api.fetchInsight(forPeriod);
+        if (!mounted || forPeriod != period) return;
+        setState(() => insight = result);
+        if (!result.dataSufficient || !result.isGenerating) return;
+      }
+    } catch (_) {
+      // 인사이트 한 줄이 없어도 화면은 쓸 수 있다.
     }
   }
 
@@ -233,7 +297,8 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
                 _buildQqsTrendCard(),
               ],
               SizedBox(height: AppSpacing.cardGap),
-              if (insight != null) _buildInsightBanner(insight!),
+              if (insight != null)
+                _buildInsightBanner(insight!, dashboard?.series.length ?? 0),
             ],
           ),
         ),
@@ -581,7 +646,10 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
     );
   }
 
-  Widget _buildInsightBanner(LongTermInsight insight) {
+  /// [scoredDays] 는 이 기간에 양·질·포만감이 다 있는 날 수(그래프 점 수).
+  /// 서버도 같은 기준(3일)으로 인사이트를 만든다
+  /// (BE `worker/jobs/feedback_long.py` `MIN_SCORED_DAYS`).
+  Widget _buildInsightBanner(LongTermInsight insight, int scoredDays) {
     if (!insight.dataSufficient) {
       return Container(
         padding: EdgeInsets.all(AppSpacing.cardPadding),
@@ -589,7 +657,11 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
           color: AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text('아직 인사이트를 만들기엔 데이터가 부족해요.', style: AppTypography.body),
+        child: Text(
+          '점수가 있는 날이 3일 이상 쌓이면 인사이트를 만들어 드려요. '
+          '(지금 $scoredDays일)',
+          style: AppTypography.body,
+        ),
       );
     }
 
@@ -602,7 +674,14 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (insight.trendSummary != null)
+          if (insight.trendSummary == null)
+            Text(
+              insight.isGenerating
+                  ? '인사이트를 만들고 있어요…'
+                  : '지금은 인사이트를 만들지 못했어요.',
+              style: AppTypography.body,
+            )
+          else
             Text(
               insight.trendSummary!,
               style: AppTypography.cardTitle.copyWith(

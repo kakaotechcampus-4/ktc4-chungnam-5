@@ -5,16 +5,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_colors.dart';
 import 'daily_condition_popup.dart';
+import 'meal_delete_confirm_popup.dart';
 import 'satiety_checkin_popup.dart';
 
 /// 앱의 팝업. [priority] 가 작을수록 먼저 띄운다.
 enum AppPopup {
+  /// 식사 기록 삭제 확인. 사용자가 방금 한 동작에 대한 답이라 가장 먼저다.
+  mealDeleteConfirm(0),
+
   /// 사후 포만감 체크인. 게이지 탭·알림처럼 사용자가 특정 끼니를 골라 연
   /// 요청이라 하루 한 번 팝업보다 먼저 띄운다.
-  satietyCheckin(0),
+  satietyCheckin(1),
 
   /// 하루 한 번, 오늘 첫 접속 때 뜨는 컨디션 기록 팝업.
-  dailyCondition(1);
+  dailyCondition(2);
 
   const AppPopup(this.priority);
 
@@ -50,16 +54,37 @@ class PopupGate {
   /// 사후 포만감 체크인. 저장했으면 `true`.
   ///
   /// 진입점은 [mealId] 하나뿐이다(멘토 리뷰 PR #9 "알림 진입 화면은 id 로
-  /// 생성"). 홈 게이지 탭과 알림(`NotificationRouter`, FE-14) 모두 이걸 부른다.
+  /// 생성"). 홈 게이지 탭과 알림(`NotificationRouter`, 나중 작업) 모두 이걸
+  /// 부른다.
   Future<bool> showSatietyCheckin(
     BuildContext context, {
     required String mealId,
+    int? initialSatiety,
   }) {
     return _request(
       context,
       AppPopup.satietyCheckin,
       id: mealId,
-      show: (c) => _showDialog(c, SatietyCheckinPopup(mealId: mealId)),
+      show: (c) => _showDialog(
+        c,
+        SatietyCheckinPopup(mealId: mealId, initialSatiety: initialSatiety),
+      ),
+    );
+  }
+
+  /// 식사 기록 삭제 확인. 삭제를 골랐으면 `true`.
+  /// 같은 끼니([mealId])를 연달아 밀어도 확인창은 하나만 뜬다.
+  Future<bool> confirmMealDelete(
+    BuildContext context, {
+    required String mealId,
+    required String description,
+  }) {
+    return _request(
+      context,
+      AppPopup.mealDeleteConfirm,
+      id: mealId,
+      show: (c) =>
+          _showDialog(c, MealDeleteConfirmPopup(description: description)),
     );
   }
 
