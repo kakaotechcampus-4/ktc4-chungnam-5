@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../api/api_exception.dart';
 import '../api/medication_api.dart';
 import 'user_session.dart';
 
@@ -81,6 +82,47 @@ class MedicationState extends ChangeNotifier {
     _set(saved);
     return saved;
   }
+
+  /// 시작일을 정정할 수 있는지. 용량을 바꾼 적이 있으면 현재 기록의
+  /// 시작일이 "투약 시작일"이 아니라서 막는다.
+  Future<bool> canCorrectStart() async => await _api.fetchDoseEventCount() <= 1;
+
+  /// `PATCH /medications/{id}` 로 시작일을 고치고 다시 받는다.
+  Future<MedicationCurrent?> correctStart(DateTime startedAt) async {
+    await _api.correct(_requireCurrent().medicationId, startedAt: startedAt);
+    return refresh();
+  }
+
+  /// 등록 후 약·용량을 바꾼다. 보통은 "오늘부터 이 용량" 변경(`POST`)이다.
+  ///
+  /// 단, **오늘 연 기록을 오늘 또 바꾸면** 서버가 409 `CONFLICT` 로 막는다 —
+  /// 같은 날 들어온 다른 값은 "정말 바꿨다"가 아니라 "잘못 넣은 걸 고친다"로
+  /// 봐서다(BE `services/medication.py` `register`). 그때는 같은 값을 정정
+  /// (`PATCH`)으로 보낸다. 등록 후에는 시작일을 `POST` 로 보내지 않으므로
+  /// 이 409 는 "오늘 연 기록"뿐이다.
+  ///
+  /// 정정했으면 true.
+  Future<bool> changeDose({
+    required String drugName,
+    required double doseMg,
+  }) async {
+    try {
+      await save(drugName: drugName, doseMg: doseMg);
+      return false;
+    } on ApiException catch (e) {
+      if (e.code != 'CONFLICT') rethrow;
+      await _api.correct(
+        _requireCurrent().medicationId,
+        drugName: drugName,
+        doseMg: doseMg,
+      );
+      await refresh();
+      return true;
+    }
+  }
+
+  MedicationCurrent _requireCurrent() =>
+      _current ?? (throw StateError('등록된 투약이 없어요'));
 
   void _set(MedicationCurrent? current) {
     _current = current;

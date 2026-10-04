@@ -79,7 +79,9 @@ class MedicationApiService {
   ///   미리보기 용도로는 절대 부르면 안 된다.
   /// - [startedAt] 은 첫 등록에만 보낸다. null 이면 서버가 기존 시작일을
   ///   그대로 둔다. 등록 후 다른 값을 보내면 409 `CONFLICT` 다.
-  /// - 오늘 등록·변경한 용량을 오늘 또 바꿔도 409 `CONFLICT` 다.
+  /// - 오늘 등록·변경한 용량을 오늘 또 바꿔도 409 `CONFLICT` 다 — 같은 날
+  ///   다시 바꾸는 건 "용량 변경"이 아니라 "잘못 넣은 값 정정"이라 [correct] 로
+  ///   보낸다(`MedicationState.changeDose`).
   ///   정정은 `PATCH /medications/{recordId}`.
   Future<MedicationCurrent> save({
     required String drugName,
@@ -96,4 +98,35 @@ class MedicationApiService {
     );
     return MedicationCurrent.fromJson(result.dataMap);
   }
+
+  /// `GET /medications/dose-events` 의 건수. 용량을 바꾼 적이 없으면 1(첫 등록)
+  /// 이다.
+  Future<int> fetchDoseEventCount() async {
+    final result = await _client.get('/medications/dose-events');
+    return (result.dataMap['events'] as List<dynamic>).length;
+  }
+
+  /// `PATCH /medications/{recordId}` — 현재 투약 기록을 고친다(정정). 준
+  /// 값만 보낸다. [recordId] 는 현재 투약의 `medicationId` 다.
+  ///
+  /// - [startedAt]: 잘못 넣은 시작일. 서버가 회차를 다시 계산한다.
+  /// - [drugName]·[doseMg]: 오늘 연 기록의 약·용량을 고친다. 새 기간을 열지
+  ///   않으므로 감량·증량 판정이 생기지 않는다.
+  ///
+  /// 응답 모양이 조회와 달라 고친 뒤에는 다시 조회한다. `injectionCount` 는
+  /// 보내지 않는다 — 보내도 회차(`doseCount`)에 반영되지 않아 뜻을 BE 에
+  /// 확인 중이다.
+  Future<void> correct(
+    String recordId, {
+    DateTime? startedAt,
+    String? drugName,
+    double? doseMg,
+  }) => _client.patch(
+    '/medications/$recordId',
+    body: {
+      if (startedAt != null) 'effectiveFrom': formatApiDate(startedAt),
+      'drugName': ?drugName,
+      'doseMg': ?doseMg,
+    },
+  );
 }
