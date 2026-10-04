@@ -64,8 +64,7 @@ flutter pub get
 
 `API_BASE_URL` 을 주면 phase 주소 대신 쓴다(에뮬레이터는 `http://10.0.2.2:<포트>/api/v1`).
 
-> 아직 API 를 연동하지 않은 화면(식사 흐름 3~7, `GET /home` 의 위 게이지·오늘의 식사, 장기 인사이트 문장)은
-> 화면 안 예시를 쓴다. FE-13 에서 연동한다.
+> 화면은 모두 API 를 부른다. local 에서는 사진을 올려도 고정 응답이라 분석 결과·점수가 늘 같다.
 
 ### mock 서버 (local)
 
@@ -165,13 +164,22 @@ docker run --rm --network infra_default -v "${backend}:/src" -w /src `
   glp1-be alembic upgrade head
 ```
 
+**음식 DB(공공 식품영양성분 DB) 넣기** — 처음 한 번. 안 넣으면 음식 확인 화면의 영양 정보 검색이
+늘 빈 목록이고, 양·질 점수도 나오지 않는다(`backend/README.md` 참고):
+
+```powershell
+# infra 폴더에서 실행 (33만 건, 1~2분). PowerShell 은 `<` 를 못 써서 cmd 로 넘긴다.
+cmd /c "docker exec -i glp1-db pg_restore -U glp1 -d glp1_dev --data-only --no-owner < seed\food_refs_20260828.dump"
+```
+
 확인:
 
 ```powershell
 curl http://localhost:8000/health     # {"status":"ok"}
 ```
 
-> 식사 분석 워커는 아직 결과 저장이 미구현이라, 식사를 등록해도 `ANALYZING` 에서 넘어가지 않는다.
+> AI 는 아직 스텁이라 무엇을 올려도 "참치김밥 · 삶은 계란"으로 인식하고, 자동으로 영양 정보를 붙이지
+> 못한다. 음식 확인 화면에서 "찾아서 고르기"로 고르면 점수가 나온다.
 > 내리기: `docker compose -f docker-compose.ai-stub.yml -f docker-compose.be.yml down`
 > (`--remove-orphans` 는 DB 컨테이너까지 지우니 쓰지 않는다 — `infra/README.md` 참고)
 
