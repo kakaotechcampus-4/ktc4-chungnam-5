@@ -1,17 +1,34 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/api/api_client.dart';
 import 'package:frontend/api/medication_api.dart';
+import 'package:frontend/common/api_format.dart';
 import 'package:frontend/main.dart';
+import 'package:frontend/popups/daily_condition_popup.dart';
 import 'package:frontend/screens/home_screen.dart' show StomachGauge;
+import 'package:frontend/screens/meal_evaluation_screen.dart';
+import 'package:frontend/screens/meal_review_screen.dart';
 import 'package:frontend/screens/medication_info_screen.dart';
+import 'package:frontend/screens/next_meal_suggestion_screen.dart';
 import 'package:frontend/state/medication_state.dart';
 import 'package:frontend/state/user_session.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fake_api.dart';
+
+/// mock 고정 응답 한 건(`mock/examples.json`)의 body.
+Map<String, dynamic> _mockBody(String route) {
+  final examples =
+      jsonDecode(File('mock/examples.json').readAsStringSync())
+          as Map<String, dynamic>;
+  final byStatus = examples[route] as Map<String, dynamic>;
+  return byStatus.values.first as Map<String, dynamic>;
+}
 
 /// 기본 테스트 화면(800×600)은 팝업 아래쪽 버튼이 잘려 세로를 늘린다.
 /// 폭은 줄이지 않는다 — 테스트 글꼴(Ahem)은 실제 글꼴보다 넓어서 375 폭에서는
@@ -122,6 +139,35 @@ void main() {
     expect(_popupTitle, findsNothing);
   });
 
+  testWidgets('weight can be typed and out-of-range blocks saving', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final api = await _pumpApp(tester);
+    await tester.tap(find.text('보통').first); // 식욕
+    await tester.tap(find.text('없음').last); // GI 증상
+    await tester.pump();
+
+    final weight = find.descendant(
+      of: find.byType(DailyConditionPopup),
+      matching: find.byType(TextField),
+    );
+    final save = find.widgetWithText(FilledButton, '기록 저장');
+
+    await tester.enterText(weight, '5');
+    await tester.pump();
+    expect(find.textContaining('kg 사이로 적어 주세요'), findsOneWidget);
+    expect(tester.widget<FilledButton>(save).onPressed, isNull);
+
+    await tester.enterText(weight, '81.3');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    final post = api.requests.singleWhere((r) => r.path == '/user-states');
+    expect((post.data as Map)['weightKg'], 81.3);
+  });
+
   testWidgets('symptom needs a severity before saving', (
     WidgetTester tester,
   ) async {
@@ -144,13 +190,27 @@ void main() {
     WidgetTester tester,
   ) async {
     _useDesignSize(tester);
-    await _pumpApp(tester);
+    // 3시간 전에 먹은 끼니. 고정 시각이면 경과 시간이 실행 시각마다 달라진다.
+    final api = FakeApi();
+    final eatenAt = formatApiDateTime(
+      DateTime.now().subtract(const Duration(hours: 3)),
+    );
+    api.on('GET /meals/{meal_id}', (o) {
+      final meal = {
+        ...(_mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map),
+        'eatenAt': eatenAt,
+      };
+      return (200, fakeOk(meal));
+    });
+    await _pumpApp(tester, api: api);
     await tester.tap(find.text('나중에')); // 컨디션 팝업
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(StomachGauge));
     await tester.pumpAndSettle();
     expect(find.text('지금 얼마나 부르세요?'), findsOneWidget);
+    // 게이지(mock 68%)에서 시작한다.
+    expect(find.widgetWithText(TextField, '68'), findsOneWidget);
     expect(find.textContaining('3시간 경과'), findsOneWidget);
 
     final save = find.widgetWithText(FilledButton, '기록 저장');
@@ -229,7 +289,7 @@ void main() {
     // 프로필 다음은 투약 정보 입력이다. 새 사용자라 잠겨 있지 않다.
     expect(find.text('프로필 입력'), findsNothing);
     expect(find.text('투약 정보를 알려주세요'), findsOneWidget);
-    expect(find.textContaining('등록 후에는 바꿀 수 없어요'), findsNothing);
+    expect(find.textContaining('용량을 바꾼 기록이 있어'), findsNothing);
     expect(find.text('1회차'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '저장'));
     await _settle(tester);
@@ -352,7 +412,8 @@ void main() {
     );
     await _settle(tester); // mock GET /medications/current = 등록됨
 
-    expect(find.textContaining('등록 후에는 바꿀 수 없어요'), findsOneWidget);
+    // mock 은 용량을 두 번 바꾼 기록이 있어 시작일을 고칠 수 없다.
+    expect(find.textContaining('용량을 바꾼 기록이 있어'), findsOneWidget);
     final countText = find.textContaining(RegExp(r'^\d+회차$'));
     final before = tester.widget<Text>(countText.first).data;
     await tester.tap(find.byIcon(Icons.add));
@@ -400,5 +461,231 @@ void main() {
     await tester.pumpWidget(MyApp(session: session, dio: api.dio));
     await tester.pumpAndSettle();
     expect(_popupTitle, findsNothing);
+  });
+
+  /// 식사 흐름 화면 하나를 가짜 서버로 띄운다.
+  Future<FakeApi> pumpMealScreen(WidgetTester tester, Widget screen) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    final api = FakeApi();
+    await tester.pumpWidget(
+      Provider(
+        create: (_) => ApiClient(session: session, dio: api.dio),
+        child: MaterialApp(home: screen),
+      ),
+    );
+    await _settle(tester);
+    return api;
+  }
+
+  testWidgets('review sends amount edits together after a pause', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+    );
+    expect(find.text('250g'), findsOneWidget);
+    // 매칭 안 된 음식은 후보를 고르라고 안내한다.
+    expect(find.text('영양정보 없음 · 찾아서 고르기'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.add).first);
+    await tester.tap(find.byIcon(Icons.add).first);
+    await tester.pump();
+    expect(find.text('270g'), findsOneWidget);
+    expect(api.requests.where((r) => r.method == 'PATCH'), isEmpty);
+
+    await tester.pump(const Duration(seconds: 1));
+    final patch = api.requests.singleWhere((r) => r.method == 'PATCH');
+    final items = (patch.data as Map)['items'] as List;
+    expect(items.single['amount'], 270.0);
+  });
+
+  testWidgets('a failed amount edit goes back to the saved amount', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final api = await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+    );
+    api.on(
+      'PATCH /meals/{meal_id}/items',
+      (_) => (500, fakeError('INTERNAL_ERROR')),
+    );
+    await tester.tap(find.byIcon(Icons.add).first);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('250g'), findsOneWidget);
+    expect(find.textContaining('되돌렸어요'), findsOneWidget);
+  });
+
+  testWidgets('review confirms with the after-meal satiety', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+    );
+    expect(find.text('식사 후 포만감'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('확인하고 평가받기'), 100);
+    await tester.tap(find.text('확인하고 평가받기'));
+    await _settle(tester);
+
+    final confirm = api.requests.singleWhere(
+      (r) => r.path.endsWith('/confirm'),
+    );
+    expect(confirm.data, {'satietyAfterPct': 50});
+    // 평가 화면은 확정 결과를 바로 보인다.
+    expect(find.text('식사 평가'), findsOneWidget);
+    expect(find.text('76'), findsOneWidget); // 양
+    expect(find.text('80'), findsOneWidget); // 질
+    expect(find.text('다음 끼니 제안 보기'), findsOneWidget);
+  });
+
+  testWidgets('evaluation opened later loads the saved scores', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(
+      tester,
+      const MealEvaluationScreen(mealId: 'm1'),
+    );
+    expect(api.requests.where((r) => r.path.endsWith('/confirm')), isEmpty);
+    expect(find.text('76'), findsOneWidget);
+    expect(find.textContaining('단백질 부족'), findsOneWidget);
+    expect(find.text('다음 끼니 제안 보기'), findsOneWidget);
+  });
+
+  testWidgets('home meal card opens the next meal suggestion', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    await _pumpApp(tester);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('현미밥, 된장국, 두부조림'));
+    await _settle(tester);
+    expect(find.text('현재 영양소 상태'), findsOneWidget);
+    expect(find.text('두부 반 모'), findsOneWidget);
+    // 그날 하루 요약도 같이 보인다.
+    await tester.scrollUntilVisible(find.text('오늘 하루 요약'), 200);
+    expect(find.textContaining('단백질이 고르게 들어간 하루'), findsOneWidget);
+  });
+
+  testWidgets('a missing daily summary is requested, then shown', (
+    WidgetTester tester,
+  ) async {
+    var made = false;
+    Map<String, Object?> daily() => {
+      'dailyFeedbackId': made ? 'd1' : null,
+      'feedbackDate': '2026-10-05',
+      'feedbackStatus': made ? 'READY' : 'PENDING',
+      'summary': made ? '하루 요약 문장' : null,
+      'stale': false,
+    };
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    final api = FakeApi()
+      ..on('GET /insights/daily', (_) => (200, fakeOk(daily())))
+      ..on('POST /insights/daily/refresh', (_) {
+        made = true;
+        return (
+          202,
+          fakeOk({'feedbackStatus': 'GENERATING', 'pollIntervalMs': 100}),
+        );
+      });
+    await tester.pumpWidget(
+      Provider(
+        create: (_) => ApiClient(session: session, dio: api.dio),
+        child: MaterialApp(
+          home: NextMealSuggestionScreen(
+            mealId: 'm1',
+            eatenAt: DateTime(2026, 10, 5, 12),
+          ),
+        ),
+      ),
+    );
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+
+    final refresh = api.requests.singleWhere(
+      (r) => r.path == '/insights/daily/refresh',
+    );
+    expect(refresh.data, {'date': '2026-10-05'});
+    await tester.scrollUntilVisible(find.text('하루 요약 문장'), 200);
+    expect(find.text('하루 요약 문장'), findsOneWidget);
+  });
+
+  testWidgets('changing the satiety on evaluation confirms again', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(
+      tester,
+      const MealEvaluationScreen(mealId: 'm1'),
+    );
+    expect(api.requests.where((r) => r.path.endsWith('/confirm')), isEmpty);
+    // mock 평가의 포만감은 68 — 끝까지 끌면 100 으로 다시 확정한다.
+    await tester.drag(find.byType(Slider), const Offset(600, 0));
+    await _settle(tester);
+    final confirm = api.requests.singleWhere(
+      (r) => r.path.endsWith('/confirm'),
+    );
+    expect(confirm.data, {'satietyAfterPct': 100});
+  });
+
+  testWidgets('history reloads when its tab is opened again', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final api = await _pumpApp(tester);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+
+    int mealLists() => api.requests.where((r) => r.path == '/meals').length;
+    final before = mealLists();
+    await tester.tap(find.text('기록'));
+    await _settle(tester);
+    expect(mealLists(), greaterThan(before));
+  });
+
+  testWidgets('insight with too little data is asked only once', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final api = FakeApi()
+      ..on(
+        'GET /insights/long-term',
+        (_) => (
+          200,
+          fakeOk({
+            'period': {'from': null, 'to': '2026-10-05'},
+            'status': 'PENDING',
+            'dataSufficient': false,
+            'trendSummary': null,
+            'recommendation': null,
+            'generatedAt': null,
+            'stale': false,
+            'staleReason': null,
+          }),
+        ),
+      );
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+    int asks() =>
+        api.requests.where((r) => r.path == '/insights/long-term').length;
+    final before = asks(); // 앱을 켤 때 한 번
+    await tester.tap(find.text('피드백'));
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 5));
+
+    // 탭을 열 때 한 번만 묻고, 부족하면 더 기다리지 않는다.
+    expect(asks() - before, 1);
+    expect(api.requests.where((r) => r.path.endsWith('/refresh')), isEmpty);
+    expect(find.textContaining('3일 이상 쌓이면'), findsOneWidget);
   });
 }
