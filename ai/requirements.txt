@@ -1,0 +1,9 @@
+# Dockerfile 이 이 파일로 의존성을 설치한다. LLM SDK 등은 AI 파트에서 추가한다.
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+pydantic-settings==2.15.0
+# BE /internal/v1 tool 호출
+httpx==0.28.1
+
+# 테스트
+pytest==9.1.1

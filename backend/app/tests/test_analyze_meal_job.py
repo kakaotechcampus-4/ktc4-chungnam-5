@@ -410,6 +410,19 @@ def test_ai_error_on_last_attempt_marks_meal_failed(db, storage):
     assert result == {"mealId": str(meal.id), "status": "FAILED", "itemCount": 0}
 
 
+def test_non_retryable_ai_error_marks_meal_failed_on_the_first_attempt(db, storage):
+    """AI 가 요청을 거부하면(4xx) 재시도해도 같다 — 첫 시도에서 바로 FAILED 로 끝낸다."""
+    from app.infra.ai import AiRequestRejected
+
+    meal = _analyzing_meal(db)
+    error = AiRequestRejected(422, "/analyze-meal")
+
+    result = run(db, _task(meal, attempts=0), FakeAi(error=error))
+
+    assert _status(db, meal) is MealStatus.FAILED
+    assert result == {"mealId": str(meal.id), "status": "FAILED", "itemCount": 0}
+
+
 def test_malformed_response_is_treated_as_ai_failure(db, storage):
     """A18: 계약과 다른 응답도 AI 실패다 — 마지막 전엔 raise, 마지막엔 FAILED. 반쯤 넣지 않는다."""
     meal = _analyzing_meal(db)
