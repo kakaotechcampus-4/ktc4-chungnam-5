@@ -27,6 +27,7 @@ class HomeMedication(CamelModel):
 class HomeStomach(CamelModel):
     """위 게이지. satiety_after 가 기록된 가장 최근 식사 기준.
 
+    satiety_pct 는 그 식사의 가장 최근 사후 체크인 값이고, 체크인이 없으면 satiety_after 다.
     feedback_summary 는 그 식사의 피드백이 SAFE 일 때만 채운다.
     """
 

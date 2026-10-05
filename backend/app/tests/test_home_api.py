@@ -663,13 +663,48 @@ def test_31_yesterdays_meal_can_be_the_source(client, db):
     assert data["today"]["recordedCount"] == 0
 
 
-def test_32_satiety_pct_is_satiety_after_not_checkin(client, db):
-    """#32: satietyPct 는 사후 체크인 값이 아니라 확정 시점의 satiety_after 다 (명세 §7 예시 근거)."""
+def test_32_satiety_pct_is_the_latest_checkin(client, db):
+    """#32: 사후 체크인이 있으면 satietyPct 는 그 끼니의 가장 최근(식후 시점이 가장 늦은) 체크인 값이다.
+
+    "지금 얼마나 부르세요?" 에 답하면 게이지가 바로 그 값으로 바뀌어야 한다.
+    """
     user = make_user(db)
     meal = _meal(db, user, _at(D_DATE, 12, 40), satiety_after=68)
     satiety_crud.upsert_checkin(db, meal_id=meal.id, offset_hours=3, pct=40)
+    satiety_crud.upsert_checkin(db, meal_id=meal.id, offset_hours=1, pct=60)
+
+    assert _home(client, user)["stomach"]["satietyPct"] == 40
+
+
+def test_32a_without_checkin_satiety_pct_is_satiety_after(client, db):
+    """#32a: 체크인이 없으면 확정 시점의 satiety_after 다."""
+    user = make_user(db)
+    _meal(db, user, _at(D_DATE, 12, 40), satiety_after=68)
 
     assert _home(client, user)["stomach"]["satietyPct"] == 68
+
+
+def test_32b_checkin_of_another_meal_is_ignored(client, db):
+    """#32b: 기준 식사가 아닌 끼니의 체크인은 게이지에 섞이지 않는다."""
+    user = make_user(db)
+    older = _meal(db, user, _at(D_DATE, 10), satiety_after=50)
+    _meal(db, user, _at(D_DATE, 12, 40), satiety_after=68)
+    satiety_crud.upsert_checkin(db, meal_id=older.id, offset_hours=2, pct=20)
+
+    assert _home(client, user)["stomach"]["satietyPct"] == 68
+
+
+def test_32c_checkin_does_not_change_the_meal_satiety_score(client, db):
+    """#32c: 체크인은 게이지만 바꾼다 — 끼니 포만감 점수(S)는 확정 시점 값 그대로다."""
+    user = make_user(db)
+    _, lunch = _make_spec_example(db, user)
+    satiety_crud.upsert_checkin(db, meal_id=lunch.id, offset_hours=3, pct=40)
+
+    data = _home(client, user)
+
+    assert data["stomach"]["satietyPct"] == 40
+    scores = next(m for m in data["today"]["meals"] if m["mealId"] == str(lunch.id))["scores"]
+    assert scores["satiety"] == 50
 
 
 def test_33_deleted_meal_is_not_the_source(client, db):

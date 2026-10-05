@@ -129,6 +129,21 @@ def upsert_checkin(
     return row
 
 
+def get_latest_checkin(db: Session, meal_id: uuid.UUID) -> SatietyCheckin | None:
+    """이 식사의 가장 최근 사후 체크인. 없으면 None.
+
+    "가장 최근" 은 **식후 시점(`checkin_offset_hours`)이 가장 늦은 것**이다. 같은 시점은
+    덮어쓰기라 하나뿐이고(`upsert_checkin`), 저장 순서는 시점과 무관하다.
+    """
+    stmt = (
+        select(SatietyCheckin)
+        .where(SatietyCheckin.meal_id == meal_id)
+        .order_by(SatietyCheckin.checkin_offset_hours.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
 def list_checkins(db: Session, meal_id: uuid.UUID) -> list[SatietyCheckin]:
     """이 식사의 사후 체크인을 식후 시점 순으로. 없으면 빈 목록."""
     stmt = (
