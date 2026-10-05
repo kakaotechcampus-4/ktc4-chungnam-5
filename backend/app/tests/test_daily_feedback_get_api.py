@@ -272,6 +272,17 @@ def test_05_no_row_with_pending_task_returns_generating(client, db):
     assert data["summary"] is None
 
 
+def test_05b_no_row_with_processing_task_returns_generating(client, db):
+    """#5 의 짝: 워커가 집어 처리 중(PROCESSING)이어도 GENERATING 이다."""
+    user = make_user(db)
+    _put_task(db, user_id=user.id, status=TaskStatus.PROCESSING)
+
+    data = _data(_get(client, user))
+
+    assert data["feedbackStatus"] == "GENERATING"
+    assert data["dailyFeedbackId"] is None
+
+
 def test_06_row_with_pending_task_returns_generating_and_keeps_content(client, db):
     """#6: 행이 있어도 대기 작업이 있으면 GENERATING 이다 — 갱신 중 표시가 우선이고 행 내용은 실린다.
 

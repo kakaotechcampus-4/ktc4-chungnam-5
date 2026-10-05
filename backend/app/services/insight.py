@@ -59,10 +59,10 @@ def _determine_status(row: LongTermFeedback | None, latest_task: Task | None) ->
     자체 enum 이 아니라 `FeedbackStatus`(PENDING/GENERATING/READY/FAILED)를
     재사용한다 — MealConfirmResponse.feedback_status 와 같은 개념이다(PR #46 리뷰).
 
-    우선순위: 대기 중인 작업이 있으면(갱신 중) 낡은 행이 있어도 GENERATING —
+    우선순위: 대기·처리 중인 작업이 있으면(갱신 중) 낡은 행이 있어도 GENERATING —
     폴링 중인 FE 에게 지금 새로 만드는 중이라는 걸 알려야 한다.
     """
-    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+    if latest_task is not None and latest_task.status.is_in_flight:
         return FeedbackStatus.GENERATING
     if row is not None:
         return FeedbackStatus.READY
@@ -193,7 +193,7 @@ def refresh_long_term_insight(
     payload 키(userId/periodType/periodStart/periodEnd)는
     `worker/jobs/feedback_long.py` 가 이미 정해둔 이름 그대로 맞춘다.
 
-    **이미 대기 중인 작업이 있으면 새로 넣지 않는다.** 안 그러면 사용자가 새로고침을
+    **이미 대기·처리 중인 작업이 있으면 새로 넣지 않는다.** 안 그러면 사용자가 새로고침을
     연타할 때마다 큐에 쌓여서 (1) AI 를 여러 번 불러 비용이 늘고, (2) 워커 여러 대가
     같은 `(user_id, period_type, period_start)` 행을 동시에 upsert 하면서 근거
     링크(`long_term_feedback_sources`)가 꼬일 수 있고, (3) `_determine_status`가
@@ -204,7 +204,7 @@ def refresh_long_term_insight(
     date_from, date_to = _resolve_period(period, today)
 
     latest_task = insight_crud.get_latest_refresh_task(db, user_id=user_id, period_type=period_type)
-    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+    if latest_task is not None and latest_task.status.is_in_flight:
         return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)
 
     enqueue(

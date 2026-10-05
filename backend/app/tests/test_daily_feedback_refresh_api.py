@@ -324,6 +324,18 @@ def test_pending_task_blocks_new_enqueue_and_returns_generating(client, db):
     assert [task.id for task in tasks] == [pending.id]
 
 
+def test_processing_task_blocks_new_enqueue_and_returns_generating(client, db):
+    """처리 중인 작업이 있으면 새로 넣지 않는다 — PENDING 만 보면 집힌 뒤의 연타가 쌓인다."""
+    user = make_user(db)
+    _put_task(db, user_id=user.id, status=TaskStatus.PROCESSING)
+
+    response = client.post(URL, json={"date": D}, headers=_headers(user))
+
+    assert response.status_code == 202, response.text
+    assert response.json()["data"]["feedbackStatus"] == "GENERATING"
+    assert _count_tasks(db) == 1
+
+
 def test_latest_pending_blocks_even_with_older_done(client, db):
     """R3: 최신 작업이 PENDING 이면 그보다 오래된 DONE 이 있어도 새로 넣지 않는다.
 
