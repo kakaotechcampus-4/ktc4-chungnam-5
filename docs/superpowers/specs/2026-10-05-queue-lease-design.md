@@ -245,8 +245,9 @@ head `05ef77bf2a6a` 다음.
 - 기존 데이터 이전은 없다. 지금 구조에서 `PROCESSING` 행은 존재할 수 없다.
 - downgrade: `PROCESSING` 행을 `PENDING` 으로 돌리고 인덱스·컬럼을 지운다. enum 값은 Postgres 가 지울 수
   없어 남긴다.
-- 배포 순서: 마이그레이션 → 워커 교체. 옛 워커와 새 워커가 동시에 돌면 안 된다(옛 워커는 lease 를 모른다) —
-  워커를 내린 뒤 올린다.
+- 배포 순서: 워커를 내린다 → 마이그레이션 → API 교체 → 새 워커를 올린다. 옛 API 는 `PROCESSING` 을
+  모른다(네이티브 enum 이라 그 행을 읽으면 `LookupError`) — 새 워커보다 먼저 바꾼다. 옛 워커가 행 잠금을
+  쥔 채면 `ADD COLUMN`(ACCESS EXCLUSIVE)이 막힌다 — 먼저 내린다. 옛 워커와 새 워커가 동시에 돌면 안 된다.
 
 ## 8. 테스트
 

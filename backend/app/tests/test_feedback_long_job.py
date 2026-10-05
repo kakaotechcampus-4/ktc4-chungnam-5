@@ -705,7 +705,7 @@ def test_logs_do_not_contain_feedback_text(db, caplog):
 
 
 def test_dispatch_routes_feedback_long_to_this_job(db):
-    """L31: dispatch.handle 이 feedback.long 을 이 워커로 보낸다 — 미구현 오류가 아니다."""
+    """L31: dispatch.get_job 이 feedback.long 을 이 워커로 보낸다 — 미구현 오류가 아니다."""
     user = make_user(db)
     _enough_days(db, user)
 

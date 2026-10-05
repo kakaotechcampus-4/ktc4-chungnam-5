@@ -8,8 +8,10 @@ Create Date: 2026-10-05 12:00:00.000000
 (docs/superpowers/specs/2026-10-05-queue-lease-design.md). 지금 구조에서는 PROCESSING
 행이 존재할 수 없으므로 데이터 이전은 없다.
 
-**배포 순서**: 이 마이그레이션 → 워커 교체. 옛 워커는 lease 를 모른다 — 새 워커와
-동시에 돌리지 않는다.
+**배포 순서**: 워커를 내린다 → 이 마이그레이션 → API 교체 → 새 워커를 올린다.
+옛 API 는 PROCESSING 을 모른다(네이티브 enum 이라 그 행을 읽으면 LookupError) — 새 워커
+보다 먼저 바꾼다. 옛 워커가 행 잠금을 쥔 채면 ADD COLUMN(ACCESS EXCLUSIVE)이 막힌다 —
+먼저 내린다.
 """
 from typing import Sequence, Union
 
@@ -47,6 +49,8 @@ def downgrade() -> None:
     """Downgrade schema.
 
     ENUM 값은 Postgres 가 지울 수 없어 남긴다. 쓰는 행만 PENDING 으로 되돌린다.
+    PROCESSING 이던 행은 claim 때 올라간 `attempts + 1` 을 그대로 가진다(시도 한 번이
+    소진된다) — 롤백으로는 받아들일 만하다.
     """
     op.execute("UPDATE task_queue SET status = 'PENDING' WHERE status = 'PROCESSING'")
     op.drop_index('ix_task_queue_processing', table_name='task_queue')

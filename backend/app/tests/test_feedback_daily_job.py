@@ -758,7 +758,7 @@ def test_average_is_rounded_with_python_round(db):
 
 
 def test_handle_routes_feedback_daily_to_the_handler(db):
-    """D2: dispatch.handle 이 feedback.daily 를 핸들러로 보낸다 — 근거 없는 사용자면 None, 0행."""
+    """D2: dispatch.get_job 이 feedback.daily 를 핸들러로 보낸다 — 근거 없는 사용자면 None, 0행."""
     user = make_user(db)
 
     task = _task(user.id)

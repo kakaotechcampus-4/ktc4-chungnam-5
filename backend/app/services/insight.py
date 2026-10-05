@@ -82,7 +82,7 @@ def _superseded_by_insufficient_run(row: LongTermFeedback | None, latest_task: T
     남아 "오늘 창은 부족" 이라는 결과를 가린다. 최근 DONE 작업의 `periodStart` 가 행보다
     늦으면 그 작업이 행을 못 만든 것이다 — 행이 없는 것으로 본다.
 
-    DONE 만 본다. PENDING 이면 아직 만드는 중이고(GENERATING), FAILED 면 부족 판정이 난 게
+    DONE 만 본다. 대기·처리 중이면 아직 만드는 중이고(GENERATING), FAILED 면 부족 판정이 난 게
     아니다 — 둘 다 기존 행을 계속 보여 준다. ALL 은 period_start 가 고정값이라 걸리지 않는다
     (같은 키 행을 워커가 이미 지운다).
     """

@@ -268,7 +268,10 @@ def _text(value: Any, *, field: str, max_len: int) -> str:
 
 
 def _is_last_attempt(task: ClaimedTask) -> bool:
-    """이번에 실패하면 큐가 격리하는가. `infra/queue.py::_record_failure` 와 같은 식이다.
+    """이번에 실패하면 큐가 격리하는가.
+
+    `infra/queue.py::DbTaskQueue._retry_or_quarantine` 와 같은 식이다(claim 이 올린 뒤의
+    attempts 로 `>= QUEUE_MAX_ATTEMPTS` 를 본다).
 
     `task.attempts` 는 이번 시도 **이전까지** 집힌 횟수다 — 큐가 claim 할 때 1 을 더한다.
     """

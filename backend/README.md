@@ -244,6 +244,10 @@ queue.release(lease)           # 종료 신호: 시도를 세지 않고 PENDING 
 것일 때만 행을 바꾼다. 워커가 죽어 lease(`QUEUE_LEASE_SEC`, 120초)가 지나면 다음 `claim`
 이 회수한다.
 
+**배포 순서**: 워커를 내린다 → 마이그레이션 → API 교체 → 새 워커를 올린다. 옛 API 는
+`PROCESSING` 을 몰라(네이티브 enum) 그 행을 읽으면 `LookupError` 가 나므로 새 워커보다
+먼저 바꾼다. 옛 워커가 행 잠금을 쥔 채면 `ADD COLUMN` 이 막히므로 먼저 내린다.
+
 ### 커밋 시점 — 여기가 전부다
 
 | 단계 | 큐가 하는 일 |

@@ -350,7 +350,7 @@ def test_refresh_skips_enqueue_when_already_processing(monkeypatch):
 
 
 def test_refresh_enqueues_when_latest_task_already_done(monkeypatch):
-    """마지막 작업이 끝났으면(PENDING 이 아니면) 새로고침 요청을 새로 넣어야 한다."""
+    """마지막 작업이 끝났으면(대기·처리 중이 아니면) 새로고침 요청을 새로 넣어야 한다."""
     monkeypatch.setattr(
         insight_crud, "get_latest_refresh_task", lambda *a, **k: _task(TaskStatus.DONE)
     )

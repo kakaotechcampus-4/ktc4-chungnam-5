@@ -91,7 +91,7 @@ def test_in_flight_means_not_finished(status, expected):
 def test_lease_defaults_to_two_minutes():
     from app.infra.queue import QueueSettings
 
-    assert QueueSettings().QUEUE_LEASE_SEC == 120
+    assert QueueSettings(_env_file=None).QUEUE_LEASE_SEC == 120
 
 
 def test_enqueue_is_atomic_with_the_domain_transaction(sessions):
@@ -327,7 +327,7 @@ def test_fail_returns_the_task_to_pending_with_backoff(sessions, queue):
         assert row.lease_token is None
         assert row.lease_expires_at is None
         # 첫 실패 → 30초 뒤. 곧바로 다시 집으면 재시도가 순식간에 소진된다.
-        assert row.next_run_at > before + timedelta(seconds=20)
+        assert before + timedelta(seconds=20) < row.next_run_at < before + timedelta(seconds=40)
 
 
 def test_second_failure_backs_off_longer(sessions, queue):
@@ -338,7 +338,8 @@ def test_second_failure_backs_off_longer(sessions, queue):
     queue.fail(lease, RuntimeError("또 실패"))
 
     with sessions() as db:
-        assert _row(db, put.id).next_run_at > before + timedelta(seconds=50)
+        next_run_at = _row(db, put.id).next_run_at
+        assert before + timedelta(seconds=50) < next_run_at < before + timedelta(seconds=70)
 
 
 def test_commit_failure_is_recorded_through_fail(sessions, queue):
@@ -453,7 +454,7 @@ def test_expired_lease_is_reclaimed_by_the_next_claim(sessions, queue):
         assert row.attempts == 1
         assert row.last_error.startswith("LeaseExpired")
         assert row.lease_token is None
-        assert row.next_run_at > before + timedelta(seconds=20)
+        assert before + timedelta(seconds=20) < row.next_run_at < before + timedelta(seconds=40)
 
     # 뒤늦게 깨어난 원래 워커의 완료는 반영되지 않는다.
     with pytest.raises(LeaseLostError):
