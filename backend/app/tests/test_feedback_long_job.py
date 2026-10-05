@@ -37,7 +37,7 @@ from app.tests.factories import (
     make_qqs_evaluation,
     make_user,
 )
-from app.worker.dispatch import handle
+from app.worker.dispatch import get_job
 from app.worker.jobs import feedback_long
 
 # 세 단계를 세션 하나로 이어 돈다. 시나리오 단언은 3단계 분리 전과 같다.
@@ -709,7 +709,8 @@ def test_dispatch_routes_feedback_long_to_this_job(db):
     user = make_user(db)
     _enough_days(db, user)
 
-    result = handle(db, _task(user.id), FakeAi())
+    task = _task(user.id)
+    result = get_job(task.type).run_inline(db, task, FakeAi())
 
     assert result is not None
     assert result["dayCount"] == 3

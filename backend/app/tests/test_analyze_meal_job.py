@@ -23,7 +23,7 @@ from app.infra.queue import ClaimedTask, QueueSettings
 from app.models.enums import MealItemSource, MealStatus, MealType
 from app.models.meal import Meal, MealItem, UserCorrection
 from app.tests.factories import make_food_ref, make_meal, make_meal_item, make_user
-from app.worker.dispatch import handle
+from app.worker.dispatch import get_job
 from app.worker.jobs import analyze_meal
 
 LAST_ATTEMPT = QueueSettings().QUEUE_MAX_ATTEMPTS - 1
@@ -459,7 +459,8 @@ def test_dispatch_routes_meal_analyze_to_this_job(db, storage):
     """A20: dispatch 가 meal.analyze 를 이 핸들러로 보낸다."""
     meal = _analyzing_meal(db)
 
-    handle(db, _task(meal), FakeAi())
+    task = _task(meal)
+    get_job(task.type).run_inline(db, task, FakeAi())
 
     assert _status(db, meal) is MealStatus.REVIEW_REQUIRED
 

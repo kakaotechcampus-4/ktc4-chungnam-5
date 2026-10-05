@@ -29,7 +29,7 @@ from app.tests.factories import (
     make_qqs_evaluation,
     make_user,
 )
-from app.worker.dispatch import handle
+from app.worker.dispatch import get_job
 from app.worker.jobs import feedback_daily
 
 # 세 단계를 세션 하나로 이어 돈다. 시나리오 단언은 3단계 분리 전과 같다.
@@ -761,7 +761,8 @@ def test_handle_routes_feedback_daily_to_the_handler(db):
     """D2: dispatch.handle 이 feedback.daily 를 핸들러로 보낸다 — 근거 없는 사용자면 None, 0행."""
     user = make_user(db)
 
-    result = handle(db, _task(user.id), FakeAi())
+    task = _task(user.id)
+    result = get_job(task.type).run_inline(db, task, FakeAi())
 
     assert result is None
     assert _daily_rows(db, user.id) == []

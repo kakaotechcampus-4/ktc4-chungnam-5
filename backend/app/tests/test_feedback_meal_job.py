@@ -34,7 +34,7 @@ from app.tests.factories import (
     make_qqs_evaluation,
     make_user,
 )
-from app.worker.dispatch import handle
+from app.worker.dispatch import get_job
 from app.worker.jobs import feedback_meal
 
 # 세 단계를 세션 하나로 이어 돈다. 시나리오 단언은 3단계 분리 전과 같다.
@@ -678,7 +678,8 @@ def test_handle_routes_feedback_meal_to_the_handler(db):
     user = make_user(db)
     meal = _evaluated_meal(db, user)
 
-    result = handle(db, _task(meal.id), FakeAi())
+    task = _task(meal.id)
+    result = get_job(task.type).run_inline(db, task, FakeAi())
 
     assert result["mealFeedbackId"] == str(_only_row(db, meal.id).id)
 
