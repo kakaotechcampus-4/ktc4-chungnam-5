@@ -225,33 +225,37 @@ def create_meal(db: Session, ...) -> MealResponse:
 등록이 원자적이다 — 커밋이 실패하면 둘 다 없고, 성공하면 둘 다 있다. SQS 를 쓸 때
 지켜야 했던 "커밋이 먼저다" 규칙은 이제 없다.
 
-### 꺼내기 — 잠금을 쥔 채로 처리한다
+### 꺼내기 — lease 로 빌린다
 
 ```python
-with queue.claim() as claim:
-    if claim is None:
-        ...          # 빈 큐
-    claim.db         # 이 작업을 잠근 세션. 핸들러가 도메인 쓰기에 그대로 쓴다
-    claim.task.type  # 'meal.analyze'
-    claim.task.payload
-    claim.task.attempts   # 지금까지 실패한 횟수. 첫 시도는 0
-    claim.result = {...}  # 담아 두면 DONE 과 함께 result 컬럼에 들어간다
+lease = queue.claim()          # PROCESSING · 토큰 · 만료 시각을 쓰고 곧바로 커밋
+with queue.read() as db:       # load: 읽기만. 끝나면 롤백
+    ...
+...                            # call_ai: 세션 없음 — AI 를 기다리는 동안 커넥션 0
+with queue.complete(lease) as done:
+    done.db                    # apply: 도메인 쓰기
+    done.result = {...}        # DONE 과 함께 result 컬럼에 들어간다
+queue.fail(lease, exc)         # 실패: PENDING(재시도) 또는 FAILED(격리)
+queue.release(lease)           # 종료 신호: 시도를 세지 않고 PENDING 으로
 ```
 
-`SELECT … FOR UPDATE SKIP LOCKED` 로 한 행을 집고 **블록이 끝날 때까지 잠금을
-유지한다.** 잠긴 행은 다른 워커가 건너뛴다. 워커를 늘리면 그대로 분산된다.
+`SELECT … FOR UPDATE SKIP LOCKED` 로 한 행을 집되 **집는 순간 커밋한다.** AI 를 기다리는
+동안 트랜잭션도 행 잠금도 커넥션도 쥐지 않는다. 완료·실패·반납은 `lease_token` 이 자기
+것일 때만 행을 바꾼다. 워커가 죽어 lease(`QUEUE_LEASE_SEC`, 120초)가 지나면 다음 `claim`
+이 회수한다.
 
 ### 커밋 시점 — 여기가 전부다
 
-| 블록이 | 큐가 하는 일 |
+| 단계 | 큐가 하는 일 |
 |---|---|
-| 정상 종료 | `status='DONE'`, `result`, `finished_at` 커밋 |
-| 예외 | 롤백 → 별도 트랜잭션에 `attempts+1`·`last_error`·`next_run_at`(30s→60s) → 3회째면 `FAILED` |
+| `claim` | `PROCESSING`, `attempts+1`, 토큰, `lease_expires_at` 커밋 |
+| `complete` 정상 종료 | 도메인 쓰기 + `DONE` · `result` · `finished_at` 을 한 트랜잭션으로 커밋. 토큰이 안 맞으면 `LeaseLostError` 로 전부 롤백 |
+| `fail` | `last_error` · `next_run_at`(30s→60s), 3번째로 집힌 시도면 `FAILED` |
+| lease 만료 | 다음 `claim` 이 `PENDING`(backoff) 또는 `FAILED` 로 회수 |
 
-**롤백되면 핸들러가 쓴 도메인 변경까지 통째로 되돌아간다.** 그래서 재시도할 때
-이전 시도의 흔적이 없다. 반대로 실패했는데 예외를 삼키면 큐는 성공으로 보고 DONE 을
-커밋한다 — 작업이 조용히 사라진다. `app/worker/loop.py` 의 `run()` 이 이 구조이고,
-`app/tests/test_worker_loop.py` 가 이것만 검증한다.
+`attempts` 는 **집힌 횟수**다. 워커를 죽이는 작업(OOM·SIGKILL)도 상한에 걸리게 하려고
+집을 때 센다. `app/worker/loop.py` 의 `process_one` · `run` 이 이 구조이고,
+`app/tests/test_worker_loop.py` 가 "AI 호출 중 커넥션 0" 과 실패 경로를 검증한다.
 
 `FAILED` 는 DLQ 자리다. 자동으로 되살리지 않는다 — 3번 실패한 작업은 대개 코드나
 데이터가 잘못된 것이라 사람이 원인을 보고 다시 넣는다.
@@ -260,21 +264,21 @@ with queue.claim() as claim:
 UPDATE task_queue SET status='PENDING', attempts=0, next_run_at=now() WHERE id='…';
 ```
 
-상태는 `python -m scripts.queue_status` 로 본다. "처리 중" 이라는 상태 컬럼은 없다 —
-워커는 행 잠금을 쥐고 있을 뿐이고 그건 커밋 전이라 다른 세션에 보이지 않는다.
+상태는 `python -m scripts.queue_status` 로 본다. 처리 중은 `PROCESSING` 으로 바로 보이고,
+lease 가 지난 것도 따로 센다.
 
 ### 작업을 하나 붙이려면
 
-1. `app/worker/jobs/` 에 파일을 만들고 `run(db, task, ai)` 를 둔다
-2. `app/worker/dispatch.py` 의 `_HANDLERS` 에 한 줄 더한다
+1. `app/worker/jobs/` 에 파일을 만들고 `load` · `call_ai` · `apply`(필요하면
+   `on_ai_error`)와 `JOB = Job(...)` 을 둔다. 계약은 `app/worker/job.py` 에 있다
+2. `app/worker/dispatch.py` 의 `_JOBS` 에 한 줄 더한다
 3. `_NOT_IMPLEMENTED` 에서 그 타입을 지운다
 
-스켈레톤 마지막 줄의 `raise NotImplementedError` 를 **가장 마지막에** 지운다.
-먼저 지우면 `loop.py` 가 성공으로 보고 DONE 을 커밋한다.
+`load` 가 넘기는 값은 ORM 객체가 아닌 순수 데이터여야 한다 — `load` 의 세션은 곧 닫힌다.
+`call_ai` 는 세션을 받지 않는다. 쓰기는 `apply` · `on_ai_error` 에서만 한다.
 
-**`run(db, task, ai)` 안에서 부르는 `services/`·`crud/` 함수는 커밋하면 안 된다.**
-이 `db` 는 작업을 잠그고 있는 세션이라, 도중에 커밋하는 service 를 그대로 부르면
-AI 호출이 끝나기 전에 행 잠금이 풀려 다른 워커가 같은 작업을 중복 처리한다.
+**`apply` 에서 부르는 `services/`·`crud/` 함수는 커밋하면 안 된다.** 커밋은 큐가 DONE 과
+함께 한다 — 도중에 커밋하는 service 를 부르면 lease 를 잃었을 때 그 변경을 되돌릴 수 없다.
 커밋하는 service 가 있으면 커밋 없는 버전으로 쪼개서 쓴다.
 
 ## 환경변수
@@ -313,7 +317,7 @@ AI 호출이 끝나기 전에 행 잠금이 풀려 다른 워커가 같은 작�
 | 레이어 경계  | import-linter — `services/*` 상호 참조 금지 · `services` → `crud` 단방향을 CI에서 강제                                          |
 | API          | `httpx.ASGITransport` + Testcontainers(Postgres)                                                                                |
 | Worker 루프  | 가짜 큐·가짜 AI 로 **커밋 시점**만 검증 — 실패한 작업을 DONE 으로 커밋하지 않는지(`test_worker_loop.py`). 외부 의존 0 |
-| 작업 큐      | 실제 Postgres 로 SKIP LOCKED·재시도·격리 검증(`test_task_queue.py`). 커넥션 둘로 동시 집기를 확인한다                 |
+| 작업 큐      | 실제 Postgres 로 lease·SKIP LOCKED·재시도·격리·회수 검증(`test_task_queue.py`). AI 호출 중 커넥션 0 을 `test_worker_loop.py` 가 확인한다 |
 | infra 추상화 | 로컬 구현으로 테스트, 외부 의존 0                                                                                               |
 
 ---
