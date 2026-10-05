@@ -9,12 +9,20 @@ BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `LongFeedbackRequest` · `LongFeedb
 payload(userId · periodType · periodStart · periodEnd)는 `services/insight.py::refresh_long_term_insight`
 가 넣는다. `periodType=ALL` 이면 `periodStart` 는 실제 시작일이 아니라 `ALL_PERIOD_START`
 (UNIQUE 키 고정값)라 하한 없이 모은다.
+
+순서 (load 1~3 · call_ai 4 · apply 5, 데이터가 모자라면 apply 가 2 의 삭제):
+  1. 기간 안 `qqs_evaluations` 를 KST 날짜별 평균으로 모은다 — 세 점수가 다 있는 날만
+  2. 점수 있는 날이 `MIN_SCORED_DAYS` 미만이면 같은 키의 행을 지우고 AI 없이 끝낸다
+  3. 같은 기간 SAFE `daily_feedbacks` 본문을 모은다 (없어도 진행)
+  4. AI 호출
+  5. `long_term_feedbacks` upsert + `long_term_feedback_sources` 재생성
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
@@ -27,6 +35,7 @@ from app.crud import meal as meal_crud
 from app.infra.ai import AiClient
 from app.infra.queue import ClaimedTask
 from app.models.enums import FeedbackPeriodType, SafetyStatus
+from app.worker.job import Job
 
 logger = logging.getLogger("worker.feedback_long")
 
@@ -37,15 +46,23 @@ MIN_SCORED_DAYS = 3
 비어 있기 쉽다. 이 경우 조회 API 는 "작업 DONE + 행 없음" 을 `dataSufficient=false` 로 보여 준다."""
 
 
-def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
-    """
-    순서:
-      1. 기간 안 `qqs_evaluations` 를 KST 날짜별 평균으로 모은다 — 세 점수가 다 있는 날만
-      2. 점수 있는 날이 `MIN_SCORED_DAYS` 미만이면 같은 키의 행을 지우고 AI 없이 끝낸다
-      3. 같은 기간 SAFE `daily_feedbacks` 본문을 모은다 (없어도 진행)
-      4. AI 호출
-      5. `long_term_feedbacks` upsert + `long_term_feedback_sources` 재생성
-    """
+@dataclass(frozen=True)
+class _Ctx:
+    """`load` 가 넘기는 값. ORM 객체를 싣지 않는다 — `load` 의 세션은 곧 닫힌다."""
+
+    user_id: uuid.UUID
+    period_type: FeedbackPeriodType
+    period_start: date
+    period_end: date
+    day_count: int
+    """점수 있는 날 수. 모자랄 때 로그에 남긴다."""
+    series: list[dict[str, Any]]
+    daily_feedback_ids: list[uuid.UUID]
+    request: dict[str, Any] | None
+    """None 이면 점수 있는 날이 `MIN_SCORED_DAYS` 미만이다 — AI 를 부르지 않고 `apply` 가 행을 지운다."""
+
+
+def load(db: Session, task: ClaimedTask) -> _Ctx:
     body = task.payload
     user_id = uuid.UUID(body["userId"])
     period_type = FeedbackPeriodType(body["periodType"])
@@ -68,17 +85,16 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
     ]
 
     if len(daily_scores) < MIN_SCORED_DAYS:
-        long_term_feedback_crud.delete_for_period(
-            db, user_id=user_id, period_type=period_type, period_start=period_start
+        return _Ctx(
+            user_id=user_id,
+            period_type=period_type,
+            period_start=period_start,
+            period_end=period_end,
+            day_count=len(daily_scores),
+            series=[],
+            daily_feedback_ids=[],
+            request=None,
         )
-        logger.info(
-            "장기 피드백 데이터 부족 userId=%s periodType=%s periodStart=%s dayCount=%s",
-            user_id,
-            period_type.value,
-            period_start,
-            len(daily_scores),
-        )
-        return None
 
     # AI payload 는 JSON 으로 나간다 — Decimal·UUID·date 객체를 싣지 않는다.
     series = [
@@ -108,8 +124,15 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
     # WEEKLY · MONTHLY 는 창 자체가 분석 구간이라 첫 며칠이 비어도 창 시작일을 보낸다.
     ai_period_start = series[0]["date"] if date_from is None else period_start.isoformat()
 
-    result = ai.long_feedback(
-        {
+    return _Ctx(
+        user_id=user_id,
+        period_type=period_type,
+        period_start=period_start,
+        period_end=period_end,
+        day_count=len(daily_scores),
+        series=series,
+        daily_feedback_ids=[row.daily_feedback_id for row in sources],
+        request={
             "userId": str(user_id),
             "periodType": period_type.value,
             "periodStart": ai_period_start,
@@ -117,41 +140,64 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
             "stage": stage.value,
             "series": series,
             "dailySummaries": [row.summary for row in sources],
-        }
+        },
     )
+
+
+def call_ai(ctx: _Ctx, ai: AiClient) -> dict[str, Any] | None:
+    if ctx.request is None:
+        return None
+    return ai.long_feedback(ctx.request)
+
+
+def apply(db: Session, task: ClaimedTask, ctx: _Ctx, result: dict[str, Any] | None) -> dict[str, Any] | None:
+    if result is None:
+        long_term_feedback_crud.delete_for_period(
+            db, user_id=ctx.user_id, period_type=ctx.period_type, period_start=ctx.period_start
+        )
+        logger.info(
+            "장기 피드백 데이터 부족 userId=%s periodType=%s periodStart=%s dayCount=%s",
+            ctx.user_id,
+            ctx.period_type.value,
+            ctx.period_start,
+            ctx.day_count,
+        )
+        return None
 
     # safetyStatus 는 AI 가 준 그대로 저장한다. SAFE 로 올리지 않는다 (규칙 1).
     long_term_feedback_id = long_term_feedback_crud.upsert(
         db,
-        user_id=user_id,
-        period_type=period_type,
-        period_start=period_start,
-        period_end=period_end,
+        user_id=ctx.user_id,
+        period_type=ctx.period_type,
+        period_start=ctx.period_start,
+        period_end=ctx.period_end,
         trend_summary=result["trendSummary"],
         recommendation=result["recommendation"],
-        chart_data={"series": series},
+        chart_data={"series": ctx.series},
         model_version=result["modelVersion"],
         safety_status=SafetyStatus(result["safetyStatus"]),
     )
     long_term_feedback_crud.replace_sources(
         db,
         long_term_feedback_id=long_term_feedback_id,
-        daily_feedback_ids=[row.daily_feedback_id for row in sources],
+        daily_feedback_ids=ctx.daily_feedback_ids,
     )
 
-    # 커밋하지 않는다. 이 세션은 큐가 작업을 잠근 트랜잭션이고, 큐가 DONE 과 함께
-    # 한 번에 커밋한다. 여기서 터지면 도메인 변경까지 통째로 롤백된다.
+    # 커밋하지 않는다. 큐가 DONE 과 함께 한 번에 커밋한다(`queue.complete`).
 
     # 로그·반환값(task_queue.result)에는 식별자와 개수만 — 문장은 남기지 않는다 (규칙 6).
     logger.info(
         "장기 피드백 완료 userId=%s periodType=%s safetyStatus=%s",
-        user_id,
-        period_type.value,
+        ctx.user_id,
+        ctx.period_type.value,
         result["safetyStatus"],
     )
 
     return {
         "longTermFeedbackId": str(long_term_feedback_id),
-        "dayCount": len(series),
-        "sourceCount": len(sources),
+        "dayCount": len(ctx.series),
+        "sourceCount": len(ctx.daily_feedback_ids),
     }
+
+
+JOB = Job(load=load, call_ai=call_ai, apply=apply)

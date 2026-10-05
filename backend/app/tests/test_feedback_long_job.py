@@ -38,7 +38,10 @@ from app.tests.factories import (
     make_user,
 )
 from app.worker.dispatch import handle
-from app.worker.jobs.feedback_long import run
+from app.worker.jobs import feedback_long
+
+# 세 단계를 세션 하나로 이어 돈다. 시나리오 단언은 3단계 분리 전과 같다.
+run = feedback_long.JOB.run_inline
 
 START = date(2026, 8, 15)
 END = date(2026, 8, 21)
@@ -827,3 +830,14 @@ def test_insight_is_insufficient_when_first_run_had_too_few_days(db):
 
     assert insight.status == FeedbackStatus.READY
     assert insight.data_sufficient is False
+
+
+# ─────────────────────────── 3단계 계약 ───────────────────────────
+
+
+def test_insufficient_days_mean_no_ai_call(db):
+    user = make_user(db)
+    ctx = feedback_long.load(db, _task(user.id))
+
+    assert ctx.request is None
+    assert feedback_long.call_ai(ctx, FakeAi()) is None

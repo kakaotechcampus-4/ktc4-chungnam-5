@@ -44,9 +44,9 @@ from app.worker.jobs import analyze_meal, feedback_daily, feedback_long, feedbac
 
 _HANDLERS: dict[str, Callable[[Session, ClaimedTask, AiClient], dict[str, Any] | None]] = {
     "meal.analyze": analyze_meal.JOB.run_inline,
-    "feedback.daily": feedback_daily.run,
+    "feedback.daily": feedback_daily.JOB.run_inline,
     "feedback.meal": feedback_meal.JOB.run_inline,
-    "feedback.long": feedback_long.run,
+    "feedback.long": feedback_long.JOB.run_inline,
 }
 
 # 계약은 정해졌지만 아직 구현이 없는 것들. 알 수 없는 타입과 구분해서 알려 준다.
