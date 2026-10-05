@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -52,6 +53,60 @@ def test_new_task_defaults_to_pending_and_runnable_now(sessions):
 
 
 # ─────────────────────────── 넣기 ───────────────────────────
+
+
+def test_new_task_has_no_lease(sessions):
+    """lease 는 claim 이 쓴다. 막 넣은 작업에는 없다."""
+    with sessions() as db:
+        task = Task(type="meal.analyze", payload={"mealId": "m1"})
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+
+        assert task.lease_token is None
+        assert task.lease_expires_at is None
+
+
+def test_processing_and_lease_columns_round_trip(sessions):
+    token = uuid.uuid4()
+    expires = datetime.now(timezone.utc) + timedelta(minutes=2)
+    with sessions() as db:
+        task = Task(
+            type="meal.analyze",
+            payload={"mealId": "m1"},
+            status=TaskStatus.PROCESSING,
+            lease_token=token,
+            lease_expires_at=expires,
+        )
+        db.add(task)
+        db.commit()
+        task_id = task.id
+
+    with sessions() as db:
+        row = _row(db, task_id)
+        assert row.status is TaskStatus.PROCESSING
+        assert row.lease_token == token
+        assert row.lease_expires_at == expires
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        (TaskStatus.PENDING, True),
+        (TaskStatus.PROCESSING, True),
+        (TaskStatus.DONE, False),
+        (TaskStatus.FAILED, False),
+    ],
+)
+def test_in_flight_means_not_finished(status, expected):
+    """"생성 중" 판정과 중복 등록 방지는 대기 중과 처리 중을 똑같이 본다."""
+    assert status.is_in_flight is expected
+
+
+def test_lease_defaults_to_two_minutes():
+    from app.infra.queue import QueueSettings
+
+    assert QueueSettings().QUEUE_LEASE_SEC == 120
 
 
 def test_enqueue_is_atomic_with_the_domain_transaction(sessions):

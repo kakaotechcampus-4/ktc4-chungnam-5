@@ -50,6 +50,10 @@ class QueueSettings(BaseSettings):
     """이 횟수만큼 실패하면 FAILED 로 격리한다."""
     QUEUE_BACKOFF_BASE_SEC: int = 30
     """재시도 지연의 기준. 30s → 60s 로 두 배씩 민다."""
+    QUEUE_LEASE_SEC: int = 120
+    """lease 길이. 이 안에 끝내지 못하면 다른 워커가 회수한다. AI 타임아웃(45초)보다
+    넉넉히 길어야 정상 작업을 두 번 돌리지 않는다 — 워커가 기동할 때 확인한다.
+    AI_TIMEOUT_SEC 는 httpx 의 단계별 타임아웃이라 총 시간 상한이 아니어서 두 배 넘게 둔다."""
     QUEUE_IDLE_TX_TIMEOUT_SEC: int = 120
     """작업 트랜잭션의 idle_in_transaction 상한. AI 타임아웃(45초)보다 넉넉히 위여야
     정상 작업을 죽이지 않는다. 멈춘 워커가 행을 영원히 붙잡는 것만 막는 안전망이다."""
