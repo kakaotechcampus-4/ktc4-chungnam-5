@@ -25,9 +25,12 @@ from app.models.meal import Meal, MealItem, UserCorrection
 from app.tests.factories import make_food_ref, make_meal, make_meal_item, make_user
 from app.worker.dispatch import handle
 from app.worker.jobs import analyze_meal
-from app.worker.jobs.analyze_meal import run
 
 LAST_ATTEMPT = QueueSettings().QUEUE_MAX_ATTEMPTS - 1
+
+# 세 단계를 세션 하나로 이어 돈다. 시나리오 단언은 3단계 분리 전과 같다 — 동작이 바뀌지
+# 않았다는 증거다.
+run = analyze_meal.JOB.run_inline
 
 
 # ─────────────────────────── Fake ───────────────────────────
@@ -539,3 +542,39 @@ def test_meal_deleted_during_ai_call_is_not_written(db, storage):
     assert result is None
     assert _items(db, meal.id) == []
     assert _status(db, meal) is MealStatus.ANALYZING
+
+
+# ─────────────────────────── 3단계 계약 ───────────────────────────
+
+
+def test_load_hands_over_plain_data_not_orm_objects(db, storage):
+    """`load` 의 세션은 큐가 닫는다. ctx 에 ORM 객체가 실리면 `apply` 에서 못 쓴다."""
+    from app.db.base import Base
+
+    meal = _analyzing_meal(db)
+
+    ctx = analyze_meal.load(db, _task(meal))
+
+    assert ctx.meal_id == meal.id
+    assert not any(isinstance(value, Base) for value in vars(ctx).values())
+
+
+def test_load_skips_without_calling_ai(db, storage):
+    from app.worker.job import Skip
+
+    meal = _analyzing_meal(db)
+    meal.status = MealStatus.REVIEW_REQUIRED
+    db.flush()
+
+    assert analyze_meal.load(db, _task(meal)) == Skip(None)
+
+
+def test_ai_error_on_last_attempt_skips_a_meal_deleted_meanwhile(db, storage):
+    """AI 가 끝내 실패했는데 그사이 사용자가 지웠으면 FAILED 로 덮지 않는다."""
+    meal = _analyzing_meal(db)
+    ctx = analyze_meal.load(db, _task(meal))
+    db.execute(update(Meal).where(Meal.id == meal.id).values(deleted_at=datetime.now(UTC)))
+
+    result = analyze_meal.on_ai_error(db, _task(meal, attempts=LAST_ATTEMPT), ctx, RuntimeError("AI 다운"))
+
+    assert result is None
