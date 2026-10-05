@@ -45,7 +45,7 @@ from app.worker.jobs import analyze_meal, feedback_daily, feedback_long, feedbac
 _HANDLERS: dict[str, Callable[[Session, ClaimedTask, AiClient], dict[str, Any] | None]] = {
     "meal.analyze": analyze_meal.JOB.run_inline,
     "feedback.daily": feedback_daily.run,
-    "feedback.meal": feedback_meal.run,
+    "feedback.meal": feedback_meal.JOB.run_inline,
     "feedback.long": feedback_long.run,
 }
 

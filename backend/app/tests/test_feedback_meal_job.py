@@ -35,7 +35,10 @@ from app.tests.factories import (
     make_user,
 )
 from app.worker.dispatch import handle
-from app.worker.jobs.feedback_meal import run
+from app.worker.jobs import feedback_meal
+
+# 세 단계를 세션 하나로 이어 돈다. 시나리오 단언은 3단계 분리 전과 같다.
+run = feedback_meal.JOB.run_inline
 
 _UNSET: Any = object()
 """`FakeAi(suggestions=...)` 를 안 넘겼다는 표시. `None` 은 "AI 가 null 을 줬다" 라 따로 둔다."""
@@ -693,3 +696,18 @@ def test_items_of_other_meals_are_not_mixed(db):
 
     assert [item["displayName"] for item in ai.calls[0]["items"]] == ["내 음식"]
 
+
+# ─────────────────────────── 3단계 계약 ───────────────────────────
+
+
+def test_load_hands_over_plain_data_not_orm_objects(db):
+    from app.db.base import Base
+
+    user = make_user(db)
+    meal = _evaluated_meal(db, user)
+
+    ctx = feedback_meal.load(db, _task(meal.id))
+
+    assert ctx.meal_id == meal.id
+    assert not any(isinstance(value, Base) for value in vars(ctx).values())
+    assert ctx.request["scope"] == "MEAL"
