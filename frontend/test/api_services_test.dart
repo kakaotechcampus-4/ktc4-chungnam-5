@@ -863,4 +863,69 @@ void main() {
       expect(await state.canCorrectStart(), isFalse);
     });
   });
+  group('api spec 10/1', () {
+    test('long-term insight reads feedbackStatus or the old status key', () {
+      Map<String, Object?> body(String key) => {
+        key: 'READY',
+        'dataSufficient': true,
+        'trendSummary': '요약',
+        'recommendation': null,
+        'stale': false,
+      };
+      expect(LongTermInsight.fromJson(body('status')).status, 'READY');
+      expect(LongTermInsight.fromJson(body('feedbackStatus')).status, 'READY');
+    });
+
+    test('a blocked meal feedback is marked for the counselling notice', () {
+      final feedback = MealFeedback.fromJson({
+        'feedbackStatus': 'READY',
+        'summary': null,
+        'suggestions': [],
+        'safetyStatus': 'BLOCKED',
+      });
+      expect(feedback.isPending, isFalse);
+      expect(feedback.isBlocked, isTrue);
+    });
+
+    test(
+      'nutrition that cannot be scaled comes back with the notice',
+      () async {
+        final (client, _) = await _client(
+          (_) => (
+            200,
+            {
+              'success': true,
+              'data': {
+                'itemId': 'i1',
+                'matched': false,
+                'nutritionSource': null,
+                'nutrition': null,
+                'status': 'ANALYZING',
+                'isRecalculation': true,
+              },
+              'error': {
+                'code': 'NUTRITION_NOT_MATCHED',
+                'message': '양을 g 으로 환산하지 못했어요',
+              },
+            },
+          ),
+        );
+        final result = await MealApiService(
+          client,
+        ).setNutrition('m1', 'i1', foodRefId: 'D1');
+        expect(result.nutrition, isNull);
+        expect(result.notice, '양을 g 으로 환산하지 못했어요');
+      },
+    );
+
+    test('candidate names drop the DB underscores for display', () {
+      final c = FoodCandidate.fromJson({
+        'foodRefId': 'D1',
+        'name': '달걀_삶은것',
+        'servingSizeG': 100,
+        'nutrition': <String, dynamic>{},
+      });
+      expect(c.displayName, '달걀 삶은것');
+    });
+  });
 }

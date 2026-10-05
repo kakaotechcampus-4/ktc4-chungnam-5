@@ -353,6 +353,8 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
   }
 
   List<Widget> _buildSuggestions() {
+    // 의료 판단이 필요한 내용이면 제안 대신 상담 안내만 보인다(§7).
+    if (feedback?.isBlocked == true) return [const NoticeBlock()];
     final suggestions = feedback?.suggestions ?? const [];
     if (suggestions.isNotEmpty) {
       return [

@@ -688,4 +688,47 @@ void main() {
     expect(api.requests.where((r) => r.path.endsWith('/refresh')), isEmpty);
     expect(find.textContaining('3일 이상 쌓이면'), findsOneWidget);
   });
+  testWidgets('a blocked meal feedback shows the counselling notice', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    final api = FakeApi()
+      ..on(
+        'GET /meals/{meal_id}/feedback',
+        (_) => (
+          200,
+          {
+            'success': true,
+            'data': {
+              'feedbackStatus': 'READY',
+              'summary': null,
+              'reasoning': null,
+              'suggestions': [],
+              'expectedSatietyPct': null,
+              'safetyStatus': 'BLOCKED',
+            },
+            'error': {'code': 'MEDICAL_QUESTION_DETECTED', 'message': ''},
+          },
+        ),
+      );
+    await tester.pumpWidget(
+      Provider(
+        create: (_) => ApiClient(session: session, dio: api.dio),
+        child: MaterialApp(
+          home: NextMealSuggestionScreen(
+            mealId: 'm1',
+            eatenAt: DateTime(2026, 10, 5, 12),
+          ),
+        ),
+      ),
+    );
+    await _settle(tester);
+    expect(find.textContaining('담당 의사와 상담'), findsOneWidget);
+    expect(
+      api.requests.where((r) => r.path.endsWith('/feedback')),
+      hasLength(1),
+    );
+  });
 }

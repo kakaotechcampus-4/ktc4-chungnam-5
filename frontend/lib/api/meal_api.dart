@@ -177,8 +177,13 @@ class FoodCandidate {
   });
 
   final String foodRefId;
+
+  /// 공공 DB 원문(`달걀_삶은것`). 화면에는 [displayName] 을 쓴다.
   final String name;
   final double? servingSizeG;
+
+  /// 표시용 이름. 원문의 `_` 를 띄어 쓴다(`달걀 삶은것`).
+  String get displayName => name.replaceAll('_', ' ').trim();
   final MealNutrition nutrition;
 
   factory FoodCandidate.fromJson(Map<String, dynamic> json) => FoodCandidate(
@@ -311,6 +316,7 @@ class MealFeedback {
     required this.feedbackStatus,
     required this.suggestions,
     this.summary,
+    this.safetyStatus,
   });
 
   /// `PENDING` · `GENERATING` · `READY` · `FAILED`.
@@ -318,11 +324,19 @@ class MealFeedback {
   final String? summary;
   final List<MealSuggestion> suggestions;
 
+  /// `SAFE` · `BLOCKED` · `REVIEW_REQUIRED`. 아직 없으면 null.
+  final String? safetyStatus;
+
   bool get isPending =>
       feedbackStatus == 'PENDING' || feedbackStatus == 'GENERATING';
 
+  /// 의료 판단이 필요한 내용이라 제안 대신 상담을 안내해야 한다
+  /// (`READY` + `BLOCKED`, 서버 notice `MEDICAL_QUESTION_DETECTED`).
+  bool get isBlocked => safetyStatus == 'BLOCKED';
+
   factory MealFeedback.fromJson(Map<String, dynamic> json) => MealFeedback(
     feedbackStatus: json['feedbackStatus'] as String,
+    safetyStatus: json['safetyStatus'] as String?,
     summary: json['summary'] as String?,
     suggestions: (json['suggestions'] as List<dynamic>? ?? const [])
         .map((e) => MealSuggestion.fromJson(e as Map<String, dynamic>))
@@ -477,7 +491,10 @@ class MealApiService {
 
   /// `PUT /meals/{mealId}/items/{itemId}/nutrition` — 후보 DB 항목으로 영양
   /// 정보를 정한다. 응답의 영양 정보는 그 음식 양으로 환산된 값이다.
-  Future<MealNutrition?> setNutrition(
+  ///
+  /// 먹은 양이 g 으로 환산되지 않으면(예: `2개`) 서버가 저장은 하되 영양
+  /// 정보를 비우고 `NUTRITION_NOT_MATCHED` 안내를 붙인다 → [notice] 로 돌려준다.
+  Future<({MealNutrition? nutrition, String? notice})> setNutrition(
     String mealId,
     String itemId, {
     required String foodRefId,
@@ -487,9 +504,12 @@ class MealApiService {
       body: {'foodRefId': foodRefId},
     );
     final nutrition = result.dataMap['nutrition'];
-    return nutrition == null
-        ? null
-        : MealNutrition.fromJson(nutrition as Map<String, dynamic>);
+    return (
+      nutrition: nutrition == null
+          ? null
+          : MealNutrition.fromJson(nutrition as Map<String, dynamic>),
+      notice: result.notice?.message,
+    );
   }
 
   /// `POST /meals/{mealId}/confirm` — 확정하고 Q·Q·S 를 바로 받는다.

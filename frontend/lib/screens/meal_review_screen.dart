@@ -224,12 +224,17 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     );
     if (candidate == null || !mounted) return;
     try {
-      final nutrition = await _api.setNutrition(
+      final (:nutrition, :notice) = await _api.setNutrition(
         widget.mealId,
         item.itemId,
         foodRefId: candidate.foodRefId,
       );
       if (!mounted) return;
+      // 양이 g 으로 환산되지 않아 영양 정보를 붙이지 못한 경우. 양을 g 으로
+      // 바꾸면 다시 고를 수 있다.
+      if (nutrition == null) {
+        _showError(notice ?? '이 양으로는 영양 정보를 계산하지 못했어요. 양을 g 으로 바꿔 보세요.');
+      }
       final current = _items.firstWhere(
         (i) => i.itemId == item.itemId,
         orElse: () => item,
@@ -809,7 +814,10 @@ class _CandidateSheetState extends State<_CandidateSheet> {
                         final kcal = c.nutrition.kcal;
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text(c.name, style: AppTypography.cardTitle),
+                          title: Text(
+                            c.displayName,
+                            style: AppTypography.cardTitle,
+                          ),
                           subtitle: Text(
                             [
                               if (serving != null) '${serving.round()}g 기준',

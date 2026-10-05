@@ -114,7 +114,9 @@ class LongTermInsight {
 
   factory LongTermInsight.fromJson(Map<String, dynamic> json) {
     return LongTermInsight(
-      status: json['status'] as String,
+      // 명세(10/1)는 feedbackStatus 로 바꾸기로 했고 코드는 아직 status 다.
+      // 어느 쪽이 와도 읽는다.
+      status: (json['feedbackStatus'] ?? json['status']) as String,
       dataSufficient: json['dataSufficient'] as bool,
       trendSummary: json['trendSummary'] as String?,
       recommendation: json['recommendation'] as String?,
@@ -676,9 +678,7 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
         children: [
           if (insight.trendSummary == null)
             Text(
-              insight.isGenerating
-                  ? '인사이트를 만들고 있어요…'
-                  : '지금은 인사이트를 만들지 못했어요.',
+              insight.isGenerating ? '인사이트를 만들고 있어요…' : '지금은 인사이트를 만들지 못했어요.',
               style: AppTypography.body,
             )
           else
