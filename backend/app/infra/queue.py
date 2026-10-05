@@ -56,6 +56,10 @@ class QueueSettings(BaseSettings):
     """lease 길이. 이 안에 끝내지 못하면 다른 워커가 회수한다. AI 타임아웃(45초)보다
     넉넉히 길어야 정상 작업을 두 번 돌리지 않는다 — 워커가 기동할 때 확인한다.
     AI_TIMEOUT_SEC 는 httpx 의 단계별 타임아웃이라 총 시간 상한이 아니어서 두 배 넘게 둔다."""
+    QUEUE_WORKER_THREADS: int = 4
+    """워커 프로세스 하나가 돌리는 폴링 스레드 수 = 동시에 처리하는 작업 수. 작업 시간은 거의
+    AI 응답 대기라 스레드로 충분하다. LLM API 의 동시 처리량을 재고 나서 맞춘다. 스레드 하나가
+    한순간에 커넥션을 하나씩만 짧게 쓰므로 DB 풀 상한을 넘을 수 없다 — 워커가 기동할 때 확인한다."""
 
 
 def enqueue(db: Session, task_type: str, payload: dict[str, Any]) -> None:
