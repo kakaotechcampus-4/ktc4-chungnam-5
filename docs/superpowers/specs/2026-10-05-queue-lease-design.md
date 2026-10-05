@@ -80,7 +80,7 @@ class Lease:
 
 class TaskQueue(Protocol):
     def claim(self) -> Lease | None: ...
-    def read(self, lease: Lease) -> AbstractContextManager[Session]: ...
+    def read(self) -> AbstractContextManager[Session]: ...
     def complete(self, lease: Lease) -> AbstractContextManager[Completion]: ...
     def fail(self, lease: Lease, exc: BaseException) -> None: ...
     def release(self, lease: Lease) -> None: ...
@@ -165,7 +165,7 @@ class Job(Generic[Ctx, Resp]):
 
 | 단계 | 세션 | 규칙 |
 |---|---|---|
-| `load` | `queue.read` (롤백) | 읽기만. 반환값은 **ORM 객체가 아닌 순수 데이터** — 세션이 닫히면 ORM 객체는 못 쓴다. AI 가 필요 없으면 `Skip(result)` |
+| `load` | `queue.read()` (롤백) | 읽기만. 반환값은 **ORM 객체가 아닌 순수 데이터** — 세션이 닫히면 ORM 객체는 못 쓴다. AI 가 필요 없으면 `Skip(result)` |
 | `call_ai` | **없음** | AI 를 부르고 응답을 검증한다. 부를 필요가 없으면 `None` |
 | `apply` | `queue.complete` | 다시 잠그고 재확인한 뒤 쓴다. 지금 job 들의 "AI 를 기다리는 사이 바뀌었으면 쓰지 않는다" 로직이 여기 온다 |
 | `on_ai_error` (선택) | `queue.complete` | `call_ai` 가 실패했을 때 도메인에 실패를 남겨야 하는 job 만. 정의하지 않으면 예외가 그대로 올라가 큐가 재시도한다 |
@@ -194,7 +194,7 @@ job 별로 자르는 자리:
 ```
 lease = queue.claim()                         # 없으면 쉰다(커넥션 없이)
 try:
-    with queue.read(lease) as db:      ctx = job.load(db, task)
+    with queue.read() as db:           ctx = job.load(db, task)
     if Skip:                           with queue.complete(lease) as c: c.result = ctx.result
     else:
         try:    resp = job.call_ai(ctx, ai)           # 커넥션 0개
@@ -221,8 +221,8 @@ except Exception as exc:
   0행이 되어 `LeaseLostError` 로 롤백한다.
 - **더블 탭 등 같은 작업의 중복 등록**은 지금처럼 job 의 도메인 재확인이 막는다. 바꾸지 않는다.
 - **정상 종료**: SIGTERM 을 받으면 처리 중인 작업을 끝까지 간다(최대 ~45초). `docker stop` 기본 유예는
-  10초라 그 뒤 SIGKILL → lease 만료 회수로 시도 1회를 태운다. `infra/docker-compose.be.yml` 의 worker 에
-  `stop_grace_period: 60s` 를 둔다.
+  10초라 그 뒤 SIGKILL → lease 만료 회수로 시도 1회를 태운다. `infra/docker-compose.be.yml` 의 worker 에는
+  이미 `stop_grace_period: 60s` 가 있다 — 주석만 lease 기준으로 고친다.
 - `NonRetryableError`(AI 4xx) 는 지금처럼 곧바로 격리한다.
 
 ## 6. 같이 바꾸는 곳
@@ -233,7 +233,7 @@ except Exception as exc:
 | `app/services/daily_feedback.py:67,135` · `app/services/insight.py:65,207` | `== PENDING` → `is_in_flight`. 처리 중을 "생성 중" 으로 보여 주고, 중복 등록 방지도 처리 중을 포함한다 |
 | `scripts/queue_status.py` | 처리 중을 `pg_stat_activity` 근사 대신 `status = PROCESSING` 으로 센다. 만료 지난 lease 수도 보인다 |
 | `scripts/smoke_queue_ai.py` | 새 큐 API 로 |
-| `infra/docker-compose.be.yml` | worker `stop_grace_period: 60s` |
+| `infra/docker-compose.be.yml` | worker `stop_grace_period: 60s` 주석을 lease 기준으로 (값은 이미 있다) |
 | `docs/superpowers/specs/2026-09-20-db-table-queue-design.md` | 맨 위에 "잠금 방식은 이 문서로 대체됨" 한 줄 |
 
 ## 7. 마이그레이션
