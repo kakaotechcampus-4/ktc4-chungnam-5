@@ -758,7 +758,7 @@ def test_insight_shows_generated_feedback_as_fresh(db):
     insight = get_long_term_insight(db, user_id=user.id, period="7d", today=END)
 
     row = _only_row(db, user.id)
-    assert insight.status == FeedbackStatus.READY
+    assert insight.feedback_status == FeedbackStatus.READY
     assert insight.data_sufficient is True
     assert insight.trend_summary == "추세"
     assert insight.generated_at == row.updated_at
@@ -787,7 +787,7 @@ def test_insight_hides_older_window_row_when_latest_run_was_insufficient(db):
 
     insight = get_long_term_insight(db, user_id=user.id, period="7d", today=END)
 
-    assert insight.status == FeedbackStatus.READY
+    assert insight.feedback_status == FeedbackStatus.READY
     assert insight.data_sufficient is False
     assert insight.trend_summary is None
     assert insight.recommendation is None
@@ -825,5 +825,5 @@ def test_insight_is_insufficient_when_first_run_had_too_few_days(db):
 
     insight = get_long_term_insight(db, user_id=user.id, period="7d", today=END)
 
-    assert insight.status == FeedbackStatus.READY
+    assert insight.feedback_status == FeedbackStatus.READY
     assert insight.data_sufficient is False
