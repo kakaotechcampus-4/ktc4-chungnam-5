@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from typing import Any
 
 import pytest
+from sqlalchemy import text
 
 from app.infra.queue import ClaimedTask, Completion, Lease, LeaseLostError
 from app.worker.dispatch import get_job
@@ -266,7 +267,15 @@ def test_no_db_connection_is_held_while_ai_is_called(sessions, test_engine, monk
         seen.append(test_engine.pool.checkedout())
         return {"ok": True}
 
-    _use(monkeypatch, Job(load=lambda db, task: {}, call_ai=call_ai, apply=lambda db, task, ctx, resp: resp))
+    # load 가 SQL 을 실행해야 세션이 커넥션을 실제로 꺼낸다 — 세션은 첫 실행에서야 풀에서 가져온다.
+    _use(
+        monkeypatch,
+        Job(
+            load=lambda db, task: {"n": db.execute(text("SELECT 1")).scalar()},
+            call_ai=call_ai,
+            apply=lambda db, task, ctx, resp: resp,
+        ),
+    )
     with sessions() as db:
         db.add(Task(type="meal.analyze", payload={"mealId": "m1"}))
         db.commit()
