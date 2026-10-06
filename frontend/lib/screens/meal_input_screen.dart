@@ -258,7 +258,7 @@ class _MealInputScreenState extends State<MealInputScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${_formatDate(_eatenAt)}',
+                          _formatDate(_eatenAt),
                           style: AppTypography.cardTitle,
                         ),
                       ),

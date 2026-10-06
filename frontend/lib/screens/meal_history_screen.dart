@@ -192,8 +192,8 @@ class MealHistoryApiService {
   ///
   /// **서버 `GET /meals` 에는 날짜 필터가 없다**(cursor · limit 만, 최신순).
   /// 그래서 최신부터 페이지를 넘기며 그날 것만 모으고, 그날보다 이전 식사가
-  /// 나오면 멈춘다. 오래된 날일수록 페이지를 많이 넘긴다.
-  /// TODO(BE 요청): `GET /meals?date=YYYY-MM-DD` 가 생기면 한 번 호출로 바꾼다.
+  /// 나오면 멈춘다. 오래된 날일수록 페이지를 많이 넘긴다. 명세(10/1)도 날짜
+  /// 필터를 두지 않기로 했다 — 날짜별은 `/meals/calendar` · `/home` 몫이다.
   Future<List<HistoryMeal>> fetchMealsByDate(DateTime date) async {
     final day = DateTime(date.year, date.month, date.day);
     final meals = <HistoryMeal>[];
@@ -363,10 +363,10 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     _loadMeals();
   }
 
-  /// 끼니 카드 탭 → 식사 평가 화면(6번). 돌아오면 목록을 다시 불러온다.
-  /// 평가한 끼니는 다음 끼니 제안(7번)을, 아직 확정 전이면 음식 확인
-  /// 화면(5번)을 연다 — 확정 전 끼니는 거기서 이어서 평가받는다.
-  Future<void> _openEvaluation(HistoryMeal meal) async {
+  /// 끼니 카드 탭 — 평가한 끼니는 다음 끼니 제안(7번)을, 아직 확정 전이면
+  /// 음식 확인 화면(5번)을 연다(확정 전 끼니는 거기서 이어서 평가받는다).
+  /// 돌아오면 목록을 다시 불러온다.
+  Future<void> _openMeal(HistoryMeal meal) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => meal.scores?.satiety == null
@@ -567,7 +567,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                 quality: meal.scores?.quality,
                 satiety: meal.scores?.satiety,
                 showChevron: true,
-                onTap: () => _openEvaluation(meal),
+                onTap: () => _openMeal(meal),
               ),
             ),
             const SizedBox(height: AppSpacing.cardGap),
