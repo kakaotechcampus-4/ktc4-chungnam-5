@@ -10,6 +10,8 @@ import 'package:frontend/common/api_format.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/popups/daily_condition_popup.dart';
 import 'package:frontend/screens/home_screen.dart' show StomachGauge;
+import 'package:frontend/api/meal_api.dart';
+import 'package:frontend/screens/meal_analysis_screen.dart';
 import 'package:frontend/screens/meal_evaluation_screen.dart';
 import 'package:frontend/screens/meal_review_screen.dart';
 import 'package:frontend/screens/medication_info_screen.dart';
@@ -740,5 +742,84 @@ void main() {
       api.requests.where((r) => r.path.endsWith('/feedback')),
       hasLength(1),
     );
+  });
+
+  testWidgets('after an amount edit the nutrition line shows the new value', (
+    WidgetTester tester,
+  ) async {
+    var patched = false;
+    final api = await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+    );
+    final meal = Map<String, dynamic>.from(
+      _mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map,
+    )..['eatenAt'] = '2026-10-06T12:40:00+09:00';
+    api
+      ..on('PATCH /meals/{meal_id}/items', (_) {
+        patched = true;
+        return (200, fakeOk({'status': 'ANALYZING', 'isRecalculation': true}));
+      })
+      ..on('GET /meals/{meal_id}', (_) {
+        if (!patched) return (200, fakeOk(meal));
+        final items = [
+          for (final i in meal['items'] as List)
+            {
+              ...(i as Map<String, dynamic>),
+              if (i['itemId'] == (meal['items'] as List).first['itemId'])
+                'nutrition': {'kcal': 800, 'proteinG': 24.4, 'fiberG': null},
+            },
+        ];
+        return (200, fakeOk({...meal, 'items': items}));
+      });
+    expect(find.textContaining('400kcal'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.add).first);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('800kcal'), findsOneWidget);
+    expect(find.text('260g'), findsOneWidget);
+  });
+
+  testWidgets('a failed analysis offers recording again', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    final api = FakeApi()
+      ..on(
+        'GET /meals/{meal_id}',
+        (_) => (
+          200,
+          fakeOk({
+            ...(_mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map),
+            'eatenAt': '2026-10-06T12:40:00+09:00',
+            'status': 'FAILED',
+            'items': [],
+          }),
+        ),
+      );
+    await tester.pumpWidget(
+      Provider(
+        create: (_) => ApiClient(session: session, dio: api.dio),
+        child: const MaterialApp(
+          home: MealAnalysisScreen(
+            meal: MealCreated(
+              mealId: 'm1',
+              pollInterval: Duration(milliseconds: 100),
+              timeout: Duration(seconds: 5),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.text('음식을 알아보지 못했어요'), findsOneWidget);
+
+    await tester.tap(find.text('다시 기록하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('식사 기록'), findsOneWidget);
   });
 }

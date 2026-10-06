@@ -10,6 +10,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_input_screen.dart';
 import 'meal_review_screen.dart';
 
 /// 분석 진행 3단계. 서버 `steps[]` 의 `key` 순서와 같다.
@@ -97,6 +98,13 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
   }
 
   void _cancel() => Navigator.of(context).pop();
+
+  /// 분석 실패 — 입력 화면을 새로 열어 다시 기록하게 한다.
+  void _retry() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const MealInputScreen()),
+    );
+  }
 
   String get _title => switch (_stopped) {
     null => '식사를 분석하고 있어요',
@@ -225,7 +233,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                   width: double.infinity,
                   height: AppLayout.primaryButtonHeight,
                   child: FilledButton(
-                    onPressed: _cancel,
+                    onPressed: _stopped == _Stopped.failed ? _retry : _cancel,
                     child: Text(
                       _stopped == _Stopped.failed ? '다시 기록하기' : '닫기',
                       style: AppTypography.buttonLabel,

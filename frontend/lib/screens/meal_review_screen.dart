@@ -163,6 +163,27 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
       _showError('양을 바꾸지 못해 되돌렸어요: $e');
       rethrow;
     }
+    await _refreshNutrition(ids);
+  }
+
+  /// 양을 바꾸면 서버가 영양 정보를 그 양으로 다시 계산한다(250g 400kcal →
+  /// 500g 800kcal). 화면의 kcal 이 예전 값으로 남지 않게 다시 받아 영양만
+  /// 바꾼다. 양은 그사이 사용자가 또 눌렀을 수 있어 화면 값을 둔다.
+  Future<void> _refreshNutrition(Set<String> ids) async {
+    final MealDetail meal;
+    try {
+      meal = await _api.fetchMeal(widget.mealId);
+    } catch (_) {
+      return; // 저장은 됐다. 표시만 늦을 뿐이다.
+    }
+    if (!mounted) return;
+    for (final server in meal.items) {
+      if (!ids.contains(server.itemId)) continue;
+      final local = _items.where((i) => i.itemId == server.itemId).firstOrNull;
+      if (local == null) continue;
+      _replace(server.copyWith(amount: local.amount));
+      _saved[server.itemId] = server;
+    }
   }
 
   // ── 추가·삭제 ──
@@ -219,6 +240,14 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
           _CandidateSheet(api: _api, initialQuery: item.displayName),
     );
     if (candidate == null || !mounted) return;
+    try {
+      // 남은 양 수정을 먼저 보낸다. 후보 지정이 먼저 가면 그 뒤 양 수정으로
+      // 서버 영양 값이 바뀌어 화면과 어긋난다.
+      await _flushAmounts();
+    } catch (_) {
+      return; // _sendAmounts 가 이미 알렸다.
+    }
+    if (!mounted) return;
     try {
       final (:nutrition, :notice) = await _api.setNutrition(
         widget.mealId,
