@@ -154,7 +154,7 @@ def get_long_term_insight(
     if row is None:
         return LongTermInsightResponse(
             period=InsightPeriod(from_=date_from, to=date_to),
-            status=status,
+            feedback_status=status,
             data_sufficient=False,
             trend_summary=None,
             recommendation=None,
@@ -175,7 +175,7 @@ def get_long_term_insight(
 
     return LongTermInsightResponse(
         period=InsightPeriod(from_=period_from, to=row.period_end),
-        status=status,
+        feedback_status=status,
         data_sufficient=True,
         trend_summary=row.trend_summary if is_safe else None,
         recommendation=row.recommendation if is_safe else None,

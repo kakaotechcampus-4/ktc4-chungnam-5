@@ -172,7 +172,7 @@ def test_get_long_term_insight_pending_when_no_row(monkeypatch):
         db=None, user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 21)
     )
 
-    assert result.status == FeedbackStatus.PENDING
+    assert result.feedback_status == FeedbackStatus.PENDING
     assert result.data_sufficient is False
     assert result.trend_summary is None
     assert result.period.from_ == date(2026, 9, 15)
@@ -192,7 +192,7 @@ def test_get_long_term_insight_hides_content_when_blocked(monkeypatch):
         db=None, user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 21)
     )
 
-    assert result.status == FeedbackStatus.READY
+    assert result.feedback_status == FeedbackStatus.READY
     assert result.data_sufficient is True
     assert result.trend_summary is None
     assert result.recommendation is None

@@ -9,7 +9,7 @@ from app.schemas.base import CamelModel, KstDatetime
 
 INSIGHT_REFRESH_POLL_INTERVAL_MS = 1500
 
-# GET /insights/long-term 의 status 는 이 리스트에서 고른다. 자체 enum 을 새로
+# GET /insights/long-term 의 feedbackStatus 는 이 리스트에서 고른다. 자체 enum 을 새로
 # 만들지 않고 `services/evaluation`의 MealConfirmResponse.feedback_status 와 같은
 # `FeedbackStatus`(PENDING/GENERATING/READY/FAILED)를 재사용한다 — "피드백 문장이
 # 아직 없다"는 같은 개념이라 명세도 같은 열거형을 쓴다(PR #46 리뷰).
@@ -37,7 +37,7 @@ class LongTermInsightResponse(CamelModel):
     """GET /insights/long-term 응답."""
 
     period: InsightPeriod
-    status: FeedbackStatus
+    feedback_status: FeedbackStatus
     data_sufficient: bool
     trend_summary: str | None
     recommendation: str | None
