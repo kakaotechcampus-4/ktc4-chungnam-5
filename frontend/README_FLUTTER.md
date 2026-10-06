@@ -59,7 +59,7 @@ flutter pub get
 | phase | 옵션 | 서버 | 언제 |
 |---|---|---|---|
 | **local**(기본) | 없음 | `http://localhost:4010` — [mock 서버](#mock-서버-local) | BE 없이 화면만 볼 때. **정해진 응답만** 온다(저장해도 다음 조회 값이 그대로) |
-| **dev** | `--dart-define=APP_PHASE=dev` | `http://127.0.0.1:8000` — Docker 로 띄운 실제 BE | 회원가입 → 투약 → 식사처럼 흐름을 이어서 볼 때. [실기기 테스트](#실기기-테스트-실서버) 참고 |
+| **dev** | `--dart-define=APP_PHASE=dev` | `http://127.0.0.1:8000` — Docker 로 띄운 실제 BE | 회원가입 → 투약 → 식사처럼 흐름을 이어서 볼 때. 웹은 [웹 → B](#b-실제-be-로-확인하기-dev--docker-be), 폰은 [실기기 테스트](#실기기-테스트-실서버) |
 | **prod** | `--dart-define=APP_PHASE=prod --dart-define=API_BASE_URL=<주소>` | 아직 없음 | 주소 없이 켜면 시작하자마자 오류 |
 
 `API_BASE_URL` 을 주면 phase 주소 대신 쓴다(에뮬레이터는 `http://10.0.2.2:<포트>/api/v1`).
@@ -86,29 +86,80 @@ npm start                    # http://localhost:4010 — 끄려면 Ctrl+C
   응답 모양이 바뀐 곳은 `examples.json` 도 고친다. **떠 있는 BE 의 스키마를 받으므로**, develop 을 받은 뒤
   BE 이미지를 먼저 다시 빌드한다(`docker compose ... up -d --build`, [2. BE 띄우기](#2-be-띄우기-docker)). 안 그러면 옛 스키마가 온다.
 
-### 웹 (UI 빠르게 확인할 때 — local phase)
+### 웹
+
+두 가지로 띄운다. 화면만 볼 때는 **A**, 실제 BE 로 흐름을 확인할 때는 **B**.
+
+#### A. 서버 없이 화면만 보기 (local — mock 서버)
 
 ```bash
-cd frontend/mock && npm start             # 다른 터미널에서 mock 서버를 먼저 띄운다
+# 터미널 1 — mock 서버 (http://localhost:4010)
+cd frontend/mock
+npm start
+
+# 터미널 2 — 앱
 cd frontend
 flutter run -d chrome --web-port=5555     # 또는 -d edge. 포트를 고정하면 주소가 매번 같다
 ```
 
 브라우저에서 `http://localhost:5555` 가 열린다. 핫 리로드는 터미널에서 `r`, 핫 리스타트는 `R`, 종료는 `q`.
 
-- **웹에서 dev(실서버)에 붙이려면** 브라우저 보안 검사를 끈 테스트용 크롬으로 띄운다. BE 에 CORS 설정이
-  없어 그냥 띄우면 브라우저가 요청을 막는다(`NETWORK_ERROR`). Flutter 가 띄우는 크롬에만 적용되고 평소
-  쓰는 크롬과는 별개다 — 이 창에서 다른 사이트는 열지 않는다.
+- 고정 응답이라 저장해도 다음 조회 값이 그대로다. 회원가입 뒤 투약 입력으로 이어지지 않고 바로
+  홈으로 간다(`onboardingStatus: READY`).
 
-  ```bash
-  flutter run -d chrome --web-port=5556 --dart-define=APP_PHASE=dev --web-browser-flag=--disable-web-security
-  ```
+#### B. 실제 BE 로 확인하기 (dev — Docker BE)
 
-  dev 주소가 `localhost` 가 아니라 `127.0.0.1` 인 이유: 윈도우 크롬은 `localhost` 를 IPv6(`::1`)로 먼저
-  찾는데 Docker BE 는 거기서 응답하지 않는다.
-- **처음부터(회원가입부터) 다시 보려면** 개발자도구(F12) → Application → Local Storage 를
-  지우고 새로고침한다. `flutter run` 이 띄운 Chrome 은 매번 새 프로필이라 새로 띄워도 된다.
-  local 은 고정 응답이라 회원가입 뒤 투약 입력으로 이어지지 않고 바로 홈으로 간다(`onboardingStatus: READY`).
+**1. BE 띄우기** — Docker Desktop 을 먼저 실행한다. 이미 떠 있으면 4번만 확인한다.
+
+```powershell
+cd infra
+docker compose -f docker-compose.yml -f docker-compose.ai-stub.yml -f docker-compose.be.yml up -d --build
+```
+
+**2. DB 마이그레이션** — 처음 한 번, 그리고 BE 에 마이그레이션이 추가될 때마다.
+
+```powershell
+# infra 폴더에서 실행
+$backend = (Resolve-Path ..\backend).Path
+docker run --rm --network infra_default -v "${backend}:/src" -w /src `
+  -e DB_URL=db:5432/glp1_dev -e DB_USER=glp1 -e DB_PASSWORD=glp1_local_dev `
+  glp1-be alembic upgrade head
+```
+
+**3. 음식 DB 넣기** — 처음 한 번. 안 넣으면 영양 정보 검색이 늘 빈 목록이고 양·질 점수가 나오지 않는다.
+
+```powershell
+# infra 폴더에서 실행 (33만 건, 1~2분). PowerShell 은 `<` 를 못 써서 cmd 로 넘긴다.
+cmd /c "docker exec -i glp1-db pg_restore -U glp1 -d glp1_dev --data-only --no-owner < seed\food_refs_20260828.dump"
+```
+
+**4. 확인**
+
+```powershell
+curl http://127.0.0.1:8000/health     # {"status":"ok"}
+```
+
+**5. 앱 실행** — 브라우저 보안 검사를 끈 테스트용 크롬으로 띄운다. BE 에 CORS 설정이 없어 그냥 띄우면
+브라우저가 요청을 막는다(`NETWORK_ERROR`). Flutter 가 띄우는 크롬에만 적용되고 평소 쓰는 크롬과는
+별개다 — **이 창에서 다른 사이트는 열지 않는다.**
+
+```bash
+cd frontend
+flutter run -d chrome --web-port=5556 --dart-define=APP_PHASE=dev --web-browser-flag=--disable-web-security
+```
+
+dev 주소가 `localhost` 가 아니라 `127.0.0.1` 인 이유: 윈도우 크롬은 `localhost` 를 IPv6(`::1`)로 먼저
+찾는데 Docker BE 는 거기서 응답하지 않는다.
+
+#### 웹에서 자주 겪는 문제
+
+| 증상 | 해결 |
+|---|---|
+| "서버에 연결하지 못했어요" | BE 가 꺼져 있다. PC 절전 뒤 DB 컨테이너가 꺼지면 `docker start glp1-db` 후 `docker restart glp1-api glp1-worker` |
+| 포트가 이미 쓰이고 있다는 오류 | 다른 `flutter run` 이 그 포트를 쓰는 중이다. 그 터미널에서 `q` 로 끄거나 `--web-port` 를 바꾼다 |
+| 영양 정보 검색이 늘 비어 있음 | B-3 음식 DB 를 안 넣었다 |
+| `ios/Flutter/ephemeral` 경로 오류 | 그 폴더를 지우고 다시 실행한다 |
+| 회원가입부터 다시 보고 싶음 | 개발자도구(F12) → Application → Local Storage 를 지우고 새로고침. `flutter run` 이 띄운 크롬은 매번 새 프로필이라 새로 띄워도 된다 |
 
 빌드 결과물만 필요하면:
 
