@@ -59,7 +59,7 @@ flutter pub get
 | phase | 옵션 | 서버 | 언제 |
 |---|---|---|---|
 | **local**(기본) | 없음 | `http://localhost:4010` — [mock 서버](#mock-서버-local) | BE 없이 화면만 볼 때. **정해진 응답만** 온다(저장해도 다음 조회 값이 그대로) |
-| **dev** | `--dart-define=APP_PHASE=dev` | `http://localhost:8000` — Docker 로 띄운 실제 BE | 회원가입 → 투약 → 식사처럼 흐름을 이어서 볼 때. [실기기 테스트](#실기기-테스트-실서버) 참고 |
+| **dev** | `--dart-define=APP_PHASE=dev` | `http://127.0.0.1:8000` — Docker 로 띄운 실제 BE | 회원가입 → 투약 → 식사처럼 흐름을 이어서 볼 때. [실기기 테스트](#실기기-테스트-실서버) 참고 |
 | **prod** | `--dart-define=APP_PHASE=prod --dart-define=API_BASE_URL=<주소>` | 아직 없음 | 주소 없이 켜면 시작하자마자 오류 |
 
 `API_BASE_URL` 을 주면 phase 주소 대신 쓴다(에뮬레이터는 `http://10.0.2.2:<포트>/api/v1`).
@@ -96,8 +96,16 @@ flutter run -d chrome --web-port=5555     # 또는 -d edge. 포트를 고정하�
 
 브라우저에서 `http://localhost:5555` 가 열린다. 핫 리로드는 터미널에서 `r`, 핫 리스타트는 `R`, 종료는 `q`.
 
-- **웹에서는 dev(실서버)에 붙지 않는다.** BE 에 CORS 설정이 없어 브라우저가 요청을 막는다
-  (`NETWORK_ERROR`). 실서버 확인은 아래 [실기기 테스트](#실기기-테스트-실서버)로 한다.
+- **웹에서 dev(실서버)에 붙이려면** 브라우저 보안 검사를 끈 테스트용 크롬으로 띄운다. BE 에 CORS 설정이
+  없어 그냥 띄우면 브라우저가 요청을 막는다(`NETWORK_ERROR`). Flutter 가 띄우는 크롬에만 적용되고 평소
+  쓰는 크롬과는 별개다 — 이 창에서 다른 사이트는 열지 않는다.
+
+  ```bash
+  flutter run -d chrome --web-port=5556 --dart-define=APP_PHASE=dev --web-browser-flag=--disable-web-security
+  ```
+
+  dev 주소가 `localhost` 가 아니라 `127.0.0.1` 인 이유: 윈도우 크롬은 `localhost` 를 IPv6(`::1`)로 먼저
+  찾는데 Docker BE 는 거기서 응답하지 않는다.
 - **처음부터(회원가입부터) 다시 보려면** 개발자도구(F12) → Application → Local Storage 를
   지우고 새로고침한다. `flutter run` 이 띄운 Chrome 은 매번 새 프로필이라 새로 띄워도 된다.
   local 은 고정 응답이라 회원가입 뒤 투약 입력으로 이어지지 않고 바로 홈으로 간다(`onboardingStatus: READY`).

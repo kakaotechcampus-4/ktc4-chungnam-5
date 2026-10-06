@@ -35,7 +35,9 @@ class ApiConfig {
     return switch (phase) {
       AppPhase.local => 'http://localhost:4010/api/v1',
       // TODO: 팀 dev 서버가 생기면 그 주소로 바꾼다.
-      AppPhase.dev => 'http://localhost:8000/api/v1',
+      // localhost 가 아니라 127.0.0.1 — 윈도우 크롬은 localhost 를 IPv6(::1)로
+      // 먼저 찾는데 Docker BE 는 거기서 응답하지 않는다. adb reverse 에서도 같다.
+      AppPhase.dev => 'http://127.0.0.1:8000/api/v1',
       AppPhase.prod => throw StateError(
         'prod 서버 주소가 아직 없어요. --dart-define=API_BASE_URL 로 넣어 주세요',
       ),
