@@ -18,9 +18,8 @@ import 'shared_meal_widgets.dart';
 /// `isRecalculation` 이 되지만, 이건 "확인 화면에서 고치는 중"이라 폴링하지
 /// 않는다(`MealDetail` 참고).
 ///
-/// 맨 아래에서 식후 포만감을 받고 "확인하고 평가받기"로 확정(`confirm`)한다.
-/// 서버는 확정 때 식후 포만감이 꼭 있어야 Q·Q·S 를 낸다. 평가 화면(6번)은
-/// 그 결과를 바로 보여 준다.
+/// "확인하고 평가받기" 는 고친 걸 다 보내고 평가 화면(6번)으로 넘어간다.
+/// 확정(`confirm`)은 식후 포만감이 필요해서 6번이 포만감과 함께 한다.
 ///
 /// 양 스테퍼는 누를 때마다 보내지 않고 잠깐 모았다가 한 번에 `PATCH` 한다.
 /// 실패하면 마지막으로 서버가 받은 값으로 되돌린다.
@@ -49,9 +48,6 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
   final Set<String> _pendingAmounts = {};
   Timer? _patchTimer;
   Future<void>? _patching;
-
-  /// 식후 포만감(0~100). 확정 때 보낸다.
-  double _afterSatiety = 50;
 
   LoadState _state = LoadState.loading;
   String? _errorMessage;
@@ -252,9 +248,9 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
 
   // ── 다음 ──
 
-  /// 고친 걸 다 보내고 식후 포만감과 함께 확정한 뒤 평가 화면(6번)으로
-  /// 교체 이동한다.
-  Future<void> _confirm() async {
+  /// 고친 걸 다 보낸 뒤 평가 화면(6번)으로 교체 이동한다. 확정은 그 화면이
+  /// 식후 포만감과 함께 한다.
+  Future<void> _goToEvaluation() async {
     setState(() => _leaving = true);
     try {
       await _flushAmounts();
@@ -262,26 +258,15 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
       if (mounted) setState(() => _leaving = false);
       return;
     }
-    try {
-      final result = await _api.confirm(
-        widget.mealId,
-        satietyAfterPct: _afterSatiety.round(),
-      );
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => MealEvaluationScreen(
-            mealId: widget.mealId,
-            imageUrl: _meal?.imageUrl,
-            result: result,
-          ),
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => MealEvaluationScreen(
+          mealId: widget.mealId,
+          imageUrl: _meal?.imageUrl,
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _leaving = false);
-      _showError('평가하지 못했어요: $e');
-    }
+      ),
+    );
   }
 
   @override
@@ -321,12 +306,11 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
               horizontal: AppSpacing.screenHorizontal,
               vertical: AppSpacing.lg,
             ),
-            itemCount: _items.length + 2,
+            itemCount: _items.length + 1,
             separatorBuilder: (_, _) =>
                 const SizedBox(height: AppSpacing.cardGap),
             itemBuilder: (context, index) {
               if (index == _items.length) return _buildAddButton();
-              if (index == _items.length + 1) return _buildSatietyInput();
               return _buildFoodCard(_items[index]);
             },
           ),
@@ -539,52 +523,6 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     );
   }
 
-  /// 식후 포만감 입력. 확정 때 같이 보낸다.
-  Widget _buildSatietyInput() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('식사 후 포만감', style: AppTypography.cardTitle),
-          const SizedBox(height: AppSpacing.xs),
-          Text('식사 후 지금, 얼마나 부르세요?', style: AppTypography.bodySecondary),
-          Row(
-            children: [
-              Expanded(
-                child: Slider(
-                  value: _afterSatiety,
-                  min: 0,
-                  max: 100,
-                  divisions: 20,
-                  onChanged: _leaving
-                      ? null
-                      : (v) => setState(() => _afterSatiety = v),
-                  activeColor: AppColors.primary,
-                  inactiveColor: AppColors.surfaceMuted,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              SizedBox(
-                width: 48,
-                child: Text(
-                  '${_afterSatiety.round()}%',
-                  textAlign: TextAlign.end,
-                  style: AppTypography.cardTitle,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildConfirmButton() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -598,7 +536,7 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
         height: AppLayout.primaryButtonHeight,
         child: ElevatedButton(
           // 음식이 하나도 없으면 평가할 게 없다.
-          onPressed: _leaving || _items.isEmpty ? null : _confirm,
+          onPressed: _leaving || _items.isEmpty ? null : _goToEvaluation,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             shape: RoundedRectangleBorder(

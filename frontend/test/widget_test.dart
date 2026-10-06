@@ -521,38 +521,39 @@ void main() {
     expect(find.textContaining('되돌렸어요'), findsOneWidget);
   });
 
-  testWidgets('review confirms with the after-meal satiety', (
+  testWidgets('review moves on without confirming', (
     WidgetTester tester,
   ) async {
     final api = await pumpMealScreen(
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
-    expect(find.text('식사 후 포만감'), findsOneWidget);
+    expect(find.text('식사 후 포만감'), findsNothing);
     await tester.scrollUntilVisible(find.text('확인하고 평가받기'), 100);
     await tester.tap(find.text('확인하고 평가받기'));
     await _settle(tester);
 
-    final confirm = api.requests.singleWhere(
-      (r) => r.path.endsWith('/confirm'),
-    );
-    expect(confirm.data, {'satietyAfterPct': 50});
-    // 평가 화면은 확정 결과를 바로 보인다.
+    expect(api.requests.where((r) => r.path.endsWith('/confirm')), isEmpty);
     expect(find.text('식사 평가'), findsOneWidget);
-    expect(find.text('76'), findsOneWidget); // 양
-    expect(find.text('80'), findsOneWidget); // 질
-    expect(find.text('다음 끼니 제안 보기'), findsOneWidget);
+    expect(find.text('포만감을 입력하면 계산돼요'), findsNWidgets(2));
   });
 
-  testWidgets('evaluation opened later loads the saved scores', (
+  testWidgets('evaluation confirms with the satiety and shows the scores', (
     WidgetTester tester,
   ) async {
     final api = await pumpMealScreen(
       tester,
       const MealEvaluationScreen(mealId: 'm1'),
     );
-    expect(api.requests.where((r) => r.path.endsWith('/confirm')), isEmpty);
-    expect(find.text('76'), findsOneWidget);
+    await tester.tap(find.text('평가 받기'));
+    await _settle(tester);
+
+    final confirm = api.requests.singleWhere(
+      (r) => r.path.endsWith('/confirm'),
+    );
+    expect(confirm.data, {'satietyAfterPct': 50});
+    expect(find.text('76'), findsOneWidget); // 양
+    expect(find.text('80'), findsOneWidget); // 질
     expect(find.textContaining('단백질 부족'), findsOneWidget);
     expect(find.text('다음 끼니 제안 보기'), findsOneWidget);
   });
@@ -627,14 +628,23 @@ void main() {
       tester,
       const MealEvaluationScreen(mealId: 'm1'),
     );
+    // 확정 전에는 슬라이더를 움직여도 보내지 않는다.
+    await tester.drag(find.byType(Slider), const Offset(-600, 0));
+    await _settle(tester);
     expect(api.requests.where((r) => r.path.endsWith('/confirm')), isEmpty);
-    // mock 평가의 포만감은 68 — 끝까지 끌면 100 으로 다시 확정한다.
+
+    await tester.tap(find.text('평가 받기'));
+    await _settle(tester);
+    // 평가 뒤(mock 포만감 68) 끝까지 끌면 100 으로 다시 확정한다.
     await tester.drag(find.byType(Slider), const Offset(600, 0));
     await _settle(tester);
-    final confirm = api.requests.singleWhere(
-      (r) => r.path.endsWith('/confirm'),
-    );
-    expect(confirm.data, {'satietyAfterPct': 100});
+    final confirms = api.requests
+        .where((r) => r.path.endsWith('/confirm'))
+        .toList();
+    expect(confirms.map((r) => r.data), [
+      {'satietyAfterPct': 0},
+      {'satietyAfterPct': 100},
+    ]);
   });
 
   testWidgets('history reloads when its tab is opened again', (

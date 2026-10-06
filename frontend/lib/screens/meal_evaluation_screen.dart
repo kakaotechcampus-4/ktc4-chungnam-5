@@ -12,30 +12,23 @@ import 'next_meal_suggestion_screen.dart';
 
 /// 식사 평가 (Q·Q·S) — Figma `hOxrHBitBpjwIBBg2GO49y` node `60:270`.
 ///
-/// 확정은 음식 확인 화면(5번)이 식후 포만감과 함께 하고, 이 화면은 그 결과를
-/// 바로 보여 준다. 버튼은 "다음 끼니 제안 보기" 하나다.
+/// 식후 포만감은 **이 화면에서만** 받는다. 서버는 확정(`confirm`) 때 식후
+/// 포만감을 꼭 받아 그 자리에서 Q·Q·S 를 계산하므로:
 ///
-/// 포만감은 여기서 고칠 수 있다. 슬라이더에서 손을 떼면 바뀐 값으로 다시
+/// 1. 확정 전 — 포만감 슬라이더만 움직이고 양·질은 "입력하면 계산돼요".
+/// 2. "평가 받기" → 확정 → 받은 점수로 양·질·포만감 카드를 채운다.
+/// 3. "다음 끼니 제안 보기" → 7번.
+///
+/// 평가 뒤에도 포만감을 고칠 수 있다. 슬라이더에서 손을 떼면 바뀐 값으로 다시
 /// 확정한다 — 서버가 재확정을 허용하고, 점수가 바뀌면 AI 피드백도 새로 만든다
 /// (BE `services/evaluation` `_is_stale_feedback`).
-///
-/// 홈·기록 탭에서 이미 평가한 끼니를 열 때는 [result] 없이 열어 서버 평가를
-/// 불러온다.
 class MealEvaluationScreen extends StatefulWidget {
-  const MealEvaluationScreen({
-    super.key,
-    required this.mealId,
-    this.imageUrl,
-    this.result,
-  });
+  const MealEvaluationScreen({super.key, required this.mealId, this.imageUrl});
 
   final String mealId;
 
   /// 식사 사진(/media/...). 없으면 자리만 잡는다.
   final String? imageUrl;
-
-  /// 방금 확정한 결과. 없으면 `GET /meals/{id}/evaluation` 으로 받는다.
-  final MealEvaluation? result;
 
   @override
   State<MealEvaluationScreen> createState() => _MealEvaluationScreenState();
@@ -44,37 +37,38 @@ class MealEvaluationScreen extends StatefulWidget {
 class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
   late final MealApiService _api = MealApiService(context.read<ApiClient>());
 
-  late MealEvaluation? _result = widget.result;
+  /// 확정 결과. null 이면 아직 확정 전.
+  MealEvaluation? _result;
   String? _error;
 
-  /// 슬라이더를 움직이는 동안의 값. 손을 떼면 저장한다.
-  double? _draftSatiety;
-  bool _savingSatiety = false;
+  /// 식후 포만감(0~100). 확정 전에는 입력값, 확정 뒤에는 고치는 중인 값.
+  double _satiety = 50;
+  bool _busy = false;
 
-  @override
-  void initState() {
-    super.initState();
-    if (_result == null) _loadEvaluation();
-  }
-
-  Future<void> _loadEvaluation() async {
-    setState(() => _error = null);
+  Future<void> _confirm() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
-      final result = await _api.fetchEvaluation(widget.mealId);
+      final result = await _api.confirm(
+        widget.mealId,
+        satietyAfterPct: _satiety.round(),
+      );
       if (mounted) setState(() => _result = result);
     } catch (e) {
-      if (mounted) setState(() => _error = '평가를 불러오지 못했어요: $e');
+      if (mounted) setState(() => _error = '평가하지 못했어요: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
-  /// 바뀐 식후 포만감으로 다시 확정한다. 실패하면 원래 값으로 돌린다.
+  /// 평가 뒤 포만감을 고치면 그 값으로 다시 확정한다. 실패하면 원래 값으로
+  /// 돌린다. 확정 전에는 아무것도 하지 않는다("평가 받기" 가 보낸다).
   Future<void> _saveSatiety(double value) async {
     final current = _result?.scores.satiety;
-    if (current == value.round()) {
-      setState(() => _draftSatiety = null);
-      return;
-    }
-    setState(() => _savingSatiety = true);
+    if (current == null || current == value.round()) return;
+    setState(() => _busy = true);
     try {
       final result = await _api.confirm(
         widget.mealId,
@@ -83,16 +77,12 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
       if (mounted) setState(() => _result = result);
     } catch (e) {
       if (!mounted) return;
+      setState(() => _satiety = current.toDouble());
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('포만감을 바꾸지 못했어요: $e')));
     } finally {
-      if (mounted) {
-        setState(() {
-          _draftSatiety = null;
-          _savingSatiety = false;
-        });
-      }
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -153,13 +143,10 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
               const SizedBox(height: AppSpacing.cardGap),
               _QualityCard(result: result),
               const SizedBox(height: AppSpacing.cardGap),
-              // 5번에서 입력한 식후 포만감. 고치면 다시 확정한다.
+              // 식후 포만감은 여기서만 받는다. 평가 뒤에 고치면 다시 확정한다.
               _SatietyCard(
-                value:
-                    _draftSatiety ?? (result?.scores.satiety ?? 0).toDouble(),
-                onChanged: result == null || _savingSatiety
-                    ? null
-                    : (v) => setState(() => _draftSatiety = v),
+                value: _satiety,
+                onChanged: _busy ? null : (v) => setState(() => _satiety = v),
                 onChangeEnd: _saveSatiety,
               ),
               if (result?.notice != null) ...[
@@ -181,10 +168,10 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
                 width: double.infinity,
                 height: AppLayout.primaryButtonHeight,
                 child: FilledButton(
-                  onPressed: result == null
-                      ? (_error != null ? _loadEvaluation : null)
-                      : _savingSatiety
+                  onPressed: _busy
                       ? null
+                      : result == null
+                      ? _confirm
                       : () => _viewNextMealSuggestion(result),
                   // NOTE: design-system.md §5 "주 버튼"은 배경을
                   // AppColors.primary(코랄)로 정해 뒀지만, 이 화면 Figma 의
@@ -197,10 +184,19 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
                       borderRadius: AppRadius.mdRadius,
                     ),
                   ),
-                  child: Text(
-                    _error != null ? '다시 불러오기' : '다음 끼니 제안 보기',
-                    style: AppTypography.buttonLabel,
-                  ),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.textInverse,
+                          ),
+                        )
+                      : Text(
+                          result == null ? '평가 받기' : '다음 끼니 제안 보기',
+                          style: AppTypography.buttonLabel,
+                        ),
                 ),
               ),
             ],
@@ -211,8 +207,8 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
   }
 }
 
-/// 평가를 불러오는 동안 양·질 카드 안내.
-const _beforeConfirm = '평가를 불러오고 있어요';
+/// 확정 전 양·질 카드 안내.
+const _beforeConfirm = '포만감을 입력하면 계산돼요';
 
 /// 영양 정보가 있는 음식이 없어 계산하지 못했을 때.
 const _noNutrition = '영양 정보가 있는 음식이 없어 계산하지 못했어요';
