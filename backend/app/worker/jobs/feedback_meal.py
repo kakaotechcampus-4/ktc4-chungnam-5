@@ -12,12 +12,22 @@
 요약에서 조용히 빠진다(`crud/daily_feedback.py::list_day_evidence`).
 
 BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ShortFeedbackRequest` · `ShortFeedbackResponse` 다.
+
+순서 (load 1~3 전반 · call_ai 3 · apply 4~5):
+  1. 식사를 읽는다. 없거나 지워졌거나 확정 상태가 아니면 AI 를 부르지 않고 끝낸다
+  2. `qqs_evaluations` 에서 Q/Q/S 를 읽는다. 없으면 채점이 아직이다 — raise 해서
+     재시도에 맡긴다
+  3. `items` · 포만감 컨텍스트를 만들고 AI 를 부른다
+  4. 식사를 잠그고 다시 본다 — AI 를 기다리는 사이 지워지거나 고쳐졌거나 다시
+     채점됐으면 쓰지 않는다
+  5. `meal_feedbacks` 에 upsert
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
@@ -35,6 +45,7 @@ from app.models.evaluation import QQSEvaluation
 from app.models.meal import Meal, MealItem
 from app.services.meal import item_nutrition, resolved_amount
 from app.services.nutrition import resolve_by_food_ref_id
+from app.worker.job import Job, Skip
 
 logger = logging.getLogger("worker.feedback_meal")
 
@@ -75,6 +86,16 @@ def _scored_as(evaluation: QQSEvaluation) -> tuple[Any, ...]:
         evaluation.quality_score,
         evaluation.satiety_score,
     )
+
+
+@dataclass(frozen=True)
+class _Ctx:
+    """`load` 가 넘기는 값. ORM 객체를 싣지 않는다 — `load` 의 세션은 곧 닫힌다."""
+
+    meal_id: uuid.UUID
+    scored_as: tuple[Any, ...]
+    """AI 에 넘긴 채점. `apply` 가 쓰기 직전에 이게 그대로인지 본다."""
+    request: dict[str, Any]
 
 
 def _item_payload(db: Session, item: MealItem) -> dict[str, Any]:
@@ -154,31 +175,23 @@ def _stored_suggestions(db: Session, raw: object) -> list[dict[str, Any]] | None
     ]
 
 
-def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
-    """
-    순서:
-      1. 식사를 읽는다. 없거나 지워졌거나 확정 상태가 아니면 AI 를 부르지 않고 끝낸다
-      2. `qqs_evaluations` 에서 Q/Q/S 를 읽는다. 없으면 채점이 아직이다 — raise 해서
-         재시도에 맡긴다
-      3. `items` · 포만감 컨텍스트를 만들고 AI 를 부른다
-      4. 식사를 잠그고 다시 본다 — AI 를 기다리는 사이 지워지거나 고쳐졌거나 다시
-         채점됐으면 쓰지 않는다
-      5. `meal_feedbacks` 에 upsert
-    """
+def load(db: Session, task: ClaimedTask) -> _Ctx | Skip:
+    """식사·평가를 읽고 AI 요청을 만든다. 평가가 아직 없으면 raise — 재시도에 맡긴다."""
     meal_id = uuid.UUID(task.payload["mealId"])
 
     meal = meal_crud.get_meal_for_worker(db, meal_id)
     if (reason := _skip_reason(meal)) is not None:
         logger.info("끼니 피드백 건너뜀 mealId=%s reason=%s", meal_id, reason)
-        return {"skipped": reason}
+        return Skip({"skipped": reason})
 
     evaluation = evaluation_crud.get_by_meal(db, meal.id)
     if evaluation is None:
         raise LookupError(f"meal {meal_id} 의 Q/Q/S 평가가 아직 없다")
-    scored_as = _scored_as(evaluation)
 
-    result = ai.short_feedback(
-        {
+    return _Ctx(
+        meal_id=meal.id,
+        scored_as=_scored_as(evaluation),
+        request={
             "scope": "MEAL",
             "userId": str(meal.user_id),
             # 채점 시점의 단계다. 점수와 같은 기준으로 문장을 써야 한다.
@@ -192,17 +205,24 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
             "mealId": str(meal.id),
             "items": [_item_payload(db, item) for item in meal.items],
             "satiety": _satiety_payload(db, meal.id),
-        }
+        },
     )
 
+
+def call_ai(ctx: _Ctx, ai: AiClient) -> dict[str, Any]:
+    return ai.short_feedback(ctx.request)
+
+
+def apply(db: Session, task: ClaimedTask, ctx: _Ctx, result: dict[str, Any]) -> dict[str, Any]:
+    """식사를 잠그고 다시 본 뒤 upsert 한다."""
     # AI 를 부르는 동안(최대 45초) 잠그지 않았다 — 그 사이 사용자가 지우거나 고쳤을 수 있다.
-    # 다시 읽기 전에 identity map 을 비운다. 객체 하나가 아니라 전부다 — 그 사이 평가
-    # 행이 지워졌으면 옛 객체는 이미 세션에서 떨어져 있을 수 있다. 잠금보다 먼저 해야
-    # 방금 잠그며 새로 읽은 식사까지 만료시켜 SELECT 를 한 번 더 내지 않는다.
+    # 워커 루프에서는 새 세션이라 identity map 이 비어 있지만, `JOB.run_inline` 은 `load` 와
+    # 같은 세션을 쓴다. 그래서 다시 읽기 전에 비운다. 객체 하나가 아니라 전부다 — 그 사이 평가
+    # 행이 지워졌으면 옛 객체는 이미 세션에서 떨어져 있을 수 있다.
     db.expire_all()
-    meal = meal_crud.lock_meal_for_worker(db, meal_id)
+    meal = meal_crud.lock_meal_for_worker(db, ctx.meal_id)
     if (reason := _skip_reason(meal)) is not None:
-        logger.info("끼니 피드백 건너뜀 mealId=%s reason=%s", meal_id, reason)
+        logger.info("끼니 피드백 건너뜀 mealId=%s reason=%s", ctx.meal_id, reason)
         return {"skipped": reason}
 
     # 상태만으로는 부족하다 — 포만감만 고쳐 재확정하면 EVALUATED 그대로다. 그 재확정이
@@ -210,8 +230,8 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
     # 새 문장을 덮고 영영 남는다. 확정이 식사 행을 먼저 잠그므로(`services/evaluation`)
     # 잠금을 얻은 지금 읽는 평가는 커밋이 끝난 값이다.
     current = evaluation_crud.get_by_meal(db, meal.id)
-    if current is None or _scored_as(current) != scored_as:
-        logger.info("끼니 피드백 건너뜀 mealId=%s reason=EVALUATION_CHANGED", meal_id)
+    if current is None or _scored_as(current) != ctx.scored_as:
+        logger.info("끼니 피드백 건너뜀 mealId=%s reason=EVALUATION_CHANGED", ctx.meal_id)
         return {"skipped": "EVALUATION_CHANGED"}
 
     suggestions = _stored_suggestions(db, result.get("suggestions"))
@@ -227,14 +247,13 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
         safety_status=SafetyStatus(result["safetyStatus"]),
     )
 
-    # 커밋하지 않는다. 이 세션은 큐가 작업을 잠근 트랜잭션이고, 큐가 DONE 과 함께
-    # 한 번에 커밋한다. 여기서 터지면 도메인 변경까지 통째로 롤백된다.
+    # 커밋하지 않는다. 큐가 DONE 과 함께 한 번에 커밋한다(`queue.complete`).
 
     # 로그·반환값(task_queue.result)에는 식별자와 개수만 — 음식명·본문·제안 문구는
     # 남기지 않는다 (규칙 6).
     logger.info(
         "끼니 피드백 완료 mealId=%s safetyStatus=%s",
-        meal_id,
+        ctx.meal_id,
         result["safetyStatus"],
     )
 
@@ -242,3 +261,6 @@ def run(db: Session, task: ClaimedTask, ai: AiClient) -> dict[str, Any] | None:
         "mealFeedbackId": str(meal_feedback_id),
         "suggestionCount": len(suggestions or []),
     }
+
+
+JOB = Job(load=load, call_ai=call_ai, apply=apply)

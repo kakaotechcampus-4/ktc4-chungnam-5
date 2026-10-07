@@ -29,8 +29,11 @@ from app.tests.factories import (
     make_qqs_evaluation,
     make_user,
 )
-from app.worker.dispatch import handle
-from app.worker.jobs.feedback_daily import run
+from app.worker.dispatch import get_job
+from app.worker.jobs import feedback_daily
+
+# 세 단계를 세션 하나로 이어 돈다. 시나리오 단언은 3단계 분리 전과 같다.
+run = feedback_daily.JOB.run_inline
 
 D = "2026-08-21"
 D_DATE = datetime(2026, 8, 21).date()
@@ -755,10 +758,23 @@ def test_average_is_rounded_with_python_round(db):
 
 
 def test_handle_routes_feedback_daily_to_the_handler(db):
-    """D2: dispatch.handle 이 feedback.daily 를 핸들러로 보낸다 — 근거 없는 사용자면 None, 0행."""
+    """D2: dispatch.get_job 이 feedback.daily 를 핸들러로 보낸다 — 근거 없는 사용자면 None, 0행."""
     user = make_user(db)
 
-    result = handle(db, _task(user.id), FakeAi())
+    task = _task(user.id)
+    result = get_job(task.type).run_inline(db, task, FakeAi())
 
     assert result is None
     assert _daily_rows(db, user.id) == []
+
+
+# ─────────────────────────── 3단계 계약 ───────────────────────────
+
+
+def test_no_evidence_means_no_ai_call_and_no_request(db):
+    """근거가 없으면 `call_ai` 가 AI 를 부르지 않고 None — `apply` 가 그날 행을 지운다."""
+    user = make_user(db)
+    ctx = feedback_daily.load(db, _task(user.id))
+
+    assert ctx.request is None
+    assert feedback_daily.call_ai(ctx, FakeAi()) is None
