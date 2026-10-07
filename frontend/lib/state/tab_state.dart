@@ -12,6 +12,12 @@ class TabState extends ChangeNotifier {
   /// [RootShell] 하단 탭 개수. 탭이 늘거나 줄면 같이 맞춘다.
   static const tabCount = 4;
 
+  // 탭 번호. 다시 보일 때 새로 불러오는 화면이 자기 탭을 알아야 한다.
+  static const home = 0;
+  static const feedback = 1;
+  static const history = 2;
+  static const my = 3;
+
   int _currentIndex = 0;
 
   int get currentIndex => _currentIndex;

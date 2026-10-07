@@ -52,6 +52,8 @@ class StageBadge extends StatelessWidget {
 ///
 /// - 양: 서버가 내려주는 라벨(`부족`·`적정`·`과다`). FE 는 계산하지 않는다.
 /// - 질 / 포만도: 0~100 정수
+///
+/// 양·질은 영양 정보가 있는 음식이 없으면 null 이라 `-` 로 보인다.
 class QqsBadgeRow extends StatelessWidget {
   const QqsBadgeRow({
     super.key,
@@ -60,8 +62,8 @@ class QqsBadgeRow extends StatelessWidget {
     required this.satiety,
   });
 
-  final String quantityLabel;
-  final int quality;
+  final String? quantityLabel;
+  final int? quality;
   final int satiety;
 
   @override
@@ -69,13 +71,13 @@ class QqsBadgeRow extends StatelessWidget {
     return Row(
       children: [
         _Badge(
-          text: '양 $quantityLabel',
+          text: '양 ${quantityLabel ?? '-'}',
           background: AppColors.quantityBg,
           foreground: AppColors.quantity,
         ),
         const SizedBox(width: AppSpacing.xs),
         _Badge(
-          text: '질 $quality점',
+          text: quality == null ? '질 -' : '질 $quality점',
           background: AppColors.qualityBg,
           foreground: AppColors.quality,
         ),
@@ -137,8 +139,10 @@ class MealCard extends StatelessWidget {
   /// `토스트, 그릭요거트`.
   final String foodNames;
 
-  /// 셋 중 하나라도 null 이면 평가 전이다 — Q·Q·S 대신 `평가 전` 배지 하나를
-  /// 보인다. 점수 자리에 0 을 채우면 "0점짜리 식사"로 읽힌다.
+  /// 포만도가 null 이면 평가 전이다 — Q·Q·S 대신 `평가 전` 배지 하나를
+  /// 보인다. 점수 자리에 0 을 채우면 "0점짜리 식사"로 읽힌다. 포만도는 확정
+  /// 때 사용자가 꼭 넣으므로 평가 여부를 가른다. 양·질은 평가 뒤에도 null 일
+  /// 수 있다(영양 정보 없는 음식만 있을 때).
   final String? quantityLabel;
   final int? quality;
   final int? satiety;
@@ -183,12 +187,12 @@ class MealCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    if ((quantityLabel, quality, satiety) case (
-                      final q?,
-                      final ql?,
-                      final s?,
-                    ))
-                      QqsBadgeRow(quantityLabel: q, quality: ql, satiety: s)
+                    if (satiety case final s?)
+                      QqsBadgeRow(
+                        quantityLabel: quantityLabel,
+                        quality: quality,
+                        satiety: s,
+                      )
                     else
                       const _Badge(
                         text: '평가 전',

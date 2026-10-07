@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
+import '../api/meal_api.dart';
 import '../common/api_format.dart';
 import '../screens/shared_meal_widgets.dart' show SkeletonBox;
 import '../theme/app_colors.dart';
@@ -55,47 +58,39 @@ class CheckinMeal {
   /// 쓰지 않는다.
   DateTime get eatenAtKst => eatenAt.toUtc().add(const Duration(hours: 9));
 
-  factory CheckinMeal.fromJson(Map<String, dynamic> json) => CheckinMeal(
-    mealId: json['mealId'] as String,
-    mealType: json['mealType'] as String,
-    eatenAt: DateTime.parse(json['eatenAt'] as String),
-    displayName: json['displayName'] as String,
+  factory CheckinMeal.fromDetail(MealDetail meal) => CheckinMeal(
+    mealId: meal.mealId,
+    mealType: meal.mealType,
+    eatenAt: meal.eatenAtInstant,
+    displayName: meal.displayName,
   );
 }
 
 // ── API 서비스 ─────────────────────────────────────────────
 
+/// 체크인 팝업이 쓰는 엔드포인트.
 class SatietyCheckinApiService {
-  /// `GET /meals/{mealId}`
-  Future<CheckinMeal> fetchMeal(String mealId) async {
-    // TODO(http|dio 결정 후): 실제 GET 요청으로 교체.
-    await Future.delayed(const Duration(milliseconds: 300));
-    // 더미는 "3시간 전에 먹은 끼니"로 만든다. 고정 날짜면 경과 시간이 수백
-    // 시간으로 찍힌다.
-    final eatenAt = DateTime.now().subtract(const Duration(hours: 3));
-    return CheckinMeal.fromJson({
-      ..._sample,
-      'mealId': mealId,
-      'eatenAt': eatenAt.toIso8601String(),
-    });
-  }
+  SatietyCheckinApiService(this._api);
 
-  /// 사후 포만감 저장.
+  final MealApiService _api;
+
+  /// `GET /meals/{mealId}`
+  Future<CheckinMeal> fetchMeal(String mealId) async =>
+      CheckinMeal.fromDetail(await _api.fetchMeal(mealId));
+
+  /// `POST /meals/{mealId}/satiety-checkins` — 식사 [elapsedMinutes] 뒤 포만감.
+  /// 서버는 몇 시간 뒤인지를 정수(0~48)로 받는다.
   Future<void> save({
     required String mealId,
-    required int satietyAfterPct,
+    required int elapsedMinutes,
+    required int satietyPct,
     required int? hungerReturnMinutes,
-  }) async {
-    // TODO(백엔드 API 생기면): satiety_logs(satiety_after · hunger_return_minutes)
-    //   저장 API 로 교체. 경로 미정.
-    await Future.delayed(const Duration(milliseconds: 300));
-  }
-
-  static const Map<String, dynamic> _sample = {
-    'mealId': 'meal_456',
-    'mealType': 'LUNCH',
-    'displayName': '현미밥, 된장국, 두부조림',
-  };
+  }) => _api.addSatietyCheckin(
+    mealId,
+    checkinOffsetHours: (elapsedMinutes / 60).round().clamp(0, 48),
+    satietyPct: satietyPct,
+    hungerReturnMinutes: hungerReturnMinutes?.clamp(0, 2880),
+  );
 }
 
 // ── 팝업 ────────────────────────────────────────────────────
@@ -109,9 +104,16 @@ class SatietyCheckinApiService {
 /// Figma 의 `satietyPct` · `hungerReturnMinutes` 라벨은 API 필드 주석이라
 /// 화면에 그리지 않는다. 빈 "메모 (선택)" 자리도 아직 내용이 없어 뺐다.
 class SatietyCheckinPopup extends StatefulWidget {
-  const SatietyCheckinPopup({super.key, required this.mealId});
+  const SatietyCheckinPopup({
+    super.key,
+    required this.mealId,
+    this.initialSatiety,
+  });
 
   final String mealId;
+
+  /// 슬라이더 시작값. 홈 게이지에서 열면 게이지 숫자로 시작한다.
+  final int? initialSatiety;
 
   @override
   State<SatietyCheckinPopup> createState() => _SatietyCheckinPopupState();
@@ -120,15 +122,17 @@ class SatietyCheckinPopup extends StatefulWidget {
 class _SatietyCheckinPopupState extends State<SatietyCheckinPopup> {
   static const _defaultSatiety = 50;
 
-  final SatietyCheckinApiService _api = SatietyCheckinApiService();
-  final TextEditingController _satietyController = TextEditingController(
-    text: '$_defaultSatiety',
+  late final SatietyCheckinApiService _api = SatietyCheckinApiService(
+    MealApiService(context.read<ApiClient>()),
+  );
+  late final TextEditingController _satietyController = TextEditingController(
+    text: '$_satiety',
   );
 
   CheckinMeal? _meal;
   bool _mealFailed = false;
 
-  int _satiety = _defaultSatiety;
+  late int _satiety = (widget.initialSatiety ?? _defaultSatiety).clamp(0, 100);
   HungerReturn? _hungerReturn;
 
   bool _saving = false;
@@ -197,7 +201,8 @@ class _SatietyCheckinPopupState extends State<SatietyCheckinPopup> {
     try {
       await _api.save(
         mealId: widget.mealId,
-        satietyAfterPct: _satiety,
+        elapsedMinutes: _elapsedMinutes,
+        satietyPct: _satiety,
         hungerReturnMinutes: _hungerReturn!.minutesAfterMeal(_elapsedMinutes),
       );
       if (!mounted) return;
