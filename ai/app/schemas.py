@@ -72,7 +72,8 @@ class RecognizedItem(_Camel):
     estimated_amount: float = Field(ge=0, le=999999.99)
     unit: str = Field(min_length=1, max_length=32)  # g / 개 / ml … g 환산은 BE 가 한다
     confidence: float = Field(ge=0, le=1)
-    candidate_food_ref_id: str | None = None  # AI 는 DB 를 모르므로 항상 None
+    # BE /internal/v1 search_foods 로 찾아 채운다. 그 API 가 생기기 전까지는 None
+    candidate_food_ref_id: str | None = None
     clarify_question: str | None = None
 
 
