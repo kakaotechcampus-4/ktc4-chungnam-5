@@ -104,6 +104,51 @@ void main() {
     expect(find.text('기록'), findsWidgets);
   });
 
+  /// 점수가 있는 날이 [day] 하루뿐인 대시보드로 피드백 탭을 열고
+  /// 기간을 모두 돌려 본다. 날마다 추이 차트의 날짜 라벨이 보여야 한다.
+  Future<void> expectFeedbackTabDrawsOneDay(
+    WidgetTester tester,
+    Map<String, Object?> day,
+  ) async {
+    _useDesignSize(tester);
+    final api = FakeApi();
+    api.on('GET /dashboard', (o) {
+      final data = _mockBody('GET /api/v1/dashboard')['data'] as Map;
+      final mockDay = (data['series'] as List).last as Map;
+      // `_mockBody` 는 `{{today}}` 자리표시자를 그대로 두어 날짜를 채운다.
+      final series = [
+        {...mockDay, 'date': '2026-10-07', ...day},
+      ];
+      return (200, fakeOk({...data, 'series': series}));
+    });
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('피드백'));
+    await _settle(tester);
+    for (final period in const ['7일', '28일', '전체']) {
+      await tester.tap(find.text(period));
+      await _settle(tester);
+      expect(tester.takeException(), isNull, reason: period);
+      expect(find.text('10/07'), findsOneWidget, reason: period);
+    }
+  }
+
+  testWidgets('feedback tab draws the trend with only one scored day', (
+    WidgetTester tester,
+  ) async {
+    // 신규 사용자처럼 점수가 있는 날이 하루뿐이다.
+    await expectFeedbackTabDrawsOneDay(tester, {});
+  });
+
+  testWidgets('feedback tab draws the trend when amount and satiety are 0', (
+    WidgetTester tester,
+  ) async {
+    // 막대·선 높이의 기준(최댓값)이 0 이 된다.
+    await expectFeedbackTabDrawsOneDay(tester, {'quantity': 0, 'satiety': 0});
+  });
+
   testWidgets('condition popup shows on launch and again after "later"', (
     WidgetTester tester,
   ) async {

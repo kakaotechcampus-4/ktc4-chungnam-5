@@ -373,7 +373,8 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
 
   List<DailyScore> _sampledSeries() {
     final series = dashboard!.series;
-    if (series.isEmpty) return series;
+    // 하루치만 있으면 아래 clamp(2, 1) 이 ArgumentError 를 던진다.
+    if (series.length < 2) return series;
     switch (period) {
       case '7d':
         return series;
@@ -453,7 +454,7 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
             child: CustomPaint(
               painter: _TrendChartPainter(
                 series: series,
-                maxVal: maxVal,
+                maxVal: maxVal == 0 ? 1.0 : maxVal,
                 doseValues: doseValues,
                 maxDose: maxDose == 0 ? 1.0 : maxDose,
                 barColor: AppColors.surfaceSage,
