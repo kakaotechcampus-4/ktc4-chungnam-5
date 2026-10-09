@@ -5,9 +5,9 @@
       "data": {
         "userId": "00000000-0000-0000-0000-000000000001",
         "nickname": "영우",
-        "heightCm": 175.0,
+        "heightCm": 175,
         "weightKg": 78.4,
-        "baselineIntake": 700.0,
+        "baselineIntake": 700,
         "onboardingStatus": "READY",
         "createdAt": "{{today-68}}T09:00:00+09:00"
       },
@@ -20,9 +20,9 @@
       "data": {
         "userId": "00000000-0000-0000-0000-000000000001",
         "nickname": "영우",
-        "heightCm": 175.0,
+        "heightCm": 175,
         "weightKg": 78.4,
-        "baselineIntake": 700.0,
+        "baselineIntake": 700,
         "onboardingStatus": "READY"
       },
       "error": null
@@ -34,9 +34,9 @@
       "data": {
         "userId": "00000000-0000-0000-0000-000000000001",
         "nickname": "영우",
-        "heightCm": 175.0,
+        "heightCm": 175,
         "weightKg": 78.4,
-        "baselineIntake": 700.0,
+        "baselineIntake": 700,
         "onboardingStatus": "READY"
       },
       "error": null
@@ -48,7 +48,7 @@
       "data": {
         "medicationId": "00000000-0000-0000-0000-0000000000a1",
         "drugName": "위고비",
-        "doseMg": 1.0,
+        "doseMg": 1,
         "startedAt": "{{today-68}}",
         "doseCount": 10,
         "nextDoseDate": "{{today+2}}",
@@ -70,7 +70,7 @@
       "data": {
         "medicationId": "00000000-0000-0000-0000-0000000000a1",
         "drugName": "위고비",
-        "doseMg": 1.0,
+        "doseMg": 1,
         "startedAt": "{{today-68}}",
         "doseCount": 10,
         "nextDoseDate": "{{today+2}}",
@@ -105,7 +105,7 @@
           },
           {
             "doseEventId": "00000000-0000-0000-0000-0000000000d3",
-            "doseMg": 1.0,
+            "doseMg": 1,
             "direction": "INCREASE",
             "effectiveFrom": "{{today-12}}"
           }
@@ -155,25 +155,38 @@
           {
             "date": "{{today-2}}",
             "count": 3,
-            "recordedMealTypes": ["BREAKFAST", "LUNCH", "DINNER"],
+            "recordedMealTypes": [
+              "BREAKFAST",
+              "LUNCH",
+              "DINNER"
+            ],
             "stage": "MAINTENANCE"
           },
           {
             "date": "{{today-1}}",
             "count": 1,
-            "recordedMealTypes": ["LUNCH"],
+            "recordedMealTypes": [
+              "LUNCH"
+            ],
             "stage": "MAINTENANCE"
           },
           {
             "date": "{{today}}",
             "count": 2,
-            "recordedMealTypes": ["BREAKFAST", "LUNCH"],
+            "recordedMealTypes": [
+              "BREAKFAST",
+              "LUNCH"
+            ],
             "stage": "MAINTENANCE"
           }
         ],
         "summary": {
           "totalMeals": 6,
-          "avgScores": { "quantity": 74, "quality": 81, "satiety": 65 }
+          "avgScores": {
+            "quantity": 74,
+            "quality": 81,
+            "satiety": 65
+          }
         }
       },
       "error": null
@@ -191,7 +204,11 @@
             "stage": "MAINTENANCE",
             "displayName": "현미밥, 된장국, 두부조림",
             "thumbnailUrl": null,
-            "scores": { "quantity": 76, "quality": 80, "satiety": 68 }
+            "scores": {
+              "quantity": 76,
+              "quality": 80,
+              "satiety": 68
+            }
           },
           {
             "mealId": "00000000-0000-0000-0000-000000000450",
@@ -200,7 +217,11 @@
             "stage": "MAINTENANCE",
             "displayName": "토스트, 그릭요거트",
             "thumbnailUrl": null,
-            "scores": { "quantity": 74, "quality": 90, "satiety": 80 }
+            "scores": {
+              "quantity": 74,
+              "quality": 90,
+              "satiety": 80
+            }
           }
         ],
         "nextCursor": null,
@@ -224,28 +245,579 @@
     "200": {
       "success": true,
       "data": {
-        "period": { "type": "7d", "from": "{{today-6}}", "to": "{{today}}" },
+        "period": {
+          "type": "7d",
+          "from": "{{today-6}}",
+          "to": "{{today}}"
+        },
         "series": [
-          { "date": "{{today-6}}", "quantity": 60, "quality": 70, "satiety": 58, "stage": "MAINTENANCE" },
-          { "date": "{{today-5}}", "quantity": 68, "quality": 74, "satiety": 66, "stage": "MAINTENANCE" },
-          { "date": "{{today-4}}", "quantity": 72, "quality": 78, "satiety": 60, "stage": "MAINTENANCE" },
-          { "date": "{{today-3}}", "quantity": 75, "quality": 80, "satiety": 64, "stage": "MAINTENANCE" },
-          { "date": "{{today-2}}", "quantity": 75, "quality": 83, "satiety": 68, "stage": "MAINTENANCE" },
-          { "date": "{{today-1}}", "quantity": 70, "quality": 76, "satiety": 62, "stage": "MAINTENANCE" },
-          { "date": "{{today}}", "quantity": 75, "quality": 85, "satiety": 74, "stage": "MAINTENANCE" }
+          {
+            "date": "{{today-6}}",
+            "quantity": 60,
+            "quality": 70,
+            "satiety": 58,
+            "stage": "MAINTENANCE"
+          },
+          {
+            "date": "{{today-5}}",
+            "quantity": 68,
+            "quality": 74,
+            "satiety": 66,
+            "stage": "MAINTENANCE"
+          },
+          {
+            "date": "{{today-4}}",
+            "quantity": 72,
+            "quality": 78,
+            "satiety": 60,
+            "stage": "MAINTENANCE"
+          },
+          {
+            "date": "{{today-3}}",
+            "quantity": 75,
+            "quality": 80,
+            "satiety": 64,
+            "stage": "MAINTENANCE"
+          },
+          {
+            "date": "{{today-2}}",
+            "quantity": 75,
+            "quality": 83,
+            "satiety": 68,
+            "stage": "MAINTENANCE"
+          },
+          {
+            "date": "{{today-1}}",
+            "quantity": 70,
+            "quality": 76,
+            "satiety": 62,
+            "stage": "MAINTENANCE"
+          },
+          {
+            "date": "{{today}}",
+            "quantity": 75,
+            "quality": 85,
+            "satiety": 74,
+            "stage": "MAINTENANCE"
+          }
         ],
-        "averages": { "quantity": 71, "quality": 78, "satiety": 65 },
+        "averages": {
+          "quantity": 71,
+          "quality": 78,
+          "satiety": 65
+        },
         "byMealType": {
-          "BREAKFAST": { "quantity": 70, "quality": 88, "satiety": 78 },
-          "LUNCH": { "quantity": 76, "quality": 80, "satiety": 66 },
-          "DINNER": { "quantity": 78, "quality": 74, "satiety": 58 }
+          "BREAKFAST": {
+            "quantity": 70,
+            "quality": 88,
+            "satiety": 78
+          },
+          "LUNCH": {
+            "quantity": 76,
+            "quality": 80,
+            "satiety": 66
+          },
+          "DINNER": {
+            "quantity": 78,
+            "quality": 74,
+            "satiety": 58
+          }
         },
         "monthlyAverages": [],
         "weightSeries": [
-          { "date": "{{today-7}}", "weightKg": 79.0 },
-          { "date": "{{today}}", "weightKg": 78.4 }
+          {
+            "date": "{{today-7}}",
+            "weightKg": 79
+          },
+          {
+            "date": "{{today}}",
+            "weightKg": 78.4
+          }
         ],
         "stageChanges": []
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/meals": {
+    "202": {
+      "success": true,
+      "data": {
+        "mealId": "00000000-0000-0000-0000-000000000456",
+        "status": "ANALYZING",
+        "steps": [
+          {
+            "key": "FOOD_RECOGNITION",
+            "state": "RUNNING"
+          },
+          {
+            "key": "DB_MATCHING",
+            "state": "PENDING"
+          },
+          {
+            "key": "STAGE_RULE_APPLY",
+            "state": "PENDING"
+          }
+        ],
+        "pollIntervalMs": 1500,
+        "timeoutMs": 30000
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/meals/{meal_id}": {
+    "200": {
+      "success": true,
+      "data": {
+        "mealId": "00000000-0000-0000-0000-000000000456",
+        "status": "REVIEW_REQUIRED",
+        "isRecalculation": false,
+        "stage": "MAINTENANCE",
+        "mealType": "LUNCH",
+        "eatenAt": "{{today}}T12:40:00+09:00",
+        "imageUrl": null,
+        "steps": [
+          {
+            "key": "FOOD_RECOGNITION",
+            "state": "DONE"
+          },
+          {
+            "key": "DB_MATCHING",
+            "state": "RUNNING"
+          },
+          {
+            "key": "STAGE_RULE_APPLY",
+            "state": "PENDING"
+          }
+        ],
+        "clarifyQuestion": null,
+        "items": [
+          {
+            "itemId": "00000000-0000-0000-0000-0000000004a1",
+            "displayName": "참치김밥",
+            "amount": 250,
+            "unit": "g",
+            "confidence": 0.62,
+            "matched": true,
+            "nutritionSource": "PUBLIC_DB",
+            "userConfirmed": false,
+            "nutrition": {
+              "kcal": 400,
+              "proteinG": 12.2,
+              "fatG": 9.4,
+              "carbG": 65.8,
+              "fiberG": null,
+              "sodiumMg": 1042
+            }
+          },
+          {
+            "itemId": "00000000-0000-0000-0000-0000000004a2",
+            "displayName": "삶은 계란",
+            "amount": 2,
+            "unit": "개",
+            "confidence": 0.96,
+            "matched": false,
+            "nutritionSource": null,
+            "userConfirmed": false,
+            "nutrition": null
+          }
+        ],
+        "scores": null,
+        "nutrients": [],
+        "satiety": null,
+        "feedback": null
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/meals/{meal_id}/items": {
+    "201": {
+      "success": true,
+      "data": {
+        "itemId": "00000000-0000-0000-0000-0000000004a3",
+        "matched": false,
+        "nutrition": null,
+        "status": "ANALYZING",
+        "isRecalculation": true
+      },
+      "error": null
+    }
+  },
+  "PATCH /api/v1/meals/{meal_id}/items": {
+    "200": {
+      "success": true,
+      "data": {
+        "status": "ANALYZING",
+        "isRecalculation": true,
+        "steps": [
+          {
+            "key": "FOOD_RECOGNITION",
+            "state": "DONE"
+          },
+          {
+            "key": "DB_MATCHING",
+            "state": "RUNNING"
+          },
+          {
+            "key": "STAGE_RULE_APPLY",
+            "state": "PENDING"
+          }
+        ]
+      },
+      "error": null
+    }
+  },
+  "DELETE /api/v1/meals/{meal_id}/items/{item_id}": {
+    "200": {
+      "success": true,
+      "data": {
+        "status": "ANALYZING",
+        "isRecalculation": true
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/nutrition/candidates": {
+    "200": {
+      "success": true,
+      "data": {
+        "candidates": [
+          {
+            "foodRefId": "P114-300030000-0214",
+            "name": "계란말이",
+            "servingSizeG": 100,
+            "nutrition": {
+              "kcal": 193,
+              "proteinG": 17.21,
+              "fatG": 13.21,
+              "carbG": 1.45,
+              "fiberG": null,
+              "sodiumMg": 449
+            }
+          },
+          {
+            "foodRefId": "P118-100010700-0055",
+            "name": "바로먹는 삶은계란",
+            "servingSizeG": 100,
+            "nutrition": {
+              "kcal": 145,
+              "proteinG": 12.4,
+              "fatG": 9.8,
+              "carbG": 0.9,
+              "fiberG": null,
+              "sodiumMg": 140
+            }
+          }
+        ]
+      },
+      "error": null
+    }
+  },
+  "PUT /api/v1/meals/{meal_id}/items/{item_id}/nutrition": {
+    "200": {
+      "success": true,
+      "data": {
+        "itemId": "00000000-0000-0000-0000-0000000004a2",
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "nutrition": {
+          "kcal": 145,
+          "proteinG": 12.4,
+          "fatG": 9.8,
+          "carbG": 0.9,
+          "fiberG": null,
+          "sodiumMg": 140
+        },
+        "status": "ANALYZING",
+        "isRecalculation": true
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/meals/{meal_id}/confirm": {
+    "200": {
+      "success": true,
+      "data": {
+        "mealId": "00000000-0000-0000-0000-000000000456",
+        "status": "EVALUATED",
+        "stage": "MAINTENANCE",
+        "scores": {
+          "quantity": 76,
+          "quality": 80,
+          "satiety": 68
+        },
+        "stageEmphasis": [
+          "SATIETY",
+          "QUALITY"
+        ],
+        "nutrients": [
+          {
+            "code": "PROTEIN",
+            "label": "단백질",
+            "current": 24.5,
+            "target": 32,
+            "unit": "g",
+            "state": "SHORT"
+          },
+          {
+            "code": "FIBER",
+            "label": "식이섬유",
+            "current": null,
+            "target": 8.3,
+            "unit": "g",
+            "state": null
+          },
+          {
+            "code": "SODIUM",
+            "label": "나트륨",
+            "current": 1042,
+            "target": 766.7,
+            "unit": "mg",
+            "state": "OVER"
+          }
+        ],
+        "evidence": {
+          "dbSource": "식품안전나라 식품영양성분DB",
+          "stageRuleVersion": "v2",
+          "weightProfileVersion": "v2",
+          "nutritionSources": [
+            "PUBLIC_DB"
+          ]
+        },
+        "feedbackStatus": "PENDING"
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/meals/{meal_id}/evaluation": {
+    "200": {
+      "success": true,
+      "data": {
+        "mealId": "00000000-0000-0000-0000-000000000456",
+        "status": "EVALUATED",
+        "stage": "MAINTENANCE",
+        "scores": {
+          "quantity": 76,
+          "quality": 80,
+          "satiety": 68
+        },
+        "stageEmphasis": [
+          "SATIETY",
+          "QUALITY"
+        ],
+        "nutrients": [
+          {
+            "code": "PROTEIN",
+            "label": "단백질",
+            "current": 24.5,
+            "target": 32,
+            "unit": "g",
+            "state": "SHORT"
+          },
+          {
+            "code": "FIBER",
+            "label": "식이섬유",
+            "current": null,
+            "target": 8.3,
+            "unit": "g",
+            "state": null
+          },
+          {
+            "code": "SODIUM",
+            "label": "나트륨",
+            "current": 1042,
+            "target": 766.7,
+            "unit": "mg",
+            "state": "OVER"
+          }
+        ],
+        "evidence": {
+          "dbSource": "식품안전나라 식품영양성분DB",
+          "stageRuleVersion": "v2",
+          "weightProfileVersion": "v2",
+          "nutritionSources": [
+            "PUBLIC_DB"
+          ]
+        }
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/meals/{meal_id}/feedback": {
+    "200": {
+      "success": true,
+      "data": {
+        "feedbackStatus": "READY",
+        "summary": "유지기 기준으로 보면 포만감이 부족한 식사예요.",
+        "reasoning": "지금은 포만감 유지가 중요한데 단백질 비중이 낮았어요.",
+        "suggestions": [
+          {
+            "foodName": "두부 반 모",
+            "nutrients": [],
+            "advice": "단백질을 조금 더 채우는 쪽이에요"
+          },
+          {
+            "foodName": "나물 한 접시",
+            "nutrients": [],
+            "advice": "식이섬유가 포만감을 늘리는 데 도움이 돼요"
+          }
+        ],
+        "expectedSatietyPct": {
+          "current": 68,
+          "after": 79
+        },
+        "safetyStatus": "SAFE"
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/meals/{meal_id}/satiety-checkins": {
+    "201": {
+      "success": true,
+      "data": {
+        "checkinId": "00000000-0000-0000-0000-0000000000c1",
+        "mealId": "00000000-0000-0000-0000-000000000456",
+        "checkinOffsetHours": 3,
+        "satietyPct": 40,
+        "hungerReturnMinutes": 150
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/home": {
+    "200": {
+      "success": true,
+      "data": {
+        "date": "{{today}}",
+        "medication": {
+          "drugName": "위고비",
+          "doseMg": 1,
+          "doseCount": 10,
+          "stage": "MAINTENANCE",
+          "nextDoseDate": "{{today+2}}",
+          "daysUntilNextDose": 2,
+          "doseChangeScheduled": false
+        },
+        "stomach": {
+          "satietyPct": 68,
+          "sourceMealId": "00000000-0000-0000-0000-000000000456",
+          "sourceMealAt": "{{today}}T12:40:00+09:00",
+          "minutesSinceMeal": 180,
+          "feedbackSummary": "유지기 기준으로 보면 포만감이 부족한 식사예요."
+        },
+        "today": {
+          "recordedCount": 2,
+          "meals": [
+            {
+              "mealId": "00000000-0000-0000-0000-000000000450",
+              "mealType": "BREAKFAST",
+              "eatenAt": "{{today}}T08:20:00+09:00",
+              "displayName": "토스트, 그릭요거트",
+              "thumbnailUrl": null,
+              "scores": {
+                "quantity": 74,
+                "quality": 90,
+                "satiety": 80
+              }
+            },
+            {
+              "mealId": "00000000-0000-0000-0000-000000000456",
+              "mealType": "LUNCH",
+              "eatenAt": "{{today}}T12:40:00+09:00",
+              "displayName": "현미밥, 된장국, 두부조림",
+              "thumbnailUrl": null,
+              "scores": {
+                "quantity": 76,
+                "quality": 80,
+                "satiety": 68
+              }
+            }
+          ],
+          "missingMealTypes": [
+            "DINNER"
+          ]
+        }
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/insights/long-term": {
+    "200": {
+      "success": true,
+      "data": {
+        "period": {
+          "from": "{{today-6}}",
+          "to": "{{today}}"
+        },
+        "status": "READY",
+        "dataSufficient": true,
+        "trendSummary": "이번 주는 질 점수가 꾸준히 올랐어요.",
+        "recommendation": "저녁에 단백질을 조금 더 챙겨 보세요.",
+        "generatedAt": "{{today}}T09:00:00+09:00",
+        "stale": false,
+        "staleReason": null
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/insights/long-term/refresh": {
+    "202": {
+      "success": true,
+      "data": {
+        "feedbackStatus": "GENERATING",
+        "pollIntervalMs": 1500
+      },
+      "error": null
+    }
+  },
+  "PATCH /api/v1/medications/{record_id}": {
+    "200": {
+      "success": true,
+      "data": {
+        "recordId": "00000000-0000-0000-0000-0000000000a1",
+        "drugName": "위고비",
+        "doseMg": 1,
+        "injectionCount": 1,
+        "effectiveFrom": "{{today-68}}",
+        "effectiveTo": null,
+        "stage": "MAINTENANCE",
+        "stageReason": "약효가 줄고 식욕이 돌아오는 구간",
+        "stageChanged": false,
+        "ruleVersion": "v1"
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/insights/daily": {
+    "200": {
+      "success": true,
+      "data": {
+        "dailyFeedbackId": "00000000-0000-0000-0000-0000000000f1",
+        "feedbackDate": "{{today}}",
+        "feedbackStatus": "READY",
+        "summary": "단백질이 고르게 들어간 하루였어요. 저녁만 포만감이 짧게 끝났어요.",
+        "scores": {
+          "quantity": 75,
+          "quality": 85,
+          "satiety": 74
+        },
+        "sourceMealIds": [
+          "00000000-0000-0000-0000-000000000456"
+        ],
+        "safetyStatus": "SAFE",
+        "generatedAt": "{{today}}T21:00:00+09:00",
+        "stale": false,
+        "staleReason": null
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/insights/daily/refresh": {
+    "202": {
+      "success": true,
+      "data": {
+        "feedbackStatus": "GENERATING",
+        "pollIntervalMs": 1500
       },
       "error": null
     }

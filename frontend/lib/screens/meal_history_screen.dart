@@ -3,12 +3,15 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../common/api_format.dart';
+import '../popups/popup_gate.dart';
+import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import 'meal_evaluation_screen.dart';
 import 'meal_input_screen.dart';
+import 'meal_review_screen.dart';
+import 'next_meal_suggestion_screen.dart';
 import 'shared_meal_widgets.dart';
 
 // ── 모델 ────────────────────────────────────────────────────
@@ -189,8 +192,8 @@ class MealHistoryApiService {
   ///
   /// **서버 `GET /meals` 에는 날짜 필터가 없다**(cursor · limit 만, 최신순).
   /// 그래서 최신부터 페이지를 넘기며 그날 것만 모으고, 그날보다 이전 식사가
-  /// 나오면 멈춘다. 오래된 날일수록 페이지를 많이 넘긴다.
-  /// TODO(BE 요청): `GET /meals?date=YYYY-MM-DD` 가 생기면 한 번 호출로 바꾼다.
+  /// 나오면 멈춘다. 오래된 날일수록 페이지를 많이 넘긴다. 명세(10/1)도 날짜
+  /// 필터를 두지 않기로 했다 — 날짜별은 `/meals/calendar` · `/home` 몫이다.
   Future<List<HistoryMeal>> fetchMealsByDate(DateTime date) async {
     final day = DateTime(date.year, date.month, date.day);
     final meals = <HistoryMeal>[];
@@ -259,9 +262,29 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
   String? _calendarError;
   String? _listError;
 
+  /// 다른 탭(홈 등)에서 식사를 기록하면 이 탭은 모른다. 탭이 다시 보일 때
+  /// 새로 불러온다(IndexedStack 이라 화면이 처음 한 번만 만들어진다).
+  late final TabState _tabs = context.read<TabState>();
+
+  void _onTabChanged() {
+    if (_tabs.currentIndex != TabState.feedback ||
+        _tabs.feedbackKind != FeedbackKind.short) {
+      return;
+    }
+    _loadCalendar();
+    _loadMeals();
+  }
+
+  @override
+  void dispose() {
+    _tabs.removeListener(_onTabChanged);
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _tabs.addListener(_onTabChanged);
     _loadCalendar();
     _loadMeals();
   }
@@ -343,11 +366,18 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     _loadMeals();
   }
 
-  /// 끼니 카드 탭 → 식사 평가 화면(6번). 돌아오면 목록을 다시 불러온다.
-  Future<void> _openEvaluation(HistoryMeal meal) async {
+  /// 끼니 카드 탭 — 평가한 끼니는 다음 끼니 제안(7번)을, 아직 확정 전이면
+  /// 음식 확인 화면(5번)을 연다(확정 전 끼니는 거기서 이어서 평가받는다).
+  /// 돌아오면 목록을 다시 불러온다.
+  Future<void> _openMeal(HistoryMeal meal) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => MealEvaluationScreen(mealId: meal.mealId),
+        builder: (_) => meal.scores?.satiety == null
+            ? MealReviewScreen(mealId: meal.mealId)
+            : NextMealSuggestionScreen(
+                mealId: meal.mealId,
+                eatenAt: meal.eatenAt,
+              ),
       ),
     );
     if (!mounted) return;
@@ -356,32 +386,15 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
   }
 
   /// 카드를 왼쪽으로 밀면 확인 후 삭제한다. 서버 삭제가 끝나야 카드가
-  /// 사라진다 — 실패하면 카드는 제자리로 돌아온다.
-  ///
-  /// TODO(FE-11 머지 후): 확인 창을 PopupGate 경유로 옮긴다(멘토 리뷰 —
-  /// 모든 팝업은 PopupGate). 이 브랜치엔 아직 PopupGate 통로가 없다.
+  /// 사라진다 — 실패하면 카드는 제자리로 돌아온다. 확인창도 다른 팝업처럼
+  /// PopupGate 를 거친다(멘토 리뷰 — 모든 팝업은 한 통로).
   Future<bool> _confirmDelete(HistoryMeal meal) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('식사 기록을 삭제할까요?'),
-        content: Text(
-          '${mealTypeLabel(meal.mealType)} · ${meal.displayName}\n'
-          '삭제하면 되돌릴 수 없어요.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
+    final confirmed = await context.read<PopupGate>().confirmMealDelete(
+      context,
+      mealId: meal.mealId,
+      description: '${mealTypeLabel(meal.mealType)} · ${meal.displayName}',
     );
-    if (confirmed != true || !mounted) return false;
+    if (!confirmed || !mounted) return false;
     try {
       await _api.deleteMeal(meal.mealId);
       return true;
@@ -557,7 +570,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                 quality: meal.scores?.quality,
                 satiety: meal.scores?.satiety,
                 showChevron: true,
-                onTap: () => _openEvaluation(meal),
+                onTap: () => _openMeal(meal),
               ),
             ),
             const SizedBox(height: AppSpacing.cardGap),

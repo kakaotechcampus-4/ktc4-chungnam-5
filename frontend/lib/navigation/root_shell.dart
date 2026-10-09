@@ -86,14 +86,14 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }
 
   Future<void> _onTabTap(int index) async {
-    if (index != TabState.feedbackTab) {
+    if (index != TabState.feedback) {
       context.read<TabState>().setIndex(index);
       return;
     }
     final size = MediaQuery.sizeOf(context);
     final tabWidth = size.width / TabState.tabCount;
     final kind = await _showFeedbackPopup(
-      anchorCenterX: tabWidth * (TabState.feedbackTab + 0.5),
+      anchorCenterX: tabWidth * (TabState.feedback + 0.5),
       bottomOffset:
           kBottomNavigationBarHeight + MediaQuery.paddingOf(context).bottom + 1,
     );
@@ -120,7 +120,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final tabState = context.watch<TabState>();
     final selectedIndex = _feedbackPopupOpen
-        ? TabState.feedbackTab
+        ? TabState.feedback
         : tabState.currentIndex;
     return Scaffold(
       body: IndexedStack(

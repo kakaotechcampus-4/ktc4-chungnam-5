@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
+import '../api/meal_api.dart';
+import '../common/api_format.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -8,39 +12,95 @@ import 'next_meal_suggestion_screen.dart';
 
 /// 식사 평가 (Q·Q·S) — Figma `hOxrHBitBpjwIBBg2GO49y` node `60:270`.
 ///
-/// 양·질은 AI/서버 계산값을 그대로 보여주기만 하고, 포만감만 이 화면에서
-/// 사용자가 직접 입력한다(README "포만감은 사용자가 직접 입력한다").
-/// `meal_input_screen.dart`에서 이미 받은 "식전(직전)" 포만감과, 여기서
-/// 받는 "식후(지금)" 포만감의 델타로 만족도 점수를 낸다.
+/// 식후 포만감은 **이 화면에서만** 받는다. 서버는 확정(`confirm`) 때 식후
+/// 포만감을 꼭 받아 그 자리에서 Q·Q·S 를 계산하므로:
+///
+/// 1. 확정 전 — 포만감 슬라이더만 움직이고 양·질은 "입력하면 계산돼요".
+/// 2. "평가 받기" → 확정 → 받은 점수로 양·질·포만감 카드를 채운다.
+/// 3. "다음 끼니 제안 보기" → 7번.
+///
+/// 평가 뒤에도 포만감을 고칠 수 있다. 슬라이더에서 손을 떼면 바뀐 값으로 다시
+/// 확정한다 — 서버가 재확정을 허용하고, 점수가 바뀌면 AI 피드백도 새로 만든다
+/// (BE `services/evaluation` `_is_stale_feedback`).
 class MealEvaluationScreen extends StatefulWidget {
-  const MealEvaluationScreen({super.key, required this.mealId});
+  const MealEvaluationScreen({super.key, required this.mealId, this.imageUrl});
 
   final String mealId;
+
+  /// 식사 사진(/media/...). 없으면 자리만 잡는다.
+  final String? imageUrl;
 
   @override
   State<MealEvaluationScreen> createState() => _MealEvaluationScreenState();
 }
 
 class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
-  // TODO: 실제 값은 확정 응답(POST 확정 API 의 동기 결과)으로 채운다.
-  static const double _quantityRatio = 0.55; // 유지기 권장 범위 내 위치(더미)
-  static const int _qualityScore = 83; // 100점 만점(더미, home_screen 스케일과 동일)
+  late final MealApiService _api = MealApiService(context.read<ApiClient>());
 
-  double _afterSatiety = 75;
+  /// 확정 결과. null 이면 아직 확정 전.
+  MealEvaluation? _result;
+  String? _error;
+
+  /// 식후 포만감(0~100). 확정 전에는 입력값, 확정 뒤에는 고치는 중인 값.
+  double _satiety = 50;
+  bool _busy = false;
+
+  Future<void> _confirm() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final result = await _api.confirm(
+        widget.mealId,
+        satietyAfterPct: _satiety.round(),
+      );
+      if (mounted) setState(() => _result = result);
+    } catch (e) {
+      if (mounted) setState(() => _error = '평가하지 못했어요: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 평가 뒤 포만감을 고치면 그 값으로 다시 확정한다. 실패하면 원래 값으로
+  /// 돌린다. 확정 전에는 아무것도 하지 않는다("평가 받기" 가 보낸다).
+  Future<void> _saveSatiety(double value) async {
+    final current = _result?.scores.satiety;
+    if (current == null || current == value.round()) return;
+    setState(() => _busy = true);
+    try {
+      final result = await _api.confirm(
+        widget.mealId,
+        satietyAfterPct: value.round(),
+      );
+      if (mounted) setState(() => _result = result);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _satiety = current.toDouble());
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('포만감을 바꾸지 못했어요: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   /// 다음 끼니 제안 보기 → 다음 끼니 제안 화면(7번)으로 교체 이동.
-  void _viewNextMealSuggestion() {
-    // TODO: 이동 전에 feedback.meal 큐 등록 API 를 호출한다.
-    //   (backend/app/worker/jobs/feedback_meal.py 주석: 이 버튼을 눌렀을 때 큐에 넣는다)
+  /// 피드백 생성은 7번이 GET /meals/{id}/feedback 을 부를 때 서버가 건다.
+  void _viewNextMealSuggestion(MealEvaluation result) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => NextMealSuggestionScreen(mealId: widget.mealId),
+        builder: (_) =>
+            NextMealSuggestionScreen(mealId: widget.mealId, evaluation: result),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final result = _result;
+    final imageUrl = widget.imageUrl;
     return Scaffold(
       backgroundColor: AppColors.background,
       // NOTE: design-system.md §1은 "화면 타이틀은 좌측 정렬"이라 하지만
@@ -61,32 +121,58 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 분석한 식사 사진. 실제 URL 로 교체 예정, 지금은 자리만 잡는다.
+              // 분석한 식사 사진. 텍스트로 기록했으면 자리만 잡는다.
               ClipRRect(
                 borderRadius: AppRadius.lgRadius,
                 child: Container(
                   width: double.infinity,
                   height: 240,
                   color: AppColors.surfaceSage,
+                  child: imageUrl == null
+                      ? null
+                      : Image.network(
+                          ApiConfig.mediaUrl(imageUrl),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const SizedBox(),
+                        ),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
 
-              const _QuantityCard(ratio: _quantityRatio),
+              _QuantityCard(result: result),
               const SizedBox(height: AppSpacing.cardGap),
-              const _QualityCard(score: _qualityScore),
+              _QualityCard(result: result),
               const SizedBox(height: AppSpacing.cardGap),
+              // 식후 포만감은 여기서만 받는다. 평가 뒤에 고치면 다시 확정한다.
               _SatietyCard(
-                value: _afterSatiety,
-                onChanged: (v) => setState(() => _afterSatiety = v),
+                value: _satiety,
+                onChanged: _busy ? null : (v) => setState(() => _satiety = v),
+                onChangeEnd: _saveSatiety,
               ),
+              if (result?.notice != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(result!.notice!, style: AppTypography.bodySecondary),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  _error!,
+                  style: AppTypography.bodySecondary.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.xl),
 
               SizedBox(
                 width: double.infinity,
                 height: AppLayout.primaryButtonHeight,
                 child: FilledButton(
-                  onPressed: _viewNextMealSuggestion,
+                  onPressed: _busy
+                      ? null
+                      : result == null
+                      ? _confirm
+                      : () => _viewNextMealSuggestion(result),
                   // NOTE: design-system.md §5 "주 버튼"은 배경을
                   // AppColors.primary(코랄)로 정해 뒀지만, 이 화면 Figma 의
                   // CTA 는 진한 다크 브라운이다. 팔레트에 전용 "다크 버튼"
@@ -98,7 +184,19 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
                       borderRadius: AppRadius.mdRadius,
                     ),
                   ),
-                  child: Text('다음 끼니 제안 보기', style: AppTypography.buttonLabel),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.textInverse,
+                          ),
+                        )
+                      : Text(
+                          result == null ? '평가 받기' : '다음 끼니 제안 보기',
+                          style: AppTypography.buttonLabel,
+                        ),
                 ),
               ),
             ],
@@ -108,6 +206,12 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
     );
   }
 }
+
+/// 확정 전 양·질 카드 안내.
+const _beforeConfirm = '포만감을 입력하면 계산돼요';
+
+/// 영양 정보가 있는 음식이 없어 계산하지 못했을 때.
+const _noNutrition = '영양 정보가 있는 음식이 없어 계산하지 못했어요';
 
 /// Q·Q·S 카드 공통 헤더. 원형 배지(Q/S) + 한글 제목 + 영문 라벨 + 우측 태그.
 class _AxisHeader extends StatelessWidget {
@@ -188,15 +292,16 @@ class _DarkPill extends StatelessWidget {
   }
 }
 
-/// 양(Quantity) — AI 계산, 값은 표시하지 않고 권장 범위 내 위치만 보여준다.
+/// 양(Quantity) — 서버 계산. 0~100 점수를 막대로 보여 준다.
 class _QuantityCard extends StatelessWidget {
-  const _QuantityCard({required this.ratio});
+  const _QuantityCard({required this.result});
 
-  /// 0.0~1.0. 유지기 권장 범위 내에서의 상대 위치(더미).
-  final double ratio;
+  final MealEvaluation? result;
 
   @override
   Widget build(BuildContext context) {
+    final r = result;
+    final score = r?.scores.quantity;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -212,17 +317,16 @@ class _QuantityCard extends StatelessWidget {
               trailing: Text('AI 계산', style: AppTypography.caption),
             ),
             const SizedBox(height: AppSpacing.md),
-            ClipRRect(
-              borderRadius: AppRadius.pillRadius,
-              child: LinearProgressIndicator(
-                value: ratio,
-                minHeight: 8,
-                backgroundColor: AppColors.primaryTint,
-                color: AppColors.quality,
-              ),
-            ),
+            _ScoreBar(score: score),
             const SizedBox(height: AppSpacing.sm),
-            Text('유지기 권장 범위 안이에요', style: AppTypography.bodySecondary),
+            Text(
+              r == null
+                  ? _beforeConfirm
+                  : score == null
+                  ? _noNutrition
+                  : '${stageLabel(r.stage)} 기준 한 끼 양이에요',
+              style: AppTypography.bodySecondary,
+            ),
           ],
         ),
       ),
@@ -230,15 +334,28 @@ class _QuantityCard extends StatelessWidget {
   }
 }
 
-/// 질(Quality) — AI 계산, 100점 만점 숫자를 함께 보여준다.
+/// 질(Quality) — 서버 계산. 부족·초과한 영양소를 함께 적는다.
 class _QualityCard extends StatelessWidget {
-  const _QualityCard({required this.score});
+  const _QualityCard({required this.result});
 
-  /// 0~100.
-  final int score;
+  final MealEvaluation? result;
+
+  /// "단백질 부족 · 나트륨 초과". 다 적정이면 그렇게 말한다.
+  static String _summary(List<NutrientStatus> nutrients) {
+    final flagged = [
+      for (final n in nutrients)
+        if (n.state == 'SHORT')
+          '${n.label} 부족'
+        else if (n.state == 'OVER')
+          '${n.label} 초과',
+    ];
+    return flagged.isEmpty ? '영양 균형이 괜찮아요' : flagged.join(' · ');
+  }
 
   @override
   Widget build(BuildContext context) {
+    final r = result;
+    final score = r?.scores.quality;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -254,25 +371,16 @@ class _QualityCard extends StatelessWidget {
               trailing: Text('AI 계산', style: AppTypography.caption),
             ),
             const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: AppRadius.pillRadius,
-                    child: LinearProgressIndicator(
-                      value: score / 100,
-                      minHeight: 8,
-                      backgroundColor: AppColors.primaryTint,
-                      color: AppColors.quality,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Text('$score', style: AppTypography.sectionHead),
-              ],
-            ),
+            _ScoreBar(score: score),
             const SizedBox(height: AppSpacing.sm),
-            Text('단백질·식이섬유 비율이 좋아요', style: AppTypography.bodySecondary),
+            Text(
+              r == null
+                  ? _beforeConfirm
+                  : score == null
+                  ? _noNutrition
+                  : _summary(r.nutrients),
+              style: AppTypography.bodySecondary,
+            ),
           ],
         ),
       ),
@@ -280,13 +388,51 @@ class _QualityCard extends StatelessWidget {
   }
 }
 
+/// 0~100 점수 막대 + 숫자. 점수가 없으면 빈 막대.
+class _ScoreBar extends StatelessWidget {
+  const _ScoreBar({required this.score});
+
+  final int? score;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = score;
+    return Row(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: AppRadius.pillRadius,
+            child: LinearProgressIndicator(
+              value: (s ?? 0) / 100,
+              minHeight: 8,
+              backgroundColor: AppColors.primaryTint,
+              color: AppColors.quality,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Text(s == null ? '-' : '$s', style: AppTypography.sectionHead),
+      ],
+    );
+  }
+}
+
 /// 포만감(Satiety) — 이 화면에서 사용자가 직접 입력하는 유일한 축.
 class _SatietyCard extends StatelessWidget {
-  const _SatietyCard({required this.value, required this.onChanged});
+  const _SatietyCard({
+    required this.value,
+    required this.onChanged,
+    this.onChangeEnd,
+  });
 
   /// 0~100.
   final double value;
-  final ValueChanged<double> onChanged;
+
+  /// null 이면 바꿀 수 없다(불러오는 중·저장 중).
+  final ValueChanged<double>? onChanged;
+
+  /// 손을 뗐을 때 — 저장한다.
+  final ValueChanged<double>? onChangeEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -314,6 +460,7 @@ class _SatietyCard extends StatelessWidget {
                     min: 0,
                     max: 100,
                     onChanged: onChanged,
+                    onChangeEnd: onChangeEnd,
                     activeColor: AppColors.primary,
                     inactiveColor: AppColors.surfaceMuted,
                   ),

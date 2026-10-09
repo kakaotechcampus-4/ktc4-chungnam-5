@@ -37,8 +37,11 @@ from app.tests.factories import (
     make_qqs_evaluation,
     make_user,
 )
-from app.worker.dispatch import handle
-from app.worker.jobs.feedback_long import run
+from app.worker.dispatch import get_job
+from app.worker.jobs import feedback_long
+
+# 세 단계를 세션 하나로 이어 돈다. 시나리오 단언은 3단계 분리 전과 같다.
+run = feedback_long.JOB.run_inline
 
 START = date(2026, 8, 15)
 END = date(2026, 8, 21)
@@ -702,11 +705,12 @@ def test_logs_do_not_contain_feedback_text(db, caplog):
 
 
 def test_dispatch_routes_feedback_long_to_this_job(db):
-    """L31: dispatch.handle 이 feedback.long 을 이 워커로 보낸다 — 미구현 오류가 아니다."""
+    """L31: dispatch.get_job 이 feedback.long 을 이 워커로 보낸다 — 미구현 오류가 아니다."""
     user = make_user(db)
     _enough_days(db, user)
 
-    result = handle(db, _task(user.id), FakeAi())
+    task = _task(user.id)
+    result = get_job(task.type).run_inline(db, task, FakeAi())
 
     assert result is not None
     assert result["dayCount"] == 3
@@ -827,3 +831,14 @@ def test_insight_is_insufficient_when_first_run_had_too_few_days(db):
 
     assert insight.feedback_status == FeedbackStatus.READY
     assert insight.data_sufficient is False
+
+
+# ─────────────────────────── 3단계 계약 ───────────────────────────
+
+
+def test_insufficient_days_mean_no_ai_call(db):
+    user = make_user(db)
+    ctx = feedback_long.load(db, _task(user.id))
+
+    assert ctx.request is None
+    assert feedback_long.call_ai(ctx, FakeAi()) is None

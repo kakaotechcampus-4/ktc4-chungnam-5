@@ -5,9 +5,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/api/api_client.dart';
 import 'package:frontend/api/api_exception.dart';
+import 'package:frontend/api/meal_api.dart';
 import 'package:frontend/api/medication_api.dart';
 import 'package:frontend/api/user_api.dart';
 import 'package:frontend/popups/daily_condition_popup.dart';
+import 'package:frontend/popups/satiety_checkin_popup.dart';
 import 'package:frontend/screens/long_term_feedback_screen.dart';
 import 'package:frontend/screens/meal_history_screen.dart';
 import 'package:frontend/state/medication_state.dart';
@@ -632,6 +634,298 @@ void main() {
       final events = await LongTermApiService(client).fetchDoseEvents();
       expect(adapter.requests.single.path, '/medications/dose-events');
       expect(events.single.doseMg, 0.25);
+    });
+  });
+  group('meal flow', () {
+    Map<String, Object?> meal({
+      String status = 'REVIEW_REQUIRED',
+      bool isRecalculation = false,
+    }) => {
+      'mealId': 'm1',
+      'status': status,
+      'isRecalculation': isRecalculation,
+      'mealType': 'LUNCH',
+      'eatenAt': '2026-10-04T12:40:00+09:00',
+      'imageUrl': null,
+      'clarifyQuestion': null,
+      'items': [
+        {
+          'itemId': 'i1',
+          'displayName': '참치김밥',
+          'amount': 250,
+          'unit': 'g',
+          'confidence': 0.62,
+          'matched': false,
+          'nutrition': null,
+        },
+      ],
+    };
+
+    test('text meal sends rawText and a +09:00 time', () async {
+      final (client, adapter) = await _client(
+        (_) => (
+          202,
+          _ok({
+            'mealId': 'm1',
+            'status': 'ANALYZING',
+            'steps': [],
+            'pollIntervalMs': 1500,
+            'timeoutMs': 30000,
+          }),
+        ),
+      );
+      final created = await MealApiService(client).createWithText(
+        mealType: 'LUNCH',
+        eatenAt: DateTime.utc(2026, 10, 4, 3, 40),
+        text: '현미밥, 된장국',
+        satietyBeforePct: 20,
+      );
+      expect(created.mealId, 'm1');
+      expect(created.pollInterval, const Duration(milliseconds: 1500));
+      expect(adapter.requests.single.data, {
+        'mealType': 'LUNCH',
+        'eatenAt': '2026-10-04T12:40:00+09:00',
+        'rawText': '현미밥, 된장국',
+        'satietyBeforePct': 20,
+      });
+    });
+
+    test('photo meal is multipart with the image content type', () async {
+      final (client, adapter) = await _client(
+        (_) => (
+          202,
+          _ok({
+            'mealId': 'm1',
+            'status': 'ANALYZING',
+            'steps': [],
+            'pollIntervalMs': 1500,
+            'timeoutMs': 30000,
+          }),
+        ),
+      );
+      final png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+      await MealApiService(client).createWithPhoto(
+        mealType: 'DINNER',
+        eatenAt: DateTime.utc(2026, 10, 4, 10),
+        photo: png,
+        fileName: 'a.png',
+      );
+      final form = adapter.requests.single.data as FormData;
+      expect(Map.fromEntries(form.fields)['mealType'], 'DINNER');
+      final file = form.files.single;
+      expect(file.key, 'image');
+      expect(file.value.contentType.toString(), 'image/png');
+    });
+
+    test('edited meal is not a first analysis', () {
+      expect(
+        MealDetail.fromJson(meal(status: 'ANALYZING')).isFirstAnalysis,
+        isTrue,
+      );
+      expect(
+        MealDetail.fromJson(
+          meal(status: 'ANALYZING', isRecalculation: true),
+        ).isFirstAnalysis,
+        isFalse,
+      );
+    });
+
+    test('amount edits go in one PATCH with name and unit', () async {
+      final (client, adapter) = await _client(
+        (_) => (200, _ok({'status': 'ANALYZING', 'isRecalculation': true})),
+      );
+      final item = MealDetail.fromJson(meal()).items.single;
+      await MealApiService(
+        client,
+      ).updateItems('m1', [item.copyWith(amount: 260)]);
+      final request = adapter.requests.single;
+      expect(request.method, 'PATCH');
+      expect(request.path, '/meals/m1/items');
+      expect(request.data, {
+        'items': [
+          {'itemId': 'i1', 'displayName': '참치김밥', 'amount': 260.0, 'unit': 'g'},
+        ],
+      });
+    });
+
+    test('confirm sends satiety and keeps the not-matched notice', () async {
+      final (client, adapter) = await _client(
+        (_) => (
+          200,
+          {
+            'success': true,
+            'data': {
+              'mealId': 'm1',
+              'status': 'EVALUATED',
+              'stage': 'MAINTENANCE',
+              'scores': {'quantity': null, 'quality': null, 'satiety': 60},
+              'stageEmphasis': [],
+              'nutrients': [
+                {
+                  'code': 'PROTEIN',
+                  'label': '단백질',
+                  'current': null,
+                  'target': 32,
+                  'unit': 'g',
+                  'state': null,
+                },
+              ],
+            },
+            'error': {'code': 'NUTRITION_NOT_MATCHED', 'message': '합계에서 빠졌어요'},
+          },
+        ),
+      );
+      final result = await MealApiService(
+        client,
+      ).confirm('m1', satietyAfterPct: 60);
+      expect(adapter.requests.single.data, {'satietyAfterPct': 60});
+      expect(result.scores.quantity, isNull);
+      expect(result.scores.satiety, 60);
+      expect(result.nutrients.single.current, isNull);
+      expect(result.notice, '합계에서 빠졌어요');
+    });
+
+    test('satiety check-in sends whole hours since the meal', () async {
+      final (client, adapter) = await _client((_) => (201, _ok({})));
+      await SatietyCheckinApiService(MealApiService(client)).save(
+        mealId: 'm1',
+        elapsedMinutes: 190,
+        satietyPct: 40,
+        hungerReturnMinutes: 130,
+      );
+      expect(adapter.requests.single.path, '/meals/m1/satiety-checkins');
+      expect(adapter.requests.single.data, {
+        'checkinOffsetHours': 3,
+        'satietyPct': 40,
+        'hungerReturnMinutes': 130,
+      });
+    });
+  });
+
+  group('medication correction', () {
+    test('start date is corrected with PATCH, then read again', () async {
+      final (client, adapter) = await _client(
+        (o) => o.method == 'PATCH'
+            ? (200, _ok({}))
+            : (200, _ok(_medication(doseCount: 3))),
+      );
+      final state = await _medicationState(client);
+      await state.ensureLoaded();
+      await state.correctStart(DateTime(2026, 9, 18));
+      final patch = adapter.requests.singleWhere((r) => r.method == 'PATCH');
+      expect(patch.path, '/medications/m1');
+      expect(patch.data, {'effectiveFrom': '2026-09-18'});
+      expect(adapter.requests.last.path, '/medications/current');
+    });
+
+    test('changing a dose opened today becomes a correction', () async {
+      final (client, adapter) = await _client(
+        (o) => switch (o.method) {
+          'POST' => (409, _error('CONFLICT')),
+          'PATCH' => (200, _ok({})),
+          _ => (200, _ok(_medication(doseMg: 0.5))),
+        },
+      );
+      final state = await _medicationState(client);
+      await state.ensureLoaded();
+      final corrected = await state.changeDose(drugName: '위고비', doseMg: 0.5);
+      expect(corrected, isTrue);
+      final patch = adapter.requests.singleWhere((r) => r.method == 'PATCH');
+      expect(patch.path, '/medications/m1');
+      expect(patch.data, {'drugName': '위고비', 'doseMg': 0.5});
+      expect(state.current?.doseMg, 0.5);
+    });
+
+    test('a dose change on another day stays a POST', () async {
+      final (client, adapter) = await _client(
+        (o) => (200, _ok(_medication(doseMg: o.method == 'POST' ? 1.0 : 0.5))),
+      );
+      final state = await _medicationState(client);
+      await state.ensureLoaded();
+      expect(await state.changeDose(drugName: '위고비', doseMg: 1.0), isFalse);
+      expect(adapter.requests.where((r) => r.method == 'PATCH'), isEmpty);
+      expect(state.current?.doseMg, 1.0);
+    });
+
+    test('only a single record can have its start corrected', () async {
+      var events = 1;
+      final (client, _) = await _client(
+        (_) => (
+          200,
+          _ok({
+            'events': List.generate(events, (i) => {'doseEventId': '$i'}),
+          }),
+        ),
+      );
+      final state = await _medicationState(client);
+      expect(await state.canCorrectStart(), isTrue);
+      events = 2;
+      expect(await state.canCorrectStart(), isFalse);
+    });
+  });
+  group('api spec 10/1', () {
+    test('long-term insight reads feedbackStatus or the old status key', () {
+      Map<String, Object?> body(String key) => {
+        key: 'READY',
+        'dataSufficient': true,
+        'trendSummary': '요약',
+        'recommendation': null,
+        'stale': false,
+      };
+      expect(LongTermInsight.fromJson(body('status')).status, 'READY');
+      expect(LongTermInsight.fromJson(body('feedbackStatus')).status, 'READY');
+    });
+
+    test('a blocked meal feedback is marked for the counselling notice', () {
+      final feedback = MealFeedback.fromJson({
+        'feedbackStatus': 'READY',
+        'summary': null,
+        'suggestions': [],
+        'safetyStatus': 'BLOCKED',
+      });
+      expect(feedback.isPending, isFalse);
+      expect(feedback.isBlocked, isTrue);
+    });
+
+    test(
+      'nutrition that cannot be scaled comes back with the notice',
+      () async {
+        final (client, _) = await _client(
+          (_) => (
+            200,
+            {
+              'success': true,
+              'data': {
+                'itemId': 'i1',
+                'matched': false,
+                'nutritionSource': null,
+                'nutrition': null,
+                'status': 'ANALYZING',
+                'isRecalculation': true,
+              },
+              'error': {
+                'code': 'NUTRITION_NOT_MATCHED',
+                'message': '양을 g 으로 환산하지 못했어요',
+              },
+            },
+          ),
+        );
+        final result = await MealApiService(
+          client,
+        ).setNutrition('m1', 'i1', foodRefId: 'D1');
+        expect(result.nutrition, isNull);
+        expect(result.notice, '양을 g 으로 환산하지 못했어요');
+      },
+    );
+
+    test('candidate names drop the DB underscores for display', () {
+      final c = FoodCandidate.fromJson({
+        'foodRefId': 'D1',
+        'name': '달걀_삶은것',
+        'servingSizeG': 100,
+        'nutrition': <String, dynamic>{},
+      });
+      expect(c.displayName, '달걀 삶은것');
     });
   });
 }

@@ -45,6 +45,15 @@ String formatApiDate(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-'
     '${d.day.toString().padLeft(2, '0')}';
 
+/// 요청에 쓰는 시각(`2026-08-21T08:20:00+09:00`). 서버는 시간대 없는 시각을
+/// 422 로 막는다. [parseApiDateTime] 과 짝이라 기기 시간대와 무관하게 KST 로 적는다.
+String formatApiDateTime(DateTime t) {
+  final k = t.toUtc().add(const Duration(hours: 9));
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${formatApiDate(k)}T${two(k.hour)}:${two(k.minute)}:${two(k.second)}'
+      '+09:00';
+}
+
 /// 요청에 쓰는 월(`2026-08`).
 String formatApiMonth(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}';

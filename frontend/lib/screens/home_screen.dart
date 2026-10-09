@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
 import '../api/medication_api.dart';
 import '../common/api_format.dart';
 import '../popups/popup_gate.dart';
 import '../state/medication_state.dart';
+import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'meal_input_screen.dart';
+import 'meal_review_screen.dart';
+import 'next_meal_suggestion_screen.dart';
 import 'medication_info_screen.dart';
 import 'shared_meal_widgets.dart';
 
 // ── 모델 ────────────────────────────────────────────────────
 
-/// Q·Q·S 점수. 셋 다 0~100 정수다.
+/// Q·Q·S 점수. 0~100 정수. 평가 전이면 셋 다, 영양 정보가 있는 음식이
+/// 없으면 양·질이 null 이다.
 class MealScores {
   const MealScores({
     required this.quantity,
@@ -24,9 +29,9 @@ class MealScores {
     this.quantityLabel,
   });
 
-  final int quantity;
-  final int quality;
-  final int satiety;
+  final int? quantity;
+  final int? quality;
+  final int? satiety;
 
   /// 양 라벨(`부족` · `적정` · `과다`).
   ///
@@ -36,13 +41,13 @@ class MealScores {
   final String? quantityLabel;
 
   factory MealScores.fromJson(Map<String, dynamic> json) => MealScores(
-    quantity: json['quantity'] as int,
-    quality: json['quality'] as int,
-    satiety: json['satiety'] as int,
+    quantity: json['quantity'] as int?,
+    quality: json['quality'] as int?,
+    satiety: json['satiety'] as int?,
     quantityLabel: json['quantityLabel'] as String?,
   );
 
-  String get quantityDisplay => quantityLabel ?? '$quantity';
+  String? get quantityDisplay => quantityLabel ?? quantity?.toString();
 }
 
 /// `GET /home` 의 `medication`.
@@ -68,18 +73,21 @@ class HomeMedication {
   /// 카드는 그 줄을 숨긴다.
   final bool? doseChangeScheduled;
 
-  /// [MedicationState] 의 값으로 만든다. `/home` 을 연동하기 전까지(FE-13)
-  /// 홈 투약 카드는 이걸로 채운다.
-  factory HomeMedication.fromCurrent(MedicationCurrent current) =>
-      HomeMedication(
-        drugName: current.drugName,
-        doseMg: current.doseMg,
-        doseCount: current.doseCount,
-        stage: current.stage,
-        nextDoseDate: current.nextDoseDate,
-        daysUntilNextDose: current.daysUntilNextDose,
-        doseChangeScheduled: null,
-      );
+  /// [MedicationState] 의 값으로 만든다. 투약 화면에서 저장하면 홈을 다시
+  /// 부르지 않아도 카드가 바뀌어야 해서, 카드 값은 `/home` 이 아니라 이걸 쓴다.
+  /// `/home` 에만 있는 [doseChangeScheduled] 는 따로 받는다.
+  factory HomeMedication.fromCurrent(
+    MedicationCurrent current, {
+    bool? doseChangeScheduled,
+  }) => HomeMedication(
+    drugName: current.drugName,
+    doseMg: current.doseMg,
+    doseCount: current.doseCount,
+    stage: current.stage,
+    nextDoseDate: current.nextDoseDate,
+    daysUntilNextDose: current.daysUntilNextDose,
+    doseChangeScheduled: doseChangeScheduled,
+  );
 
   factory HomeMedication.fromJson(Map<String, dynamic> json) => HomeMedication(
     drugName: json['drugName'] as String,
@@ -134,7 +142,8 @@ class HomeMeal {
   final String mealType;
   final DateTime eatenAt;
   final String displayName;
-  final MealScores scores;
+  /// 아직 평가 전이면 null.
+  final MealScores? scores;
   final String? thumbnailUrl;
 
   factory HomeMeal.fromJson(Map<String, dynamic> json) => HomeMeal(
@@ -143,7 +152,10 @@ class HomeMeal {
     eatenAt: parseApiDateTime(json['eatenAt'] as String),
     displayName: json['displayName'] as String,
     thumbnailUrl: json['thumbnailUrl'] as String?,
-    scores: MealScores.fromJson(json['scores'] as Map<String, dynamic>),
+    scores: switch (json['scores']) {
+      final Map<String, dynamic> s => MealScores.fromJson(s),
+      _ => null,
+    },
   );
 }
 
@@ -160,10 +172,12 @@ class HomeSummary {
 
   final DateTime date;
 
-  /// 투약 미등록이면 null. 지금 홈 투약 카드는 이 값이 아니라 `MedicationState`
-  /// 를 본다. `/home` 을 연동할 때(FE-13) 둘을 어떻게 맞출지 정한다.
+  /// 투약 미등록이면 null. 홈 투약 카드는 `MedicationState` 를 보고, 여기서는
+  /// `doseChangeScheduled` 만 가져다 쓴다.
   final HomeMedication? medication;
-  final HomeStomach stomach;
+
+  /// 기록한 식사가 하나도 없으면 null.
+  final HomeStomach? stomach;
   final int recordedCount;
   final List<HomeMeal> meals;
   final List<String> missingMealTypes;
@@ -172,10 +186,14 @@ class HomeSummary {
     final today = json['today'] as Map<String, dynamic>;
     return HomeSummary(
       date: parseApiDate(json['date'] as String),
-      medication: HomeMedication.fromJson(
-        json['medication'] as Map<String, dynamic>,
-      ),
-      stomach: HomeStomach.fromJson(json['stomach'] as Map<String, dynamic>),
+      medication: switch (json['medication']) {
+        final Map<String, dynamic> m => HomeMedication.fromJson(m),
+        _ => null,
+      },
+      stomach: switch (json['stomach']) {
+        final Map<String, dynamic> m => HomeStomach.fromJson(m),
+        _ => null,
+      },
       recordedCount: today['recordedCount'] as int,
       meals: (today['meals'] as List<dynamic>)
           .map((e) => HomeMeal.fromJson(e as Map<String, dynamic>))
@@ -214,63 +232,14 @@ String _formatDose(double mg) => '${mg}mg';
 // ── API ─────────────────────────────────────────────────────
 
 /// 홈 화면이 쓰는 엔드포인트.
-///
-/// 지금은 명세 예시를 그대로 돌려준다. 통신 라이브러리가 정해지면
-/// 메서드 본문만 교체하면 되고 화면은 건드리지 않는다.
 class HomeApiService {
-  /// `GET /home`
-  Future<HomeSummary> fetchHome() async {
-    // TODO(FE-13): `GET /home` 연동 전이라 화면 안 예시를 돌려준다.
-    //   ApiClient 로 부르고, 투약 카드는 MedicationState 를 그대로 쓴다.
-    //   error.code 분기: PROFILE_REQUIRED -> 프로필 입력,
-    //                    STAGE_NOT_SET   -> 투약 정보 입력.
-    //   둘 다 실패가 아니라 이동이라 재시도 블록을 띄우지 않는다.
-    await Future.delayed(const Duration(milliseconds: 300));
-    return HomeSummary.fromJson(_sample);
-  }
+  HomeApiService(this._client);
 
-  /// 명세의 `GET /home` 예시 응답(`data` 안쪽).
-  static const Map<String, dynamic> _sample = {
-    'date': '2026-08-21',
-    'medication': {
-      'drugName': '위고비',
-      'doseMg': 1.0,
-      'doseCount': 10,
-      'stage': 'MAINTENANCE',
-      'nextDoseDate': '2026-08-23',
-      'daysUntilNextDose': 2,
-      'doseChangeScheduled': false,
-    },
-    'stomach': {
-      'satietyPct': 68,
-      'sourceMealId': 'meal_456',
-      'sourceMealAt': '2026-08-21T12:40:00+09:00',
-      'minutesSinceMeal': 320,
-      'feedbackSummary': '유지기 기준 포만감이 부족한 식사였어요.',
-    },
-    'today': {
-      'recordedCount': 2,
-      'meals': [
-        {
-          'mealId': 'meal_450',
-          'mealType': 'BREAKFAST',
-          'eatenAt': '2026-08-21T08:20:00+09:00',
-          'displayName': '토스트, 그릭요거트',
-          'thumbnailUrl': null,
-          'scores': {'quantity': 74, 'quality': 90, 'satiety': 80},
-        },
-        {
-          'mealId': 'meal_456',
-          'mealType': 'LUNCH',
-          'eatenAt': '2026-08-21T12:40:00+09:00',
-          'displayName': '현미밥, 된장국, 두부조림',
-          'thumbnailUrl': null,
-          'scores': {'quantity': 76, 'quality': 80, 'satiety': 68},
-        },
-      ],
-      'missingMealTypes': ['DINNER'],
-    },
-  };
+  final ApiClient _client;
+
+  /// `GET /home`. 투약 미등록이어도 실패가 아니다(`medication: null`).
+  Future<HomeSummary> fetchHome() async =>
+      HomeSummary.fromJson((await _client.get('/home')).dataMap);
 }
 
 // ── 화면 ────────────────────────────────────────────────────
@@ -287,16 +256,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final HomeApiService _api = HomeApiService();
+  late final HomeApiService _api = HomeApiService(context.read<ApiClient>());
 
   HomeSummary? _home;
   LoadState _state = LoadState.loading;
   String? _errorMessage;
 
+  /// 기록 탭에서 식사를 기록하고 돌아오면 홈은 모른다. 탭이 다시 보일 때
+  /// 새로 불러온다.
+  late final TabState _tabs = context.read<TabState>();
+
+  void _onTabChanged() {
+    if (_tabs.currentIndex == TabState.home) _load();
+  }
+
   @override
   void initState() {
     super.initState();
+    _tabs.addListener(_onTabChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _tabs.removeListener(_onTabChanged);
+    super.dispose();
   }
 
   /// [refreshMedication] 이면 투약도 서버에서 다시 받는다(당겨서 새로고침).
@@ -329,12 +313,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 위 게이지 탭 → 사후 포만감 체크인 팝업. 저장했으면 게이지가 바뀌니
   /// 홈을 다시 불러온다.
-  Future<void> _openSatietyCheckin(String mealId) async {
+  Future<void> _openSatietyCheckin(String mealId, int satietyPct) async {
     final saved = await context.read<PopupGate>().showSatietyCheckin(
       context,
       mealId: mealId,
+      initialSatiety: satietyPct,
     );
     if (!mounted || !saved) return;
+    _load();
+  }
+
+  /// 오늘의 식사 카드 탭 — 평가한 끼니는 다음 끼니 제안(7번), 아직 확정
+  /// 전이면 음식 확인 화면(5번)을 연다. 기록 탭과 같다.
+  Future<void> _openMeal(HomeMeal meal) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => meal.scores?.satiety == null
+            ? MealReviewScreen(mealId: meal.mealId)
+            : NextMealSuggestionScreen(
+                mealId: meal.mealId,
+                eatenAt: meal.eatenAt,
+              ),
+      ),
+    );
+    if (!mounted) return;
     _load();
   }
 
@@ -364,7 +366,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final current = context.watch<MedicationState>().current;
     final medication = current == null
         ? null
-        : HomeMedication.fromCurrent(current);
+        : HomeMedication.fromCurrent(
+            current,
+            doseChangeScheduled: home?.medication?.doseChangeScheduled,
+          );
 
     return SafeArea(
       child: RefreshIndicator(
@@ -427,7 +432,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   List<Widget> _buildReady(HomeSummary home, HomeMedication? medication) {
-    final hasMeals = home.meals.isNotEmpty;
+    final stomach = home.stomach;
     final nextMealType = home.missingMealTypes.isEmpty
         ? null
         : mealTypeLabel(home.missingMealTypes.first);
@@ -444,33 +449,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // 위 게이지 영역 탭 → 사후 포만감 체크인 팝업. 기준 끼니가 없으면 막는다.
       InkWell(
-        onTap: hasMeals && home.stomach.sourceMealId != null
-            ? () => _openSatietyCheckin(home.stomach.sourceMealId!)
-            : null,
+        onTap: stomach?.sourceMealId == null
+            ? null
+            : () => _openSatietyCheckin(
+                stomach!.sourceMealId!,
+                stomach.satietyPct,
+              ),
         borderRadius: AppRadius.lgRadius,
         child: Column(
           children: [
             Center(
               child: StomachGauge(
-                satiety: hasMeals ? home.stomach.satietyPct : 0,
+                satiety: stomach?.satietyPct ?? 0,
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            if (!hasMeals)
+            if (stomach == null)
               const EmptyBlock(message: '아직 기록된 식사가 없어요')
             else
               Center(
                 child: Column(
                   children: [
                     Text(
-                      _formatElapsed(home.stomach.minutesSinceMeal),
+                      _formatElapsed(stomach.minutesSinceMeal),
                       style: AppTypography.bodySecondary,
                     ),
                     // 문구 생성이 실패하면 이 줄만 빠지고 나머지는 정상이다.
-                    if (home.stomach.feedbackSummary != null)
+                    if (stomach.feedbackSummary != null)
                       Text(
-                        home.stomach.feedbackSummary!,
+                        stomach.feedbackSummary!,
                         textAlign: TextAlign.center,
                         style: AppTypography.bodySecondary,
                       ),
@@ -490,9 +498,11 @@ class _HomeScreenState extends State<HomeScreen> {
           mealTypeLabel: mealTypeLabel(meal.mealType),
           time: _formatTime(meal.eatenAt),
           foodNames: meal.displayName,
-          quantityLabel: meal.scores.quantityDisplay,
-          quality: meal.scores.quality,
-          satiety: meal.scores.satiety,
+          quantityLabel: meal.scores?.quantityDisplay,
+          quality: meal.scores?.quality,
+          satiety: meal.scores?.satiety,
+          showChevron: true,
+          onTap: () => _openMeal(meal),
         ),
         const SizedBox(height: AppSpacing.cardGap),
       ],

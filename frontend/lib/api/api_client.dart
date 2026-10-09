@@ -35,7 +35,9 @@ class ApiConfig {
     return switch (phase) {
       AppPhase.local => 'http://localhost:4010/api/v1',
       // TODO: 팀 dev 서버가 생기면 그 주소로 바꾼다.
-      AppPhase.dev => 'http://localhost:8000/api/v1',
+      // localhost 가 아니라 127.0.0.1 — 윈도우 크롬은 localhost 를 IPv6(::1)로
+      // 먼저 찾는데 Docker BE 는 거기서 응답하지 않는다. adb reverse 에서도 같다.
+      AppPhase.dev => 'http://127.0.0.1:8000/api/v1',
       AppPhase.prod => throw StateError(
         'prod 서버 주소가 아직 없어요. --dart-define=API_BASE_URL 로 넣어 주세요',
       ),
@@ -43,6 +45,15 @@ class ApiConfig {
   }
 
   static const timeout = Duration(seconds: 10);
+
+  /// 서버가 주는 파일 경로(`/media/meals/x.png`)를 그릴 수 있는 주소로 바꾼다.
+  /// API 주소에서 `/api/v1` 을 뗀 호스트에 붙는다. 이미 전체 주소면 그대로.
+  static String mediaUrl(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    final host = Uri.parse(baseUrl).replace(path: '').toString();
+    return '${host.endsWith('/') ? host.substring(0, host.length - 1) : host}'
+        '$path';
+  }
 }
 
 /// 성공 응답. [data] 는 래퍼 `{ success, data, error }` 의 `data` 다.
@@ -105,6 +116,34 @@ class ApiClient {
 
   Future<ApiResult> patch(String path, {Object? body}) =>
       _send(() => _dio.patch<dynamic>(path, data: body));
+
+  Future<ApiResult> put(String path, {Object? body}) =>
+      _send(() => _dio.put<dynamic>(path, data: body));
+
+  /// multipart 요청(사진 업로드). [fields] 는 문자열로 보내고, 파일은
+  /// 바이트로 받아 웹에서도 같은 코드로 올린다.
+  Future<ApiResult> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    required String fileField,
+    required List<int> fileBytes,
+    required String fileName,
+    required String fileContentType,
+  }) => _send(
+    () => _dio.post<dynamic>(
+      path,
+      data: FormData.fromMap({
+        ...fields,
+        fileField: MultipartFile.fromBytes(
+          fileBytes,
+          filename: fileName,
+          // 서버가 파트의 Content-Type 을 본다(image/jpeg·png·webp 만 받음).
+          contentType: DioMediaType.parse(fileContentType),
+        ),
+      }),
+      options: Options(contentType: 'multipart/form-data'),
+    ),
+  );
 
   Future<ApiResult> delete(String path) =>
       _send(() => _dio.delete<dynamic>(path));

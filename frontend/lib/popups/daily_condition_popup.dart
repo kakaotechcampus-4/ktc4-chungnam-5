@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
@@ -176,6 +177,17 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
   int _weightTenths = _defaultWeightTenths;
   bool _weightTouched = false;
 
+  /// 체중 숫자 칸. ± 버튼과 키보드 입력이 같은 값을 쓴다.
+  late final TextEditingController _weightController = TextEditingController(
+    text: _formatWeight(_weightTenths),
+  );
+  final FocusNode _weightFocus = FocusNode();
+
+  /// 입력 중인 값이 저장할 수 있는 체중인지(빈칸·범위 밖이면 false).
+  bool _weightValid = true;
+
+  static String _formatWeight(int tenths) => (tenths / 10).toStringAsFixed(1);
+
   Appetite? _appetite;
 
   /// GI "없음"을 골랐는지. 증상을 하나라도 고르면 풀린다.
@@ -189,7 +201,22 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
   @override
   void initState() {
     super.initState();
+    // 입력을 마치면(포커스가 빠지면) 소수 한 자리로 다시 적는다.
+    _weightFocus.addListener(() {
+      if (!_weightFocus.hasFocus && _weightValid) _syncWeightText();
+    });
     _loadPrefill();
+  }
+
+  @override
+  void dispose() {
+    _weightController.dispose();
+    _weightFocus.dispose();
+    super.dispose();
+  }
+
+  void _syncWeightText() {
+    _weightController.text = _formatWeight(_weightTenths);
   }
 
   /// 프리필은 스켈레톤 없이 폼을 먼저 그리고 응답이 오면 채운다.
@@ -206,6 +233,7 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
         final weight = prefill.weightKg;
         if (weight != null && !_weightTouched) {
           _weightTenths = (weight * 10).round();
+          _syncWeightText();
         }
       });
     } catch (_) {
@@ -216,10 +244,27 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
   void _changeWeight(int deltaTenths) {
     setState(() {
       _weightTouched = true;
+      _weightValid = true;
       _weightTenths = (_weightTenths + deltaTenths).clamp(
         _minWeightTenths,
         _maxWeightTenths,
       );
+    });
+    _syncWeightText();
+  }
+
+  /// 키보드 입력. 치는 도중(`7` → `78`)에는 범위를 강제하지 않고, 저장할 수
+  /// 있는 값일 때만 체중으로 받는다. 범위 밖이면 저장 버튼을 막는다.
+  void _onWeightTyped(String text) {
+    final kg = double.tryParse(text);
+    final tenths = kg == null ? null : (kg * 10).round();
+    setState(() {
+      _weightTouched = true;
+      _weightValid =
+          tenths != null &&
+          tenths >= _minWeightTenths &&
+          tenths <= _maxWeightTenths;
+      if (_weightValid) _weightTenths = tenths!;
     });
   }
 
@@ -242,6 +287,7 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
   /// 식욕을 골랐고, GI 는 "없음" 이거나 증상+강도까지 골라야 저장할 수 있다.
   bool get _canSave =>
       !_saving &&
+      _weightValid &&
       _appetite != null &&
       (_noSymptom || (_symptoms.isNotEmpty && _severity != null));
 
@@ -356,9 +402,30 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text(
-                      (_weightTenths / 10).toStringAsFixed(1),
-                      style: AppTypography.emphasis.copyWith(fontSize: 24),
+                    SizedBox(
+                      width: 88,
+                      child: TextField(
+                        controller: _weightController,
+                        focusNode: _weightFocus,
+                        textAlign: TextAlign.end,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        textInputAction: TextInputAction.done,
+                        // 정수 세 자리 + 소수 한 자리까지만.
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d{0,3}(\.\d?)?'),
+                          ),
+                        ],
+                        style: AppTypography.emphasis.copyWith(fontSize: 24),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onChanged: _onWeightTyped,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Text(
@@ -379,6 +446,13 @@ class _DailyConditionPopupState extends State<DailyConditionPopup> {
             ],
           ),
         ),
+        if (!_weightValid) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '${_formatWeight(_minWeightTenths)}~${_formatWeight(_maxWeightTenths)}kg 사이로 적어 주세요',
+            style: AppTypography.caption.copyWith(color: AppColors.primary),
+          ),
+        ],
       ],
     );
   }

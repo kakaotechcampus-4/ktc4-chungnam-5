@@ -42,7 +42,10 @@ class FakeApi implements HttpClientAdapter {
     );
   }
 
+  /// 고정 경로(`/meals/calendar`)를 `{meal_id}` 같은 자리 표시 경로보다 먼저 본다.
   FakeHandler? _match(String method, String path) {
+    final exact = _routes['$method $path'];
+    if (exact != null) return exact;
     for (final MapEntry(:key, :value) in _routes.entries) {
       final [routeMethod, routePath] = key.split(' ');
       if (routeMethod != method) continue;
