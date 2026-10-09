@@ -37,8 +37,8 @@ import pytest  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import Engine, create_engine  # noqa: E402
-from sqlalchemy.orm import Session  # noqa: E402
+from sqlalchemy import Engine, create_engine, text  # noqa: E402
+from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
@@ -116,3 +116,18 @@ def client(db: Session) -> Generator[TestClient, None, None]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def sessions(test_engine):
+    """진짜로 커밋하는 세션 팩토리.
+
+    conftest 의 `db` 픽스처는 savepoint 위에서 도는 단일 커넥션이라 여기 쓸 수 없다.
+    이 테스트가 검증하는 게 바로 커밋·롤백 경계이고, 동시성 테스트에는 커넥션이 둘 필요하다.
+    대신 테스트마다 테이블을 비운다.
+    """
+    factory = sessionmaker(bind=test_engine, autoflush=False, expire_on_commit=False)
+    yield factory
+    with factory() as cleanup:
+        cleanup.execute(text("DELETE FROM task_queue"))
+        cleanup.commit()

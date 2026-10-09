@@ -4,8 +4,8 @@ r"""큐 상태 보기.
     .\.venv\Scripts\Activate.ps1
     python -m scripts.queue_status
 
-"처리 중" 이라는 상태 컬럼은 없다. 워커는 행 잠금을 쥐고 있을 뿐이고 그건 커밋 전이라
-다른 세션에 안 보인다. 그래서 대신 **작업 트랜잭션을 열어 둔 커넥션**을 보여 준다.
+처리 중은 `status = 'PROCESSING'` 이다. lease 가 이미 지난 것은 워커가 죽은 것이고,
+다음 claim 이 회수한다.
 """
 
 from __future__ import annotations
@@ -23,17 +23,12 @@ _SUMMARY = text(
     """
 )
 
-# 잠긴 행을 pg_locks 로 되짚는 건 튜플 단위라 실용적이지 않아, task_queue 를 만지며
-# 트랜잭션을 연 채인 커넥션을 센다. 근사라서 **워커가 아닌 세션도 잡힌다** —
-# 누군가 같은 시각에 이 스크립트를 돌리고 있으면 그 세션도 여기 나온다.
 _IN_FLIGHT = text(
     """
-    SELECT pid, now() - xact_start AS elapsed
-      FROM pg_stat_activity
-     WHERE xact_start IS NOT NULL
-       AND query ILIKE '%task_queue%'
-       AND pid <> pg_backend_pid()
-     ORDER BY xact_start
+    SELECT type, attempts, now() - updated_at AS elapsed, lease_expires_at < now() AS expired
+      FROM task_queue
+     WHERE status = 'PROCESSING'
+     ORDER BY updated_at
     """
 )
 
@@ -56,10 +51,11 @@ def main() -> None:
             print(f"{status:<10} {count:>6}  {oldest}")
 
         in_flight = db.execute(_IN_FLIGHT).all()
-        print(f"\n처리 중(작업 트랜잭션을 연 커넥션): {len(in_flight)}")
-        print("  (근사치 — task_queue 를 만지며 트랜잭션을 연 커넥션을 센다. 워커가 아닌 세션도 잡힐 수 있다)")
-        for pid, elapsed in in_flight:
-            print(f"  pid={pid} 경과={elapsed}")
+        expired = sum(1 for row in in_flight if row.expired)
+        print(f"\n처리 중(PROCESSING): {len(in_flight)}  — lease 만료 {expired}건은 다음 claim 이 회수한다")
+        for row in in_flight:
+            mark = " (만료)" if row.expired else ""
+            print(f"  {row.type:<16} attempts={row.attempts} 경과={row.elapsed}{mark}")
 
         failed = db.execute(_FAILED).all()
         if failed:

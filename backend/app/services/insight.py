@@ -59,10 +59,10 @@ def _determine_status(row: LongTermFeedback | None, latest_task: Task | None) ->
     자체 enum 이 아니라 `FeedbackStatus`(PENDING/GENERATING/READY/FAILED)를
     재사용한다 — MealConfirmResponse.feedback_status 와 같은 개념이다(PR #46 리뷰).
 
-    우선순위: 대기 중인 작업이 있으면(갱신 중) 낡은 행이 있어도 GENERATING —
+    우선순위: 대기·처리 중인 작업이 있으면(갱신 중) 낡은 행이 있어도 GENERATING —
     폴링 중인 FE 에게 지금 새로 만드는 중이라는 걸 알려야 한다.
     """
-    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+    if latest_task is not None and latest_task.status.is_in_flight:
         return FeedbackStatus.GENERATING
     if row is not None:
         return FeedbackStatus.READY
@@ -82,7 +82,7 @@ def _superseded_by_insufficient_run(row: LongTermFeedback | None, latest_task: T
     남아 "오늘 창은 부족" 이라는 결과를 가린다. 최근 DONE 작업의 `periodStart` 가 행보다
     늦으면 그 작업이 행을 못 만든 것이다 — 행이 없는 것으로 본다.
 
-    DONE 만 본다. PENDING 이면 아직 만드는 중이고(GENERATING), FAILED 면 부족 판정이 난 게
+    DONE 만 본다. 대기·처리 중이면 아직 만드는 중이고(GENERATING), FAILED 면 부족 판정이 난 게
     아니다 — 둘 다 기존 행을 계속 보여 준다. ALL 은 period_start 가 고정값이라 걸리지 않는다
     (같은 키 행을 워커가 이미 지운다).
     """
@@ -154,7 +154,7 @@ def get_long_term_insight(
     if row is None:
         return LongTermInsightResponse(
             period=InsightPeriod(from_=date_from, to=date_to),
-            status=status,
+            feedback_status=status,
             data_sufficient=False,
             trend_summary=None,
             recommendation=None,
@@ -175,7 +175,7 @@ def get_long_term_insight(
 
     return LongTermInsightResponse(
         period=InsightPeriod(from_=period_from, to=row.period_end),
-        status=status,
+        feedback_status=status,
         data_sufficient=True,
         trend_summary=row.trend_summary if is_safe else None,
         recommendation=row.recommendation if is_safe else None,
@@ -193,7 +193,7 @@ def refresh_long_term_insight(
     payload 키(userId/periodType/periodStart/periodEnd)는
     `worker/jobs/feedback_long.py` 가 이미 정해둔 이름 그대로 맞춘다.
 
-    **이미 대기 중인 작업이 있으면 새로 넣지 않는다.** 안 그러면 사용자가 새로고침을
+    **이미 대기·처리 중인 작업이 있으면 새로 넣지 않는다.** 안 그러면 사용자가 새로고침을
     연타할 때마다 큐에 쌓여서 (1) AI 를 여러 번 불러 비용이 늘고, (2) 워커 여러 대가
     같은 `(user_id, period_type, period_start)` 행을 동시에 upsert 하면서 근거
     링크(`long_term_feedback_sources`)가 꼬일 수 있고, (3) `_determine_status`가
@@ -204,7 +204,7 @@ def refresh_long_term_insight(
     date_from, date_to = _resolve_period(period, today)
 
     latest_task = insight_crud.get_latest_refresh_task(db, user_id=user_id, period_type=period_type)
-    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+    if latest_task is not None and latest_task.status.is_in_flight:
         return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)
 
     enqueue(

@@ -1,0 +1,14 @@
+# 비밀이 이미지 레이어에 남지 않게 한다. 레이어는 지워도 이미지 히스토리에 남는다.
+.env
+.env.*
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+pytest.ini
+
+README.md
+Dockerfile
+.dockerignore

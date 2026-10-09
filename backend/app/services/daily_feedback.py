@@ -61,10 +61,10 @@ def _determine_status(row: DailyFeedback | None, latest_task: Task | None) -> Fe
     """행·작업 상태를 조합해 하나의 status 로 만든다.
 
     services/insight.py 의 _determine_status 와 같은 규칙 — services 끼리 import 하지 않는다.
-    대기 중인 작업이 있으면(갱신 중) 행이 있어도 GENERATING 이 우선이다.
+    대기·처리 중인 작업이 있으면(갱신 중) 행이 있어도 GENERATING 이 우선이다.
     행 없이 작업이 DONE 이면 근거가 없어 워커가 행을 안 만든 경우라 READY 다.
     """
-    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+    if latest_task is not None and latest_task.status.is_in_flight:
         return FeedbackStatus.GENERATING
     if row is not None:
         return FeedbackStatus.READY
@@ -132,7 +132,7 @@ def request_refresh(
     latest_task = daily_feedback_crud.get_latest_refresh_task(
         db, user_id=user_id, feedback_date=target_date
     )
-    if latest_task is not None and latest_task.status == TaskStatus.PENDING:
+    if latest_task is not None and latest_task.status.is_in_flight:
         return InsightRefreshResponse(feedback_status=FeedbackStatus.GENERATING)
 
     # payload 키는 워커(jobs/feedback_daily.py)가 읽는 이름과 같아야 한다.

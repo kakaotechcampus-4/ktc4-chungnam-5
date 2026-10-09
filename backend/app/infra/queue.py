@@ -6,10 +6,12 @@ D13 — `infra/` 는 `Protocol` 뒤에 구현을 숨긴다. 도메인은 어느 
 하나로 충분하고, 그 대신 **작업 등록이 도메인 커밋과 같은 트랜잭션**이 된다 —
 "커밋이 먼저다" 라는, 사람이 지켜야 했던 순서 규칙이 사라진다.
 
-워커는 `SELECT … FOR UPDATE SKIP LOCKED` 로 행 하나를 집고 처리하는 동안 잠금을
-유지한다. 실패하면 롤백만으로 작업이 되돌아간다.
+워커는 작업을 **lease 로 빌린다.** `claim` 이 `SELECT … FOR UPDATE SKIP LOCKED` 로 행
+하나를 집어 PROCESSING · 토큰 · 만료 시각을 쓰고 곧바로 커밋한다 — AI 를 기다리는 동안
+트랜잭션도 커넥션도 쥐지 않는다. 끝낼 때(`complete` · `fail` · `release`)는 토큰이 자기
+것일 때만 행을 바꾼다. 워커가 죽어 lease 가 지나면 다음 `claim` 이 회수한다.
 
-설계 배경은 docs/superpowers/specs/2026-09-20-db-table-queue-design.md 에 있다.
+설계 배경은 docs/superpowers/specs/2026-10-05-queue-lease-design.md 에 있다.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import case, cast, func, select, text, update
+from sqlalchemy import ColumnElement, case, cast, func, select, update
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
@@ -47,12 +49,17 @@ class QueueSettings(BaseSettings):
     QUEUE_POLL_INTERVAL_SEC: float = 1.0
     """빈 큐일 때 쉬는 시간. 롱 폴링 대신이다."""
     QUEUE_MAX_ATTEMPTS: int = 3
-    """이 횟수만큼 실패하면 FAILED 로 격리한다."""
+    """이 횟수만큼 집혔는데 끝내지 못하면 FAILED 로 격리한다."""
     QUEUE_BACKOFF_BASE_SEC: int = 30
     """재시도 지연의 기준. 30s → 60s 로 두 배씩 민다."""
-    QUEUE_IDLE_TX_TIMEOUT_SEC: int = 120
-    """작업 트랜잭션의 idle_in_transaction 상한. AI 타임아웃(45초)보다 넉넉히 위여야
-    정상 작업을 죽이지 않는다. 멈춘 워커가 행을 영원히 붙잡는 것만 막는 안전망이다."""
+    QUEUE_LEASE_SEC: int = 120
+    """lease 길이. 이 안에 끝내지 못하면 다른 워커가 회수한다. AI 타임아웃(45초)보다
+    넉넉히 길어야 정상 작업을 두 번 돌리지 않는다 — 워커가 기동할 때 확인한다.
+    AI_TIMEOUT_SEC 는 httpx 의 단계별 타임아웃이라 총 시간 상한이 아니어서 두 배 넘게 둔다."""
+    QUEUE_WORKER_THREADS: int = 4
+    """워커 프로세스 하나가 돌리는 폴링 스레드 수 = 동시에 처리하는 작업 수. 작업 시간은 거의
+    AI 응답 대기라 스레드로 충분하다. LLM API 의 동시 처리량을 재고 나서 맞춘다. 스레드 하나가
+    한순간에 커넥션을 하나씩만 짧게 쓰므로 DB 풀 상한을 넘을 수 없다 — 워커가 기동할 때 확인한다."""
 
 
 def enqueue(db: Session, task_type: str, payload: dict[str, Any]) -> None:
@@ -73,33 +80,60 @@ logger = logging.getLogger("queue")
 _ERROR_MAX_CHARS = 500
 
 
+class NonRetryableError(Exception):
+    """다시 해도 같은 결과인 실패. 핸들러가 이걸 올리면 attempts 를 기다리지 않고
+    곧바로 FAILED 로 격리한다.
+
+    예: AI 가 4xx 로 요청을 거부했다 — 같은 요청은 몇 번을 보내도 같은 4xx 이고,
+    실제 AI 에서는 시도마다 LLM 비용이 든다.
+    """
+
+
+class LeaseLostError(Exception):
+    """lease 를 잃었다 — 만료돼 다른 워커가 회수했다.
+
+    이 워커가 `complete` 블록에서 쓴 도메인 변경은 롤백됐다. 실패로 기록하지 않는다 —
+    그 작업은 이제 다른 워커 몫이고, 기록하면 남의 시도를 깎는다.
+    """
+
+
 @dataclass(frozen=True)
 class ClaimedTask:
     id: uuid.UUID
     type: str
     payload: dict[str, Any]
     attempts: int
-    """지금까지 **실패한** 횟수. 첫 시도 때는 0 이다."""
+    """이번 시도 **이전까지** 집힌 횟수. 첫 시도 때는 0 이다."""
+
+
+@dataclass(frozen=True)
+class Lease:
+    """빌려 온 작업 하나. `token` 이 맞아야 완료·실패·반납이 행을 바꾼다."""
+
+    task: ClaimedTask
+    token: uuid.UUID
 
 
 @dataclass
-class Claim:
-    """집어 온 작업 하나와, 그것을 잠그고 있는 트랜잭션."""
+class Completion:
+    """`complete` 블록이 쓰는 자리."""
 
     db: Session
-    """이 작업을 잠근 세션. 핸들러가 도메인 쓰기에 **그대로 쓴다** — 작업 완료와
-    도메인 변경이 한 트랜잭션이라야 실패했을 때 흔적이 남지 않는다."""
-    task: ClaimedTask
+    """도메인 쓰기에 쓰는 세션. 블록이 끝나면 큐가 DONE 과 함께 한 번에 커밋한다."""
     result: dict[str, Any] | None = None
-    """핸들러 반환값을 담아 두면 DONE 커밋 때 `result` 컬럼에 함께 들어간다."""
+    """담아 두면 `task_queue.result` 에 들어간다."""
+
+
+def _seconds(value: Any) -> ColumnElement[Any]:
+    # make_interval 의 인자는 (years, months, weeks, days, hours, mins, secs) 순이라 초만 채운다.
+    return func.make_interval(0, 0, 0, 0, 0, 0, value)
 
 
 class DbTaskQueue:
     """PostgreSQL 테이블 큐.
 
-    `receive` 와 `delete` 를 나눌 수 없다. 처리하는 동안 행 잠금을 유지하는 것이
-    이 큐의 재시도 메커니즘 전부이고, 잠금은 트랜잭션에 묶여 있기 때문이다.
-    그래서 인터페이스가 컨텍스트 매니저다.
+    한 작업이 트랜잭션 넷을 거친다 — `claim`(빌리기) · `read`(읽기, 롤백) ·
+    `complete`(쓰기 + DONE) 또는 `fail`/`release`. 어느 것도 AI 호출을 감싸지 않는다.
     """
 
     def __init__(
@@ -111,24 +145,12 @@ class DbTaskQueue:
         self._session_factory = session_factory
         self._settings = settings or QueueSettings()
 
-    @contextmanager
-    def claim(self) -> Iterator[Claim | None]:
-        """작업 하나를 집어 잠근 채로 넘긴다.
+    def claim(self) -> Lease | None:
+        """만료된 lease 를 회수한 뒤 작업 하나를 빌린다. 빌린 사실은 곧바로 커밋한다."""
+        with self._session_factory() as db:
+            self._reclaim_expired(db)
+            db.commit()
 
-        블록이 정상으로 끝나면 DONE 으로 커밋하고, 예외가 나면 롤백한다 —
-        롤백되면 행은 PENDING 그대로라 다음 폴링에 다시 집힌다. 실패 이력만
-        별도 트랜잭션에 남긴다(그러지 않으면 롤백이 attempts 도 되돌린다).
-        """
-        db = self._session_factory()
-        try:
-            # 멈춘 워커가 행을 영원히 붙잡지 않게 하는 안전망. SET LOCAL 이라
-            # 이 트랜잭션에만 걸리고 커밋·롤백과 함께 사라진다.
-            db.execute(
-                text(
-                    "SET LOCAL idle_in_transaction_session_timeout = "
-                    f"'{self._settings.QUEUE_IDLE_TX_TIMEOUT_SEC}s'"
-                )
-            )
             row = db.execute(
                 select(Task)
                 .where(Task.status == TaskStatus.PENDING, Task.next_run_at <= func.now())
@@ -144,77 +166,83 @@ class DbTaskQueue:
 
             if row is None:
                 db.rollback()
-                yield None
-                return
+                return None
 
-            claim = Claim(
-                db=db,
-                task=ClaimedTask(
-                    id=row.id, type=row.type, payload=row.payload, attempts=row.attempts
-                ),
-            )
-
-            try:
-                yield claim
-                # 완료 UPDATE 와 commit 을 이 try 안에 둬야 한다. `SessionLocal` 은
-                # autoflush=False 라, 핸들러가 `claim.db` 에 쌓아 둔 도메인 객체의 flush 는
-                # 여기 commit 시점에야 실제로 나간다 — FK 위반·UNIQUE 충돌은 물론
-                # `result` 에 JSON 직렬화가 안 되는 값이 섞여도 여기서 터진다. try 밖에
-                # 있으면 그 실패가 아래 except 를 타지 않아 attempts 가 오르지 않고,
-                # next_run_at 도 과거 그대로라 다음 폴링에 즉시 다시 집혀 AI 를 또 부른다.
-                db.execute(
-                    update(Task)
-                    .where(Task.id == claim.task.id)
-                    .values(
-                        status=TaskStatus.DONE,
-                        result=claim.result,
-                        finished_at=func.now(),
-                        updated_at=func.now(),
-                    )
+            # 아래 UPDATE 가 identity map 의 객체를 고칠 수 있어 쓰기 전에 값을 옮겨 둔다.
+            task = ClaimedTask(id=row.id, type=row.type, payload=row.payload, attempts=row.attempts)
+            token = uuid.uuid4()
+            db.execute(
+                update(Task)
+                .where(Task.id == task.id)
+                .values(
+                    status=TaskStatus.PROCESSING,
+                    # 집을 때 센다. 워커를 죽이는 작업(OOM · SIGKILL)은 실패를 기록할 기회가
+                    # 없어서, 실패할 때만 세면 lease 만료 회수로 끝없이 되살아난다.
+                    attempts=Task.attempts + 1,
+                    lease_token=token,
+                    lease_expires_at=func.now() + _seconds(self._settings.QUEUE_LEASE_SEC),
+                    updated_at=func.now(),
                 )
-                db.commit()
-            except (KeyboardInterrupt, SystemExit, GeneratorExit):
-                # 작업이 실패한 게 아니라 프로세스가 내려가는 것이다. 롤백해서 잠금만 풀고
-                # attempts 는 태우지 않는다 — 배포 때마다 한 번씩 까이면 멀쩡한 작업이 격리된다.
-                db.rollback()
-                raise
-            except BaseException as exc:
-                db.rollback()
-                self._record_failure(claim.task, exc)
-                raise
+            )
+            db.commit()
+            return Lease(task=task, token=token)
+
+    @contextmanager
+    def read(self) -> Iterator[Session]:
+        """`load` 단계용 세션. 블록이 끝나면 **항상 롤백**한다 — 읽기만 하라는 뜻을 구조로 강제한다."""
+        db = self._session_factory()
+        try:
+            yield db
+        finally:
+            db.rollback()
+            db.close()
+
+    @contextmanager
+    def complete(self, lease: Lease) -> Iterator[Completion]:
+        """블록의 도메인 쓰기와 DONE 을 한 트랜잭션으로 커밋한다.
+
+        lease 가 아직 내 것일 때만 커밋한다. 아니면 `LeaseLostError` — 도메인 쓰기까지
+        롤백된다. 블록이나 커밋이 터지면 롤백하고 그대로 올린다 — 실패 기록(`fail`)은
+        호출부(워커 루프)가 한다.
+        """
+        db = self._session_factory()
+        try:
+            completion = Completion(db=db)
+            yield completion
+            # DONE UPDATE 와 commit 을 블록 뒤 같은 try 안에 둔다. `SessionLocal` 은
+            # autoflush=False 라 블록에서 쌓은 도메인 객체의 flush 가 commit 에서야 나간다 —
+            # FK · UNIQUE 위반, `result` 의 JSON 직렬화 실패도 여기서 터진다.
+            done = db.execute(
+                update(Task)
+                .where(*self._owned(lease))
+                .values(
+                    status=TaskStatus.DONE,
+                    result=completion.result,
+                    finished_at=func.now(),
+                    updated_at=func.now(),
+                    lease_token=None,
+                    lease_expires_at=None,
+                )
+            )
+            if done.rowcount != 1:
+                raise LeaseLostError(f"task {lease.task.id}")
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
         finally:
             db.close()
 
-    def _record_failure(self, task: ClaimedTask, exc: BaseException) -> None:
-        """실패를 **별도 트랜잭션**에 남긴다.
+    def fail(self, lease: Lease, exc: BaseException) -> None:
+        """실패를 기록하고 lease 를 놓는다. 재시도할지 격리할지 여기서 정한다.
 
-        작업 트랜잭션은 이미 롤백됐다. 거기에 기록하면 같이 되돌아간다.
-
-        여기서 또 터져도 원래 예외를 덮어쓰지 않는다 — 기록이 안 되면 attempts 가
-        안 오를 뿐, 작업은 PENDING 으로 남아 다음에 다시 집힌다.
+        여기서 또 터져도 원래 예외를 덮지 않는다 — 기록이 안 되면 작업은 PROCESSING 으로
+        남았다가 lease 가 지나면 회수된다. 조용히 사라지지 않는다.
         """
-        # attempts 는 **DB 안에서** 증분한다. 파이썬에서 `task.attempts + 1` 로 계산한
-        # 절대값을 쓰면 실패 횟수가 유실된다: A 가 롤백해 잠금을 풀고(행은 PENDING) →
-        # B 가 같은 행(attempts=0)을 집어 실패해 attempts=1 을 기록 → A 의 이 UPDATE 가
-        # 뒤늦게 또 attempts=1 을 쓴다. 실패 2회가 1회로 집계돼 QUEUE_MAX_ATTEMPTS 가
-        # 상한 보장이 아니게 된다. 아래 SET 안의 `Task.attempts` 는 전부 UPDATE 이전의
-        # 값(OLD)이라, 증분과 backoff·상태 판정이 같은 값 위에서 일관되게 계산된다.
-        attempts = Task.attempts + 1
-        # status 컬럼은 native ENUM 이다. CASE 의 가지가 둘 다 타입 없는 리터럴이면
-        # Postgres 가 CASE 전체를 text 로 해석해 "column is of type task_status but
-        # expression is of type text" 로 대입이 깨진다. 결과 타입을 못 박는다.
-        status_type = Task.__table__.c.status.type
-        status = cast(
-            case(
-                (attempts >= self._settings.QUEUE_MAX_ATTEMPTS, TaskStatus.FAILED.value),
-                else_=TaskStatus.PENDING.value,
-            ),
-            status_type,
-        )
-        # 30s → 60s. 실패할 때마다 두 배로 민다. make_interval 의 인자는
-        # (years, months, weeks, days, hours, mins, secs) 순이라 초만 채운다.
-        backoff_secs = self._settings.QUEUE_BACKOFF_BASE_SEC * func.pow(2, Task.attempts)
-        backoff = func.make_interval(0, 0, 0, 0, 0, 0, backoff_secs)
+        status: Any = self._retry_or_quarantine()
+        if isinstance(exc, NonRetryableError):
+            # 재시도해도 같은 실패다. 상한까지 태우지 않고 바로 격리한다.
+            status = TaskStatus.FAILED
 
         # 예외 메시지에 사용자 입력이 섞여 들어올 수 있다(규칙 6). 특히 SQLAlchemy
         # IntegrityError 의 str() 은 "[SQL: INSERT ...]\n[parameters: (...)]" 형태로
@@ -225,32 +253,106 @@ class DbTaskQueue:
 
         try:
             with self._session_factory() as db:
-                # 상태 가드가 없으면: A 가 롤백해 잠금을 풀고(행은 여전히 PENDING) →
-                # B 가 같은 행을 집어 성공 처리해 DONE 커밋 → A 의 이 UPDATE 가
-                # (READ COMMITTED 라 WHERE id=... 가 여전히 참이라) DONE 을 다시
-                # PENDING 으로 되돌려 버린다. status=PENDING 가드로, 이미 다른
-                # 워커가 끝낸 행이면 0행 매칭으로 조용히 넘어간다.
                 db.execute(
                     update(Task)
-                    .where(Task.id == task.id, Task.status == TaskStatus.PENDING)
+                    .where(*self._owned(lease))
                     .values(
-                        attempts=attempts,
                         status=status,
                         last_error=reason,
-                        next_run_at=func.now() + backoff,
+                        next_run_at=func.now() + self._backoff(),
+                        lease_token=None,
+                        lease_expires_at=None,
                         updated_at=func.now(),
                     )
                 )
                 db.commit()
         except Exception:
-            logger.exception("작업 실패를 기록하지 못했다. 작업은 PENDING 으로 남는다.")
+            logger.exception("작업 실패를 기록하지 못했다. lease 가 지나면 회수된다.")
+
+    def release(self, lease: Lease) -> None:
+        """종료 신호로 처리를 놓는다. 실패가 아니므로 이번 시도를 세지 않는다.
+
+        배포할 때마다 한 번씩 깎이면 멀쩡한 작업이 QUEUE_MAX_ATTEMPTS 만에 격리된다.
+        """
+        try:
+            with self._session_factory() as db:
+                db.execute(
+                    update(Task)
+                    .where(*self._owned(lease))
+                    .values(
+                        status=TaskStatus.PENDING,
+                        attempts=Task.attempts - 1,
+                        next_run_at=func.now(),
+                        lease_token=None,
+                        lease_expires_at=None,
+                        updated_at=func.now(),
+                    )
+                )
+                db.commit()
+        except Exception:
+            logger.exception("작업을 반납하지 못했다. lease 가 지나면 회수된다.")
+
+    def _reclaim_expired(self, db: Session) -> None:
+        """lease 가 지난 PROCESSING 을 되돌린다. 워커가 죽었거나 lease 안에 끝내지 못했다.
+
+        시도는 claim 때 이미 셌으므로 attempts 는 그대로다. 여러 워커가 동시에 돌려도 행
+        잠금이 직렬화하고, READ COMMITTED 의 재평가로 뒤에 온 쪽은 0행이다.
+        """
+        db.execute(
+            update(Task)
+            .where(Task.status == TaskStatus.PROCESSING, Task.lease_expires_at < func.now())
+            .values(
+                status=self._retry_or_quarantine(),
+                last_error="LeaseExpired: lease 안에 끝내지 못했다(워커 종료 또는 지연)",
+                next_run_at=func.now() + self._backoff(),
+                lease_token=None,
+                lease_expires_at=None,
+                updated_at=func.now(),
+            )
+        )
+
+    def _retry_or_quarantine(self) -> ColumnElement[Any]:
+        """상한에 닿았으면 FAILED, 아니면 PENDING.
+
+        status 컬럼은 native ENUM 이다. CASE 의 가지가 둘 다 타입 없는 리터럴이면
+        Postgres 가 CASE 전체를 text 로 해석해 "column is of type task_status but
+        expression is of type text" 로 대입이 깨진다. 결과 타입을 못 박는다.
+        """
+        return cast(
+            case(
+                (Task.attempts >= self._settings.QUEUE_MAX_ATTEMPTS, TaskStatus.FAILED.value),
+                else_=TaskStatus.PENDING.value,
+            ),
+            Task.__table__.c.status.type,
+        )
+
+    def _backoff(self) -> ColumnElement[Any]:
+        """30s → 60s. attempts 는 claim 때 이미 1 올라 있으므로 첫 실패가 2^0 이다."""
+        return _seconds(self._settings.QUEUE_BACKOFF_BASE_SEC * func.pow(2, Task.attempts - 1))
+
+    @staticmethod
+    def _owned(lease: Lease) -> tuple[ColumnElement[bool], ...]:
+        """이 lease 가 아직 유효한 행. 회수됐거나 이미 끝난 행이면 0행이 된다."""
+        return (
+            Task.id == lease.task.id,
+            Task.status == TaskStatus.PROCESSING,
+            Task.lease_token == lease.token,
+        )
 
 
 class TaskQueue(Protocol):
     """작업 큐. 워커는 이 모양만 안다."""
 
-    def claim(self) -> AbstractContextManager[Claim | None]: ...
+    def claim(self) -> Lease | None: ...
+
+    def read(self) -> AbstractContextManager[Session]: ...
+
+    def complete(self, lease: Lease) -> AbstractContextManager[Completion]: ...
+
+    def fail(self, lease: Lease, exc: BaseException) -> None: ...
+
+    def release(self, lease: Lease) -> None: ...
 
 
-def build_task_queue() -> TaskQueue:
-    return DbTaskQueue()
+def build_task_queue(settings: QueueSettings | None = None) -> TaskQueue:
+    return DbTaskQueue(settings=settings)

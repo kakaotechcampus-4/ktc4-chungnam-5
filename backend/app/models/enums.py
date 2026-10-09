@@ -118,17 +118,27 @@ class FeedbackPeriodType(str, enum.Enum):
 class TaskStatus(str, enum.Enum):
     """`task_queue` 행의 상태.
 
-    RUNNING 이 없다. 워커는 처리하는 동안 행 잠금을 쥐고 있을 뿐이고, 그 사실은
-    커밋 전이라 다른 세션에 보이지 않는다 — 써 봐야 아무도 관측할 수 없는 값이 된다.
-    "지금 처리 중"은 곧 "PENDING 인데 행 잠금이 걸린 상태"이고, `pg_locks` 는 잠금이
-    튜플 단위라 실용적이지 않아 `scripts/queue_status.py` 는 `pg_stat_activity` 로 근사한다.
+    PROCESSING 은 워커가 lease 를 빌려 처리 중이라는 뜻이다. `claim` 이 집는 순간
+    커밋하므로 다른 세션에도 보인다. `lease_expires_at` 이 지나도 PROCESSING 이면 워커가
+    죽은 것으로 보고 다음 `claim` 이 회수해 PENDING(상한이면 FAILED)으로 돌린다.
 
-    FAILED 는 DLQ 자리다. QUEUE_MAX_ATTEMPTS 만큼 실패하면 여기로 옮기고 더 집지 않는다.
+    FAILED 는 DLQ 자리다. QUEUE_MAX_ATTEMPTS 만큼 집혔는데 끝내지 못하면 여기로 옮기고
+    더 집지 않는다.
     """
 
     PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
     DONE = "DONE"
     FAILED = "FAILED"
+
+    @property
+    def is_in_flight(self) -> bool:
+        """아직 끝나지 않았다 — 대기 중이거나 처리 중이다.
+
+        "생성 중" 응답과 중복 등록 방지가 이걸 본다. PENDING 만 보면 워커가 집은 순간
+        (PROCESSING) 생성 중 표시가 사라지고 새로고침이 같은 작업을 또 넣는다.
+        """
+        return self in (TaskStatus.PENDING, TaskStatus.PROCESSING)
 
 
 # ── 여기부터는 응답 전용 ENUM ────────────────────────────────

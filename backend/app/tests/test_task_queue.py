@@ -6,29 +6,15 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import func, select, text, update
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.models.enums import TaskStatus
 from app.models.task import Task
-
-
-@pytest.fixture
-def sessions(test_engine):
-    """진짜로 커밋하는 세션 팩토리.
-
-    conftest 의 `db` 픽스처는 savepoint 위에서 도는 단일 커넥션이라 여기 쓸 수 없다.
-    이 테스트가 검증하는 게 바로 커밋·롤백 경계이고, 동시성 테스트에는 커넥션이 둘 필요하다.
-    대신 테스트마다 테이블을 비운다.
-    """
-    factory = sessionmaker(bind=test_engine, autoflush=False, expire_on_commit=False)
-    yield factory
-    with factory() as cleanup:
-        cleanup.execute(text("DELETE FROM task_queue"))
-        cleanup.commit()
 
 
 def _row(db: Session, task_id) -> Task:
@@ -52,6 +38,60 @@ def test_new_task_defaults_to_pending_and_runnable_now(sessions):
 
 
 # ─────────────────────────── 넣기 ───────────────────────────
+
+
+def test_new_task_has_no_lease(sessions):
+    """lease 는 claim 이 쓴다. 막 넣은 작업에는 없다."""
+    with sessions() as db:
+        task = Task(type="meal.analyze", payload={"mealId": "m1"})
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+
+        assert task.lease_token is None
+        assert task.lease_expires_at is None
+
+
+def test_processing_and_lease_columns_round_trip(sessions):
+    token = uuid.uuid4()
+    expires = datetime.now(timezone.utc) + timedelta(minutes=2)
+    with sessions() as db:
+        task = Task(
+            type="meal.analyze",
+            payload={"mealId": "m1"},
+            status=TaskStatus.PROCESSING,
+            lease_token=token,
+            lease_expires_at=expires,
+        )
+        db.add(task)
+        db.commit()
+        task_id = task.id
+
+    with sessions() as db:
+        row = _row(db, task_id)
+        assert row.status is TaskStatus.PROCESSING
+        assert row.lease_token == token
+        assert row.lease_expires_at == expires
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        (TaskStatus.PENDING, True),
+        (TaskStatus.PROCESSING, True),
+        (TaskStatus.DONE, False),
+        (TaskStatus.FAILED, False),
+    ],
+)
+def test_in_flight_means_not_finished(status, expected):
+    """"생성 중" 판정과 중복 등록 방지는 대기 중과 처리 중을 똑같이 본다."""
+    assert status.is_in_flight is expected
+
+
+def test_lease_defaults_to_two_minutes():
+    from app.infra.queue import QueueSettings
+
+    assert QueueSettings(_env_file=None).QUEUE_LEASE_SEC == 120
 
 
 def test_enqueue_is_atomic_with_the_domain_transaction(sessions):
@@ -92,7 +132,9 @@ def queue(sessions):
 
     return DbTaskQueue(
         sessions,
-        settings=QueueSettings(QUEUE_MAX_ATTEMPTS=3, QUEUE_BACKOFF_BASE_SEC=30),
+        settings=QueueSettings(
+            QUEUE_MAX_ATTEMPTS=3, QUEUE_BACKOFF_BASE_SEC=30, QUEUE_LEASE_SEC=120
+        ),
     )
 
 
@@ -105,53 +147,176 @@ def _put(sessions, **kwargs) -> Task:
     return task
 
 
+def _expire(sessions, task_id) -> None:
+    """lease 를 이미 지난 것으로 만든다. 워커가 죽어 120초가 흐른 상황이다."""
+    with sessions() as db:
+        db.execute(
+            update(Task)
+            .where(Task.id == task_id)
+            .values(lease_expires_at=func.now() - timedelta(seconds=1))
+        )
+        db.commit()
+
+
 def test_claim_returns_none_on_empty_queue(queue):
-    with queue.claim() as claim:
-        assert claim is None
+    assert queue.claim() is None
 
 
-def test_success_commits_done_with_the_handler_result(sessions, queue):
+def test_claim_commits_processing_with_a_fresh_lease(sessions, queue):
+    """집은 사실이 곧바로 커밋된다 — 다른 세션에서 PROCESSING 이 보여야 한다."""
     put = _put(sessions)
+    before = datetime.now(timezone.utc)
 
-    with queue.claim() as claim:
-        assert claim is not None
-        assert claim.task.id == put.id
-        assert claim.task.type == "meal.analyze"
-        assert claim.task.payload == {"mealId": "m1"}
-        assert claim.task.attempts == 0
-        claim.result = {"items": 3}
+    lease = queue.claim()
+
+    assert lease is not None
+    assert lease.task.id == put.id
+    assert lease.task.type == "meal.analyze"
+    assert lease.task.payload == {"mealId": "m1"}
+    assert lease.task.attempts == 0  # 이번 시도 이전까지 집힌 횟수
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.PROCESSING
+        assert row.attempts == 1
+        assert row.lease_token == lease.token
+        assert row.lease_expires_at > before + timedelta(seconds=100)
+
+
+def test_claim_leaves_no_connection_checked_out(sessions, queue, test_engine):
+    """claim 이 끝나면 트랜잭션도 커넥션도 남지 않는다 — 이 변경의 목적이다."""
+    _put(sessions)
+
+    assert queue.claim() is not None
+    assert test_engine.pool.checkedout() == 0
+
+
+def test_claimed_task_is_not_handed_out_twice(sessions, queue):
+    _put(sessions)
+
+    assert queue.claim() is not None
+    assert queue.claim() is None
+
+
+def test_claim_skips_a_row_another_worker_is_claiming(sessions, queue):
+    """SKIP LOCKED — 다른 워커가 집는 중(행 잠금)인 행은 기다리지 않고 건너뛴다.
+
+    기다리면 워커를 늘려도 한 줄로 서게 된다.
+    """
+    first = _put(sessions, payload={"n": 1})
+    second = _put(sessions, payload={"n": 2})
+
+    with sessions() as other:
+        other.execute(select(Task).where(Task.id == first.id).with_for_update())
+        lease = queue.claim()
+        other.rollback()
+
+    assert lease is not None
+    assert lease.task.id == second.id
+
+
+def test_task_scheduled_in_the_future_is_not_claimed(sessions, queue):
+    _put(sessions, next_run_at=datetime.now(timezone.utc) + timedelta(hours=1))
+
+    assert queue.claim() is None
+
+
+# ─────────────────────────── 읽기 ───────────────────────────
+
+
+def test_read_session_never_commits(sessions, queue):
+    """`load` 단계 세션은 끝나면 롤백된다 — 실수로 쓴 것도 남지 않는다."""
+    _put(sessions)
+
+    with queue.read() as db:
+        db.add(Task(type="side.effect", payload={}))
+        db.flush()
+
+    with sessions() as db:
+        assert db.execute(select(Task.type)).scalars().all() == ["meal.analyze"]
+
+
+# ─────────────────────────── 완료 ───────────────────────────
+
+
+def test_complete_commits_done_with_the_result_and_clears_the_lease(sessions, queue):
+    put = _put(sessions)
+    lease = queue.claim()
+
+    with queue.complete(lease) as done:
+        done.result = {"items": 3}
 
     with sessions() as db:
         row = _row(db, put.id)
         assert row.status is TaskStatus.DONE
         assert row.result == {"items": 3}
         assert row.finished_at is not None
-        assert row.attempts == 0
+        assert row.attempts == 1
+        assert row.lease_token is None
+        assert row.lease_expires_at is None
 
 
-def test_claimed_task_is_not_handed_out_twice(sessions, queue):
-    """DONE 이 된 작업은 다시 집히지 않는다."""
-    _put(sessions)
+def test_complete_commits_domain_writes_with_done(sessions, queue):
+    """도메인 쓰기와 DONE 은 한 트랜잭션이다."""
+    put = _put(sessions)
+    lease = queue.claim()
 
-    with queue.claim() as claim:
-        assert claim is not None
+    with queue.complete(lease) as done:
+        done.db.add(Task(type="side.effect", payload={}))
 
-    with queue.claim() as claim:
-        assert claim is None
+    with sessions() as db:
+        assert sorted(db.execute(select(Task.type)).scalars().all()) == ["meal.analyze", "side.effect"]
+        assert _row(db, put.id).status is TaskStatus.DONE
+
+
+def test_complete_with_a_lost_lease_rolls_back_domain_writes(sessions, queue):
+    """lease 가 만료돼 다른 워커가 가져갔으면 이 워커의 결과는 버린다 — 도메인 쓰기까지."""
+    from app.infra.queue import LeaseLostError
+
+    put = _put(sessions)
+    lease = queue.claim()
+    other_token = uuid.uuid4()
+    with sessions() as db:
+        db.execute(update(Task).where(Task.id == put.id).values(lease_token=other_token))
+        db.commit()
+
+    with pytest.raises(LeaseLostError):
+        with queue.complete(lease) as done:
+            done.db.add(Task(type="side.effect", payload={}))
+
+    with sessions() as db:
+        assert db.execute(select(Task.type)).scalars().all() == ["meal.analyze"]
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.PROCESSING
+        assert row.lease_token == other_token
+
+
+def test_complete_that_fails_to_commit_raises_and_leaves_the_lease(sessions, queue):
+    """DONE 커밋 자체가 깨지면(직렬화 불가 등) 예외가 올라오고 행은 PROCESSING 그대로다.
+
+    루프가 그 예외를 `fail` 로 넘긴다 — 다음 테스트.
+    """
+    put = _put(sessions)
+    lease = queue.claim()
+
+    with pytest.raises(Exception):
+        with queue.complete(lease) as done:
+            done.result = {"finishedAt": datetime.now(timezone.utc)}
+
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.PROCESSING
+        assert row.result is None
 
 
 # ─────────────────────────── 실패 ───────────────────────────
 
 
-def test_failure_leaves_the_task_pending_and_records_the_attempt(sessions, queue):
-    """실패하면 지우지도 완료하지도 않는다. 이력만 남기고 되돌린다."""
+def test_fail_returns_the_task_to_pending_with_backoff(sessions, queue):
     put = _put(sessions)
     before = datetime.now(timezone.utc)
+    lease = queue.claim()
 
-    with pytest.raises(RuntimeError):
-        with queue.claim() as claim:
-            assert claim is not None
-            raise RuntimeError("AI 가 500 을 냈다")
+    queue.fail(lease, RuntimeError("AI 가 500 을 냈다"))
 
     with sessions() as db:
         row = _row(db, put.id)
@@ -159,150 +324,163 @@ def test_failure_leaves_the_task_pending_and_records_the_attempt(sessions, queue
         assert row.attempts == 1
         assert "RuntimeError" in row.last_error
         assert row.result is None
+        assert row.lease_token is None
+        assert row.lease_expires_at is None
         # 첫 실패 → 30초 뒤. 곧바로 다시 집으면 재시도가 순식간에 소진된다.
-        assert row.next_run_at > before + timedelta(seconds=20)
+        assert before + timedelta(seconds=20) < row.next_run_at < before + timedelta(seconds=40)
 
 
-def test_commit_failure_is_recorded_as_a_failed_attempt(sessions, queue):
-    """DONE 커밋 자체가 실패해도(FK 위반·직렬화 불가 등) 실패로 집계돼야 한다.
+def test_second_failure_backs_off_longer(sessions, queue):
+    put = _put(sessions, attempts=1)
+    before = datetime.now(timezone.utc)
+    lease = queue.claim()
 
-    `result` 에 JSON 으로 직렬화할 수 없는 값(`datetime`)을 담아 DONE UPDATE 를
-    깨뜨린다. 이 커밋은 `try` 블록 밖에 있었을 때는 실패 경로(`_record_failure`)를
-    타지 않아 attempts 가 오르지 않고 next_run_at 도 과거 그대로 남았다 — 그러면
-    행이 즉시 다시 집혀 AI 를 또 부르면서도 QUEUE_MAX_ATTEMPTS 로 격리되지 않았다.
-    """
+    queue.fail(lease, RuntimeError("또 실패"))
+
+    with sessions() as db:
+        next_run_at = _row(db, put.id).next_run_at
+        assert before + timedelta(seconds=50) < next_run_at < before + timedelta(seconds=70)
+
+
+def test_commit_failure_is_recorded_through_fail(sessions, queue):
     put = _put(sessions)
+    lease = queue.claim()
 
-    with pytest.raises(Exception):
-        with queue.claim() as claim:
-            assert claim is not None
-            claim.result = {"finishedAt": datetime.now(timezone.utc)}
+    with pytest.raises(Exception) as caught:
+        with queue.complete(lease) as done:
+            done.result = {"finishedAt": datetime.now(timezone.utc)}
+    queue.fail(lease, caught.value)
 
     with sessions() as db:
         row = _row(db, put.id)
         assert row.status is TaskStatus.PENDING
-        assert row.attempts == 1
         assert "TypeError" in row.last_error
-        assert row.result is None
-
-
-def test_domain_writes_are_rolled_back_with_the_task(sessions, queue):
-    """핸들러가 claim 의 세션에 쓴 것도 함께 되돌아간다.
-
-    이게 SQS 대비 가장 큰 차이다 — 재시도할 때 이전 시도의 흔적이 남지 않는다.
-    """
-    put = _put(sessions)
-
-    with pytest.raises(RuntimeError):
-        with queue.claim() as claim:
-            claim.db.add(Task(type="side.effect", payload={}))
-            claim.db.flush()
-            raise RuntimeError("처리 도중 실패")
-
-    with sessions() as db:
-        types = db.execute(select(Task.type)).scalars().all()
-        assert types == ["meal.analyze"]
-        assert _row(db, put.id).attempts == 1
 
 
 def test_task_is_quarantined_after_max_attempts(sessions, queue):
-    """3회째 실패하면 FAILED 로 옮기고 더 집지 않는다 — DLQ 자리다."""
+    """3번째로 집힌 시도가 실패하면 FAILED 로 옮기고 더 집지 않는다 — DLQ 자리다."""
     put = _put(sessions, attempts=2)
+    lease = queue.claim()
 
-    with pytest.raises(RuntimeError):
-        with queue.claim() as claim:
-            raise RuntimeError("세 번째 실패")
+    queue.fail(lease, RuntimeError("세 번째 실패"))
 
     with sessions() as db:
         row = _row(db, put.id)
         assert row.status is TaskStatus.FAILED
         assert row.attempts == 3
-
-    with queue.claim() as claim:
-        assert claim is None
+    assert queue.claim() is None
 
 
-def test_task_scheduled_in_the_future_is_not_claimed(sessions, queue):
-    _put(sessions, next_run_at=datetime.now(timezone.utc) + timedelta(hours=1))
-
-    with queue.claim() as claim:
-        assert claim is None
-
-
-def test_late_failure_record_does_not_revive_a_done_task(sessions, queue):
-    """진짜 경쟁 조건(A 롤백 → B 가 같은 행을 집어 DONE 커밋 → A 의 실패 기록이 뒤늦게 도착)은
-    타이밍을 강제할 수 없어 결정적으로 재현하지 못한다. 대신 그 상황의 결과 — 이미 DONE 인
-    행에 뒤늦은 실패 기록이 도착하는 것 — 를 `_record_failure` 를 직접 불러 고정한다.
-    이 테스트가 지키는 계약은 "늦게 도착한 실패 기록이 완료된 작업을 건드리지 않는다" 는 것이다.
-    """
-    from app.infra.queue import ClaimedTask
+def test_non_retryable_failure_is_quarantined_on_the_first_attempt(sessions, queue):
+    from app.infra.queue import NonRetryableError
 
     put = _put(sessions)
-    with sessions() as db:
-        db.execute(
-            update(Task)
-            .where(Task.id == put.id)
-            .values(status=TaskStatus.DONE, result={"ok": True}, finished_at=func.now())
-        )
-        db.commit()
+    lease = queue.claim()
 
-    queue._record_failure(
-        ClaimedTask(id=put.id, type=put.type, payload=put.payload, attempts=0),
-        RuntimeError("늦게 도착한 실패 기록"),
-    )
+    queue.fail(lease, NonRetryableError("AI 가 422 를 냈다"))
+
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.FAILED
+        assert row.attempts == 1
+        assert "NonRetryableError" in row.last_error
+    assert queue.claim() is None
+
+
+def test_late_failure_does_not_revive_a_done_task(sessions, queue):
+    """이미 끝난 작업에 뒤늦은 실패 기록이 와도 건드리지 않는다 — 토큰 가드."""
+    put = _put(sessions)
+    lease = queue.claim()
+    with queue.complete(lease) as done:
+        done.result = {"ok": True}
+
+    queue.fail(lease, RuntimeError("늦게 도착한 실패 기록"))
 
     with sessions() as db:
         row = _row(db, put.id)
         assert row.status is TaskStatus.DONE
-        assert row.attempts == 0
         assert row.last_error is None
 
 
-def test_keyboard_interrupt_does_not_consume_an_attempt(sessions, queue):
-    """Ctrl+C·SIGTERM 은 작업 실패가 아니라 프로세스 종료다. attempts 를 태우면 배포할 때마다
-    멀쩡한 작업이 한 번씩 까여 QUEUE_MAX_ATTEMPTS 만에 격리돼 버린다."""
+def test_failure_message_drops_the_sql_dump_and_is_truncated(sessions, queue):
+    """IntegrityError 의 str() 은 원본 파라미터(음식명 등)를 붙인다 — 규칙 6."""
     put = _put(sessions)
+    lease = queue.claim()
 
-    with pytest.raises(KeyboardInterrupt):
-        with queue.claim() as claim:
-            assert claim is not None
-            raise KeyboardInterrupt()
+    queue.fail(lease, RuntimeError("x" * 600 + "\n[SQL: INSERT 비밀 음식명]"))
+
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert "비밀" not in row.last_error
+        assert len(row.last_error) <= 500
+
+
+# ─────────────────────────── 반납 ───────────────────────────
+
+
+def test_release_does_not_consume_an_attempt(sessions, queue):
+    """종료 신호로 놓는 건 실패가 아니다. 배포할 때마다 한 번씩 깎이면 멀쩡한 작업이 격리된다."""
+    put = _put(sessions)
+    lease = queue.claim()
+
+    queue.release(lease)
 
     with sessions() as db:
         row = _row(db, put.id)
         assert row.status is TaskStatus.PENDING
         assert row.attempts == 0
         assert row.last_error is None
+        assert row.lease_token is None
         assert row.next_run_at <= datetime.now(timezone.utc) + timedelta(seconds=1)
 
 
-# ─────────────────────────── 동시성 ───────────────────────────
+# ─────────────────────────── 회수 ───────────────────────────
 
 
-def test_two_workers_never_claim_the_same_row(sessions, queue):
-    """SKIP LOCKED — 워커 둘이 동시에 집으면 서로 다른 행을 가져간다.
+def test_expired_lease_is_reclaimed_by_the_next_claim(sessions, queue):
+    """워커가 죽어 lease 가 지나면 다음 claim 이 PENDING 으로 되돌린다(backoff 적용)."""
+    from app.infra.queue import LeaseLostError
 
-    잠긴 행을 기다리지 않고 건너뛴다는 것이 핵심이다. 기다리면 워커를 늘려도
-    한 줄로 서게 된다.
-    """
-    from app.infra.queue import DbTaskQueue
+    put = _put(sessions)
+    lease = queue.claim()
+    _expire(sessions, put.id)
+    before = datetime.now(timezone.utc)
 
-    first = _put(sessions, payload={"n": 1})
-    second = _put(sessions, payload={"n": 2})
-    other = DbTaskQueue(sessions)
+    assert queue.claim() is None  # 회수된 작업은 backoff 뒤에 다시 집힌다
 
-    with queue.claim() as a, other.claim() as b:
-        assert a is not None and b is not None
-        assert {a.task.id, b.task.id} == {first.id, second.id}
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.PENDING
+        assert row.attempts == 1
+        assert row.last_error.startswith("LeaseExpired")
+        assert row.lease_token is None
+        assert before + timedelta(seconds=20) < row.next_run_at < before + timedelta(seconds=40)
+
+    # 뒤늦게 깨어난 원래 워커의 완료는 반영되지 않는다.
+    with pytest.raises(LeaseLostError):
+        with queue.complete(lease):
+            pass
 
 
-def test_second_worker_gets_nothing_when_the_only_row_is_locked(sessions, queue):
-    from app.infra.queue import DbTaskQueue
+def test_expired_lease_at_max_attempts_is_quarantined(sessions, queue):
+    """워커를 죽이는 작업도 상한에 걸린다 — attempts 를 집을 때 세는 이유다."""
+    put = _put(sessions, attempts=2)
+    queue.claim()
+    _expire(sessions, put.id)
 
-    _put(sessions)
-    other = DbTaskQueue(sessions)
+    assert queue.claim() is None
 
-    with queue.claim() as a:
-        assert a is not None
-        with other.claim() as b:
-            assert b is None
+    with sessions() as db:
+        assert _row(db, put.id).status is TaskStatus.FAILED
+
+
+def test_live_lease_is_not_reclaimed(sessions, queue):
+    put = _put(sessions)
+    lease = queue.claim()
+
+    assert queue.claim() is None
+
+    with sessions() as db:
+        row = _row(db, put.id)
+        assert row.status is TaskStatus.PROCESSING
+        assert row.lease_token == lease.token

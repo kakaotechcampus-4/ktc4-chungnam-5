@@ -62,10 +62,15 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
   /// 서버가 판정한 현재 투약. 단계 블록을 채우고, 있으면 등록 후 모드다.
   MedicationCurrent? _current;
 
-  /// 이미 등록했는지. 등록 후에는 시작일·회차를 잠근다 — `POST` 는 등록
-  /// 전용이라 둘을 바꾸면 409 이고, 고치는 건 정정(`PATCH`)이다.
-  /// 약·용량은 "오늘부터 이 용량으로 바꿈"이라 그대로 열어 둔다.
+  /// 이미 등록했는지. 약·용량은 "오늘부터 이 용량으로 바꿈"이라 `POST` 로,
+  /// 시작일·회차는 잘못 넣은 걸 고치는 정정(`PATCH`)으로 저장한다.
   bool get _registered => _current != null;
+
+  /// 등록 후 시작일을 고칠 수 있는지. 용량을 바꾼 기록이 있으면 현재 기록의
+  /// 시작일이 투약 시작일이 아니어서 막는다. 확인 전(null)에도 막아 둔다.
+  bool? _canCorrectStart;
+
+  bool get _startLocked => _registered && _canCorrectStart != true;
 
   /// 사용자가 폼을 건드렸는지. 늦게 도착한 프리필이 입력을 덮지 않게 한다.
   bool _touchedByUser = false;
@@ -84,9 +89,10 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       // 이미 받아 둔 값이 있으면 서버에 다시 묻지 않는다.
       final current = await _medication.ensureLoaded();
       if (!mounted || current == null) return;
+      _checkCorrectable();
       setState(() {
         _current = current;
-        // 시작일은 잠기므로 사용자가 먼저 손댔어도 서버 값으로 맞춘다.
+        // 등록 전에 사용자가 손댄 시작일은 의미가 없다. 서버 값으로 맞춘다.
         _startedAt = current.startedAt;
         // 약·용량은 사용자가 이미 손댔으면 건드리지 않는다.
         if (!_touchedByUser) {
@@ -97,6 +103,15 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
     } catch (_) {
       // 프리필 실패는 조용히 넘긴다. 빈 폼으로도 입력할 수 있고,
       // 여기서 재시도 블록을 띄우면 처음 쓰는 사람에게 실패처럼 보인다.
+    }
+  }
+
+  Future<void> _checkCorrectable() async {
+    try {
+      final ok = await _medication.canCorrectStart();
+      if (mounted) setState(() => _canCorrectStart = ok);
+    } catch (_) {
+      // 확인하지 못하면 잠근 채로 둔다.
     }
   }
 
@@ -153,13 +168,33 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       _saveError = null;
     });
     try {
-      final saved = await _medication.save(
-        drugName: _drug,
-        doseMg: _dose,
-        startedAt: _registered ? null : _startedAt,
-      );
-      if (!mounted) return;
-      setState(() => _current = saved);
+      final current = _current;
+      if (current == null) {
+        final saved = await _medication.save(
+          drugName: _drug,
+          doseMg: _dose,
+          startedAt: _startedAt,
+        );
+        if (!mounted) return;
+        setState(() => _current = saved);
+      } else {
+        // 시작일 정정 먼저, 그다음 약·용량. 오늘 연 기록이면 용량도 정정된다.
+        if (_startedAt != current.startedAt) {
+          await _medication.correctStart(_startedAt);
+        }
+        if (_drug != current.drugName || _dose != current.doseMg) {
+          final corrected = await _medication.changeDose(
+            drugName: _drug,
+            doseMg: _dose,
+          );
+          if (corrected && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('오늘 등록한 용량을 고쳤어요')),
+            );
+          }
+        }
+        if (!mounted) return;
+      }
       // 첫 등록이면 서버의 onboardingStatus 가 READY 로 바뀐다. 프로필도 맞춘다.
       context.read<ProfileState>().refreshInBackground();
       // 저장 완료 → 연 곳으로 돌아간다. 홈 투약 카드는 MedicationState 로
@@ -168,12 +203,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
       Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (!mounted) return;
-      // 시작일은 등록 후 보내지 않으므로 409 는 "오늘 이미 바꾼 용량"뿐이다.
-      setState(
-        () => _saveError = e.code == 'CONFLICT'
-            ? '오늘 저장한 용량은 내일부터 바꿀 수 있어요'
-            : '저장하지 못했어요: ${e.message}',
-      );
+      setState(() => _saveError = '저장하지 못했어요: ${e.message}');
     } catch (e) {
       if (!mounted) return;
       setState(() => _saveError = '저장하지 못했어요: $e');
@@ -283,7 +313,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                               const _SectionLabel('투약 시작일'),
                               const SizedBox(height: AppSpacing.md),
                               _FieldBox(
-                                onTap: _registered ? null : _pickStartDate,
+                                onTap: _startLocked ? null : _pickStartDate,
                                 child: Row(
                                   children: [
                                     Expanded(
@@ -295,7 +325,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                                     Icon(
                                       Icons.calendar_today_outlined,
                                       size: AppLayout.tabIconSize,
-                                      color: _registered
+                                      color: _startLocked
                                           ? AppColors.inactive
                                           : AppColors.textSecondary,
                                     ),
@@ -317,7 +347,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                                   children: [
                                     _StepperButton(
                                       icon: Icons.remove,
-                                      onTap: !_registered && _doseCount > 1
+                                      onTap: !_startLocked && _doseCount > 1
                                           ? () => _changeDoseCount(-1)
                                           : null,
                                     ),
@@ -330,7 +360,7 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                                     ),
                                     _StepperButton(
                                       icon: Icons.add,
-                                      onTap: _registered
+                                      onTap: _startLocked
                                           ? null
                                           : () => _changeDoseCount(1),
                                     ),
@@ -345,8 +375,9 @@ class _MedicationInfoScreenState extends State<MedicationInfoScreen> {
                     if (_registered) ...[
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        '시작일과 회차는 등록 후에는 바꿀 수 없어요. '
-                        '잘못 입력했다면 정정 기능을 준비하고 있어요.',
+                        _canCorrectStart == false
+                            ? '용량을 바꾼 기록이 있어 시작일과 회차는 바꿀 수 없어요.'
+                            : '시작일·회차를 잘못 넣었다면 고쳐서 저장하세요.',
                         style: AppTypography.caption,
                       ),
                     ],

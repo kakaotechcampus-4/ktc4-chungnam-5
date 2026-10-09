@@ -1,112 +1,94 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
+import '../api/meal_api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_input_screen.dart';
 import 'meal_review_screen.dart';
 
-/// 분석 진행 3단계.
-///
-/// **서버는 이 단계를 모른다.** `meals.status` 는 `ANALYZING` 하나뿐이고
-/// `meal.analyze` 워커도 `ANALYZING → REVIEW_REQUIRED` 로 한 번에 넘어간다
-/// (`backend/app/worker/jobs/analyze_meal.py`). 그래서 셋을 똑같이 다루지
-/// 않는다 — 계산량을 예측할 수 있는 1·3단계는 고정 연출 타이머를 쓰고,
-/// 소요 시간을 가늠할 수 없는(백엔드 DB 조회) 2단계만 실제 폴링 완료
-/// 신호를 기다린다.
+/// 분석 진행 3단계. 서버 `steps[]` 의 `key` 순서와 같다.
 enum AnalysisStep { recognizeFood, matchNutritionDb, applyDoseStage }
 
 enum _StepState { done, inProgress, pending }
 
-/// 분석 상태 폴링 서비스.
-///
-/// 지금은 더미로 몇 번째 호출인지만 세서 흉내 낸다. 실제 연동 시
-/// `GET /meals/{mealId}` 를 1.5초 간격으로 불러 `status` 가
-/// `REVIEW_REQUIRED` 인지만 보면 된다 — 그 이상의 세부 단계는 없다.
-class MealAnalysisApiService {
-  /// 더미는 첫 폴링에서 바로 완료를 돌려준다. 폴링 간격(1.5초) + 이 지연(0.5초)
-  /// 으로 2단계가 2초 걸린다.
-  Future<bool> isReviewRequired(String mealId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return true;
-  }
-}
+/// 분석 화면이 멈춘 이유.
+enum _Stopped { failed, timedOut }
 
 /// AI 분석 진행 — Figma `hOxrHBitBpjwIBBg2GO49y` node `89:6`.
 ///
-/// README 폴링 규칙(1.5초 간격 · 45초 초과 시 FCM 푸시로 인계)을 그대로
-/// 따른다. 화면을 벗어나도(뒤로가기 없이 다른 탭으로 이동 등) 분석 자체는
-/// 서버에서 계속되므로, 여기서 취소해도 서버 쪽 분석까지 멈추지는 않는다
-/// — "취소"는 폴링을 그만 보는 것뿐이다.
+/// `GET /meals/{mealId}` 를 서버가 준 간격(`pollIntervalMs`)으로 불러
+/// 최초 분석이 끝나면(`REVIEW_REQUIRED`) 음식 확인 화면으로 넘어간다.
+/// 서버가 준 한도(`timeoutMs`)를 넘기면 폴링만 멈춘다 — 분석은 서버에서
+/// 계속되므로 기록 탭에서 이어 볼 수 있다. 알림으로 넘기는 건 FE-14 몫이다.
 class MealAnalysisScreen extends StatefulWidget {
-  const MealAnalysisScreen({super.key, required this.mealId});
+  const MealAnalysisScreen({super.key, required this.meal, this.photo});
 
-  final String mealId;
+  final MealCreated meal;
+
+  /// 올린 사진(미리보기용). 텍스트로 입력했으면 null.
+  final Uint8List? photo;
 
   @override
   State<MealAnalysisScreen> createState() => _MealAnalysisScreenState();
 }
 
 class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
-  static const _pollInterval = Duration(milliseconds: 1500);
-  static const _pollTimeout = Duration(seconds: 45);
+  /// 끝난 걸 보여 주고 넘어가기까지 잠깐 둔다(3단계 완료 표시).
+  static const _doneHold = Duration(milliseconds: 600);
 
-  // 1·3단계 연출 타이머. 계산량을 예측할 수 있는 구간이라 고정값을 쓴다.
-  // 단계마다 2초씩, 더미 기준 총 6초 뒤 리뷰 화면으로 넘어간다.
-  static const _recognizeFoodDuration = Duration(seconds: 2);
-  static const _applyDoseStageDuration = Duration(seconds: 2);
-
-  final MealAnalysisApiService _api = MealAnalysisApiService();
+  late final MealApiService _api = MealApiService(context.read<ApiClient>());
 
   AnalysisStep _step = AnalysisStep.recognizeFood;
+  _Stopped? _stopped;
 
   @override
   void initState() {
     super.initState();
-    _runAnalysisFlow();
+    _poll();
   }
 
-  Future<void> _runAnalysisFlow() async {
-    // 1단계 — 음식 인식. 고정 연출.
-    await Future.delayed(_recognizeFoodDuration);
-    if (!mounted) return;
-
-    // 2단계 — 영양 DB 매칭. 실제 폴링이 REVIEW_REQUIRED 를 돌려줄 때까지.
-    setState(() => _step = AnalysisStep.matchNutritionDb);
-    final reviewRequired = await _pollUntilReviewRequired();
-    if (!mounted) return;
-    if (!reviewRequired) {
-      // TODO: 45초 초과 — 폴링을 끊고 FCM 푸시 인계 안내로 전환한다.
-      return;
+  Future<void> _poll() async {
+    final deadline = DateTime.now().add(widget.meal.timeout);
+    while (mounted) {
+      await Future.delayed(widget.meal.pollInterval);
+      if (!mounted) return;
+      final MealDetail meal;
+      try {
+        meal = await _api.fetchMeal(widget.meal.mealId);
+      } catch (_) {
+        // 한 번 실패는 넘기고 다음 차례에 다시 묻는다. 한도는 그대로 센다.
+        if (DateTime.now().isAfter(deadline)) return _stop(_Stopped.timedOut);
+        continue;
+      }
+      if (!mounted) return;
+      if (meal.status == 'FAILED') return _stop(_Stopped.failed);
+      if (!meal.isFirstAnalysis) return _finish();
+      if (DateTime.now().isAfter(deadline)) return _stop(_Stopped.timedOut);
     }
+  }
 
-    // 3단계 — 투약 단계 기준 적용. 백엔드는 이미 끝났지만, 연출상 잠깐 보여준다.
+  void _stop(_Stopped reason) {
+    if (mounted) setState(() => _stopped = reason);
+  }
+
+  /// 서버는 음식 인식이 끝나면 바로 확인 단계로 넘어간다(DB 매칭·단계 적용은
+  /// 확정 때 한다). 남은 단계를 완료로 보여 주고 음식 확인 화면으로 간다.
+  Future<void> _finish() async {
     setState(() => _step = AnalysisStep.applyDoseStage);
-    await Future.delayed(_applyDoseStageDuration);
+    await Future.delayed(_doneHold);
     if (!mounted) return;
-
-    // REVIEW_REQUIRED 확정 — 음식 확인·수정 화면(5번)으로 교체 이동한다.
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => MealReviewScreen(mealId: widget.mealId),
+        builder: (_) => MealReviewScreen(mealId: widget.meal.mealId),
       ),
     );
-  }
-
-  /// `true` 를 돌려주면 분석 완료, `false` 면 45초 타임아웃.
-  Future<bool> _pollUntilReviewRequired() async {
-    final deadline = DateTime.now().add(_pollTimeout);
-    while (mounted) {
-      if (DateTime.now().isAfter(deadline)) return false;
-
-      await Future.delayed(_pollInterval);
-      if (!mounted) return false;
-
-      if (await _api.isReviewRequired(widget.mealId)) return true;
-    }
-    return false;
   }
 
   _StepState _stateFor(AnalysisStep step) {
@@ -116,6 +98,25 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
   }
 
   void _cancel() => Navigator.of(context).pop();
+
+  /// 분석 실패 — 입력 화면을 새로 열어 다시 기록하게 한다.
+  void _retry() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const MealInputScreen()),
+    );
+  }
+
+  String get _title => switch (_stopped) {
+    null => '식사를 분석하고 있어요',
+    _Stopped.failed => '음식을 알아보지 못했어요',
+    _Stopped.timedOut => '분석이 오래 걸리고 있어요',
+  };
+
+  String get _subtitle => switch (_stopped) {
+    null => '보통 5~10초 걸려요. 화면을 벗어나도 계속 분석돼요.',
+    _Stopped.failed => '사진을 다시 찍거나 먹은 음식을 직접 적어 주세요.',
+    _Stopped.timedOut => '분석은 계속돼요. 끝나면 기록 탭에서 이어서 확인할 수 있어요.',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -145,23 +146,23 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 업로드한 사진. 실제 URL 로 교체 예정, 지금은 자리만 잡는다.
+              // 올린 사진. 텍스트로 입력했으면 자리만 잡는다.
               ClipRRect(
                 borderRadius: AppRadius.lgRadius,
                 child: Container(
                   width: double.infinity,
                   height: 240,
                   color: AppColors.surfaceSage,
+                  child: widget.photo == null
+                      ? null
+                      : Image.memory(widget.photo!, fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
 
-              Text('식사를 분석하고 있어요', style: AppTypography.sectionHead),
+              Text(_title, style: AppTypography.sectionHead),
               const SizedBox(height: AppSpacing.xs),
-              Text(
-                '보통 5~10초 걸려요. 화면을 벗어나도 계속 분석돼요.',
-                style: AppTypography.bodySecondary,
-              ),
+              Text(_subtitle, style: AppTypography.bodySecondary),
               const SizedBox(height: AppSpacing.lg),
 
               Card(
@@ -183,7 +184,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                       const Divider(height: AppSpacing.xl),
                       _StepRow(
                         label: '투약 단계 기준 적용',
-                        description: '유지기 기준으로 Q·Q·S를 계산해요',
+                        description: '투약 단계 기준으로 Q·Q·S를 계산해요',
                         state: _stateFor(AnalysisStep.applyDoseStage),
                       ),
                     ],
@@ -214,18 +215,31 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.cardPadding),
-                decoration: const BoxDecoration(
-                  color: AppColors.surfaceMuted,
-                  borderRadius: AppRadius.lgRadius,
+              if (_stopped == null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.cardPadding),
+                  decoration: const BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: AppRadius.lgRadius,
+                  ),
+                  child: Text(
+                    '분석이 끝나면 음식과 양을 직접 확인·수정할 수 있어요. 확인한 내용만 평가에 사용해요.',
+                    style: AppTypography.bodySecondary,
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  height: AppLayout.primaryButtonHeight,
+                  child: FilledButton(
+                    onPressed: _stopped == _Stopped.failed ? _retry : _cancel,
+                    child: Text(
+                      _stopped == _Stopped.failed ? '다시 기록하기' : '닫기',
+                      style: AppTypography.buttonLabel,
+                    ),
+                  ),
                 ),
-                child: Text(
-                  '분석이 끝나면 음식과 양을 직접 확인·수정할 수 있어요. 확인한 내용만 평가에 사용해요.',
-                  style: AppTypography.bodySecondary,
-                ),
-              ),
             ],
           ),
         ),

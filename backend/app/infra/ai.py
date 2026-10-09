@@ -14,6 +14,11 @@ from typing import Any, Protocol
 import httpx
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.infra.queue import NonRetryableError
+
+# 4xx 지만 "잠시 뒤엔 될" 응답이다. 5xx 처럼 재시도에 맡긴다.
+_TRANSIENT_CLIENT_ERRORS = frozenset({408, 429})
+
 
 class AiClient(Protocol):
     def analyze_meal(self, payload: dict[str, Any]) -> dict[str, Any]: ...
@@ -40,6 +45,18 @@ class AiSettings(BaseSettings):
     AI_STUB_SCENARIO: str = ""
 
 
+class AiRequestRejected(NonRetryableError):
+    """AI 가 요청을 4xx 로 거부했다 — 계약 위반·인증 실패 등. 재시도해도 같다.
+
+    응답 본문은 담지 않는다. 요청(음식명 등)이 되비쳐 `last_error` 에 남을 수 있다(규칙 6).
+    """
+
+    def __init__(self, status_code: int, path: str) -> None:
+        super().__init__(f"AI 가 요청을 거부했다: {status_code} {path}")
+        self.status_code = status_code
+        self.path = path
+
+
 class HttpAiClient:
     def __init__(
         self,
@@ -47,6 +64,7 @@ class HttpAiClient:
         *,
         timeout_sec: float = 45.0,
         stub_scenario: str = "",
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         headers = {}
         if stub_scenario:
@@ -55,11 +73,14 @@ class HttpAiClient:
             base_url=base_url.rstrip("/"),
             timeout=timeout_sec,
             headers=headers,
+            transport=transport,
         )
 
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         response = self._client.post(path, json=payload)
-        # 5xx 든 4xx 든 예외로 올린다. 워커가 메시지를 지우지 않아 재시도된다.
+        # 4xx 는 재시도해도 같으니 바로 격리한다. 5xx·408·429 는 예외로 올려 큐의 재시도에 맡긴다.
+        if response.is_client_error and response.status_code not in _TRANSIENT_CLIENT_ERRORS:
+            raise AiRequestRejected(response.status_code, path)
         response.raise_for_status()
         return response.json()
 

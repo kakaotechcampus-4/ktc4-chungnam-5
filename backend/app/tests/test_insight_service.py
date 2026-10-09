@@ -172,7 +172,7 @@ def test_get_long_term_insight_pending_when_no_row(monkeypatch):
         db=None, user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 21)
     )
 
-    assert result.status == FeedbackStatus.PENDING
+    assert result.feedback_status == FeedbackStatus.PENDING
     assert result.data_sufficient is False
     assert result.trend_summary is None
     assert result.period.from_ == date(2026, 9, 15)
@@ -192,7 +192,7 @@ def test_get_long_term_insight_hides_content_when_blocked(monkeypatch):
         db=None, user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 21)
     )
 
-    assert result.status == FeedbackStatus.READY
+    assert result.feedback_status == FeedbackStatus.READY
     assert result.data_sufficient is True
     assert result.trend_summary is None
     assert result.recommendation is None
@@ -323,8 +323,34 @@ def test_refresh_skips_enqueue_when_already_pending(monkeypatch):
     assert result.feedback_status == FeedbackStatus.GENERATING
 
 
+def test_processing_task_counts_as_generating():
+    """워커가 집은 순간(PROCESSING) 생성 중 표시가 사라지면 FE 폴링이 낡은 행을 READY 로 본다."""
+    assert _determine_status(_feedback_row(), _task(TaskStatus.PROCESSING)) == FeedbackStatus.GENERATING
+    assert _determine_status(None, _task(TaskStatus.PROCESSING)) == FeedbackStatus.GENERATING
+
+
+def test_refresh_skips_enqueue_when_already_processing(monkeypatch):
+    """처리 중인 작업이 있어도 새로 넣지 않는다 — PENDING 만 보면 집힌 뒤의 연타가 중복으로 쌓인다."""
+    monkeypatch.setattr(
+        insight_crud, "get_latest_refresh_task", lambda *a, **k: _task(TaskStatus.PROCESSING)
+    )
+    enqueue_calls = []
+    monkeypatch.setattr(
+        insight_service, "enqueue", lambda db, task_type, payload: enqueue_calls.append(payload)
+    )
+    fake_db = MagicMock()
+
+    result = refresh_long_term_insight(
+        fake_db, user_id=uuid.uuid4(), period="7d", today=date(2026, 9, 23)
+    )
+
+    assert enqueue_calls == []
+    fake_db.commit.assert_not_called()
+    assert result.feedback_status == FeedbackStatus.GENERATING
+
+
 def test_refresh_enqueues_when_latest_task_already_done(monkeypatch):
-    """마지막 작업이 끝났으면(PENDING 이 아니면) 새로고침 요청을 새로 넣어야 한다."""
+    """마지막 작업이 끝났으면(대기·처리 중이 아니면) 새로고침 요청을 새로 넣어야 한다."""
     monkeypatch.setattr(
         insight_crud, "get_latest_refresh_task", lambda *a, **k: _task(TaskStatus.DONE)
     )

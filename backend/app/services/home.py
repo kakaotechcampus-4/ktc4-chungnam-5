@@ -17,6 +17,7 @@ from app.core.errors import ApiError, ErrorCode
 from app.core.time import KST, kst_day_range
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
+from app.crud import satiety as satiety_crud
 from app.crud import user as user_crud
 from app.models.enums import MealType, SafetyStatus
 from app.models.feedback import MealFeedback
@@ -119,11 +120,17 @@ def _build_stomach(db: Session, *, user_id: uuid.UUID, now: datetime) -> HomeSto
         return None
     meal, satiety_after = row
 
+    # 게이지는 "지금" 배가 얼마나 부른지다. 사후 체크인("지금 얼마나 부르세요?")이 있으면
+    # 그 끼니의 가장 최근 체크인 값을, 없으면 확정 시점의 satiety_after 를 쓴다.
+    # 끼니 포만감 점수(S)는 여기와 무관하게 satiety_after 그대로다(services/evaluation).
+    checkin = satiety_crud.get_latest_checkin(db, meal.id)
+    satiety_pct = checkin.satiety_pct if checkin is not None else satiety_after
+
     # 분 단위 내림. eaten_at 이 now 보다 미래면(시계 차이·미래 시각 입력) 음수 대신 0 이다.
     minutes_since_meal = max(0, int((now - meal.eaten_at).total_seconds() // 60))
 
     return HomeStomach(
-        satiety_pct=satiety_after,
+        satiety_pct=satiety_pct,
         source_meal_id=meal.id,
         source_meal_at=meal.eaten_at,
         minutes_since_meal=minutes_since_meal,
