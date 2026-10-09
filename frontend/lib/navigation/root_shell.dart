@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../popups/popup_gate.dart';
+import '../screens/chatbot_screen.dart';
 import '../screens/long_term_feedback_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/medication_info_screen.dart';
@@ -10,9 +11,13 @@ import '../screens/meal_history_screen.dart';
 import '../state/profile_state.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
+import 'feedback_branch_popup.dart';
+import 'nav_icons.dart';
 
-/// 하단 탭 4개(홈·피드백·기록·마이)를 오가는 앱 루트 셸.
+/// 하단 탭 4개(홈·피드백·AI·마이)를 오가는 앱 루트 셸.
 /// Figma `hOxrHBitBpjwIBBg2GO49y` node 96:46 (탭바) 기준 구성.
+/// 피드백 탭은 누르면 분기 팝업(단기 피드백 → 기록 달력 / 장기 피드백)이 먼저 뜨고,
+/// 고른 화면을 그 탭 안에 보여준다.
 /// 탭 인덱스는 `TabState`(Provider)로 관리한다 — 화면 밖(알림 진입 등)에서도
 /// `context.read<TabState>().setIndex(...)` 로 탭을 바꿀 수 있어야 하기 때문.
 ///
@@ -26,6 +31,9 @@ class RootShell extends StatefulWidget {
 }
 
 class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
+  /// 분기 팝업이 떠 있는 동안 탭바에서 피드백 탭을 선택 상태로 보여준다(Figma 2-b).
+  bool _feedbackPopupOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -77,16 +85,53 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     context.read<PopupGate>().showDailyPopupsIfDue(context);
   }
 
+  Future<void> _onTabTap(int index) async {
+    if (index != TabState.feedbackTab) {
+      context.read<TabState>().setIndex(index);
+      return;
+    }
+    final size = MediaQuery.sizeOf(context);
+    final tabWidth = size.width / TabState.tabCount;
+    final kind = await _showFeedbackPopup(
+      anchorCenterX: tabWidth * (TabState.feedbackTab + 0.5),
+      bottomOffset:
+          kBottomNavigationBarHeight + MediaQuery.paddingOf(context).bottom + 1,
+    );
+    if (kind != null && mounted) context.read<TabState>().showFeedback(kind);
+  }
+
+  Future<FeedbackKind?> _showFeedbackPopup({
+    required double anchorCenterX,
+    required double bottomOffset,
+  }) async {
+    setState(() => _feedbackPopupOpen = true);
+    try {
+      return await showFeedbackBranchPopup(
+        context,
+        anchorCenterX: anchorCenterX,
+        bottomOffset: bottomOffset,
+      );
+    } finally {
+      if (mounted) setState(() => _feedbackPopupOpen = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = context.watch<TabState>().currentIndex;
+    final tabState = context.watch<TabState>();
+    final selectedIndex = _feedbackPopupOpen
+        ? TabState.feedbackTab
+        : tabState.currentIndex;
     return Scaffold(
       body: IndexedStack(
-        index: selectedIndex,
+        index: tabState.currentIndex,
         children: [
           const HomeScreen(),
-          const LongTermFeedbackScreen(),
-          const MealHistoryScreen(),
+          IndexedStack(
+            index: tabState.feedbackKind.index,
+            children: const [MealHistoryScreen(), LongTermFeedbackScreen()],
+          ),
+          const ChatbotScreen(),
           const MyScreen(),
         ],
       ),
@@ -97,23 +142,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         ),
         child: BottomNavigationBar(
           currentIndex: selectedIndex,
-          onTap: (index) => context.read<TabState>().setIndex(index),
+          onTap: _onTabTap,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: '홈',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              activeIcon: Icon(Icons.chat_bubble),
-              label: '피드백',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.receipt_long_outlined),
-              activeIcon: Icon(Icons.receipt_long),
-              label: '기록',
-            ),
+            BottomNavigationBarItem(icon: FeedbackTabIcon(), label: '피드백'),
+            BottomNavigationBarItem(icon: AiTabIcon(), label: 'AI'),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
