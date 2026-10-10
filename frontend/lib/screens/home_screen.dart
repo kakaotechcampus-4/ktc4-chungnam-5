@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -260,6 +262,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   HomeSummary? _home;
   LoadState _state = LoadState.loading;
+
+  /// 불러오는 중 · 불러온 뒤에 같은 게이지를 이어 쓰려고 쥔다(수위를 이전 값에서부터 움직인다).
+  final GlobalKey _gaugeKey = GlobalKey();
   String? _errorMessage;
 
   /// 기록 탭에서 식사를 기록하고 돌아오면 홈은 모른다. 탭이 다시 보일 때
@@ -414,9 +419,12 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _buildLoading() => [
     const SkeletonBox(width: double.infinity, height: 75),
     const SizedBox(height: AppSpacing.xl),
-    // 게이지는 실루엣을 그대로 그리고 채움만 0 으로 둔다.
-    // 자리를 비우면 완료 시점에 아래 내용이 통째로 밀린다.
-    const Center(child: StomachGauge(satiety: 0)),
+    // 게이지는 실루엣을 그대로 그린다. 자리를 비우면 완료 시점에 아래 내용이 통째로 밀린다.
+    // 다시 불러오는 중에는 지금 수위를 그대로 두고(처음이면 빈 실루엣),
+    // 같은 key 로 이어서 써야 새 값이 왔을 때 이전 값에서부터 움직인다.
+    Center(
+      child: StomachGauge(key: _gaugeKey, satiety: _home?.stomach?.satietyPct),
+    ),
     const SizedBox(height: AppSpacing.xl),
     const _SectionHeader(trailing: null),
     const SizedBox(height: AppSpacing.md),
@@ -460,7 +468,12 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: AppRadius.lgRadius,
         child: Column(
           children: [
-            Center(child: StomachGauge(satiety: stomach?.satietyPct ?? 0)),
+            Center(
+              child: StomachGauge(
+                key: _gaugeKey,
+                satiety: stomach?.satietyPct ?? 0,
+              ),
+            ),
             const SizedBox(height: AppSpacing.lg),
 
             if (stomach == null)
@@ -667,30 +680,143 @@ class _MedicationStatusCard extends StatelessWidget {
 ///
 /// Figma `화면 2 · 홈 (수정)` 의 위 그룹(식도 · 몸통 · 꼬리 · 채움)을 SVG 원본 좌표
 /// 그대로 `CustomPaint` 로 옮겼다. 수치는 이 위젯이 그리지 않고 아래에 따로 놓는다.
-class StomachGauge extends StatelessWidget {
+///
+/// 움직임:
+/// - 수면은 항상 잔잔하게 찰랑인다.
+/// - 값이 바뀌면 **이전 값에서 새 값까지** 수위가 부드럽게 오르거나 내린다.
+///   바뀐 폭이 클수록 오래 걸리고, 그 사이 출렁임이 커졌다가 잦아든다.
+/// - 처음 값을 받을 때는 비어 있던 상태가 아니라 그 값 그대로 보여 준다.
+/// - 기기가 "애니메이션 줄이기" 이면 움직임 없이 값만 보여 준다.
+///
+/// 이전 값을 기억해야 하므로, 화면을 다시 불러오는 동안에도 같은 위젯(같은 `key`)을
+/// 유지해서 쓴다.
+class StomachGauge extends StatefulWidget {
+  /// [satiety] 가 null 이면 값을 아직 모르는 상태라 수위를 바꾸지 않는다
+  /// (처음 불러오는 중에는 빈 실루엣, 다시 불러오는 중에는 지금 수위 그대로).
   const StomachGauge({super.key, required this.satiety});
 
   /// 0~100.
-  final int satiety;
+  final int? satiety;
 
   static const double _width = 175;
   static const double _height = 193;
 
   @override
+  State<StomachGauge> createState() => _StomachGaugeState();
+}
+
+class _StomachGaugeState extends State<StomachGauge>
+    with TickerProviderStateMixin {
+  /// 수면이 찰랑이는 움직임. 계속 돈다.
+  late final AnimationController _wave = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  );
+
+  /// 수위가 이전 값에서 새 값까지 움직이는 진행도.
+  late final AnimationController _level = AnimationController(vsync: this);
+  late final Animation<double> _levelCurve = CurvedAnimation(
+    parent: _level,
+    curve: Curves.easeInOutCubic,
+  );
+
+  /// 수위가 바뀐 직후의 출렁임(1 → 0 으로 잦아든다).
+  late final AnimationController _slosh = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  );
+
+  double _from = 0;
+  double _to = 0;
+  bool _hasValue = false;
+  bool _reduceMotion = false;
+
+  /// 지금 화면에 보이는 수위(0~1).
+  double get _ratio => _from + (_to - _from) * _levelCurve.value;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (_reduceMotion) {
+      _wave.stop();
+    } else if (!_wave.isAnimating) {
+      _wave.repeat();
+    }
+    if (!_hasValue) _moveTo(widget.satiety);
+  }
+
+  @override
+  void didUpdateWidget(StomachGauge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.satiety != widget.satiety) _moveTo(widget.satiety);
+  }
+
+  void _moveTo(int? satiety) {
+    if (satiety == null) return;
+    final target = satiety / 100;
+    // 처음 받은 값이거나 움직임을 줄인 경우에는 그대로 보여 준다.
+    if (!_hasValue || _reduceMotion) {
+      _hasValue = true;
+      _from = _to = target;
+      _level.value = 1;
+      _slosh.value = 0;
+      return;
+    }
+    _from = _ratio;
+    _to = target;
+    final change = (_to - _from).abs();
+    if (change == 0) return;
+    // 바뀐 폭이 클수록 오래 걸리고 더 크게 출렁인다.
+    _level.duration = Duration(milliseconds: (700 + 1300 * change).round());
+    _level.forward(from: 0);
+    _slosh.reverse(from: math.min(1.0, 0.4 + change * 1.2));
+  }
+
+  @override
+  void dispose() {
+    _wave.dispose();
+    _level.dispose();
+    _slosh.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: _width,
-      height: _height,
-      child: CustomPaint(painter: _StomachPainter(fillRatio: satiety / 100)),
+      width: StomachGauge._width,
+      height: StomachGauge._height,
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_wave, _level, _slosh]),
+          builder: (context, _) => CustomPaint(
+            painter: _StomachPainter(
+              fillRatio: _hasValue ? _ratio : 0,
+              phase: _wave.value * 2 * math.pi,
+              amplitude: 2.2 + 4.8 * _slosh.value,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
 class _StomachPainter extends CustomPainter {
-  const _StomachPainter({required this.fillRatio});
+  const _StomachPainter({
+    required this.fillRatio,
+    required this.phase,
+    required this.amplitude,
+  });
 
   /// 0.0 ~ 1.0.
   final double fillRatio;
+
+  /// 수면 물결의 위상(0 ~ 2π). 한 바퀴 돌면 처음과 같아 끊김 없이 이어진다.
+  final double phase;
+
+  /// 수면 물결의 높이(px, 기준 좌표계).
+  final double amplitude;
 
   /// 패스를 그린 기준 좌표계(Figma 위 그룹 크기). 실제 크기에 맞춰 스케일한다.
   static const Size reference = Size(StomachGauge._width, StomachGauge._height);
@@ -720,20 +846,43 @@ class _StomachPainter extends CustomPainter {
     final body = _body();
     canvas.drawPath(body, track);
 
-    // 채운 부분. 몸통 안에서만 보이고 윗면은 물결이다.
+    // 채운 부분. 0% 에서는 몸통 아래로 완전히 숨고, 100% 에서는 물결 마루까지 덮는다.
+    // 몸통 안에서만 보이고 윗면은 물결이다.
     final ratio = fillRatio.clamp(0.0, 1.0);
-    if (ratio > 0) {
+    if (ratio > 0.001) {
+      final bottom = _bodyTop + _bodyHeight + 8;
+      final top = _bodyTop - 10;
       canvas.save();
       canvas.clipPath(body);
-      // 0% 에서는 몸통 아래로 완전히 숨고, 100% 에서는 물결 마루까지 덮는다.
-      final bottom = _bodyTop + _bodyHeight + 6;
-      final top = _bodyTop - 8;
-      final waveTop = bottom - ratio * (bottom - top);
-      canvas.drawPath(_wave(waveTop), Paint()..color = AppColors.stomach);
+      canvas.drawPath(
+        _wave(bottom - ratio * (bottom - top)),
+        Paint()..color = AppColors.stomach,
+      );
       canvas.restore();
     }
 
     canvas.restore();
+  }
+
+  /// 가로 [x] 에서의 수면 높이. 큰 물결과 작은 물결을 겹친다.
+  double _surfaceY(double x, double top) {
+    final big = amplitude * math.sin(x * 2 * math.pi / 86 + phase);
+    final small = amplitude * 0.45 * math.sin(x * 2 * math.pi / 41 - 2 * phase);
+    return top + big + small;
+  }
+
+  /// 채움의 물결 윗면. 몸통보다 넓게 그려서 가로로 빈틈이 없게 한다.
+  Path _wave(double top) {
+    const from = -10.0;
+    const to = 185.0;
+    final path = Path()..moveTo(from, _surfaceY(from, top));
+    for (var x = from + 3; x <= to; x += 3) {
+      path.lineTo(x, _surfaceY(x, top));
+    }
+    return path
+      ..lineTo(to, top + 400)
+      ..lineTo(from, top + 400)
+      ..close();
   }
 
   /// 위 몸통. Figma 벡터 `stomachClip` 좌표 그대로.
@@ -809,30 +958,9 @@ class _StomachPainter extends CustomPainter {
       130 + 7.42575,
     );
 
-  /// 채움의 물결 윗면. 몸통보다 넓게 그려서 가로로 빈틈이 없게 한다.
-  Path _wave(double top) => Path()
-    ..moveTo(-6.381, top + 2.58227)
-    ..cubicTo(
-      -6.381 + 32.5351,
-      top - 6.36297,
-      -6.381 + 60.7321,
-      top + 11.5275,
-      -6.381 + 93.2672,
-      top + 2.58227,
-    )
-    ..cubicTo(
-      -6.381 + 121.464,
-      top - 5.24482,
-      -6.381 + 151.83,
-      top + 9.2912,
-      -6.381 + 186.534,
-      top + 0.345958,
-    )
-    ..lineTo(-6.381 + 186.534, top + 400)
-    ..lineTo(-6.381, top + 400)
-    ..close();
-
   @override
-  bool shouldRepaint(_StomachPainter oldDelegate) =>
-      oldDelegate.fillRatio != fillRatio;
+  bool shouldRepaint(_StomachPainter old) =>
+      old.fillRatio != fillRatio ||
+      old.phase != phase ||
+      old.amplitude != amplitude;
 }
