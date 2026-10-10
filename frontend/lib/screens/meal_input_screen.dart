@@ -227,7 +227,7 @@ class _MealInputScreenState extends State<MealInputScreen> {
                     const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: _SegmentTab(
-                        label: '검색',
+                        label: '직접 입력',
                         selected: _selectedTab == 1,
                         onTap: () => setState(() => _selectedTab = 1),
                       ),
@@ -237,7 +237,7 @@ class _MealInputScreenState extends State<MealInputScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // 사진 / 검색 — 탭에 따라 내용을 바꾼다.
+              // 사진 / 직접 입력 — 탭에 따라 내용을 바꾼다.
               if (_selectedTab == 0)
                 _buildPhotoUpload()
               else
