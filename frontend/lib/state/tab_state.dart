@@ -12,15 +12,20 @@ class TabState extends ChangeNotifier {
   /// [RootShell] 하단 탭 개수. 탭이 늘거나 줄면 같이 맞춘다.
   static const tabCount = 4;
 
-  // 탭 번호. 다시 보일 때 새로 불러오는 화면이 자기 탭을 알아야 한다.
+  // 탭 번호(홈 · 피드백 · AI · 마이). 다시 보일 때 새로 불러오는 화면이 자기 탭을 알아야 한다.
+  // 기록(달력)은 피드백 탭 안의 단기 피드백이라 [feedbackKind] 로 구분한다.
   static const home = 0;
   static const feedback = 1;
-  static const history = 2;
+  static const ai = 2;
   static const my = 3;
 
   int _currentIndex = 0;
+  FeedbackKind _feedbackKind = FeedbackKind.short;
 
   int get currentIndex => _currentIndex;
+
+  /// 피드백 탭이 지금 보여줄 화면. 탭을 누르면 뜨는 분기 팝업에서 고른다.
+  FeedbackKind get feedbackKind => _feedbackKind;
 
   void setIndex(int index) {
     assert(
@@ -31,4 +36,15 @@ class TabState extends ChangeNotifier {
     _currentIndex = index;
     notifyListeners();
   }
+
+  /// 피드백 탭으로 이동하면서 [kind] 화면을 보여준다.
+  void showFeedback(FeedbackKind kind) {
+    if (_currentIndex == feedback && _feedbackKind == kind) return;
+    _currentIndex = feedback;
+    _feedbackKind = kind;
+    notifyListeners();
+  }
 }
+
+/// 피드백 탭의 두 갈래. 단기 = 기록(달력), 장기 = 장기 피드백 대시보드.
+enum FeedbackKind { short, long }

@@ -267,7 +267,10 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
   late final TabState _tabs = context.read<TabState>();
 
   void _onTabChanged() {
-    if (_tabs.currentIndex != TabState.history) return;
+    if (_tabs.currentIndex != TabState.feedback ||
+        _tabs.feedbackKind != FeedbackKind.short) {
+      return;
+    }
     _loadCalendar();
     _loadMeals();
   }

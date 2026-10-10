@@ -85,8 +85,16 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// 하단 탭의 피드백을 눌러 분기 팝업에서 [branch]('단기 피드백' · '장기 피드백')를 고른다.
+Future<void> _openFeedback(WidgetTester tester, String branch) async {
+  await tester.tap(find.text('피드백'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(branch));
+  await _settle(tester);
+}
+
 void main() {
-  testWidgets('bottom nav switches between the four tabs', (
+  testWidgets('bottom nav shows 홈 · 피드백 · AI · 마이 and switches tabs', (
     WidgetTester tester,
   ) async {
     _useDesignSize(tester);
@@ -96,12 +104,58 @@ void main() {
     await tester.tap(find.text('나중에'));
     await tester.pumpAndSettle();
 
-    expect(find.text('홈'), findsWidgets);
+    for (final label in ['홈', '피드백', 'AI', '마이']) {
+      expect(find.text(label), findsWidgets);
+    }
+    expect(find.text('기록'), findsNothing);
 
-    await tester.tap(find.text('기록'));
+    await tester.tap(find.text('AI'));
     await tester.pumpAndSettle();
 
-    expect(find.text('기록'), findsWidgets);
+    expect(find.text('AI 코치'), findsOneWidget);
+  });
+
+  testWidgets('feedback tab asks short or long, then shows that screen', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    await _pumpApp(tester);
+    await tester.tap(find.text('나중에'));
+    await tester.pumpAndSettle();
+
+    // 피드백을 누르면 화면 전환 없이 분기 팝업만 뜬다.
+    await tester.tap(find.text('피드백'));
+    await tester.pumpAndSettle();
+    expect(find.text('단기 피드백'), findsOneWidget);
+    expect(find.text('장기 피드백'), findsOneWidget);
+
+    // 단기 피드백 = 예전 기록(달력) 화면.
+    await tester.tap(find.text('단기 피드백'));
+    await _settle(tester);
+    expect(find.text('단기 피드백'), findsNothing);
+    expect(find.text('기록'), findsOneWidget);
+
+    // 장기 피드백 = 예전 피드백 탭 화면.
+    await _openFeedback(tester, '장기 피드백');
+    expect(find.text('장기 피드백'), findsOneWidget);
+    expect(find.text('기록'), findsNothing);
+  });
+
+  testWidgets('dismissing the feedback popup keeps the current tab', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    await _pumpApp(tester);
+    await tester.tap(find.text('나중에'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('피드백'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(find.text('단기 피드백'), findsNothing);
+    expect(find.text('기록'), findsNothing);
   });
 
   /// 점수가 있는 날이 [day] 하루뿐인 대시보드로 피드백 탭을 열고
@@ -125,8 +179,7 @@ void main() {
     await tester.tap(find.text('나중에')); // 컨디션 팝업
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('피드백'));
-    await _settle(tester);
+    await _openFeedback(tester, '장기 피드백');
     for (final period in const ['7일', '28일', '전체']) {
       await tester.tap(find.text(period));
       await _settle(tester);
@@ -421,8 +474,7 @@ void main() {
     await _pumpApp(tester);
     await tester.tap(find.text('나중에')); // 컨디션 팝업
     await tester.pumpAndSettle();
-    await tester.tap(find.text('기록'));
-    await _settle(tester);
+    await _openFeedback(tester, '단기 피드백');
 
     final cards = find.byType(Dismissible);
     final before = tester.widgetList(cards).length;
@@ -704,8 +756,7 @@ void main() {
 
     int mealLists() => api.requests.where((r) => r.path == '/meals').length;
     final before = mealLists();
-    await tester.tap(find.text('기록'));
-    await _settle(tester);
+    await _openFeedback(tester, '단기 피드백');
     expect(mealLists(), greaterThan(before));
   });
 
@@ -736,8 +787,7 @@ void main() {
     int asks() =>
         api.requests.where((r) => r.path == '/insights/long-term').length;
     final before = asks(); // 앱을 켤 때 한 번
-    await tester.tap(find.text('피드백'));
-    await _settle(tester);
+    await _openFeedback(tester, '장기 피드백');
     await tester.pump(const Duration(seconds: 5));
 
     // 탭을 열 때 한 번만 묻고, 부족하면 더 기다리지 않는다.

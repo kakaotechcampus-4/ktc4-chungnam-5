@@ -190,7 +190,10 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen> {
   late final TabState _tabs = context.read<TabState>();
 
   void _onTabChanged() {
-    if (_tabs.currentIndex == TabState.feedback) _load();
+    if (_tabs.currentIndex == TabState.feedback &&
+        _tabs.feedbackKind == FeedbackKind.long) {
+      _load();
+    }
   }
 
   @override
