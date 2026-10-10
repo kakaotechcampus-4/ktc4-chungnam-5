@@ -351,8 +351,12 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.screenHorizontal,
+      // 상태바·노치 아래에서 한 칸 더 내려 다른 화면 제목과 높이를 맞춘다.
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        AppSpacing.md,
+        AppSpacing.screenHorizontal,
+        0,
       ),
       child: Row(
         children: [
