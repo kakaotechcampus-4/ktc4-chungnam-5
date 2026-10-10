@@ -10,6 +10,7 @@ import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'meal_evaluation_screen.dart';
+import 'meal_item_edit_sheet.dart';
 import 'shared_meal_widgets.dart';
 
 /// 음식 확인·수정 — 분석 결과를 사용자가 고치는 화면(5번).
@@ -112,13 +113,6 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
   }
 
   // ── 양 ──
-
-  /// 단위별 한 칸. 무게·부피는 10, 개수는 1, 그 밖(인분·공기)은 0.5.
-  static double _stepOf(String? unit) => switch (unit) {
-    '개' => 1,
-    'g' || 'ml' => 10,
-    _ => 0.5,
-  };
 
   void _changeAmount(String itemId, double delta) {
     // 연달아 누르면 그려진 카드보다 값이 앞서 있다. 지금 값에서 센다.
@@ -227,51 +221,73 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     }
   }
 
-  // ── 영양 정보 ──
+  // ── 음식 수정 ──
 
-  /// 공공 DB 후보에서 골라 영양 정보를 정한다.
-  Future<void> _pickNutrition(MealItem item) async {
-    final candidate = await showModalBottomSheet<FoodCandidate>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheetRadius),
-      builder: (_) =>
-          _CandidateSheet(api: _api, initialQuery: item.displayName),
+  /// "음식 수정" 시트로 이름·양·단위·영양정보를 고친다. 저장을 누르면 바뀐
+  /// 것만 서버에 보내고 식사를 다시 받아 온다.
+  Future<void> _editItem(MealItem item) async {
+    final edit = await showMealItemEditSheet(
+      context,
+      item: item,
+      pickCandidate: (query) => showModalBottomSheet<FoodCandidate>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: AppRadius.sheetRadius,
+        ),
+        builder: (_) => _CandidateSheet(api: _api, initialQuery: query),
+      ),
     );
-    if (candidate == null || !mounted) return;
+    if (edit == null || !mounted) return;
     try {
-      // 남은 양 수정을 먼저 보낸다. 후보 지정이 먼저 가면 그 뒤 양 수정으로
-      // 서버 영양 값이 바뀌어 화면과 어긋난다.
+      // 남은 양 수정을 먼저 보낸다. 그 뒤 값이 서버 영양 값을 다시 계산하므로
+      // 영양정보 지정은 항상 마지막에 보낸다.
       await _flushAmounts();
     } catch (_) {
       return; // _sendAmounts 가 이미 알렸다.
     }
     if (!mounted) return;
+    final current = _items.firstWhere(
+      (i) => i.itemId == item.itemId,
+      orElse: () => item,
+    );
     try {
-      final (:nutrition, :notice) = await _api.setNutrition(
-        widget.mealId,
-        item.itemId,
-        foodRefId: candidate.foodRefId,
-      );
-      if (!mounted) return;
-      // 양이 g 으로 환산되지 않아 영양 정보를 붙이지 못한 경우. 양을 g 으로
-      // 바꾸면 다시 고를 수 있다.
-      if (nutrition == null) {
-        _showError(notice ?? '이 양으로는 영양 정보를 계산하지 못했어요. 양을 g 으로 바꿔 보세요.');
+      if (edit.name != current.displayName ||
+          edit.amount != current.amount ||
+          edit.unit != current.unit) {
+        await _api.updateItems(widget.mealId, [
+          MealItem(
+            itemId: current.itemId,
+            displayName: edit.name,
+            amount: edit.amount,
+            unit: edit.unit,
+            confidence: current.confidence,
+            matched: current.matched,
+            nutrition: current.nutrition,
+          ),
+        ]);
       }
-      final current = _items.firstWhere(
-        (i) => i.itemId == item.itemId,
-        orElse: () => item,
-      );
-      final updated = current.copyWith(
-        matched: nutrition != null,
-        nutrition: nutrition,
-      );
-      _replace(updated);
-      _saved[item.itemId] = updated;
+      final candidate = edit.candidate;
+      final manual = edit.manual;
+      if (candidate != null || manual != null) {
+        final (:nutrition, :notice) = await _api.setNutrition(
+          widget.mealId,
+          item.itemId,
+          foodRefId: candidate?.foodRefId,
+          manual: manual,
+        );
+        // 양이 g 으로 환산되지 않아 영양 정보를 붙이지 못한 경우. 양을 g 으로
+        // 바꾸면 다시 고를 수 있다.
+        if (nutrition == null && mounted) {
+          _showError(notice ?? '이 양으로는 영양 정보를 계산하지 못했어요. 양을 g 으로 바꿔 보세요.');
+        }
+      }
+      if (!mounted) return;
+      // 이름·양을 바꾸면 서버가 영양을 다시 계산하므로 통째로 다시 받는다.
+      await _loadMeal();
     } catch (e) {
-      if (mounted) _showError('영양 정보를 바꾸지 못했어요: $e');
+      if (mounted) _showError('음식을 수정하지 못했어요: $e');
     }
   }
 
@@ -474,7 +490,7 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     GestureDetector(
-                      onTap: () => _pickNutrition(item),
+                      onTap: () => _editItem(item),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -538,7 +554,7 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     if (amount == null) {
       return Text('양 모름', style: AppTypography.bodySecondary);
     }
-    final step = _stepOf(item.unit);
+    final step = mealAmountStep(item.unit);
     return Row(
       children: [
         _stepButton(Icons.remove, () => _changeAmount(item.itemId, -step)),
@@ -820,8 +836,31 @@ class _CandidateSheetState extends State<_CandidateSheet> {
               controller: _query,
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _search(),
+              textAlignVertical: TextAlignVertical.center,
+              style: AppTypography.body.copyWith(fontSize: 15),
               decoration: InputDecoration(
                 hintText: '음식 이름',
+                hintStyle: AppTypography.body.copyWith(
+                  fontSize: 15,
+                  color: AppColors.textTertiary,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.borderStrong),
+                ),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search),
                   onPressed: _search,

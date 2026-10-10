@@ -601,6 +601,80 @@ void main() {
     expect(items.single['amount'], 270.0);
   });
 
+  testWidgets('edit sheet saves a manual nutrition and the new name', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+    );
+    await tester.tap(find.text('수정').first);
+    await tester.pumpAndSettle();
+    expect(find.text('음식 수정'), findsOneWidget);
+
+    await tester.tap(find.text('직접 입력하기'));
+    await tester.pumpAndSettle();
+    // 칼로리 칸(첫 숫자 칸)에 값을 적고 이름도 바꾼다.
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.first, '새 이름');
+    await tester.enterText(fields.at(1), '123');
+    await tester.pump();
+
+    await tester.tap(find.text('저장'));
+    await _settle(tester);
+
+    final patch = api.requests.singleWhere((r) => r.method == 'PATCH');
+    expect(
+      ((patch.data as Map)['items'] as List).single['displayName'],
+      '새 이름',
+    );
+    final put = api.requests.singleWhere((r) => r.method == 'PUT');
+    expect(put.path, endsWith('/nutrition'));
+    final manual = (put.data as Map)['manual'] as Map;
+    expect(manual['kcal'], 123.0);
+    expect((put.data as Map).containsKey('foodRefId'), isFalse);
+  });
+
+  testWidgets('edit sheet saves the picked candidate, not the manual values', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+    );
+    await tester.tap(find.text('수정').first);
+    await tester.pumpAndSettle();
+
+    // 직접 입력 쪽을 들여다보고 다시 영양 정보 고르기로 돌아와 후보를 고른다.
+    await tester.tap(find.text('직접 입력하기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('영양 정보 고르기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.search).first);
+    await tester.pumpAndSettle();
+    expect(find.text('영양 정보 고르기'), findsNWidgets(2)); // 버튼 + 후보 시트 제목
+    await tester.tap(find.byType(ListTile).first);
+    await tester.pumpAndSettle();
+    // 고르면 영양 6가지가 모두 보인다.
+    for (final label in [
+      '칼로리 (kcal)',
+      '단백질 (g)',
+      '지방 (g)',
+      '탄수화물 (g)',
+      '식이섬유 (g)',
+      '나트륨 (mg)',
+    ]) {
+      expect(find.text(label), findsOneWidget);
+    }
+
+    await tester.tap(find.text('저장'));
+    await _settle(tester);
+
+    final put = api.requests.singleWhere((r) => r.method == 'PUT');
+    expect((put.data as Map).containsKey('foodRefId'), isTrue);
+    expect((put.data as Map).containsKey('manual'), isFalse);
+  });
+
   testWidgets('a failed amount edit goes back to the saved amount', (
     WidgetTester tester,
   ) async {
