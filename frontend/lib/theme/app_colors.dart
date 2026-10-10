@@ -30,11 +30,6 @@ class AppColors {
   /// 위(胃) 색 #FA9C95 (단색). 홈 위 게이지가 채워지는 색.
   static const Color stomach = Color(0xFFFA9C95);
 
-  /// 홈 화면이 아직 그라디언트로 그려서 남겨 둔 임시 별칭. 두 값이 같아 단색으로 보인다.
-  /// 홈 화면을 [stomach] 로 바꾸면 지운다.
-  static const Color gaugeFrom = stomach;
-  static const Color gaugeTo = stomach;
-
   /// 회색 배경 #EDF1F0. 트랙, 비활성 세그먼트.
   static const Color surfaceMuted = Color(0xFFEDF1F0);
 

@@ -393,7 +393,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? null
                     : Text(
                         _formatFullDate(home.date),
-                        style: AppTypography.bodySecondary,
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
                       ),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -414,7 +416,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const SizedBox(height: AppSpacing.xl),
     // 게이지는 실루엣을 그대로 그리고 채움만 0 으로 둔다.
     // 자리를 비우면 완료 시점에 아래 내용이 통째로 밀린다.
-    const Center(child: StomachGauge(satiety: 0, showValue: false)),
+    const Center(child: StomachGauge(satiety: 0)),
     const SizedBox(height: AppSpacing.xl),
     const _SectionHeader(trailing: null),
     const SizedBox(height: AppSpacing.md),
@@ -458,11 +460,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: AppRadius.lgRadius,
         child: Column(
           children: [
-            Center(
-              child: StomachGauge(
-                satiety: stomach?.satietyPct ?? 0,
-              ),
-            ),
+            Center(child: StomachGauge(satiety: stomach?.satietyPct ?? 0)),
             const SizedBox(height: AppSpacing.lg),
 
             if (stomach == null)
@@ -472,16 +470,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   children: [
                     Text(
-                      _formatElapsed(stomach.minutesSinceMeal),
-                      style: AppTypography.bodySecondary,
-                    ),
-                    // 문구 생성이 실패하면 이 줄만 빠지고 나머지는 정상이다.
-                    if (stomach.feedbackSummary != null)
-                      Text(
-                        stomach.feedbackSummary!,
-                        textAlign: TextAlign.center,
-                        style: AppTypography.bodySecondary,
+                      '${stomach.satietyPct}%',
+                      style: AppTypography.gaugeValue.copyWith(
+                        fontSize: 21,
+                        color: AppColors.textPrimary,
                       ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      _formatElapsed(stomach.minutesSinceMeal),
+                      style: AppTypography.body,
+                    ),
                   ],
                 ),
               ),
@@ -527,9 +526,16 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text('오늘의 식사', style: AppTypography.sectionHead),
+        Text(
+          '오늘의 식사',
+          style: AppTypography.sectionHead.copyWith(fontSize: 14.5),
+        ),
         const Spacer(),
-        if (trailing != null) Text(trailing!, style: AppTypography.caption),
+        if (trailing != null)
+          Text(
+            trailing!,
+            style: AppTypography.caption.copyWith(fontSize: 11),
+          ),
       ],
     );
   }
@@ -549,7 +555,13 @@ class _MedicationStatusCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppRadius.lgRadius,
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          // Figma 카드는 위아래가 좁아 높이가 약 75 다.
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            9,
+            AppSpacing.md,
+            AppSpacing.sm,
+          ),
           child: IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -561,27 +573,39 @@ class _MedicationStatusCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          // Figma 는 주사기 일러스트다. 에셋이 들어오면 교체한다.
-                          const Icon(
-                            Icons.vaccines_outlined,
-                            size: 20,
-                            color: AppColors.primary,
+                          // 주사기는 35px 이지만 배지 줄 높이만 차지하고 위아래로 겹쳐 나온다.
+                          SizedBox(
+                            width: 35,
+                            height: 20,
+                            child: OverflowBox(
+                              maxWidth: 35,
+                              maxHeight: 35,
+                              child: Image.asset(
+                                'assets/images/syringe.png',
+                                width: 35,
+                                height: 35,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           StageBadge(label: stageLabel(medication.stage)),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: 6),
                       Text(
                         '${medication.drugName} ${_formatDose(medication.doseMg)}',
-                        style: AppTypography.sectionHead,
+                        style: AppTypography.sectionHead.copyWith(fontSize: 15),
                       ),
                       const SizedBox(height: 2),
                       // Figma 는 `12회차 · 투약 10주차` 인데 명세에는 doseCount 뿐이라
                       // 주차를 만들 수 없다. startedAt 이 /home 에 없다.
                       Text(
                         '${medication.doseCount}회차',
-                        style: AppTypography.caption,
+                        style: AppTypography.caption.copyWith(
+                          fontSize: 10.5,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ],
                   ),
@@ -591,7 +615,12 @@ class _MedicationStatusCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('다음 투약', style: AppTypography.caption),
+                    Text(
+                      '다음 투약',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.xs),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -600,13 +629,17 @@ class _MedicationStatusCard extends StatelessWidget {
                         Text(
                           'D-${medication.daysUntilNextDose}',
                           style: AppTypography.sectionHead.copyWith(
+                            fontSize: 14.5,
                             color: AppColors.primary,
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Text(
                           _formatShortDate(medication.nextDoseDate),
-                          style: AppTypography.caption,
+                          style: AppTypography.caption.copyWith(
+                            fontSize: 11,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ],
                     ),
@@ -614,7 +647,9 @@ class _MedicationStatusCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         scheduled ? '증량 예정 있음' : '증량 예정 없음',
-                        style: AppTypography.caption,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ],
@@ -630,67 +665,23 @@ class _MedicationStatusCard extends StatelessWidget {
 
 /// 위(胃) 게이지. 채움 높이 = 포만감 %.
 ///
-/// [_StomachPainter] 의 패스는 Figma 실루엣을 손으로 근사한 것이다.
-/// 원본 벡터를 SVG 로 내보내 교체하는 게 최종 형태다(`flutter_svg` + `ClipPath`).
-/// 지금은 의존성·에셋을 늘리지 않으려고 `CustomPaint` 로만 그린다.
+/// Figma `화면 2 · 홈 (수정)` 의 위 그룹(식도 · 몸통 · 꼬리 · 채움)을 SVG 원본 좌표
+/// 그대로 `CustomPaint` 로 옮겼다. 수치는 이 위젯이 그리지 않고 아래에 따로 놓는다.
 class StomachGauge extends StatelessWidget {
-  const StomachGauge({
-    super.key,
-    required this.satiety,
-    this.showValue = true,
-  });
+  const StomachGauge({super.key, required this.satiety});
 
   /// 0~100.
   final int satiety;
 
-  /// 로딩 중에는 수치를 감추고 실루엣만 남긴다.
-  final bool showValue;
-
-  static const double _width = 208;
-  static const double _height = 235;
+  static const double _width = 175;
+  static const double _height = 193;
 
   @override
   Widget build(BuildContext context) {
-    // 채움이 낮으면 수치가 회색 면 위에 얹혀 대비가 죽는다.
-    final onFill = satiety >= 35;
-
     return SizedBox(
       width: _width,
       height: _height,
-      child: Stack(
-        // Figma 는 수치를 정중앙이 아니라 살짝 아래(채운 영역 한가운데)에 둔다.
-        // 위 실루엣이 좌측으로 치우쳐 있어 가로도 조금 왼쪽으로 민다.
-        alignment: const Alignment(-0.08, 0.22),
-        children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _StomachPainter(fillRatio: satiety / 100),
-            ),
-          ),
-          if (showValue)
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$satiety%',
-                  style: AppTypography.gaugeValue.copyWith(
-                    color: onFill
-                        ? AppColors.textInverse
-                        : AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  '지금 포만감',
-                  style: AppTypography.body.copyWith(
-                    color: onFill
-                        ? AppColors.textInverse
-                        : AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
+      child: CustomPaint(painter: _StomachPainter(fillRatio: satiety / 100)),
     );
   }
 }
@@ -701,88 +692,145 @@ class _StomachPainter extends CustomPainter {
   /// 0.0 ~ 1.0.
   final double fillRatio;
 
-  /// 패스를 그린 기준 좌표계. 실제 크기에 맞춰 스케일한다.
-  static const Size _reference = Size(208, 235);
+  /// 패스를 그린 기준 좌표계(Figma 위 그룹 크기). 실제 크기에 맞춰 스케일한다.
+  static const Size reference = Size(StomachGauge._width, StomachGauge._height);
+
+  /// 식도 아래 몸통이 시작하는 높이와 몸통 높이.
+  static const double _bodyTop = 26.8357;
+  static const double _bodyHeight = 165.369;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.scale(
-      size.width / _reference.width,
-      size.height / _reference.height,
+    canvas.scale(size.width / reference.width, size.height / reference.height);
+
+    // 식도 · 꼬리는 회색 면 하나로 보인다.
+    final track = Paint()..color = AppColors.surfaceMuted;
+    canvas.drawPath(_esophagus(), track);
+    canvas.drawPath(
+      _tail(),
+      Paint()
+        ..color = AppColors.surfaceMuted
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 14.85
+        ..strokeCap = StrokeCap.round,
     );
 
-    canvas.clipPath(_buildPath());
+    // 몸통의 빈 부분.
+    final body = _body();
+    canvas.drawPath(body, track);
 
-    // 빈 부분. Figma 에는 어두운 윤곽선이 없고 밝은 회색 면으로만 보인다
-    // (디자인 가이드 §5 의 1.5px 윤곽선과 다르며, Figma 를 기준으로 삼았다).
-    canvas.drawRect(
-      Offset.zero & _reference,
-      Paint()..color = AppColors.surfaceMuted,
-    );
-
-    // 채운 부분. 아래에서 위로 fillRatio 만큼.
+    // 채운 부분. 몸통 안에서만 보이고 윗면은 물결이다.
     final ratio = fillRatio.clamp(0.0, 1.0);
     if (ratio > 0) {
-      final fillRect = Rect.fromLTRB(
-        0,
-        _reference.height * (1 - ratio),
-        _reference.width,
-        _reference.height,
-      );
-      canvas.drawRect(
-        fillRect,
-        Paint()
-          ..shader = const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.gaugeFrom, AppColors.gaugeTo],
-          ).createShader(fillRect),
-      );
+      canvas.save();
+      canvas.clipPath(body);
+      // 0% 에서는 몸통 아래로 완전히 숨고, 100% 에서는 물결 마루까지 덮는다.
+      final bottom = _bodyTop + _bodyHeight + 6;
+      final top = _bodyTop - 8;
+      final waveTop = bottom - ratio * (bottom - top);
+      canvas.drawPath(_wave(waveTop), Paint()..color = AppColors.stomach);
+      canvas.restore();
     }
 
     canvas.restore();
   }
 
-  /// 위 몸통 + 상단 분문(식도) + 우하단 유문 쪽 꼬리를 하나로 합친다.
-  ///
-  /// 세 조각의 감는 방향이 서로 달라 상쇄되는 걸 막으려고
-  /// `Path.combine` 으로 명시적으로 합집합을 만든다.
-  Path _buildPath() {
-    // 몸통. 좌측은 볼록(대만곡), 우측은 오목(소만곡)하게 잡는다.
-    final body = Path()
-      ..moveTo(96, 36)
-      ..cubicTo(60, 42, 38, 70, 34, 104)
-      ..cubicTo(30, 134, 10, 154, 8, 182)
-      ..cubicTo(5, 216, 40, 240, 82, 240)
-      ..cubicTo(126, 240, 160, 216, 166, 184)
-      ..cubicTo(171, 160, 162, 142, 150, 126)
-      ..cubicTo(137, 108, 130, 92, 130, 68)
-      ..cubicTo(130, 46, 116, 34, 96, 36)
-      ..close();
+  /// 위 몸통. Figma 벡터 `stomachClip` 좌표 그대로.
+  Path _body() => Path()
+    ..moveTo(69.534, _bodyTop)
+    ..cubicTo(
+      36.9989,
+      _bodyTop + 4.47262,
+      2.29489,
+      _bodyTop + 29.072,
+      0.125885,
+      _bodyTop + 71.5619,
+    )
+    ..cubicTo(
+      -2.04312,
+      _bodyTop + 114.052,
+      23.9849,
+      _bodyTop + 154.305,
+      65.196,
+      _bodyTop + 163.251,
+    )
+    ..cubicTo(
+      95.562,
+      _bodyTop + 171.078,
+      123.759,
+      _bodyTop + 156.542,
+      135.689,
+      _bodyTop + 130.824,
+    )
+    ..cubicTo(
+      140.027,
+      _bodyTop + 120.761,
+      125.928,
+      _bodyTop + 115.17,
+      117.252,
+      _bodyTop + 108.461,
+    )
+    ..cubicTo(
+      105.323,
+      _bodyTop + 98.3977,
+      99.9,
+      _bodyTop + 80.5072,
+      95.562,
+      _bodyTop + 58.1441,
+    )
+    ..cubicTo(
+      92.3085,
+      _bodyTop + 31.3083,
+      89.055,
+      _bodyTop + 15.6542,
+      86.886,
+      _bodyTop,
+    )
+    ..close();
 
-    // 분문 — 위 몸통 위로 뻗는 짧은 관.
-    final cardia = Path()
-      ..moveTo(94, 8)
-      ..cubicTo(94, 0, 120, 0, 120, 8)
-      ..lineTo(126, 70)
-      ..lineTo(96, 70)
-      ..close();
+  /// 몸통 위로 올라가는 식도(위쪽이 살짝 좁은 사다리꼴).
+  Path _esophagus() => Path()
+    ..moveTo(67.365, 0)
+    ..lineTo(67.365 + 2.169, _bodyTop)
+    ..lineTo(67.365 + 19.521, _bodyTop)
+    ..lineTo(67.365 + 16.2675, 0)
+    ..close();
 
-    // 유문 — 우하단으로 빠지는 짧은 꼬리.
-    final pylorus = Path()
-      ..moveTo(156, 166)
-      ..cubicTo(176, 172, 190, 188, 199, 208)
-      ..cubicTo(205, 219, 192, 227, 186, 216)
-      ..cubicTo(177, 198, 166, 186, 150, 180)
-      ..close();
-
-    return Path.combine(
-      PathOperation.union,
-      body,
-      Path.combine(PathOperation.union, cardia, pylorus),
+  /// 우하단으로 빠지는 꼬리(굵은 선).
+  Path _tail() => Path()
+    ..moveTo(123.3 + 7.4259, 130 + 23.0799)
+    ..cubicTo(
+      123.3 + 24.7779,
+      130 + 34.2615,
+      123.3 + 42.13,
+      130 + 25.3162,
+      123.3 + 44.299,
+      130 + 7.42575,
     );
-  }
+
+  /// 채움의 물결 윗면. 몸통보다 넓게 그려서 가로로 빈틈이 없게 한다.
+  Path _wave(double top) => Path()
+    ..moveTo(-6.381, top + 2.58227)
+    ..cubicTo(
+      -6.381 + 32.5351,
+      top - 6.36297,
+      -6.381 + 60.7321,
+      top + 11.5275,
+      -6.381 + 93.2672,
+      top + 2.58227,
+    )
+    ..cubicTo(
+      -6.381 + 121.464,
+      top - 5.24482,
+      -6.381 + 151.83,
+      top + 9.2912,
+      -6.381 + 186.534,
+      top + 0.345958,
+    )
+    ..lineTo(-6.381 + 186.534, top + 400)
+    ..lineTo(-6.381, top + 400)
+    ..close();
 
   @override
   bool shouldRepaint(_StomachPainter oldDelegate) =>
