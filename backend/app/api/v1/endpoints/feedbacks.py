@@ -44,8 +44,9 @@ def get_meal_feedback(
     없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다
     (`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).
 
-    **아직 피드백이 없어도 200 이다** — `feedbackStatus: PENDING`. 에러가 아니라
-    "아직" 이고, 404 로 내리면 FE 가 "없는 식사" 와 구분하지 못한다.
+    **아직 피드백이 없어도 200 이다** — `feedbackStatus: PENDING`(대기) ·
+    `GENERATING`(생성 중) · `FAILED`(재시도 소진). 에러가 아니라 "아직" 이거나
+    "문장만 없음" 이고, 404 로 내리면 FE 가 "없는 식사" 와 구분하지 못한다.
 
     `safetyStatus` 가 `SAFE` 가 아니면 `summary` · `suggestions` 가 비어 나간다
     (명세: "상담 안내로 대체"). FE 는 그 필드를 보고 안내 화면으로 바꾼다.

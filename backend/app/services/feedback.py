@@ -162,14 +162,16 @@ def get_feedback(
         BLOCKED         영영 못 보여 준다. FE 는 상담 안내로
                         바꾼다(`MEDICAL_QUESTION_DETECTED`)    → READY
         REVIEW_REQUIRED 검수를 통과하면 보일 수도 있다         → PENDING
-        내용 없음 · 확정 전                                    → PENDING
+        내용 없음 · 가장 최근 작업이 처리 중(PROCESSING)       → GENERATING
+        내용 없음 · 가장 최근 작업이 격리됨(FAILED)            → FAILED
+        내용 없음 (그 밖) · 확정 전                            → PENDING
 
     명세가 주는 것은 값 목록(`:46`)과 예시 둘(`POST /confirm` → `PENDING`, 여기 →
     `READY`)뿐이고 **유도 규칙은 없다.** 그 둘은 이미 만족한다.
 
     **이 GET 은 쓰기를 하지 않는다.** `feedback.meal` 은 확인 API 가 채점과 같은
     트랜잭션에서 넣고(`services/evaluation/__init__.py::confirm`), 워커가 채우면 여기서
-    `READY` 가 된다. FE 는 `PENDING` 인 동안 폴링만 한다.
+    `READY` 가 된다. FE 는 `PENDING` · `GENERATING` 인 동안 폴링만 한다.
 
     제안 화면을 열 때(이 GET) 넣지 않는 이유: 하루 피드백이 끼니 피드백을 근거로 쓰므로
     (`crud/daily_feedback.py::list_day_evidence`), 화면을 안 연 끼니가 하루 요약에서
@@ -178,8 +180,9 @@ def get_feedback(
     `FAILED` 는 가장 최근 `feedback.meal` 작업이 격리됐고 보여 줄 문장이 없을 때다.
     재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣고, 그러면
     가장 최근 작업이 PENDING 이 되어 여기서도 PENDING 으로 돌아간다.
-    `GENERATING` 은 내지 않는다. 처리 중인 작업도 상태는 PENDING 이라
-    (`models/enums.py::TaskStatus`) 구분할 근거가 없다.
+    `GENERATING` 은 가장 최근 작업을 워커가 집어 처리 중(`TaskStatus.PROCESSING`)일
+    때다. 워커가 집는 순간 커밋하므로(`infra/queue.py::claim`) 다른 세션인 여기서도
+    보인다. 재시도 대기(backoff) 중인 작업은 PENDING 으로 돌아가 있어 PENDING 이다.
     """
     meal = _owned_meal(db, user_id, meal_id)
 
@@ -214,7 +217,10 @@ def get_feedback(
     row = feedback_crud.get_by_meal(db, meal.id)
     if row is None or not (row.body or "").strip():
         # 보여 줄 문장이 없을 때만 작업 이력을 본다. 문장이 있으면 그게 답이다.
-        if feedback_crud.latest_task_status(db, meal.id) is TaskStatus.FAILED:
+        task_status = feedback_crud.latest_task_status(db, meal.id)
+        if task_status is TaskStatus.PROCESSING:
+            return MealFeedbackResponse.generating()
+        if task_status is TaskStatus.FAILED:
             return MealFeedbackResponse.failed()
         return MealFeedbackResponse.pending()
 

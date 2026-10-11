@@ -1061,3 +1061,56 @@ def test_failed_task_of_another_meal_is_ignored(client: TestClient, db: Session)
     data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
 
     assert data["feedbackStatus"] == "PENDING"
+
+
+def test_processing_task_without_text_is_generating(client: TestClient, db: Session) -> None:
+    """워커가 작업을 집어 처리 중이면 GENERATING 이다. 내용은 PENDING 처럼 비어 있다."""
+    user, meal = _meal(db)
+    _add_task(db, meal, TaskStatus.PROCESSING)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "GENERATING"
+    assert data["summary"] is None
+    assert data["reasoning"] is None
+    assert data["suggestions"] == []
+    assert data["expectedSatietyPct"] is None
+    assert data["safetyStatus"] is None
+
+
+def test_requeued_task_being_processed_is_generating(client: TestClient, db: Session) -> None:
+    """실패 뒤 재확정한 작업을 워커가 집으면 옛 FAILED 가 아니라 GENERATING 이다."""
+    user, meal = _meal(db)
+    old = _add_task(db, meal, TaskStatus.FAILED)
+    new = _add_task(db, meal, TaskStatus.PROCESSING)
+    old.created_at = datetime(2026, 9, 1, tzinfo=UTC)
+    new.created_at = datetime(2026, 9, 2, tzinfo=UTC)
+    db.flush()
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "GENERATING"
+
+
+def test_ready_text_wins_over_a_processing_task(client: TestClient, db: Session) -> None:
+    """재확정으로 새 작업이 도는 중이어도 쓸 만한 문장이 남아 있으면 READY 다."""
+    user, meal = _meal(db)
+    _add_feedback(db, meal)
+    _add_task(db, meal, TaskStatus.PROCESSING)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "READY"
+
+
+def test_processing_task_of_unconfirmed_meal_is_pending(client: TestClient, db: Session) -> None:
+    """확정 상태가 아닌 식사는 작업이 돌아도 PENDING 이다 — 워커가 쓰지 않고 건너뛴다."""
+    user, meal = _meal(db)
+    meal.status = MealStatus.ANALYZING
+    meal.is_recalculation = True
+    _add_task(db, meal, TaskStatus.PROCESSING)
+    db.flush()
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
