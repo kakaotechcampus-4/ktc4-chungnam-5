@@ -45,7 +45,7 @@ def get_meal_feedback(
     (`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).
 
     **아직 피드백이 없어도 200 이다** — `feedbackStatus: PENDING`(대기) ·
-    `GENERATING`(생성 중) · `FAILED`(재시도 소진). 에러가 아니라 "아직" 이거나
+    `GENERATING`(생성 중) · `FAILED`(재시도 소진 · 문장 없이 끝남). 에러가 아니라 "아직" 이거나
     "문장만 없음" 이고, 404 로 내리면 FE 가 "없는 식사" 와 구분하지 못한다.
 
     `safetyStatus` 가 `SAFE` 가 아니면 `summary` · `suggestions` 가 비어 나간다

@@ -164,6 +164,7 @@ def get_feedback(
         REVIEW_REQUIRED 검수를 통과하면 보일 수도 있다         → PENDING
         내용 없음 · 가장 최근 작업이 처리 중(PROCESSING)       → GENERATING
         내용 없음 · 가장 최근 작업이 격리됨(FAILED)            → FAILED
+        내용 없음 · 가장 최근 작업이 끝남(DONE)                → FAILED
         내용 없음 (그 밖) · 확정 전                            → PENDING
 
     명세가 주는 것은 값 목록(`:46`)과 예시 둘(`POST /confirm` → `PENDING`, 여기 →
@@ -177,7 +178,8 @@ def get_feedback(
     (`crud/daily_feedback.py::list_day_evidence`), 화면을 안 연 끼니가 하루 요약에서
     조용히 빠진다.
 
-    `FAILED` 는 가장 최근 `feedback.meal` 작업이 격리됐고 보여 줄 문장이 없을 때다.
+    `FAILED` 는 보여 줄 문장이 없는데 가장 최근 `feedback.meal` 작업이 격리됐거나
+    끝났을 때다 — 어느 쪽이든 기다려도 문장이 오지 않는다.
     재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣고, 그러면
     가장 최근 작업이 PENDING 이 되어 여기서도 PENDING 으로 돌아간다.
     `GENERATING` 은 가장 최근 작업을 워커가 집어 처리 중(`TaskStatus.PROCESSING`)일
@@ -220,7 +222,10 @@ def get_feedback(
         task_status = feedback_crud.latest_task_status(db, meal.id)
         if task_status is TaskStatus.PROCESSING:
             return MealFeedbackResponse.generating()
-        if task_status is TaskStatus.FAILED:
+        # DONE 인데 문장이 없으면 더 기다려도 오지 않는다 — AI 가 빈 본문을 줬거나 가드레일이
+        # 지웠다. 워커가 낡은 작업이라 건너뛰고 DONE 으로 끝낸 경우는 여기 오지 않는다:
+        # 건너뛰게 만든 재확정이 새 작업을 함께 넣으므로 가장 최근 작업은 그 새 작업이다.
+        if task_status in (TaskStatus.FAILED, TaskStatus.DONE):
             return MealFeedbackResponse.failed()
         return MealFeedbackResponse.pending()
 

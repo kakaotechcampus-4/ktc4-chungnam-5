@@ -1114,3 +1114,54 @@ def test_processing_task_of_unconfirmed_meal_is_pending(client: TestClient, db: 
     data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
 
     assert data["feedbackStatus"] == "PENDING"
+
+
+def test_done_task_without_text_is_failed(client: TestClient, db: Session) -> None:
+    """작업은 끝났는데 쓸 문장이 없으면 더 기다려도 오지 않는다 — FAILED 다.
+
+    AI 가 빈 본문을 주거나 가드레일이 본문을 지우면 이렇게 끝난다.
+    """
+    user, meal = _meal(db)
+    _add_task(db, meal, TaskStatus.DONE)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "FAILED"
+    assert data["summary"] is None
+    assert data["suggestions"] == []
+
+
+def test_done_task_with_blank_text_is_failed(client: TestClient, db: Session) -> None:
+    """본문이 공백뿐인 행도 문장이 없는 것이다."""
+    user, meal = _meal(db)
+    row = _add_feedback(db, meal)
+    row.body = "   "
+    _add_task(db, meal, TaskStatus.DONE)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "FAILED"
+
+
+def test_requeued_after_empty_done_is_pending_again(client: TestClient, db: Session) -> None:
+    """문장 없이 끝난 뒤 재확정이 새 작업을 넣으면 다시 기다린다."""
+    user, meal = _meal(db)
+    old = _add_task(db, meal, TaskStatus.DONE)
+    new = _add_task(db, meal, TaskStatus.PENDING)
+    old.created_at = datetime(2026, 9, 1, tzinfo=UTC)
+    new.created_at = datetime(2026, 9, 2, tzinfo=UTC)
+    db.flush()
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+
+
+def test_queued_task_without_text_is_pending(client: TestClient, db: Session) -> None:
+    """대기열에만 있는 작업은 PENDING 이다."""
+    user, meal = _meal(db)
+    _add_task(db, meal, TaskStatus.PENDING)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
