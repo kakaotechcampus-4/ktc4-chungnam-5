@@ -83,6 +83,19 @@ class MealFeedbackResponse(CamelModel):
         )
 
     @classmethod
+    def generating(cls) -> MealFeedbackResponse:
+        """워커가 작업을 집어 AI 를 부르는 중이다. 내용은 `pending()` 과 같이 비어 있다 —
+        다른 건 "대기열에 있다" 가 아니라 "만드는 중" 이라는 것뿐이다."""
+        return cls.pending().model_copy(update={"feedback_status": FeedbackStatus.GENERATING})
+
+    @classmethod
+    def failed(cls) -> MealFeedbackResponse:
+        """기다려도 문장이 오지 않는다 — 워커가 재시도를 다 쓰고 포기했거나, 작업은 끝났는데
+        쓸 문장이 없다. 내용은 `pending()` 과 같이 비어 있다 — 다른 건 FE 가 폴링을 멈출 수
+        있다는 것뿐이다."""
+        return cls.pending().model_copy(update={"feedback_status": FeedbackStatus.FAILED})
+
+    @classmethod
     def from_row(
         cls,
         row: MealFeedback,
