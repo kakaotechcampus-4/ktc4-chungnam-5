@@ -19,9 +19,13 @@ from app.models.feedback import MealFeedback
 from app.models.food import FoodRef
 from app.models.task import Task
 
-_FEEDBACK_TASK_TYPE: Final = "feedback.meal"
-"""`services/evaluation/__init__.py::FEEDBACK_TASK_TYPE` 과 같은 값. crud 가 services 를
-import 하면 순환이 생겨 여기 따로 둔다."""
+FEEDBACK_TASK_TYPE: Final = "feedback.meal"
+"""끼니 피드백 작업의 큐 타입. 넣는 쪽(`services/evaluation::confirm`)과 찾는 쪽
+(`latest_task_status`)이 이 값 하나를 쓴다 — 따로 적으면 한쪽만 바뀌었을 때 작업을 못 찾아
+FAILED · GENERATING 이 조용히 PENDING 이 된다. 워커 등록(`worker/dispatch.py`)도 같은 문자열이다.
+
+crud 에 두는 건 services → crud 방향만 import 가 허용되기 때문이다
+(`crud/daily_feedback.py::REFRESH_TASK_TYPE` 과 같은 자리)."""
 
 
 def get_by_meal(db: Session, meal_id: uuid.UUID) -> MealFeedback | None:
@@ -34,11 +38,15 @@ def latest_task_status(db: Session, meal_id: uuid.UUID) -> TaskStatus | None:
 
     가장 최근 것만 본다 — 재확정은 실패한 작업 위에 새 작업을 넣고, 그때부터는
     새 작업의 결과를 기다리는 중이다.
+
+    "가장 최근" 은 `created_at`(트랜잭션 시작 시각) 순이다. 한 트랜잭션에서 넣은 작업끼리는
+    값이 같아 순서가 정해지지 않는데, `confirm` 은 트랜잭션마다 많아야 하나를 넣으므로
+    운영에서는 생기지 않는다.
     """
     stmt = (
         select(Task.status)
         .where(
-            Task.type == _FEEDBACK_TASK_TYPE,
+            Task.type == FEEDBACK_TASK_TYPE,
             Task.payload["mealId"].astext == str(meal_id),
         )
         .order_by(Task.created_at.desc())
