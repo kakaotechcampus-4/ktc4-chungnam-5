@@ -83,6 +83,12 @@ class MealFeedbackResponse(CamelModel):
         )
 
     @classmethod
+    def failed(cls) -> MealFeedbackResponse:
+        """워커가 재시도를 다 쓰고 포기했다. 내용은 `pending()` 과 같이 비어 있다 —
+        다른 건 FE 가 폴링을 멈출 수 있다는 것뿐이다."""
+        return cls.pending().model_copy(update={"feedback_status": FeedbackStatus.FAILED})
+
+    @classmethod
     def from_row(
         cls,
         row: MealFeedback,

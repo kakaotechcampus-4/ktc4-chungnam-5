@@ -15,7 +15,7 @@ from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import satiety as satiety_crud
-from app.models.enums import MealStatus
+from app.models.enums import MealStatus, TaskStatus
 from app.models.meal import Meal
 from app.schemas.feedback import (
     ExpectedSatiety,
@@ -175,10 +175,11 @@ def get_feedback(
     (`crud/daily_feedback.py::list_day_evidence`), 화면을 안 연 끼니가 하루 요약에서
     조용히 빠진다.
 
-    🔗 TODO: 명세의 `GENERATING` · `FAILED` 는 아직 내지 않는다. 워커는
-    `QUEUE_MAX_ATTEMPTS` 까지 재시도한 뒤 DLQ 로 격리하는데(`worker/loop.py`), 그 상태를
-    여기서 `task_queue` 로 읽어 `FAILED` 를 낼지는 FE 와 합의 후 정한다. 그때까지
-    재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣는다.
+    `FAILED` 는 가장 최근 `feedback.meal` 작업이 격리됐고 보여 줄 문장이 없을 때다.
+    재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣고, 그러면
+    가장 최근 작업이 PENDING 이 되어 여기서도 PENDING 으로 돌아간다.
+    `GENERATING` 은 내지 않는다. 처리 중인 작업도 상태는 PENDING 이라
+    (`models/enums.py::TaskStatus`) 구분할 근거가 없다.
     """
     meal = _owned_meal(db, user_id, meal_id)
 
@@ -212,6 +213,9 @@ def get_feedback(
     # 흡수하는 것과 같은 이유다.
     row = feedback_crud.get_by_meal(db, meal.id)
     if row is None or not (row.body or "").strip():
+        # 보여 줄 문장이 없을 때만 작업 이력을 본다. 문장이 있으면 그게 답이다.
+        if feedback_crud.latest_task_status(db, meal.id) is TaskStatus.FAILED:
+            return MealFeedbackResponse.failed()
         return MealFeedbackResponse.pending()
 
     # 마스킹은 스키마 팩토리가 한다 — `GET /meals/{mealId}` 도 같은 행을 읽으므로

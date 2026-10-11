@@ -14,13 +14,36 @@ from sqlalchemy import Numeric, and_, cast, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models.enums import NutrientCode, SafetyStatus
+from app.models.enums import NutrientCode, SafetyStatus, TaskStatus
 from app.models.feedback import MealFeedback
 from app.models.food import FoodRef
+from app.models.task import Task
+
+_FEEDBACK_TASK_TYPE: Final = "feedback.meal"
+"""`services/evaluation/__init__.py::FEEDBACK_TASK_TYPE` 과 같은 값. crud 가 services 를
+import 하면 순환이 생겨 여기 따로 둔다."""
 
 
 def get_by_meal(db: Session, meal_id: uuid.UUID) -> MealFeedback | None:
     stmt = select(MealFeedback).where(MealFeedback.meal_id == meal_id)
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def latest_task_status(db: Session, meal_id: uuid.UUID) -> TaskStatus | None:
+    """이 끼니의 가장 최근 `feedback.meal` 작업 상태. 작업이 없으면 None.
+
+    가장 최근 것만 본다 — 재확정은 실패한 작업 위에 새 작업을 넣고, 그때부터는
+    새 작업의 결과를 기다리는 중이다.
+    """
+    stmt = (
+        select(Task.status)
+        .where(
+            Task.type == _FEEDBACK_TASK_TYPE,
+            Task.payload["mealId"].astext == str(meal_id),
+        )
+        .order_by(Task.created_at.desc())
+        .limit(1)
+    )
     return db.execute(stmt).scalar_one_or_none()
 
 

@@ -19,8 +19,9 @@ from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import satiety as satiety_crud
-from app.models.enums import MealStatus, MedicationStage, SafetyStatus
+from app.models.enums import MealStatus, MedicationStage, SafetyStatus, TaskStatus
 from app.models.feedback import MealFeedback
+from app.models.task import Task
 from app.tests.factories import make_food_ref, make_meal, make_meal_item, make_user
 
 _SPEC_FIELDS = {
@@ -1003,3 +1004,60 @@ def test_typo_field_is_rejected(client: TestClient, db: Session) -> None:
     )
 
     assert res.status_code == 422
+
+
+def _add_task(db: Session, meal, status: TaskStatus) -> Task:
+    """`confirm` 이 넣는 `feedback.meal` 작업을 흉내 낸다."""
+    task = Task(type="feedback.meal", payload={"mealId": str(meal.id)}, status=status)
+    db.add(task)
+    db.flush()
+    return task
+
+
+def test_quarantined_task_without_text_is_failed(client: TestClient, db: Session) -> None:
+    """워커가 포기한 끼니는 PENDING 이 아니라 FAILED 다 — FE 가 폴링을 멈춘다."""
+    user, meal = _meal(db)
+    _add_task(db, meal, TaskStatus.FAILED)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "FAILED"
+    assert data["summary"] is None
+    assert data["suggestions"] == []
+    assert data["safetyStatus"] is None
+
+
+def test_requeued_after_failure_is_pending_again(client: TestClient, db: Session) -> None:
+    """재확정이 작업을 다시 넣으면 가장 최근 작업만 본다."""
+    user, meal = _meal(db)
+    old = _add_task(db, meal, TaskStatus.FAILED)
+    new = _add_task(db, meal, TaskStatus.PENDING)
+    # created_at 이 같은 트랜잭션에서 같아질 수 있어 순서를 못 박는다.
+    old.created_at = datetime(2026, 9, 1, tzinfo=UTC)
+    new.created_at = datetime(2026, 9, 2, tzinfo=UTC)
+    db.flush()
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+
+
+def test_ready_text_wins_over_a_failed_task(client: TestClient, db: Session) -> None:
+    """문장이 이미 있으면 작업 이력과 무관하게 READY 다."""
+    user, meal = _meal(db)
+    _add_feedback(db, meal)
+    _add_task(db, meal, TaskStatus.FAILED)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "READY"
+
+
+def test_failed_task_of_another_meal_is_ignored(client: TestClient, db: Session) -> None:
+    user, meal = _meal(db)
+    other = make_meal(db, user_id=user.id, status=MealStatus.EVALUATED)
+    _add_task(db, other, TaskStatus.FAILED)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
