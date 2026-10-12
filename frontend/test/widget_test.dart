@@ -661,17 +661,22 @@ void main() {
     WidgetTester tester,
   ) async {
     _useDesignSize(tester);
-    await _pumpApp(tester);
+    final api = await _pumpApp(tester);
     await tester.tap(find.text('나중에')); // 컨디션 팝업
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('현미밥, 된장국, 두부조림'));
     await _settle(tester);
-    expect(find.text('현재 영양소 상태'), findsOneWidget);
+    expect(find.text('끼니 피드백'), findsOneWidget);
+    expect(find.text('이번 끼니'), findsOneWidget);
+    expect(find.text('영양소 상태'), findsOneWidget);
     expect(find.text('두부 반 모'), findsOneWidget);
-    // 그날 하루 요약도 같이 보인다.
-    await tester.scrollUntilVisible(find.text('오늘 하루 요약'), 200);
-    expect(find.textContaining('단백질이 고르게 들어간 하루'), findsOneWidget);
+    // 점심 끼니라서 하루 요약은 보이지 않고, 요약도 만들어 달라고 하지 않는다.
+    expect(find.text('오늘 하루 요약'), findsNothing);
+    expect(
+      api.requests.where((r) => r.path.startsWith('/insights/daily')),
+      isEmpty,
+    );
   });
 
   testWidgets('a missing daily summary is requested, then shown', (
@@ -689,6 +694,20 @@ void main() {
     SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
     final session = await UserSession.load();
     final api = FakeApi()
+      // 하루 요약은 저녁 끼니일 때만 보인다.
+      ..on(
+        'GET /meals/{meal_id}',
+        (_) => (
+          200,
+          fakeOk({
+            'mealId': 'm1',
+            'status': 'EVALUATED',
+            'mealType': 'DINNER',
+            'eatenAt': '2026-10-05T19:00:00+09:00',
+            'items': <Object?>[],
+          }),
+        ),
+      )
       ..on('GET /insights/daily', (_) => (200, fakeOk(daily())))
       ..on('POST /insights/daily/refresh', (_) {
         made = true;
