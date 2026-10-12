@@ -304,7 +304,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
               style: AppTypography.cardTitle.copyWith(fontSize: 12.5),
             ),
             Text(
-              '100g 기준 · 공공 DB',
+              '${stageLabel(eval.stage)} 1끼 기준',
               style: AppTypography.caption.copyWith(
                 fontSize: 9.5,
                 color: AppColors.textTertiary,
