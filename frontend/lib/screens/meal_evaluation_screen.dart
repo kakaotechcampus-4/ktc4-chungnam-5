@@ -11,7 +11,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'next_meal_suggestion_screen.dart';
 
-/// 식사 평가 (Q·Q·S) — Figma `hOxrHBitBpjwIBBg2GO49y` node `60:270`.
+/// 식사 평가 (Q·Q·S) — Figma `S6BHeo0ZebzY4PAQOSp0EW` node `1:243`(화면 6 · 식사 평가 (Q·Q·S 수정)).
 ///
 /// 식후 포만감은 **이 화면에서만** 받는다. 서버는 확정(`confirm`) 때 식후
 /// 포만감을 꼭 받아 그 자리에서 Q·Q·S 를 계산하므로:
@@ -109,7 +109,13 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
       // 따랐다(§0 메타 규칙: 다르면 Figma 가 기준).
       appBar: AppBar(
         centerTitle: true,
-        title: Text('식사 평가', style: AppTypography.screenTitle),
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed: () => Navigator.of(context).maybePop(),
+          tooltip: '뒤로',
+        ),
+        title: const Text('식사 평가'),
+        titleTextStyle: AppTypography.sectionHead.copyWith(fontSize: 14),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -124,10 +130,10 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
             children: [
               // 분석한 식사 사진. 텍스트로 기록했으면 자리만 잡는다.
               ClipRRect(
-                borderRadius: AppRadius.lgRadius,
+                borderRadius: AppRadius.xlRadius,
                 child: Container(
                   width: double.infinity,
-                  height: 240,
+                  height: 247,
                   color: AppColors.surfaceSage,
                   child: imageUrl == null ? null : ApiImage(imageUrl),
                 ),
@@ -135,9 +141,9 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
               const SizedBox(height: AppSpacing.xl),
 
               _QuantityCard(result: result),
-              const SizedBox(height: AppSpacing.cardGap),
+              const SizedBox(height: AppSpacing.md),
               _QualityCard(result: result),
-              const SizedBox(height: AppSpacing.cardGap),
+              const SizedBox(height: AppSpacing.md),
               // 식후 포만감은 여기서만 받는다. 평가 뒤에 고치면 다시 확정한다.
               _SatietyCard(
                 value: _satiety,
@@ -157,26 +163,21 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.lg),
 
               SizedBox(
                 width: double.infinity,
-                height: AppLayout.primaryButtonHeight,
+                height: 56,
                 child: FilledButton(
                   onPressed: _busy
                       ? null
                       : result == null
                       ? _confirm
                       : () => _viewNextMealSuggestion(result),
-                  // NOTE: design-system.md §5 "주 버튼"은 배경을
-                  // AppColors.primary(코랄)로 정해 뒀지만, 이 화면 Figma 의
-                  // CTA 는 진한 다크 브라운이다. 팔레트에 전용 "다크 버튼"
-                  // 토큰이 없어 가장 가까운 AppColors.textPrimary 를 임시로
-                  // 빌려 썼다 — 확정되면 문서에 별도 규칙을 추가해야 한다.
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.textPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.mdRadius,
+                    backgroundColor: AppColors.primary,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppRadius.xlRadius,
                     ),
                   ),
                   child: _busy
@@ -208,15 +209,19 @@ const _beforeConfirm = '포만감을 입력하면 계산돼요';
 /// 영양 정보가 있는 음식이 없어 계산하지 못했을 때.
 const _noNutrition = '영양 정보가 있는 음식이 없어 계산하지 못했어요';
 
-/// Q·Q·S 카드 공통 헤더. 원형 배지(Q/S) + 한글 제목 + 영문 라벨 + 우측 태그.
-class _AxisHeader extends StatelessWidget {
-  const _AxisHeader({
+/// Q·Q·S 카드 공통 틀. 왼쪽에 원형 배지(Q/S), 오른쪽에 제목 줄과 [body] 를 쌓는다.
+///
+/// 제목 · 막대 · 설명이 모두 배지 오른쪽의 같은 세로선에서 시작한다(Figma).
+/// [body] 는 제목 줄 아래에 놓인다.
+class _AxisCard extends StatelessWidget {
+  const _AxisCard({
     required this.letter,
     required this.badgeColor,
     required this.badgeBackground,
     required this.title,
     required this.englishLabel,
     required this.trailing,
+    required this.body,
   });
 
   final String letter;
@@ -224,42 +229,100 @@ class _AxisHeader extends StatelessWidget {
   final Color badgeBackground;
   final String title;
   final String englishLabel;
-  final Widget trailing;
 
-  static const double _badgeSize = 28;
+  /// 제목 줄 오른쪽 끝(`AI 계산` · `내가 입력해요`).
+  final Widget trailing;
+  final Widget body;
+
+  static const double _badgeSize = 26;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: _badgeSize,
-          height: _badgeSize,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: badgeBackground,
-            shape: BoxShape.circle,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
+      decoration: _cardDecoration,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: _badgeSize,
+            height: _badgeSize,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: badgeBackground,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              letter,
+              style: AppTypography.emphasis.copyWith(
+                fontSize: 12.5,
+                color: badgeColor,
+              ),
+            ),
           ),
-          child: Text(
-            letter,
-            style: AppTypography.emphasis.copyWith(color: badgeColor),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.cardTitle.copyWith(fontSize: 13.5),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      englishLabel,
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 10.5,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const Spacer(),
+                    trailing,
+                  ],
+                ),
+                body,
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Text(title, style: AppTypography.cardTitle),
-        const SizedBox(width: AppSpacing.xs),
-        Text(englishLabel, style: AppTypography.caption),
-        const Spacer(),
-        trailing,
-      ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 카드 바탕(흰색 + 회색 테두리, 둥근 16).
+final BoxDecoration _cardDecoration = BoxDecoration(
+  color: AppColors.surface,
+  border: Border.all(color: AppColors.border),
+  borderRadius: AppRadius.xlRadius,
+);
+
+/// 양·질 카드 오른쪽 위 `AI 계산`.
+const Widget _aiLabel = _AiLabel();
+
+class _AiLabel extends StatelessWidget {
+  const _AiLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'AI 계산',
+      style: AppTypography.caption.copyWith(
+        fontSize: 9.5,
+        color: AppColors.textPrimary,
+      ),
     );
   }
 }
 
 /// "내가 입력해요" 같은 다크 필 배지.
 ///
-/// NOTE: `_AxisHeader` 의 CTA 버튼과 같은 임시 다크 토큰 이슈 — 전용 색이
-/// 없어 AppColors.textPrimary/textInverse 를 빌려 썼다.
+/// NOTE: 전용 색이 없어 AppColors.textPrimary/textInverse 를 빌려 썼다.
 class _DarkPill extends StatelessWidget {
   const _DarkPill({required this.label});
 
@@ -268,10 +331,7 @@ class _DarkPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: const BoxDecoration(
         color: AppColors.textPrimary,
         borderRadius: AppRadius.pillRadius,
@@ -280,7 +340,8 @@ class _DarkPill extends StatelessWidget {
         label,
         style: AppTypography.emphasis.copyWith(
           color: AppColors.textInverse,
-          fontSize: 10,
+          fontSize: 9.5,
+          height: 1.25,
         ),
       ),
     );
@@ -297,33 +358,21 @@ class _QuantityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = result;
     final score = r?.scores.quantity;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _AxisHeader(
-              letter: 'Q',
-              badgeColor: AppColors.quantity,
-              badgeBackground: AppColors.quantityBg,
-              title: '양',
-              englishLabel: 'Quantity',
-              trailing: Text('AI 계산', style: AppTypography.caption),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _ScoreBar(score: score),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              r == null
-                  ? _beforeConfirm
-                  : score == null
-                  ? _noNutrition
-                  : '${stageLabel(r.stage)} 기준 한 끼 양이에요',
-              style: AppTypography.bodySecondary,
-            ),
-          ],
-        ),
+    return _AxisCard(
+      letter: 'Q',
+      badgeColor: AppColors.quantity,
+      badgeBackground: AppColors.quantityBg,
+      title: '양',
+      englishLabel: 'Quantity',
+      trailing: _aiLabel,
+      body: _ScoreBody(
+        score: score,
+        color: AppColors.quantity,
+        description: r == null
+            ? _beforeConfirm
+            : score == null
+            ? _noNutrition
+            : '${stageLabel(r.stage)} 기준 한 끼 양이에요',
       ),
     );
   }
@@ -351,63 +400,95 @@ class _QualityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = result;
     final score = r?.scores.quality;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _AxisHeader(
-              letter: 'Q',
-              badgeColor: AppColors.quality,
-              badgeBackground: AppColors.qualityBg,
-              title: '질',
-              englishLabel: 'Quality',
-              trailing: Text('AI 계산', style: AppTypography.caption),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _ScoreBar(score: score),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              r == null
-                  ? _beforeConfirm
-                  : score == null
-                  ? _noNutrition
-                  : _summary(r.nutrients),
-              style: AppTypography.bodySecondary,
-            ),
-          ],
-        ),
+    return _AxisCard(
+      letter: 'Q',
+      badgeColor: AppColors.quality,
+      badgeBackground: AppColors.qualityBg,
+      title: '질',
+      englishLabel: 'Quality',
+      trailing: _aiLabel,
+      body: _ScoreBody(
+        score: score,
+        color: AppColors.quality,
+        description: r == null
+            ? _beforeConfirm
+            : score == null
+            ? _noNutrition
+            : _summary(r.nutrients),
       ),
     );
   }
 }
 
-/// 0~100 점수 막대 + 숫자. 점수가 없으면 빈 막대.
-class _ScoreBar extends StatelessWidget {
-  const _ScoreBar({required this.score});
+/// 막대 + 오른쪽 숫자 + 아래 설명. 제목과 같은 왼쪽 선에서 시작한다.
+class _ScoreBody extends StatelessWidget {
+  const _ScoreBody({
+    required this.score,
+    required this.color,
+    required this.description,
+  });
 
   final int? score;
+  final Color color;
+  final String description;
 
   @override
   Widget build(BuildContext context) {
     final s = score;
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: AppRadius.pillRadius,
-            child: LinearProgressIndicator(
-              value: (s ?? 0) / 100,
-              minHeight: 8,
-              backgroundColor: AppColors.primaryTint,
-              color: AppColors.quality,
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: _ScoreBar(score: s, color: color)),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 28,
+              child: Text(
+                s == null ? '-' : '$s',
+                textAlign: TextAlign.right,
+                style: AppTypography.cardTitle.copyWith(fontSize: 14),
+              ),
             ),
-          ),
+          ],
         ),
-        const SizedBox(width: AppSpacing.md),
-        Text(s == null ? '-' : '$s', style: AppTypography.sectionHead),
+        const SizedBox(height: 12),
+        Text(
+          description,
+          style: AppTypography.bodySecondary.copyWith(height: 1.25),
+        ),
       ],
+    );
+  }
+}
+
+/// 0~100 점수 막대. 점수가 생기면 왼쪽에서부터 차오른다. 없으면 빈 막대.
+class _ScoreBar extends StatelessWidget {
+  const _ScoreBar({required this.score, required this.color});
+
+  final int? score;
+  final Color color;
+
+  /// 막대가 차오르는 시간.
+  static const Duration _fillDuration = Duration(milliseconds: 700);
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      // begin 이 0 이라 처음 그릴 때도 0 에서부터 차오른다. 점수가 바뀌면 지금 값에서 이어서 움직인다.
+      tween: Tween<double>(begin: 0, end: (score ?? 0) / 100),
+      duration: _fillDuration,
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) => ClipRRect(
+        borderRadius: AppRadius.pillRadius,
+        child: LinearProgressIndicator(
+          value: value,
+          minHeight: 8,
+          backgroundColor: AppColors.surfaceMuted,
+          color: color,
+        ),
+      ),
     );
   }
 }
@@ -431,70 +512,206 @@ class _SatietyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _AxisHeader(
-              letter: 'S',
-              badgeColor: AppColors.satiety,
-              badgeBackground: AppColors.satietyBg,
-              title: '포만감',
-              englishLabel: 'Satiety',
-              trailing: const _DarkPill(label: '내가 입력해요'),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text('식사 후 지금, 얼마나 부르세요?', style: AppTypography.bodySecondary),
-            Row(
-              children: [
-                Expanded(
-                  child: Slider(
-                    value: value,
-                    min: 0,
-                    max: 100,
-                    onChanged: onChanged,
-                    onChangeEnd: onChangeEnd,
-                    activeColor: AppColors.primary,
-                    inactiveColor: AppColors.surfaceMuted,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(13, 14, 13, 12),
+      decoration: _cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 배지 · 제목 · 안내 문구는 양·질 카드와 같은 선에서 시작한다.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: _AxisCard._badgeSize,
+                height: _AxisCard._badgeSize,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: AppColors.satietyBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  'S',
+                  style: AppTypography.emphasis.copyWith(
+                    fontSize: 12.5,
+                    color: AppColors.satiety,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Container(
-                  width: 76,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: AppRadius.mdRadius,
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Text(
-                    '${value.toInt()} %',
-                    style: AppTypography.sectionHead,
-                  ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          '포만감',
+                          style: AppTypography.cardTitle.copyWith(
+                            fontSize: 13.5,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Satiety',
+                          style: AppTypography.caption.copyWith(
+                            fontSize: 10.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const Spacer(),
+                        const _DarkPill(label: '내가 입력해요'),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '식사 후 지금, 얼마나 부르세요?',
+                      style: AppTypography.bodySecondary.copyWith(height: 1.25),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            Row(
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // 슬라이더는 카드 안쪽 왼쪽 끝에서 시작해 오른쪽 입력 상자 앞에서 끝난다.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
               children: [
                 Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('0%', style: AppTypography.caption),
-                      Text('100%', style: AppTypography.caption),
+                      SliderTheme(
+                        data: SliderThemeData(
+                          trackHeight: 8,
+                          trackShape: const _FullWidthTrackShape(),
+                          thumbShape: const _RingThumbShape(),
+                          overlayShape: SliderComponentShape.noOverlay,
+                          activeTrackColor: AppColors.satiety,
+                          inactiveTrackColor: AppColors.surfaceMuted,
+                          disabledActiveTrackColor: AppColors.satiety,
+                          disabledInactiveTrackColor: AppColors.surfaceMuted,
+                        ),
+                        child: Slider(
+                          value: value,
+                          min: 0,
+                          max: 100,
+                          onChanged: onChanged,
+                          onChangeEnd: onChangeEnd,
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '0%',
+                            style: AppTypography.caption.copyWith(fontSize: 8),
+                          ),
+                          Text(
+                            '100%',
+                            style: AppTypography.caption.copyWith(fontSize: 8),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                const SizedBox(width: 76),
+                const SizedBox(width: 20),
+                Container(
+                  width: 80,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${value.toInt()}',
+                        style: AppTypography.cardTitle.copyWith(fontSize: 15),
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '%',
+                        style: AppTypography.caption.copyWith(fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// 슬라이더 막대가 위젯 폭을 그대로 쓰게 한다. 기본 모양은 양 끝을 손잡이 반지름만큼 비워
+/// 다른 막대와 길이가 맞지 않는다.
+class _FullWidthTrackShape extends RoundedRectSliderTrackShape {
+  const _FullWidthTrackShape();
+
+  @override
+  Rect getPreferredRect({
+    required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    final height = sliderTheme.trackHeight ?? 8;
+    final top = offset.dy + (parentBox.size.height - height) / 2;
+    return Rect.fromLTWH(offset.dx, top, parentBox.size.width, height);
+  }
+}
+
+/// 흰 바탕에 포만감 색 테두리를 두른 손잡이(Figma 22px).
+class _RingThumbShape extends SliderComponentShape {
+  const _RingThumbShape();
+
+  static const double _radius = 11;
+
+  @override
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) =>
+      const Size.fromRadius(_radius);
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
+  }) {
+    final canvas = context.canvas;
+    canvas.drawShadow(
+      Path()..addOval(Rect.fromCircle(center: center, radius: _radius)),
+      AppColors.textPrimary,
+      2,
+      true,
+    );
+    canvas.drawCircle(center, _radius, Paint()..color = AppColors.surface);
+    canvas.drawCircle(
+      center,
+      _radius - 1.25,
+      Paint()
+        ..color = AppColors.satiety
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
     );
   }
 }
