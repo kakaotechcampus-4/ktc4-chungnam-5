@@ -1,16 +1,15 @@
-# infra — 로컬 개발 환경
+# infra — 로컬 개발 환경 · 운영 배포
 
-컨테이너는 전부 같은 compose 프로젝트(`infra`)에 속한다. 그래서 한 네트워크(`infra_default`)에
+> 운영(EC2) 배포는 [아래 "운영 배포"](#운영-배포) 절. 위쪽은 전부 로컬 개발 얘기다.
+
+로컬 개발 컨테이너는 전부 같은 compose 프로젝트(`infra`)에 속한다. 그래서 한 네트워크(`infra_default`)에
 붙고 **서비스 이름으로 서로를 부를 수 있다.**
 
 | 파일 | 서비스 | 컨테이너 | 호스트 포트 |
 |---|---|---|---|
-| `docker-compose.yml` | `db` | `glp1-db` | — |
+| `docker-compose.yml` | `db` | `glp1-db` | 5433 |
 | `docker-compose.ai-stub.yml` | `ai-stub` | `glp1-ai-stub` | 8001 |
 | `docker-compose.be.yml` | `api` · `worker` | `glp1-api` · `glp1-worker` | 8000 (api) |
-
-> ⚠️ `docker-compose.yml`(DB)은 아직 커밋돼 있지 않다. `glp1-db` 컨테이너는 돌고 있지만
-> 파일이 저장소에 없어서 새로 클론한 사람은 DB 를 띄울 수 없다. 담당 티켓에서 추가할 것.
 
 ---
 
@@ -18,6 +17,7 @@
 
 ```powershell
 docker compose `
+  -f docker-compose.yml `
   -f docker-compose.ai-stub.yml `
   -f docker-compose.be.yml `
   up -d
@@ -25,16 +25,13 @@ docker compose `
 
 파일을 하나씩 띄워도 동작한다(같은 프로젝트라 네트워크를 공유한다). 다만 그때는
 compose 가 나머지 컨테이너를 모르는 것으로 보고 **`Found orphan containers` 경고**를 낸다.
-`-f` 를 모아 주면 대부분 사라진다.
-
-`glp1-db` 에 대한 경고는 위 명령으로도 남는다 — `docker-compose.yml` 이 저장소에 없어서
-`-f` 목록에 넣을 수가 없기 때문이다. 그 파일이 커밋되면 목록에 추가하고 경고도 없어진다.
-`--remove-orphans` 는 **쓰지 말 것.** 돌고 있는 `glp1-db` 를 지워 버린다.
+`-f` 를 모아 주면 사라진다. `--remove-orphans` 는 **쓰지 말 것.** `-f` 에 빠진 컨테이너를
+지워 버린다.
 
 내리기:
 
 ```powershell
-docker compose -f docker-compose.ai-stub.yml -f docker-compose.be.yml down
+docker compose -f docker-compose.yml -f docker-compose.ai-stub.yml -f docker-compose.be.yml down
 ```
 
 ---
@@ -103,3 +100,96 @@ PENDING          1  2026-09-20 10:15:40+00:00
 ```
 
 `FAILED` 가 있으면 목록과 함께 다시 넣는 SQL 을 같이 출력해 준다.
+
+---
+
+## 운영 배포
+
+팀 EC2 1대에 컨테이너 5개를 띄운다. 외부에 열린 포트는 Caddy 의 80·443 뿐이다.
+서버 접속은 SSH 가 아니라 **SSM Session Manager** 로 한다.
+
+| 파일 | 역할 |
+|---|---|
+| `docker-compose.prod.yml` | `db` · `api` · `worker` · `ai` · `caddy`. compose 프로젝트 이름은 `glp1-prod` |
+| `Caddyfile` | HTTPS(Let's Encrypt) + 데모 키 검사 |
+| `.env.prod.example` | 서버의 `.env.prod` 에 채울 키 목록. 비밀값은 **서버의 `.env.prod` 에만** 둔다 |
+| `deploy.sh` | 배포 스크립트. 사람과 CI 가 같은 스크립트를 쓴다 |
+
+```
+인터넷 ──80/443──▶ caddy ──▶ api:8000 ──▶ db:5432
+                              ▲   │
+                    /internal │   ▼ (큐: task_queue 테이블)
+                              ai ◀── worker
+```
+
+### 접근 규칙 (Caddyfile, 위에서부터)
+
+1. `/internal/*` → 404. AI 가 BE 를 다시 부르는 경로라 compose 내부 네트워크로만 닿는다
+2. `/health` → 통과
+3. `X-Demo-Key` 헤더가 `DEMO_KEY` 와 같거나, 접속 IP 가 `ALLOWED_IPS` 안이면 → api
+4. 나머지 → 403
+
+업로드 제한은 12MB 로 BE(10MB)보다 약간 크다. BE 가 내는 413 메시지가 앱까지 가게 하려는 것이다.
+
+### 첫 배포 (Session Manager 에서)
+
+```bash
+sudo mkdir -p /opt/glp1 && sudo chown ubuntu:ubuntu /opt/glp1
+git clone https://github.com/kakaotechcampus-4/ktc4-chungnam-5.git /opt/glp1 && cd /opt/glp1/infra
+cp .env.prod.example .env.prod && vi .env.prod   # 비밀값은 openssl rand -hex 32 로 만든다
+chmod 600 .env.prod
+./deploy.sh
+docker compose -f docker-compose.prod.yml logs -f caddy   # 인증서 발급 로그 확인
+```
+
+스키마는 `api` 가 기동할 때마다 `alembic upgrade head` 로 맞춘다. 공공 영양DB 시드는
+**처음 한 번만** 넣는다 (336,351건):
+
+```bash
+docker exec -i glp1-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --data-only --no-owner' \
+  < seed/food_refs_20260828.dump
+```
+
+### 다시 배포
+
+`main` 에 병합되면 GitHub Actions 가 `ssm send-command` 로 `deploy.sh` 를 부른다.
+급할 때는 Session Manager 에서 직접 실행한다.
+
+```bash
+/opt/glp1/infra/deploy.sh            # origin/main
+/opt/glp1/infra/deploy.sh <커밋 SHA>  # 특정 커밋
+```
+
+### 운영 중 자주 쓰는 것
+
+```bash
+cd /opt/glp1/infra
+docker compose -f docker-compose.prod.yml ps
+docker logs -f glp1-worker
+
+# .env.prod 를 고친 뒤에는 restart 가 아니라 up -d 로 컨테이너를 다시 만든다 (환경변수는 생성 시점에 읽힌다)
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d caddy
+```
+
+- 디스크는 50GB 고정이다. 차면 `docker system df` 로 보고 `docker system prune -af` 로 정리한다.
+  **`docker volume prune` 은 쓰지 않는다** — `db-data` · `media` · `caddy_data` 가 지워진다.
+- 서버는 **중지하지 말고 재부팅만** 한다. 중지 → 시작하면 공인 IP 가 바뀐다 (DuckDNS cron 이 따라가지만 몇 분 끊긴다).
+
+### 로컬에서 운영 구성 확인
+
+`DOMAIN=localhost` 로 띄우면 Caddy 가 내부 인증서를 쓴다. 컨테이너 이름이 로컬 개발용과
+같으므로(`glp1-db` 등) 개발 컨테이너를 먼저 내린다.
+
+```bash
+cd infra
+cp .env.prod.example .env.prod      # DOMAIN=localhost, 나머지는 아무 시험 값
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build --wait
+
+curl -k https://localhost/health                                    # 200
+curl -k https://localhost/docs                                      # 403
+curl -k -H "X-Demo-Key: <값>" https://localhost/docs                # 200
+curl -k -H "X-Demo-Key: <값>" https://localhost/internal/v1/foods   # 404
+docker compose -f docker-compose.prod.yml ps                        # 5개 모두 healthy
+
+docker compose -f docker-compose.prod.yml down    # -v 를 붙이면 DB·사진·인증서 볼륨까지 지운다
+```

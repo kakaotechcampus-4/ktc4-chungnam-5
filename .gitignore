@@ -18,6 +18,9 @@
 .env
 .env.*
 !.env.example
+# 운영 서버 비밀값(infra/.env.prod). 위 .env.* 에도 걸리지만 명시해 둔다
+.env.prod
+!.env.prod.example
 *.pem
 *.key
 *.p12
