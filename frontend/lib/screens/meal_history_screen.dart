@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../common/api_format.dart';
-import '../common/api_image.dart';
 import '../popups/popup_gate.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
@@ -580,8 +579,17 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
               confirmDismiss: (_) => _confirmDelete(meal),
               onDismissed: (_) => _onDeleted(meal),
               background: const _DeleteSwipeBackground(),
-              child: _HistoryMealCard(
-                meal: meal,
+              child: MealCard(
+                mealTypeLabel: mealTypeLabel(meal.mealType),
+                time: _formatTime(meal.eatenAt),
+                foodNames: meal.displayName,
+                quantityLabel: meal.scores?.quantityDisplay,
+                quality: meal.scores?.quality,
+                satiety: meal.scores?.satiety,
+                thumbnailUrl: meal.thumbnailUrl,
+                // 평가한 끼니는 다음 끼니 제안으로, 아직이면 음식 확인으로 간다.
+                showChevron: true,
+                trailingLabel: meal.scores?.satiety == null ? null : '제안 ›',
                 onTap: () => _openMeal(meal),
               ),
             ),
@@ -900,7 +908,7 @@ class _MonthSummaryBar extends StatelessWidget {
   }
 }
 
-/// 선택한 날 제목 옆의 투약 단계 칩(`유지기` 등).
+/// 선택한 날 제목 옆의 투약 단계 칩(`유지기` 등). 9 Bold · 알약(9) · 안쪽 여백 7×3.
 class _StageChip extends StatelessWidget {
   const _StageChip({required this.label});
 
@@ -908,161 +916,18 @@ class _StageChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ScoreChip(
-      text: label,
-      background: AppColors.primaryTint,
-      foreground: AppColors.primaryStrong,
-    );
-  }
-}
-
-/// 기록 탭의 한 끼 카드. 사진 · `아침 · 08:20` · 음식 이름 · Q·Q·S 칩 · `제안 ›`.
-///
-/// 홈의 [MealCard] 와 모양이 달라 이 화면에서만 쓴다.
-class _HistoryMealCard extends StatelessWidget {
-  const _HistoryMealCard({required this.meal, required this.onTap});
-
-  final HistoryMeal meal;
-  final VoidCallback onTap;
-
-  static const double _thumbnailSize = 54;
-
-  @override
-  Widget build(BuildContext context) {
-    final scores = meal.scores;
-    final satiety = scores?.satiety;
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(13),
-      side: const BorderSide(color: AppColors.border),
-    );
-    final thumbnail = meal.thumbnailUrl;
-
-    return Material(
-      color: AppColors.surface,
-      shape: shape,
-      child: InkWell(
-        onTap: onTap,
-        customBorder: shape,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-          child: Row(
-            children: [
-              // 사진이 없거나 못 받으면 회색 자리만 남는다.
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox.square(
-                  dimension: _thumbnailSize,
-                  child: ColoredBox(
-                    color: AppColors.surfaceSage,
-                    child: thumbnail == null ? null : ApiImage(thumbnail),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${mealTypeLabel(meal.mealType)} · ${_formatTime(meal.eatenAt)}',
-                      style: AppTypography.caption.copyWith(
-                        fontSize: 9.5,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      meal.displayName,
-                      style: AppTypography.cardTitle.copyWith(fontSize: 12.5),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 3),
-                    // 포만도가 null 이면 평가 전이다. 0점으로 채우지 않고 칩 하나만 보인다.
-                    if (satiety == null)
-                      const _ScoreChip(
-                        text: '평가 전',
-                        background: AppColors.surfaceMuted,
-                        foreground: AppColors.textSecondary,
-                      )
-                    else
-                      Wrap(
-                        spacing: 5,
-                        runSpacing: 3,
-                        children: [
-                          _ScoreChip(
-                            text: '양 ${scores?.quantityDisplay ?? '-'}',
-                            background: AppColors.quantityBg,
-                            foreground: AppColors.quantity,
-                          ),
-                          _ScoreChip(
-                            text: scores?.quality == null
-                                ? '질 -'
-                                : '질 ${scores!.quality}점',
-                            background: AppColors.qualityBg,
-                            foreground: AppColors.quality,
-                          ),
-                          _ScoreChip(
-                            text: '포만도 $satiety%',
-                            background: AppColors.satietyBg,
-                            foreground: AppColors.satiety,
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              // 평가한 끼니는 다음 끼니 제안으로, 아직이면 음식 확인으로 간다.
-              if (satiety == null)
-                const Icon(
-                  Icons.chevron_right,
-                  size: AppLayout.tabIconSize,
-                  color: AppColors.inactive,
-                )
-              else
-                Text(
-                  '제안 ›',
-                  style: AppTypography.emphasis.copyWith(
-                    fontSize: 9.5,
-                    color: AppColors.primaryStrong,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 작은 알약 칩(9 Bold). Q·Q·S 점수와 단계 표시에 쓴다.
-class _ScoreChip extends StatelessWidget {
-  const _ScoreChip({
-    required this.text,
-    required this.background,
-    required this.foreground,
-  });
-
-  final String text;
-  final Color background;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: background,
+        color: AppColors.primaryTint,
         borderRadius: BorderRadius.circular(9),
       ),
       child: Text(
-        text,
+        label,
         style: AppTypography.emphasis.copyWith(
           fontSize: 9,
           height: 1.25,
-          color: foreground,
+          color: AppColors.primaryStrong,
         ),
       ),
     );

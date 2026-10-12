@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../common/api_image.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -75,13 +76,13 @@ class QqsBadgeRow extends StatelessWidget {
           background: AppColors.quantityBg,
           foreground: AppColors.quantity,
         ),
-        const SizedBox(width: AppSpacing.xs),
+        const SizedBox(width: 5),
         _Badge(
           text: quality == null ? '질 -' : '질 $quality점',
           background: AppColors.qualityBg,
           foreground: AppColors.quality,
         ),
-        const SizedBox(width: AppSpacing.xs),
+        const SizedBox(width: 5),
         _Badge(
           text: '포만도 $satiety%',
           background: AppColors.satietyBg,
@@ -105,18 +106,27 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Figma 칩: 9 Bold · 알약(9) · 안쪽 여백 7×3.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: AppRadius.smRadius,
+        borderRadius: BorderRadius.circular(9),
       ),
-      child: Text(text, style: _badgeText.copyWith(color: foreground)),
+      child: Text(
+        text,
+        style: _badgeText.copyWith(
+          fontSize: 9,
+          height: 1.25,
+          color: foreground,
+        ),
+      ),
     );
   }
 }
 
-/// 기록된 한 끼 카드. 홈과 기록이 같은 모양을 쓰고, 기록만 우측 `>` 를 켠다.
+/// 기록된 한 끼 카드. 홈과 기록(단기 피드백)이 같은 모양을 쓴다.
+/// 오른쪽에는 `>` 화살표를 켜거나 [trailingLabel](`제안 ›`)을 놓는다.
 class MealCard extends StatelessWidget {
   const MealCard({
     super.key,
@@ -126,8 +136,10 @@ class MealCard extends StatelessWidget {
     required this.quantityLabel,
     required this.quality,
     required this.satiety,
+    this.thumbnailUrl,
     this.onTap,
     this.showChevron = false,
+    this.trailingLabel,
   });
 
   /// `아침` · `점심` · `저녁` · `간식`.
@@ -147,46 +159,68 @@ class MealCard extends StatelessWidget {
   final int? quality;
   final int? satiety;
 
+  /// 서버가 준 사진 경로(`/media/...`). 없거나 못 받으면 회색 자리만 보인다.
+  final String? thumbnailUrl;
+
   final VoidCallback? onTap;
   final bool showChevron;
+
+  /// 오른쪽에 `>` 대신 놓는 짧은 글(`제안 ›`). 주면 [showChevron] 보다 우선한다.
+  final String? trailingLabel;
 
   static const double _thumbnailSize = 54;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(13),
+      side: const BorderSide(color: AppColors.border),
+    );
+    final photo = thumbnailUrl;
+    final label = trailingLabel;
+
+    return Material(
+      color: AppColors.surface,
+      shape: shape,
       child: InkWell(
         onTap: onTap,
-        borderRadius: AppRadius.lgRadius,
+        customBorder: shape,
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 실제 사진은 S3 URL 로 교체한다. 지금은 자리만 잡는다.
-              Container(
-                width: _thumbnailSize,
-                height: _thumbnailSize,
-                decoration: const BoxDecoration(
-                  color: AppColors.surfaceSage,
-                  borderRadius: AppRadius.mdRadius,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox.square(
+                  dimension: _thumbnailSize,
+                  child: ColoredBox(
+                    color: AppColors.surfaceSage,
+                    child: photo == null ? null : ApiImage(photo),
+                  ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('$mealTypeLabel · $time', style: AppTypography.caption),
-                    const SizedBox(height: 2),
+                    Text(
+                      '$mealTypeLabel · $time',
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 9.5,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
                     Text(
                       foodNames,
-                      style: AppTypography.cardTitle,
+                      style: AppTypography.cardTitle.copyWith(fontSize: 12.5),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: 3),
                     if (satiety case final s?)
                       QqsBadgeRow(
                         quantityLabel: quantityLabel,
@@ -202,7 +236,16 @@ class MealCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (showChevron) ...[
+              if (label != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  label,
+                  style: AppTypography.emphasis.copyWith(
+                    fontSize: 9.5,
+                    color: AppColors.primaryStrong,
+                  ),
+                ),
+              ] else if (showChevron) ...[
                 const SizedBox(width: AppSpacing.sm),
                 const Icon(
                   Icons.chevron_right,
@@ -340,11 +383,11 @@ class MealCardSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
         child: Row(
           children: [
             const SkeletonBox(width: 54, height: 54),
-            const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
