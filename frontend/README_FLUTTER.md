@@ -60,7 +60,7 @@ flutter pub get
 |---|---|---|---|
 | **local**(기본) | 없음 | `http://localhost:4010` — [mock 서버](#mock-서버-local) | BE 없이 화면만 볼 때. **정해진 응답만** 온다(저장해도 다음 조회 값이 그대로) |
 | **dev** | `--dart-define=APP_PHASE=dev` | `http://127.0.0.1:8000` — Docker 로 띄운 실제 BE | 회원가입 → 투약 → 식사처럼 흐름을 이어서 볼 때. 웹은 [웹 → B](#b-실제-be-로-확인하기-dev--docker-be), 폰은 [실기기 테스트](#실기기-테스트-실서버) |
-| **prod** | `--dart-define=APP_PHASE=prod --dart-define=API_BASE_URL=<주소>` | 아직 없음 | 주소 없이 켜면 시작하자마자 오류 |
+| **prod** | `--dart-define=APP_PHASE=prod --dart-define=DEMO_KEY=<키>` | `https://glp1-demo.duckdns.org` — 데모 서버(팀 EC2) | 시연용 APK. 키는 팀 비밀 채널에서 받는다. 키가 없거나 틀리면 "서버 접속 키가 맞지 않아요"(403) |
 
 `API_BASE_URL` 을 주면 phase 주소 대신 쓴다(에뮬레이터는 `http://10.0.2.2:<포트>/api/v1`).
 
@@ -388,8 +388,13 @@ Navigator.push(
 | 키 | 기본값 | 설명 |
 |---|---|---|
 | `APP_PHASE` | `local` | `local`(mock 서버) · `dev`(Docker BE) · `prod`. [환경(phase)](#환경phase--local--dev--prod) 참고 |
-| `API_BASE_URL` | phase 주소 | 주면 phase 주소 대신 쓴다. 에뮬레이터는 `http://10.0.2.2:<포트>/api/v1` |
+| `API_BASE_URL` | phase 주소 | 주면 phase 주소 대신 쓴다. **`/api/v1` 까지 적는다.** 에뮬레이터는 `http://10.0.2.2:<포트>/api/v1` |
+| `DEMO_KEY` | 없음 | 데모 서버 접근 키. 있으면 모든 요청과 사진에 `X-Demo-Key` 로 붙는다. local · dev 는 필요 없다 |
 
 ```bash
-flutter run --dart-define=APP_PHASE=prod --dart-define=API_BASE_URL=https://...
+# 시연용 APK (release 빌드)
+flutter build apk --dart-define=APP_PHASE=prod --dart-define=DEMO_KEY=<키>
 ```
+
+> 키가 들어간 APK 는 공개 채널에 올리지 않는다(APK 를 풀면 키가 보인다).
+> 사진은 `Image.network` 대신 `lib/common/api_image.dart` 의 `ApiImage` 로 그린다 — 사진 요청에도 키가 붙어야 한다.
