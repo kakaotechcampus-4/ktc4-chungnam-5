@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- release 빌드용. Flutter 템플릿은 이 권한을 debug · profile 매니페스트에만
+         넣어서, 빠지면 flutter run 은 되고 build apk 결과물은 서버에 못 붙는다. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="frontend"
         android:name="${applicationName}"

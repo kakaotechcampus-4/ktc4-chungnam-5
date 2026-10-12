@@ -90,7 +90,8 @@ flutter build apk --release       # 배포용 APK
 
 | 키 | 설명 |
 |---|---|
-| `API_BASE_URL` | BE 공개 API 주소 |
+| `API_BASE_URL` | BE 공개 API 주소 (`/api/v1` 포함). 주면 phase 주소 대신 쓴다 |
+| `DEMO_KEY` | 데모 서버 접근 키(`X-Demo-Key`). prod 빌드에만 넣는다 |
 | `KAKAO_NATIVE_APP_KEY` | 카카오 로그인 |
 | `FCM_SENDER_ID` | 푸시 |
 

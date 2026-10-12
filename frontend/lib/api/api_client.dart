@@ -8,7 +8,8 @@ import 'api_exception.dart';
 /// - [local]: `frontend/mock` 의 mock 서버. BE 스키마대로 **정해진 응답만**
 ///   돌려준다 — 저장해도 다음 조회 값이 바뀌지 않는다.
 /// - [dev]: 실제 BE + 개발 DB. 지금은 각자 PC 에 Docker 로 띄운 BE 다.
-/// - [prod]: 운영 서버. 아직 없다.
+/// - [prod]: 데모 서버(팀 EC2). 앞단 Caddy 가 `X-Demo-Key` 없는 요청을
+///   403 으로 막으므로 `DEMO_KEY` 를 함께 넣어 빌드한다.
 enum AppPhase { local, dev, prod }
 
 /// API 연결 설정. 값은 빌드할 때 `--dart-define` 으로 바꾼다.
@@ -38,11 +39,20 @@ class ApiConfig {
       // localhost 가 아니라 127.0.0.1 — 윈도우 크롬은 localhost 를 IPv6(::1)로
       // 먼저 찾는데 Docker BE 는 거기서 응답하지 않는다. adb reverse 에서도 같다.
       AppPhase.dev => 'http://127.0.0.1:8000/api/v1',
-      AppPhase.prod => throw StateError(
-        'prod 서버 주소가 아직 없어요. --dart-define=API_BASE_URL 로 넣어 주세요',
-      ),
+      // 도메인은 비밀값이 아니다. `/api/v1` 까지 적어 둬서 빌드 명령에서
+      // 빠뜨릴 일이 없게 한다(빠지면 API 만 전부 404 가 나고 사진은 뜬다).
+      AppPhase.prod => 'https://glp1-demo.duckdns.org/api/v1',
     };
   }
+
+  /// 데모 서버 접근 키(`--dart-define=DEMO_KEY`). 비밀값이라 소스에 두지 않는다.
+  /// 비어 있으면 헤더를 붙이지 않는다 — local · dev 는 키가 필요 없다.
+  static const demoKey = String.fromEnvironment('DEMO_KEY');
+
+  /// dio 를 거치지 않는 요청(`Image.network`)에 붙일 헤더. 사진도 같은
+  /// Caddy 를 지나므로 키가 빠지면 사진만 403 이 난다 — 사진은 [ApiImage] 로 그린다.
+  static Map<String, String>? get demoKeyHeaders =>
+      demoKey.isEmpty ? null : {'X-Demo-Key': demoKey};
 
   static const timeout = Duration(seconds: 10);
 
@@ -72,7 +82,8 @@ class ApiResult {
 
 /// 모든 API 호출이 지나가는 곳.
 ///
-/// - 요청마다 `X-User-Id` 를 붙인다([UserSession]).
+/// - 요청마다 `X-User-Id` 를 붙인다([UserSession]). 데모 키가 있으면
+///   `X-Demo-Key` 도 붙인다([ApiConfig.demoKey]).
 /// - 응답 래퍼를 벗겨 [ApiResult] 로 돌려준다.
 /// - 실패는 전부 [ApiException] 으로 바꾼다. 화면은 dio 를 몰라도 된다.
 /// - `USER_NOT_FOUND` 는 화면마다 처리하지 않고 여기서 세션을 지운다.
@@ -82,23 +93,27 @@ class ApiResult {
 /// 각 화면의 `XxxApiService` 는 이 클라이언트를 받아 메서드 본문만 채운다.
 /// 더미 분기를 두지 않는다 — 서버 없이 볼 때는 local phase(mock 서버)를 쓴다.
 class ApiClient {
-  ApiClient({required UserSession session, Dio? dio})
-    : _session = session,
-      _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              baseUrl: ApiConfig.baseUrl,
-              connectTimeout: ApiConfig.timeout,
-              receiveTimeout: ApiConfig.timeout,
-              contentType: Headers.jsonContentType,
-            ),
-          ) {
+  ApiClient({
+    required UserSession session,
+    Dio? dio,
+    String demoKey = ApiConfig.demoKey,
+  }) : _session = session,
+       _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               baseUrl: ApiConfig.baseUrl,
+               connectTimeout: ApiConfig.timeout,
+               receiveTimeout: ApiConfig.timeout,
+               contentType: Headers.jsonContentType,
+             ),
+           ) {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           final userId = session.userId;
           if (userId != null) options.headers['X-User-Id'] = userId;
+          if (demoKey.isNotEmpty) options.headers['X-Demo-Key'] = demoKey;
           handler.next(options);
         },
       ),
@@ -204,6 +219,15 @@ class ApiClient {
       if (body is Map<String, dynamic>) {
         final error = _errorOf(body, response.statusCode);
         if (error != null) return error;
+      }
+      // 래퍼 없는 403 은 BE 가 아니라 데모 서버 앞단(Caddy)이 막은 것이다 —
+      // 데모 키가 빠졌거나 틀렸다. 현장에서 원인을 바로 알 수 있게 따로 말한다.
+      if (response.statusCode == 403) {
+        return const ApiException(
+          code: ApiException.unexpectedResponse,
+          message: '서버 접속 키가 맞지 않아요',
+          statusCode: 403,
+        );
       }
       return ApiException(
         code: ApiException.unexpectedResponse,
