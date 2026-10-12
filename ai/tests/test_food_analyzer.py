@@ -8,23 +8,21 @@ import pytest
 
 from app.food_analyzer import _build_prompt, _parse_response, analyze_food
 
-_EMPTY_RESULT = {"items": [], "clarifyQuestion": None}
-
 
 def test_analyze_food_requires_image_or_raw_text():
     with pytest.raises(ValueError):
         asyncio.run(analyze_food("LUNCH"))
 
 
-def test_analyze_food_with_image_returns_empty_result_stub():
-    """모델 호출이 아직 TODO 라 지금은 항상 빈 결과를 돌려줘야 한다."""
+def test_analyze_food_with_image_returns_empty_list_stub():
+    """모델 호출이 아직 TODO 라 지금은 항상 빈 목록을 돌려줘야 한다."""
     result = asyncio.run(analyze_food("LUNCH", image=b"fake-image-bytes"))
-    assert result == _EMPTY_RESULT
+    assert result == []
 
 
-def test_analyze_food_with_raw_text_returns_empty_result_stub():
+def test_analyze_food_with_raw_text_returns_empty_list_stub():
     result = asyncio.run(analyze_food("LUNCH", raw_text="닭가슴살 100g 먹었어"))
-    assert result == _EMPTY_RESULT
+    assert result == []
 
 
 def test_build_prompt_includes_meal_type():
@@ -45,6 +43,6 @@ def test_build_prompt_omits_raw_text_section_when_not_given():
 
 
 def test_parse_response_shape_is_stable_regardless_of_input():
-    """TODO 가 채워지기 전까지는 어떤 응답이 와도 같은 빈 모양을 돌려준다."""
-    assert _parse_response(None) == _EMPTY_RESULT
-    assert _parse_response({"anything": "goes here"}) == _EMPTY_RESULT
+    """TODO 가 채워지기 전까지는 어떤 응답이 와도 빈 목록을 돌려준다."""
+    assert _parse_response(None) == []
+    assert _parse_response({"anything": "goes here"}) == []
