@@ -465,7 +465,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                 ),
                 if (selectedStage != null) ...[
                   const SizedBox(width: 6),
-                  _StageChip(label: stageLabel(selectedStage)),
+                  StageBadge(label: stageLabel(selectedStage)),
                 ],
                 const Spacer(),
                 if (_listState == LoadState.ready)
@@ -586,7 +586,6 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                 quantityLabel: meal.scores?.quantityDisplay,
                 quality: meal.scores?.quality,
                 satiety: meal.scores?.satiety,
-                thumbnailUrl: meal.thumbnailUrl,
                 showChevron: true,
                 onTap: () => _openMeal(meal),
               ),
@@ -902,32 +901,6 @@ class _MonthSummaryBar extends StatelessWidget {
                 ),
               ],
             ),
-    );
-  }
-}
-
-/// 선택한 날 제목 옆의 투약 단계 칩(`유지기` 등). 9 Bold · 알약(9) · 안쪽 여백 7×3.
-class _StageChip extends StatelessWidget {
-  const _StageChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.primaryTint,
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Text(
-        label,
-        style: AppTypography.emphasis.copyWith(
-          fontSize: 9,
-          height: 1.25,
-          color: AppColors.primaryStrong,
-        ),
-      ),
     );
   }
 }
