@@ -125,8 +125,7 @@ class _Badge extends StatelessWidget {
   }
 }
 
-/// 기록된 한 끼 카드. 홈과 기록(단기 피드백)이 같은 모양을 쓴다.
-/// 오른쪽에는 `>` 화살표를 켜거나 [trailingLabel](`제안 ›`)을 놓는다.
+/// 기록된 한 끼 카드. 홈과 기록(단기 피드백)이 같은 모양을 쓰고, 오른쪽 `>` 는 켤 수 있다.
 class MealCard extends StatelessWidget {
   const MealCard({
     super.key,
@@ -139,7 +138,6 @@ class MealCard extends StatelessWidget {
     this.thumbnailUrl,
     this.onTap,
     this.showChevron = false,
-    this.trailingLabel,
   });
 
   /// `아침` · `점심` · `저녁` · `간식`.
@@ -165,9 +163,6 @@ class MealCard extends StatelessWidget {
   final VoidCallback? onTap;
   final bool showChevron;
 
-  /// 오른쪽에 `>` 대신 놓는 짧은 글(`제안 ›`). 주면 [showChevron] 보다 우선한다.
-  final String? trailingLabel;
-
   static const double _thumbnailSize = 54;
 
   @override
@@ -177,7 +172,6 @@ class MealCard extends StatelessWidget {
       side: const BorderSide(color: AppColors.border),
     );
     final photo = thumbnailUrl;
-    final label = trailingLabel;
 
     return Material(
       color: AppColors.surface,
@@ -236,16 +230,7 @@ class MealCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (label != null) ...[
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  label,
-                  style: AppTypography.emphasis.copyWith(
-                    fontSize: 9.5,
-                    color: AppColors.primaryStrong,
-                  ),
-                ),
-              ] else if (showChevron) ...[
+              if (showChevron) ...[
                 const SizedBox(width: AppSpacing.sm),
                 const Icon(
                   Icons.chevron_right,

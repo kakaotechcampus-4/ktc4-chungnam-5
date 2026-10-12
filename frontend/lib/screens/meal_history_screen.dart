@@ -587,9 +587,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                 quality: meal.scores?.quality,
                 satiety: meal.scores?.satiety,
                 thumbnailUrl: meal.thumbnailUrl,
-                // 평가한 끼니는 다음 끼니 제안으로, 아직이면 음식 확인으로 간다.
                 showChevron: true,
-                trailingLabel: meal.scores?.satiety == null ? null : '제안 ›',
                 onTap: () => _openMeal(meal),
               ),
             ),
