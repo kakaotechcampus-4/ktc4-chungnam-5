@@ -228,9 +228,9 @@ class MealHistoryApiService {
 
 // ── 화면 ────────────────────────────────────────────────────
 
-/// 기록 — 월 달력 + 선택한 날의 식사.
+/// 단기 피드백 — 월 달력 + 선택한 날의 식사.
 ///
-/// Figma `hOxrHBitBpjwIBBg2GO49y` node `94:6`.
+/// Figma `S6BHeo0ZebzY4PAQOSp0EW` node `1:1388`(화면 9 · 기록 (달력 수정)).
 ///
 /// 달력과 목록은 API 가 달라 상태를 따로 들고 있다. 한쪽이 실패해도 다른 쪽을
 /// 같이 죽이지 않는다(`design-system.md` §10).
@@ -433,67 +433,21 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.screenHorizontal,
-          AppSpacing.titleTop,
+          AppSpacing.md,
           AppSpacing.screenHorizontal,
           AppLayout.scrollBottomPadding,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('기록', style: AppTypography.screenTitle),
-            const SizedBox(height: AppSpacing.lg),
-
-            _MonthNavigator(
-              month: _focusedMonth,
-              onPrevious: () => _moveMonth(-1),
-              onNext: () => _moveMonth(1),
-              onToday: _goToToday,
+            Text(
+              '단기 피드백',
+              style: AppTypography.screenTitle.copyWith(fontSize: 17),
             ),
+            const SizedBox(height: AppSpacing.xl),
+
+            _buildCalendarCard(calendar),
             const SizedBox(height: AppSpacing.md),
-
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: _calendarState == LoadState.failed
-                    ? RetryBlock(
-                        message: _calendarError ?? '달력을 불러오지 못했어요',
-                        onRetry: _loadCalendar,
-                      )
-                    : Column(
-                        children: [
-                          Row(
-                            children: [
-                              for (var i = 0; i < _weekdayLabels.length; i++)
-                                Expanded(
-                                  child: Text(
-                                    _weekdayLabels[i],
-                                    textAlign: TextAlign.center,
-                                    style: AppTypography.caption.copyWith(
-                                      // 일요일만 코랄.
-                                      color: i == 0
-                                          ? AppColors.primary
-                                          : AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          _MonthGrid(
-                            month: _focusedMonth,
-                            today: _today,
-                            selectedDay: _selectedDay,
-                            // 아직 집계를 못 받았으면 점을 비운다.
-                            calendar: _calendarState == LoadState.ready
-                                ? calendar
-                                : null,
-                            onSelect: _selectDay,
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.cardGap),
 
             _MonthSummaryBar(
               month: _focusedMonth,
@@ -501,27 +455,90 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                   ? calendar?.summary
                   : null,
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.md),
 
             Row(
               children: [
                 Text(
                   _formatDayHeader(_selectedDay),
-                  style: AppTypography.sectionHead,
+                  style: AppTypography.cardTitle,
                 ),
                 if (selectedStage != null) ...[
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: 6),
                   StageBadge(label: stageLabel(selectedStage)),
                 ],
                 const Spacer(),
                 if (_listState == LoadState.ready)
-                  Text('${_meals.length}끼 기록됨', style: AppTypography.caption),
+                  Text(
+                    '${_meals.length}끼 기록됨',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             ..._buildMealList(),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 월 이동 + 요일 + 날짜 그리드를 한 장의 흰 카드에 담는다.
+  Widget _buildCalendarCard(CalendarMonth? calendar) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(8, 15, 8, 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: AppRadius.xlRadius,
+      ),
+      child: Column(
+        children: [
+          _MonthNavigator(
+            month: _focusedMonth,
+            onPrevious: () => _moveMonth(-1),
+            onNext: () => _moveMonth(1),
+            onToday: _goToToday,
+          ),
+          const SizedBox(height: 22),
+          if (_calendarState == LoadState.failed)
+            RetryBlock(
+              message: _calendarError ?? '달력을 불러오지 못했어요',
+              onRetry: _loadCalendar,
+            )
+          else ...[
+            Row(
+              children: [
+                for (var i = 0; i < _weekdayLabels.length; i++)
+                  Expanded(
+                    child: Text(
+                      _weekdayLabels[i],
+                      textAlign: TextAlign.center,
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 9,
+                        // 일요일만 코랄.
+                        color: i == 0
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            _MonthGrid(
+              month: _focusedMonth,
+              today: _today,
+              selectedDay: _selectedDay,
+              // 아직 집계를 못 받았으면 점을 비운다.
+              calendar: _calendarState == LoadState.ready ? calendar : null,
+              onSelect: _selectDay,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -573,7 +590,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                 onTap: () => _openMeal(meal),
               ),
             ),
-            const SizedBox(height: AppSpacing.cardGap),
+            const SizedBox(height: AppSpacing.sm),
           ],
           AddMealCard(label: '＋ 저녁 식사 기록하기', onTap: _openMealInput),
         ];
@@ -590,9 +607,9 @@ class _DeleteSwipeBackground extends StatelessWidget {
     return Container(
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.primaryTint,
-        borderRadius: AppRadius.lgRadius,
+        borderRadius: BorderRadius.circular(13),
       ),
       child: Text(
         '삭제',
@@ -620,28 +637,30 @@ class _MonthNavigator extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _ArrowButton(icon: Icons.chevron_left, onTap: onPrevious),
-        const SizedBox(width: AppSpacing.sm),
-        Text('${month.year}년 ${month.month}월', style: AppTypography.sectionHead),
-        const SizedBox(width: AppSpacing.sm),
-        _ArrowButton(icon: Icons.chevron_right, onTap: onNext),
+        _ArrowButton(glyph: '‹', onTap: onPrevious),
+        const SizedBox(width: 8),
+        Text(
+          '${month.year}년 ${month.month}월',
+          style: AppTypography.cardTitle.copyWith(fontSize: 14),
+        ),
+        const SizedBox(width: 8),
+        _ArrowButton(glyph: '›', onTap: onNext),
         const Spacer(),
-        InkWell(
-          onTap: onToday,
-          borderRadius: AppRadius.pillRadius,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.xs,
-            ),
-            decoration: const BoxDecoration(
-              color: AppColors.surfaceMuted,
-              borderRadius: AppRadius.pillRadius,
-            ),
-            child: Text(
-              '오늘',
-              style: AppTypography.caption.copyWith(
-                color: AppColors.textSecondary,
+        Material(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(9),
+          child: InkWell(
+            onTap: onToday,
+            borderRadius: BorderRadius.circular(9),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              child: Text(
+                '오늘',
+                style: AppTypography.emphasis.copyWith(
+                  fontSize: 9.5,
+                  height: 1,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
           ),
@@ -651,10 +670,11 @@ class _MonthNavigator extends StatelessWidget {
   }
 }
 
+/// 월 이동 화살표(‹ ›). 글자 모양 그대로 쓴다.
 class _ArrowButton extends StatelessWidget {
-  const _ArrowButton({required this.icon, required this.onTap});
+  const _ArrowButton({required this.glyph, required this.onTap});
 
-  final IconData icon;
+  final String glyph;
   final VoidCallback onTap;
 
   @override
@@ -663,11 +683,10 @@ class _ArrowButton extends StatelessWidget {
       onTap: onTap,
       customBorder: const CircleBorder(),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xs),
-        child: Icon(
-          icon,
-          size: AppLayout.tabIconSize,
-          color: AppColors.textSecondary,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Text(
+          glyph,
+          style: AppTypography.cardTitle.copyWith(fontSize: 15, height: 1),
         ),
       ),
     );
@@ -695,6 +714,9 @@ class _MonthGrid extends StatelessWidget {
   static const int _rows = 6;
   static const int _columns = 7;
 
+  /// 날짜 한 칸의 높이. 칸 사이 세로 간격은 2.
+  static const double _cellHeight = 36;
+
   /// 점은 아침·점심·저녁 순서. 간식은 Figma 에 자리가 없어 목록에만 나온다.
   static const List<String> _dotMealTypes = ['BREAKFAST', 'LUNCH', 'DINNER'];
 
@@ -707,7 +729,8 @@ class _MonthGrid extends StatelessWidget {
 
     return Column(
       children: [
-        for (var row = 0; row < _rows; row++)
+        for (var row = 0; row < _rows; row++) ...[
+          if (row > 0) const SizedBox(height: 2),
           Row(
             children: [
               for (var column = 0; column < _columns; column++)
@@ -719,13 +742,14 @@ class _MonthGrid extends StatelessWidget {
                 ),
             ],
           ),
+        ],
       ],
     );
   }
 
   Widget _buildCell(int dayNumber, int daysInMonth) {
     if (dayNumber < 1 || dayNumber > daysInMonth) {
-      return const SizedBox(height: 44);
+      return const SizedBox(height: _cellHeight);
     }
 
     final date = DateTime(month.year, month.month, dayNumber);
@@ -734,6 +758,7 @@ class _MonthGrid extends StatelessWidget {
 
     return _DayCell(
       day: dayNumber,
+      height: _cellHeight,
       isFuture: isFuture,
       isSelected: date == selectedDay,
       recordedMeals: [
@@ -747,6 +772,7 @@ class _MonthGrid extends StatelessWidget {
 class _DayCell extends StatelessWidget {
   const _DayCell({
     required this.day,
+    required this.height,
     required this.isFuture,
     required this.isSelected,
     required this.recordedMeals,
@@ -754,6 +780,7 @@ class _DayCell extends StatelessWidget {
   });
 
   final int day;
+  final double height;
   final bool isFuture;
   final bool isSelected;
 
@@ -769,20 +796,20 @@ class _DayCell extends StatelessWidget {
     final textColor = isSelected
         ? AppColors.primary
         : isFuture
-        ? AppColors.textTertiary
-        : AppColors.textPrimary;
+        ? AppColors.border
+        : AppColors.textBody;
+    final radius = BorderRadius.circular(11);
 
     return InkWell(
       onTap: isFuture ? null : onTap,
-      borderRadius: AppRadius.lgRadius,
+      borderRadius: radius,
       child: Container(
-        height: 44,
-        margin: const EdgeInsets.all(1),
+        height: height,
         decoration: isSelected
             ? BoxDecoration(
                 color: AppColors.primaryTint,
-                borderRadius: AppRadius.lgRadius,
-                border: Border.all(color: AppColors.primary),
+                borderRadius: radius,
+                border: Border.all(color: AppColors.primary, width: 1.5),
               )
             : null,
         child: Column(
@@ -791,6 +818,8 @@ class _DayCell extends StatelessWidget {
             Text(
               '$day',
               style: AppTypography.body.copyWith(
+                fontSize: 10.5,
+                height: 1.25,
                 color: textColor,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
               ),
@@ -837,13 +866,11 @@ class _MonthSummaryBar extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      height: 48,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.cardPadding,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: AppRadius.lgRadius,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(13),
       ),
       child: s == null
           ? const Row(
@@ -857,14 +884,20 @@ class _MonthSummaryBar extends StatelessWidget {
               children: [
                 Text(
                   '${month.month}월 ${s.totalMeals}끼 기록',
-                  style: AppTypography.cardTitle,
+                  style: AppTypography.emphasis.copyWith(
+                    fontSize: 11.5,
+                    color: AppColors.textBody,
+                  ),
                 ),
                 const Spacer(),
                 Text(
                   '평균 양 ${s.avgScores.quantity ?? '-'} · '
                   '질 ${s.avgScores.quality ?? '-'} · '
                   '포만감 ${s.avgScores.satiety ?? '-'}',
-                  style: AppTypography.caption,
+                  style: AppTypography.caption.copyWith(
+                    fontSize: 9.5,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),

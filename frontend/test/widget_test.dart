@@ -134,16 +134,16 @@ void main() {
     expect(find.text('단기 피드백'), findsOneWidget);
     expect(find.text('장기 피드백'), findsOneWidget);
 
-    // 단기 피드백 = 예전 기록(달력) 화면.
+    // 단기 피드백 = 예전 기록(달력) 화면. 제목도 "단기 피드백"이다.
     await tester.tap(find.text('단기 피드백'));
     await _settle(tester);
-    expect(find.text('단기 피드백'), findsNothing);
-    expect(find.text('기록'), findsOneWidget);
+    // 팝업은 닫혔고 화면 제목 하나만 남는다. 달력 월 이동이 보이면 단기 피드백 화면이다.
+    expect(find.text('단기 피드백'), findsOneWidget);
+    expect(find.text('오늘'), findsOneWidget);
 
     // 장기 피드백 = 예전 피드백 탭 화면.
     await _openFeedback(tester, '장기 피드백');
     expect(find.text('장기 피드백'), findsOneWidget);
-    expect(find.text('기록'), findsNothing);
   });
 
   testWidgets('dismissing the feedback popup keeps the current tab', (
@@ -160,7 +160,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('단기 피드백'), findsNothing);
-    expect(find.text('기록'), findsNothing);
+    expect(find.text('오늘'), findsNothing);
   });
 
   /// 점수가 있는 날이 [day] 하루뿐인 대시보드로 피드백 탭을 열고
