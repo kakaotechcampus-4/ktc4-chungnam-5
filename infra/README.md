@@ -114,6 +114,8 @@ PENDING          1  2026-09-20 10:15:40+00:00
 | `Caddyfile` | HTTPS(Let's Encrypt) + 데모 키 검사 |
 | `.env.prod.example` | 서버의 `.env.prod` 에 채울 키 목록. 비밀값은 **서버의 `.env.prod` 에만** 둔다 |
 | `deploy.sh` | 배포 스크립트. 사람과 CI 가 같은 스크립트를 쓴다 |
+| `docker-compose.staging.yml` | 스테이징(develop) 스택. 운영 파일 위에 덮어써 이름·이미지·볼륨을 `glp1-staging` 으로 가른다 |
+| `deploy-staging.sh` | 스테이징 배포 스크립트. `deploy.sh` 와 같은 잠금을 써서 둘이 동시에 돌지 않는다 |
 
 ```
 인터넷 ──80/443──▶ caddy ──▶ api:8000 ──▶ db:5432
@@ -213,6 +215,46 @@ AI_SERVICE_BASE_URL=http://ai-stub:8000
 docker rm -f glp1-prod-ai-stub
 ```
 
+### 스테이징
+
+같은 EC2 에 `develop` 을 올리는 스택을 하나 더 띄운다. 머지 전에 배포 환경(도메인·인증서·Caddy·서버 자원)에서
+돌려 보려는 것이다. 설계: `docs/superpowers/specs/2026-10-13-staging-env-design.md`
+
+```
+glp1-demo.duckdns.org    ┐                     ┌─▶ glp1-prod-api     (main,    /opt/glp1)
+                         ├─▶ glp1-prod-caddy ──┤
+glp1-staging.duckdns.org ┘   (80/443 하나)     └─▶ glp1-staging-api  (develop, /opt/glp1-staging)
+                                                    glp1-edge 네트워크
+```
+
+- 80/443 은 운영 Caddy 하나가 맡고 도메인으로 나눈다. 스테이징 api 에는 외부 네트워크 `glp1-edge` 로 닿는다
+- DB·사진·큐는 볼륨이 따로라(`glp1-staging_*`) 운영 데이터와 섞이지 않는다. 데모 키는 운영과 같다
+- 스테이징 컨테이너에는 `mem_limit` 이 있다. 메모리가 모자라면 운영 대신 스테이징이 먼저 죽는다
+- `deploy.sh` 와 `deploy-staging.sh` 는 같은 잠금(`/tmp/glp1-deploy.lock`)을 써서 한 번에 하나씩 돈다
+- 운영 `.env.prod` 에 `STAGING_DOMAIN` 이 **반드시** 있어야 한다 (비면 운영 배포가 기동 전에 멈춘다)
+
+```bash
+/opt/glp1-staging/infra/deploy-staging.sh            # origin/develop
+/opt/glp1-staging/infra/deploy-staging.sh <커밋 SHA>
+docker compose -p glp1-staging stop                  # 데모 당일 등 잠시 내릴 때
+```
+
+처음 띄우는 절차(서브도메인·`.env.staging`·시드)는 `contracts/Deployment.md` E2 절을 따른다.
+
+로컬 측정(유휴 상태, Docker Desktop):
+
+| 컨테이너 | 메모리 (사용 / 한도) |
+|---|---|
+| glp1-prod-caddy | 12.9MiB / 제한 없음 |
+| glp1-prod-api | 67.6MiB / 제한 없음 |
+| glp1-prod-worker | 59.7MiB / 제한 없음 |
+| glp1-prod-ai | 35.6MiB / 제한 없음 |
+| glp1-prod-db | 27.4MiB / 제한 없음 |
+| glp1-staging-api | 67.5MiB / 512MiB |
+| glp1-staging-worker | 59.5MiB / 512MiB |
+| glp1-staging-ai | 35.6MiB / 256MiB |
+| glp1-staging-db | 44.5MiB / 384MiB |
+
 ### 로컬에서 운영 구성 확인
 
 `DOMAIN=localhost` 로 띄우면 Caddy 가 내부 인증서를 쓴다. 개발 환경과 함께 떠 있어도 된다 —
@@ -221,7 +263,8 @@ docker rm -f glp1-prod-ai-stub
 
 ```bash
 cd infra
-cp .env.prod.example .env.prod      # DOMAIN=localhost, 나머지는 아무 시험 값
+cp .env.prod.example .env.prod      # DOMAIN=localhost, STAGING_DOMAIN=staging.localhost, 나머지는 아무 시험 값
+docker network create glp1-edge     # 운영 compose 가 요구하는 외부 네트워크 (배포 스크립트는 알아서 만든다)
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build --wait
 
 curl -k https://localhost/health                                    # 200
@@ -230,5 +273,11 @@ curl -k -H "X-Demo-Key: <값>" https://localhost/docs                # 200
 curl -k -H "X-Demo-Key: <값>" https://localhost/internal/v1/foods   # 404
 docker compose -f docker-compose.prod.yml ps                        # 5개 모두 healthy
 
+# 스테이징까지 함께: .env.prod 를 복사해 DB_PASSWORD·INTERNAL_SERVICE_TOKEN 만 바꾼다
+cp .env.prod .env.staging
+docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml --env-file .env.staging up -d --build --wait
+curl -k https://staging.localhost/health                            # 200
+
+docker compose -p glp1-staging down
 docker compose -f docker-compose.prod.yml down    # -v 를 붙이면 DB·사진·인증서 볼륨까지 지운다
 ```
