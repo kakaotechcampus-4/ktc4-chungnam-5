@@ -21,6 +21,8 @@
 # 운영 서버 비밀값(infra/.env.prod). 위 .env.* 에도 걸리지만 명시해 둔다
 .env.prod
 !.env.prod.example
+# 스테이징 서버 비밀값(infra/.env.staging). 위 .env.* 에도 걸리지만 명시해 둔다
+.env.staging
 *.pem
 *.key
 *.p12
