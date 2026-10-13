@@ -11,7 +11,8 @@
 	encode gzip
 
 	# BE 제한(10MB, meals.py 의 _MAX_IMAGE_BYTES)보다 약간 크게 둔다. 같거나 작으면
-	# Caddy 가 먼저 끊어서 BE 가 보내는 413 메시지가 앱까지 가지 않는다.
+	# Caddy 가 먼저 끊어서(본문 없는 413) BE 가 보내는 422 VALIDATION_ERROR(크기 안내 메시지)가
+	# 앱까지 가지 않는다.
 	request_body {
 		max_size 12MB
 	}
