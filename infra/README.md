@@ -126,7 +126,9 @@ PENDING          1  2026-09-20 10:15:40+00:00
 
 1. `/internal/*` → 404. AI 가 BE 를 다시 부르는 경로라 compose 내부 네트워크로만 닿는다
 2. `/health` → 통과
-3. `X-Demo-Key` 헤더가 `DEMO_KEY` 와 같거나, 접속 IP 가 `ALLOWED_IPS` 안이면 → api
+3. `X-Demo-Key` 헤더가 `DEMO_KEY` 와 같거나, 접속 IP 가 `ALLOWED_IPS` 안이면 → api.
+   팀원 IP 는 경로 제한 없이 **전체 API** 를 키 없이 통과한다 — Swagger 의 "Try it out" 요청에는
+   키 헤더가 붙지 않아 `/docs` 만 열면 쓸 수 없다. 그래서 공용망 IP 는 넣지 않는다
 4. 나머지 → 403
 
 업로드 제한은 12MB 로 BE(10MB)보다 약간 크다. BE 가 내는 413 메시지가 앱까지 가게 하려는 것이다.

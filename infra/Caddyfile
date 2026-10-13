@@ -1,7 +1,8 @@
 # 운영 리버스 프록시. 값은 docker-compose.prod.yml 이 .env.prod 에서 넘겨준다.
 #
 # 데모 기간 접근 제어 — 앱이 모든 요청에 X-Demo-Key 를 붙이고 여기서 확인한다.
-# Swagger(/docs)를 브라우저로 볼 수 있게 팀원 IP(ALLOWED_IPS)도 통과시킨다(OR).
+# 팀원 IP(ALLOWED_IPS)는 키 없이 전체 API 를 통과한다(OR). Swagger 의 "Try it out" 요청에는
+# 키 헤더가 붙지 않아서 /docs 만 열면 쓸 수 없다. 키가 APK 에 들어 있어 IP 쪽이 오히려 좁다.
 # Authorization 헤더는 나중에 JWT 가 써야 해서 건드리지 않는다.
 #
 # DOMAIN=localhost 로 띄우면 Let's Encrypt 대신 내부 인증서를 쓴다 (curl 은 -k).
@@ -28,6 +29,7 @@
 		@demo header X-Demo-Key {$DEMO_KEY}
 		reverse_proxy @demo api:8000
 
+		# 팀원 IP — 경로 제한 없이 전체 통과 (위 머리 주석 참고)
 		@team remote_ip {$ALLOWED_IPS}
 		reverse_proxy @team api:8000
 
