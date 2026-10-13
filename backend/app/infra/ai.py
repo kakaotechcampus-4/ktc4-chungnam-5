@@ -18,6 +18,8 @@ from app.infra.queue import NonRetryableError
 
 # 4xx 지만 "잠시 뒤엔 될" 응답이다. 5xx 처럼 재시도에 맡긴다.
 _TRANSIENT_CLIENT_ERRORS = frozenset({408, 429})
+# 5xx 지만 재시도해도 같은 응답이다. 501 은 "그 기능이 없다"는 뜻이다.
+_PERMANENT_SERVER_ERRORS = frozenset({501})
 
 
 class AiClient(Protocol):
@@ -46,7 +48,7 @@ class AiSettings(BaseSettings):
 
 
 class AiRequestRejected(NonRetryableError):
-    """AI 가 요청을 4xx 로 거부했다 — 계약 위반·인증 실패 등. 재시도해도 같다.
+    """AI 가 요청을 4xx·501 로 거부했다 — 계약 위반·인증 실패·미구현 등. 재시도해도 같다.
 
     응답 본문은 담지 않는다. 요청(음식명 등)이 되비쳐 `last_error` 에 남을 수 있다(규칙 6).
     """
@@ -78,8 +80,11 @@ class HttpAiClient:
 
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         response = self._client.post(path, json=payload)
-        # 4xx 는 재시도해도 같으니 바로 격리한다. 5xx·408·429 는 예외로 올려 큐의 재시도에 맡긴다.
-        if response.is_client_error and response.status_code not in _TRANSIENT_CLIENT_ERRORS:
+        # 4xx·501 은 재시도해도 같으니 바로 격리한다. 그 밖의 5xx·408·429 는 예외로 올려
+        # 큐의 재시도에 맡긴다.
+        if (
+            response.is_client_error and response.status_code not in _TRANSIENT_CLIENT_ERRORS
+        ) or response.status_code in _PERMANENT_SERVER_ERRORS:
             raise AiRequestRejected(response.status_code, path)
         response.raise_for_status()
         return response.json()

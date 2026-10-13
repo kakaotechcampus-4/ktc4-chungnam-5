@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../api/meal_api.dart';
 import '../common/api_format.dart';
+import '../common/api_image.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -128,13 +129,7 @@ class _MealEvaluationScreenState extends State<MealEvaluationScreen> {
                   width: double.infinity,
                   height: 240,
                   color: AppColors.surfaceSage,
-                  child: imageUrl == null
-                      ? null
-                      : Image.network(
-                          ApiConfig.mediaUrl(imageUrl),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const SizedBox(),
-                        ),
+                  child: imageUrl == null ? null : ApiImage(imageUrl),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),

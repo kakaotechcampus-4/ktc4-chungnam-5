@@ -48,6 +48,7 @@ Future<(ApiClient, _FakeAdapter)> _client(
   Object? body, {
   bool fail = false,
   String? userId = 'user-1',
+  String demoKey = '',
 }) async {
   SharedPreferences.setMockInitialValues(
     userId == null ? {} : {'session.userId': userId},
@@ -56,7 +57,7 @@ Future<(ApiClient, _FakeAdapter)> _client(
   final adapter = _FakeAdapter(status, body, fail: fail);
   final dio = Dio(BaseOptions(baseUrl: 'http://test/api/v1'))
     ..httpClientAdapter = adapter;
-  return (ApiClient(session: session, dio: dio), adapter);
+  return (ApiClient(session: session, dio: dio, demoKey: demoKey), adapter);
 }
 
 void main() {
@@ -84,6 +85,41 @@ void main() {
     await client.post('/users/profile', body: {});
 
     expect(adapter.lastRequest!.headers.containsKey('X-User-Id'), isFalse);
+  });
+
+  test('sends X-Demo-Key only when a demo key is set', () async {
+    final (withKey, withKeyAdapter) = await _client(200, {
+      'success': true,
+      'data': {},
+      'error': null,
+    }, demoKey: 'demo-123');
+    await withKey.get('/home');
+    expect(withKeyAdapter.lastRequest!.headers['X-Demo-Key'], 'demo-123');
+
+    final (noKey, noKeyAdapter) = await _client(200, {
+      'success': true,
+      'data': {},
+      'error': null,
+    });
+    await noKey.get('/home');
+    expect(
+      noKeyAdapter.lastRequest!.headers.containsKey('X-Demo-Key'),
+      isFalse,
+    );
+  });
+
+  test('403 without an envelope says the demo key is wrong', () async {
+    // 데모 서버 앞단(Caddy)은 래퍼 없이 막는다.
+    final (client, _) = await _client(403, 'Forbidden');
+
+    await expectLater(
+      client.get('/home'),
+      throwsA(
+        isA<ApiException>()
+            .having((e) => e.statusCode, 'statusCode', 403)
+            .having((e) => e.message, 'message', '서버 접속 키가 맞지 않아요'),
+      ),
+    );
   });
 
   test('success with an error code is a notice, not a failure', () async {
