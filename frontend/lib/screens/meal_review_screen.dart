@@ -9,6 +9,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_add_sheet.dart';
 import 'meal_evaluation_screen.dart';
 import 'meal_item_edit_sheet.dart';
 import 'shared_meal_widgets.dart';
@@ -196,28 +197,40 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     }
   }
 
+  /// "＋ 음식 추가" — 시트에서 목록으로 받은 음식을 하나씩 서버에 보낸다.
+  /// 일부만 실패해도 들어간 것은 남으므로, 끝나면 식사를 다시 받아 서버 기준으로 맞춘다.
   Future<void> _addItem() async {
-    final input = await showModalBottomSheet<_NewItem>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheetRadius),
-      builder: (_) => const _AddItemSheet(),
-    );
-    if (input == null || !mounted) return;
+    final entries = await showMealAddSheet(context);
+    if (entries == null || entries.isEmpty || !mounted) return;
     try {
       await _flushAmounts();
-      await _api.addItem(
-        widget.mealId,
-        displayName: input.name,
-        amount: input.amount,
-        unit: input.unit,
+    } catch (_) {
+      return; // _sendAmounts 가 이미 알렸다.
+    }
+    var failed = 0;
+    Object? lastError;
+    for (final entry in entries) {
+      try {
+        await _api.addItem(
+          widget.mealId,
+          displayName: entry.name,
+          amount: entry.amount,
+          unit: entry.unit,
+        );
+      } catch (e) {
+        failed++;
+        lastError = e;
+      }
+    }
+    if (!mounted) return;
+    // 응답에 이름·양이 없어 다시 받는다.
+    await _loadMeal();
+    if (failed > 0 && mounted) {
+      _showError(
+        failed == entries.length
+            ? '추가하지 못했어요: $lastError'
+            : '$failed개는 추가하지 못했어요: $lastError',
       );
-      if (!mounted) return;
-      // 응답에 이름·양이 없어 다시 받는다.
-      await _loadMeal();
-    } catch (e) {
-      if (mounted) _showError('추가하지 못했어요: $e');
     }
   }
 
@@ -664,104 +677,6 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   bool shouldRepaint(_DashedBorderPainter old) =>
       old.color != color || old.radius != radius;
-}
-
-/// 음식 추가 입력값.
-class _NewItem {
-  const _NewItem(this.name, this.amount, this.unit);
-
-  final String name;
-  final double amount;
-  final String unit;
-}
-
-/// 음식 추가 시트 — 이름·양·단위.
-class _AddItemSheet extends StatefulWidget {
-  const _AddItemSheet();
-
-  @override
-  State<_AddItemSheet> createState() => _AddItemSheetState();
-}
-
-class _AddItemSheetState extends State<_AddItemSheet> {
-  final _name = TextEditingController();
-  final _amount = TextEditingController(text: '1');
-  final _unit = TextEditingController(text: '인분');
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _amount.dispose();
-    _unit.dispose();
-    super.dispose();
-  }
-
-  _NewItem? get _value {
-    final name = _name.text.trim();
-    final amount = double.tryParse(_amount.text.trim());
-    final unit = _unit.text.trim();
-    if (name.isEmpty || amount == null || amount <= 0 || unit.isEmpty) {
-      return null;
-    }
-    return _NewItem(name, amount, unit);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final value = _value;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.screenHorizontal,
-        AppSpacing.lg,
-        AppSpacing.screenHorizontal,
-        AppSpacing.lg + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('음식 추가', style: AppTypography.sectionHead),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _name,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: '음식 이름'),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _amount,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(labelText: '양'),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: TextField(
-                  controller: _unit,
-                  decoration: const InputDecoration(labelText: '단위 (g·개·인분)'),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton(
-            onPressed: value == null
-                ? null
-                : () => Navigator.of(context).pop(value),
-            child: const Text('추가'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// 영양 정보 후보 검색 시트 — 공공 식품영양성분 DB.
