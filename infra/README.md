@@ -110,7 +110,7 @@ PENDING          1  2026-09-20 10:15:40+00:00
 
 | 파일 | 역할 |
 |---|---|
-| `docker-compose.prod.yml` | `db` · `api` · `worker` · `ai` · `caddy`. compose 프로젝트 이름은 `glp1-prod` |
+| `docker-compose.prod.yml` | `db` · `api` · `worker` · `ai` · `caddy` (+ 데모용 `ai-stub`). compose 프로젝트 이름은 `glp1-prod` |
 | `Caddyfile` | HTTPS(Let's Encrypt) + 데모 키 검사 |
 | `.env.prod.example` | 서버의 `.env.prod` 에 채울 키 목록. 비밀값은 **서버의 `.env.prod` 에만** 둔다 |
 | `deploy.sh` | 배포 스크립트. 사람과 CI 가 같은 스크립트를 쓴다 |
@@ -174,6 +174,23 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d caddy
 - 디스크는 50GB 고정이다. 차면 `docker system df` 로 보고 `docker system prune -af` 로 정리한다.
   **`docker volume prune` 은 쓰지 않는다** — `db-data` · `media` · `caddy_data` 가 지워진다.
 - 서버는 **중지하지 말고 재부팅만** 한다. 중지 → 시작하면 공인 IP 가 바뀐다 (DuckDNS cron 이 따라가지만 몇 분 끊긴다).
+
+### AI 스텁으로 데모하기
+
+실제 AI 의 엔드포인트가 아직 501 인 동안에는 식사 분석이 전부 FAILED 로 끝난다.
+그 기간에는 고정 더미 응답을 주는 `ai-stub` 을 붙인다. `.env.prod` 에 두 줄을 넣고 다시 배포한다.
+
+```bash
+COMPOSE_PROFILES=stub
+AI_SERVICE_BASE_URL=http://ai-stub:8000
+```
+
+`ai` 컨테이너는 계속 뜨므로 LLM 값은 그대로 채워 둔다. 끌 때는 두 줄을 지우고 다시 배포한 뒤
+남은 스텁을 내린다 — profile 을 끄는 것만으로는 이미 떠 있는 컨테이너가 내려가지 않는다.
+
+```bash
+docker rm -f glp1-ai-stub
+```
 
 ### 로컬에서 운영 구성 확인
 

@@ -19,7 +19,8 @@ x-be-env: &be-env
   DB_URL: db:5432/${DB_NAME:?}
   DB_USER: ${DB_USER:?}
   DB_PASSWORD: ${DB_PASSWORD:?}
-  AI_SERVICE_BASE_URL: http://ai:8000
+  # 음식 인식이 머지되기 전 데모는 .env.prod 에서 ai-stub 으로 바꾼다 (아래 ai-stub 참고).
+  AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai:8000}
   # 워커가 AI 에 넘기는 imageUrl 의 앞부분. AI 컨테이너가 사진을 받아 가는 내부 주소다.
   LOCAL_STORAGE_BASE_URL: http://api:8000/media
   INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?}
@@ -121,6 +122,20 @@ services:
     healthcheck:
       <<: *python-health
       start_period: 15s
+    restart: unless-stopped
+
+  # 실제 AI 의 엔드포인트가 아직 501 이라 데모에서 분석이 전부 실패한다. 그 기간에는
+  # 고정 더미 응답을 주는 스텁을 붙인다. profile 이라 평소에는 뜨지 않는다.
+  # 켜기: .env.prod 에 COMPOSE_PROFILES=stub, AI_SERVICE_BASE_URL=http://ai-stub:8000
+  ai-stub:
+    build:
+      context: ../ai-stub
+    image: glp1-ai-stub
+    container_name: glp1-ai-stub
+    profiles: ["stub"]
+    healthcheck:
+      <<: *python-health
+      start_period: 5s
     restart: unless-stopped
 
   caddy:
