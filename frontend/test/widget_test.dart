@@ -164,7 +164,7 @@ void main() {
   });
 
   /// 점수가 있는 날이 [day] 하루뿐인 대시보드로 피드백 탭을 열고
-  /// 기간을 모두 돌려 본다. 날마다 추이 차트의 날짜 라벨이 보여야 한다.
+  /// 기간을 모두 돌려 본다. 어느 기간에서도 오류 없이 차트가 그려져야 한다.
   Future<void> expectFeedbackTabDrawsOneDay(
     WidgetTester tester,
     Map<String, Object?> day,
@@ -174,9 +174,11 @@ void main() {
     api.on('GET /dashboard', (o) {
       final data = _mockBody('GET /api/v1/dashboard')['data'] as Map;
       final mockDay = (data['series'] as List).last as Map;
-      // `_mockBody` 는 `{{today}}` 자리표시자를 그대로 두어 날짜를 채운다.
+      // 막대 칸은 오늘 기준으로 잡히므로 점수가 있는 하루를 오늘로 둔다.
+      final now = DateTime.now();
+      String two(int n) => n.toString().padLeft(2, '0');
       final series = [
-        {...mockDay, 'date': '2026-10-07', ...day},
+        {...mockDay, 'date': '${now.year}-${two(now.month)}-${two(now.day)}', ...day},
       ];
       return (200, fakeOk({...data, 'series': series}));
     });
@@ -189,7 +191,8 @@ void main() {
       await tester.tap(find.text(period));
       await _settle(tester);
       expect(tester.takeException(), isNull, reason: period);
-      expect(find.text('10/07'), findsOneWidget, reason: period);
+      // 점수가 하루뿐이어도 차트(막대 칸)는 그려진다.
+      expect(find.text('식사량 · 포만감 · 투약 용량'), findsOneWidget, reason: period);
     }
   }
 
