@@ -160,6 +160,12 @@ docker exec -i glp1-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 /opt/glp1/infra/deploy.sh <커밋 SHA>  # 특정 커밋
 ```
 
+`deploy.sh` 는 이미지를 먼저 만들고, **워커를 내린 뒤** 나머지를 올린다. 마이그레이션은 `api` 가
+기동할 때 도는데, 옛 워커가 그와 겹치면 잠금·enum 문제로 마이그레이션이나 워커가 터질 수 있어서다
+(예: `9a1c4e7b2d3f`). 그래서 배포 중 워커는 마이그레이션 · `api` 기동 동안 잠시 멈춘다.
+작업은 큐(`task_queue`)에 남아 있다가 새 워커가 처리한다. 손으로 배포할 때도 `up` 을 직접
+부르지 말고 `deploy.sh` 를 쓴다.
+
 ### 운영 중 자주 쓰는 것
 
 ```bash
