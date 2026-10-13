@@ -10,6 +10,8 @@
 # 외부에 여는 포트는 caddy 의 80·443 뿐이다. api·ai·db 는 compose 내부 네트워크로만 닿는다.
 
 # 로컬 개발 compose(프로젝트 infra)와 볼륨·네트워크가 섞이지 않게 프로젝트를 분리한다.
+# 컨테이너 이름·이미지 태그도 glp1-prod- 를 붙여 개발용(glp1-db, glp1-be 등)과 겹치지 않게 한다 —
+# 로컬에서 둘을 함께 띄워도 이름이 충돌하지 않고, 운영 빌드가 개발 이미지를 덮어쓰지 않는다.
 name: glp1-prod
 
 x-be-env: &be-env
@@ -38,7 +40,7 @@ x-python-health: &python-health
 services:
   db:
     image: postgres:17-alpine
-    container_name: glp1-db
+    container_name: glp1-prod-db
     environment:
       POSTGRES_USER: ${DB_USER:?}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?}
@@ -57,8 +59,8 @@ services:
   api:
     build:
       context: ../backend
-    image: glp1-be
-    container_name: glp1-api
+    image: glp1-prod-be
+    container_name: glp1-prod-api
     # 기동할 때마다 스키마를 최신으로 맞춘다. 마이그레이션은 api 만 돌린다 —
     # worker 는 api 가 healthy 가 된 뒤에 뜨므로 두 번 돌거나 겹치지 않는다.
     command:
@@ -81,8 +83,8 @@ services:
   worker:
     build:
       context: ../backend
-    image: glp1-be
-    container_name: glp1-worker
+    image: glp1-prod-be
+    container_name: glp1-prod-worker
     command: ["python", "-m", "app.worker_main"]
     environment: *be-env
     depends_on:
@@ -107,8 +109,8 @@ services:
   ai:
     build:
       context: ../ai
-    image: glp1-ai
-    container_name: glp1-ai
+    image: glp1-prod-ai
+    container_name: glp1-prod-ai
     environment:
       LLM_API_KEY: ${LLM_API_KEY:?}
       LLM_VISION_URL: ${LLM_VISION_URL:?}
@@ -130,8 +132,8 @@ services:
   ai-stub:
     build:
       context: ../ai-stub
-    image: glp1-ai-stub
-    container_name: glp1-ai-stub
+    image: glp1-prod-ai-stub
+    container_name: glp1-prod-ai-stub
     profiles: ["stub"]
     healthcheck:
       <<: *python-health
@@ -140,7 +142,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
-    container_name: glp1-caddy
+    container_name: glp1-prod-caddy
     ports:
       - "80:80"
       - "443:443"

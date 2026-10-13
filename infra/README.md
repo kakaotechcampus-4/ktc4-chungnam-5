@@ -148,7 +148,7 @@ docker compose -f docker-compose.prod.yml logs -f caddy   # 인증서 발급 로
 **처음 한 번만** 넣는다 (336,351건):
 
 ```bash
-docker exec -i glp1-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --data-only --no-owner' \
+docker exec -i glp1-prod-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --data-only --no-owner' \
   < seed/food_refs_20260828.dump
 ```
 
@@ -173,7 +173,7 @@ docker exec -i glp1-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 ```bash
 cd /opt/glp1/infra
 docker compose -f docker-compose.prod.yml ps
-docker logs -f glp1-worker
+docker logs -f glp1-prod-worker
 
 # .env.prod 를 고친 뒤에는 restart 가 아니라 up -d 로 컨테이너를 다시 만든다 (환경변수는 생성 시점에 읽힌다)
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d caddy
@@ -197,13 +197,14 @@ AI_SERVICE_BASE_URL=http://ai-stub:8000
 남은 스텁을 내린다 — profile 을 끄는 것만으로는 이미 떠 있는 컨테이너가 내려가지 않는다.
 
 ```bash
-docker rm -f glp1-ai-stub
+docker rm -f glp1-prod-ai-stub
 ```
 
 ### 로컬에서 운영 구성 확인
 
-`DOMAIN=localhost` 로 띄우면 Caddy 가 내부 인증서를 쓴다. 컨테이너 이름이 로컬 개발용과
-같으므로(`glp1-db` 등) 개발 컨테이너를 먼저 내린다.
+`DOMAIN=localhost` 로 띄우면 Caddy 가 내부 인증서를 쓴다. 개발 환경과 함께 떠 있어도 된다 —
+컨테이너 이름·이미지 태그(`glp1-prod-*`), 볼륨·네트워크(프로젝트 `glp1-prod`), 포트(80·443)가
+개발용과 겹치지 않는다.
 
 ```bash
 cd infra
