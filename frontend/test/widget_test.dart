@@ -68,6 +68,11 @@ Future<FakeApi> _pumpApp(
   SharedPreferences.setMockInitialValues(
     withProfile ? {'session.userId': 'test-user'} : {},
   );
+  // 위 게이지의 수면은 계속 찰랑여서 pumpAndSettle 이 끝나지 않는다.
+  // "애니메이션 줄이기" 를 켜 두면 움직임 없이 값만 그려진다(앱이 이 설정을 따른다).
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
   final fake = api ?? FakeApi();
   final session = await UserSession.load();
   await tester.pumpWidget(MyApp(session: session, dio: fake.dio));
