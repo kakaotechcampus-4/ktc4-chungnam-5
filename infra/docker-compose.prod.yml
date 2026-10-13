@@ -1,0 +1,176 @@
+# 운영(EC2) 배포. 사람도 CI 도 직접 부르지 않고 deploy.sh 를 거친다.
+#
+#   ./deploy.sh            # build → stop worker → up -d --wait (워커를 마이그레이션보다 먼저 내린다)
+#
+# 비밀값은 전부 .env.prod 한 곳에서 온다(B4). --env-file 로 읽어 아래 ${...} 에 끼워 넣고,
+# 서비스마다 **필요한 키만** environment 로 넘긴다 — env_file 로 통째로 넣으면 db·caddy
+# 컨테이너에도 LLM 키가 들어간다. ai/.env · backend/.env 는 쓰지 않는다.
+# ${VAR:?} 는 값이 비어 있으면 compose 가 기동 전에 멈춘다.
+#
+# 외부에 여는 포트는 caddy 의 80·443 뿐이다. api·ai·db 는 compose 내부 네트워크로만 닿는다.
+
+# 로컬 개발 compose(프로젝트 infra)와 볼륨·네트워크가 섞이지 않게 프로젝트를 분리한다.
+# 컨테이너 이름·이미지 태그도 glp1-prod- 를 붙여 개발용(glp1-db, glp1-be 등)과 겹치지 않게 한다 —
+# 로컬에서 둘을 함께 띄워도 이름이 충돌하지 않고, 운영 빌드가 개발 이미지를 덮어쓰지 않는다.
+name: glp1-prod
+
+x-be-env: &be-env
+  # local 이어야 /users/* 의 X-User-Id 이음새가 살아 있다. production 이면 기동이 막힌다
+  # (backend/README.md). JWT 병합 전까지 바깥 접근은 Caddy 의 데모 키가 막는다.
+  APP_ENV: local
+  DB_URL: db:5432/${DB_NAME:?}
+  DB_USER: ${DB_USER:?}
+  DB_PASSWORD: ${DB_PASSWORD:?}
+  # 음식 인식이 머지되기 전 데모는 .env.prod 에서 ai-stub 으로 바꾼다 (아래 ai-stub 참고).
+  AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai:8000}
+  # 워커가 AI 에 넘기는 imageUrl 의 앞부분. AI 컨테이너가 사진을 받아 가는 내부 주소다.
+  LOCAL_STORAGE_BASE_URL: http://api:8000/media
+  INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?}
+
+x-python-health: &python-health
+  test:
+    - CMD
+    - python
+    - -c
+    - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')
+  interval: 10s
+  timeout: 3s
+  retries: 3
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: glp1-prod-db
+    environment:
+      POSTGRES_USER: ${DB_USER:?}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+      POSTGRES_DB: ${DB_NAME:?}
+      # 한글 음식명 정렬·비교를 위해 UTF-8 로 초기화한다 (docker-compose.yml 과 같다)
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../backend
+    image: glp1-prod-be
+    container_name: glp1-prod-api
+    # 기동할 때마다 스키마를 최신으로 맞춘다. 마이그레이션은 api 만 돌린다 —
+    # worker 는 api 가 healthy 가 된 뒤에 뜨므로 두 번 돌거나 겹치지 않는다.
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment: *be-env
+    # 업로드한 사진. 볼륨이 없으면 컨테이너를 다시 만들 때마다 사라진다.
+    volumes:
+      - media:/srv/var/media
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      <<: *python-health
+      # 마이그레이션이 끝나야 uvicorn 이 뜬다
+      start_period: 30s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../backend
+    image: glp1-prod-be
+    container_name: glp1-prod-worker
+    command: ["python", "-m", "app.worker_main"]
+    environment: *be-env
+    depends_on:
+      api:
+        condition: service_healthy
+    # HTTP 를 듣지 않으므로 DB 에 붙는지로 본다. 큐가 DB 테이블이라 DB 가 곧 일감이다.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "from sqlalchemy import create_engine, text; from app.core.config import get_settings; create_engine(get_settings().sqlalchemy_dsn).connect().execute(text('select 1'))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # SIGTERM 을 받으면 진행 중인 작업을 끝까지 처리하고 내려간다. compose 기본 10초는
+    # AI 타임아웃(45초)보다 짧다 (docker-compose.be.yml 참고).
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+  ai:
+    build:
+      context: ../ai
+    image: glp1-prod-ai
+    container_name: glp1-prod-ai
+    environment:
+      LLM_API_KEY: ${LLM_API_KEY:?}
+      LLM_VISION_URL: ${LLM_VISION_URL:?}
+      LLM_REASONING_URL: ${LLM_REASONING_URL:?}
+      LLM_TIMEOUT_SEC: ${LLM_TIMEOUT_SEC:-45}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      TOOL_CALL_LIMIT: ${TOOL_CALL_LIMIT:-3}
+      # tool 역호출. Caddy 는 /internal/* 을 404 로 막으므로 내부 네트워크로만 닿는다.
+      BE_INTERNAL_BASE_URL: http://api:8000/internal/v1
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?}
+    healthcheck:
+      <<: *python-health
+      start_period: 15s
+    restart: unless-stopped
+
+  # 실제 AI 의 엔드포인트가 아직 501 이라 데모에서 분석이 전부 실패한다. 그 기간에는
+  # 고정 더미 응답을 주는 스텁을 붙인다. profile 이라 평소에는 뜨지 않는다.
+  # 켜기: .env.prod 에 COMPOSE_PROFILES=stub, AI_SERVICE_BASE_URL=http://ai-stub:8000
+  ai-stub:
+    build:
+      context: ../ai-stub
+    image: glp1-prod-ai-stub
+    container_name: glp1-prod-ai-stub
+    profiles: ["stub"]
+    healthcheck:
+      <<: *python-health
+      start_period: 5s
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: glp1-prod-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?}
+      DEMO_KEY: ${DEMO_KEY:?}
+      # 비워 두면 Caddyfile 의 remote_ip 가 인자 없이 남아 파싱에 실패한다.
+      # 기본값은 컨테이너 자기 자신이라 사실상 아무도 허용하지 않는다.
+      ALLOWED_IPS: ${ALLOWED_IPS:-127.0.0.1/32}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 발급받은 인증서. 없으면 컨테이너를 다시 만들 때마다 새로 받다가 Let's Encrypt
+      # 발급 한도에 걸린다.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # 관리 API(localhost:2019)가 응답하면 설정을 읽고 떠 있는 것이다
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  media:
+  caddy_data:
+  caddy_config:
