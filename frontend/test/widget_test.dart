@@ -591,8 +591,8 @@ void main() {
       const MealReviewScreen(mealId: 'm1'),
     );
     expect(find.text('250g'), findsOneWidget);
-    // 매칭 안 된 음식은 후보를 고르라고 안내한다.
-    expect(find.text('영양정보 없음 · 찾아서 고르기'), findsOneWidget);
+    // 매칭 안 된 음식은 영양정보 없음으로 표시한다.
+    expect(find.text('영양정보 없음'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.add).first);
     await tester.tap(find.byIcon(Icons.add).first);

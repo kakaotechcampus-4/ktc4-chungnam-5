@@ -351,8 +351,12 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.screenHorizontal,
+      // 상태바·노치 아래에서 한 칸 더 내려 다른 화면 제목과 높이를 맞춘다.
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        AppSpacing.md,
+        AppSpacing.screenHorizontal,
+        0,
       ),
       child: Row(
         children: [
@@ -385,17 +389,55 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
         AppSpacing.screenHorizontal,
         0,
       ),
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
-        color: AppColors.primaryTint,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.quantityBg,
+        borderRadius: BorderRadius.circular(13),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.help_outline, size: 18, color: AppColors.primary),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(question, style: AppTypography.body)),
+          Container(
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: AppColors.quantity,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '?',
+              style: AppTypography.caption.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textInverse,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  question,
+                  style: AppTypography.caption.copyWith(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.quantity,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'AI가 확신하지 못한 항목이 있어요. 확인하거나 수정해 주세요.',
+                  style: AppTypography.caption.copyWith(
+                    fontSize: 9.5,
+                    color: AppColors.quantity,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -403,12 +445,17 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
 
   Widget _buildFoodCard(MealItem item) {
     final nutrition = item.nutrition;
+    final hasNutrition = item.matched && nutrition != null;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
+        // 영양정보가 없으면 테두리를 빨강으로 눈에 띄게 한다.
+        border: Border.all(
+          color: hasNutrition ? AppColors.border : AppColors.primary,
+          width: hasNutrition ? 1 : 1.5,
+        ),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,10 +475,22 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
                     const SizedBox(width: AppSpacing.sm),
                     GestureDetector(
                       onTap: () => _pickNutrition(item),
-                      child: Text(
-                        '수정',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.primary,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          '수정',
+                          style: AppTypography.caption.copyWith(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ),
@@ -449,27 +508,17 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
-          if (item.matched && nutrition != null)
+          if (hasNutrition)
             Text(_nutritionLine(nutrition), style: AppTypography.bodySecondary)
           else
-            GestureDetector(
-              onTap: () => _pickNutrition(item),
-              child: Text(
-                '영양정보 없음 · 찾아서 고르기',
-                style: AppTypography.bodySecondary.copyWith(
-                  color: AppColors.primary,
-                ),
+            Text(
+              '영양정보 없음',
+              style: AppTypography.bodySecondary.copyWith(
+                color: AppColors.primary,
               ),
             ),
           const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              _buildStepper(item),
-              const Spacer(),
-              if (item.confidence != null)
-                _buildConfidenceBadge(item.confidence!),
-            ],
-          ),
+          _buildStepper(item),
         ],
       ),
     );
@@ -519,35 +568,25 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     );
   }
 
-  Widget _buildConfidenceBadge(double confidence) {
-    final percent = (confidence * 100).round();
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        '신뢰도 $percent%',
-        style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-      ),
-    );
-  }
-
   Widget _buildAddButton() {
     return GestureDetector(
       onTap: _addItem,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.cardPadding),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.borderStrong),
-          borderRadius: BorderRadius.circular(12),
+      child: CustomPaint(
+        painter: const _DashedBorderPainter(
+          color: AppColors.borderStrong,
+          radius: 13,
         ),
-        alignment: Alignment.center,
-        child: Text('+ 음식 추가', style: AppTypography.body),
+        child: Container(
+          height: 46,
+          alignment: Alignment.center,
+          child: Text(
+            '＋ 음식 추가',
+            style: AppTypography.body.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -579,6 +618,36 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
       ),
     );
   }
+}
+
+/// 점선 둥근 사각형 테두리(Figma 음식 추가 버튼).
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({required this.color, required this.radius});
+
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final rect = (Offset.zero & size).deflate(paint.strokeWidth / 2);
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+    const dash = 6.0;
+    const gap = 4.0;
+    for (final metric in path.computeMetrics()) {
+      for (var d = 0.0; d < metric.length; d += dash + gap) {
+        canvas.drawPath(metric.extractPath(d, d + dash), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter old) =>
+      old.color != color || old.radius != radius;
 }
 
 /// 음식 추가 입력값.
