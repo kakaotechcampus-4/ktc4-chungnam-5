@@ -160,7 +160,19 @@ docker exec -i glp1-prod-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_
 
 ```bash
 /opt/glp1/infra/deploy.sh            # origin/main
-/opt/glp1/infra/deploy.sh <커밋 SHA>  # 특정 커밋
+/opt/glp1/infra/deploy.sh <커밋 SHA>  # main 의 특정 커밋. 롤백도 이것으로 한다 (아래)
+```
+
+`main` 에 있는 커밋만 배포할 수 있다(`git fetch origin main`). 리뷰를 거친 코드만 서버에 올리려는
+규칙이다 — 핫픽스도 `main` 에 머지한 뒤 배포한다.
+
+**롤백 = `deploy.sh <이전 SHA>`.** `--wait` 가 실패해도 이미 바뀐 컨테이너는 그대로라 이걸로 되돌린다.
+단, 되돌리는 구간에 마이그레이션이 있으면 옛 코드가 DB 의 새 리비전을 몰라 `api` 기동이 실패한다.
+그때는 **새 이미지가 떠 있는 동안 먼저** DB 를 내린 뒤 이전 SHA 로 배포한다.
+
+```bash
+docker exec glp1-prod-api alembic downgrade <이전 SHA 의 head 리비전>
+/opt/glp1/infra/deploy.sh <이전 SHA>
 ```
 
 `deploy.sh` 는 이미지를 먼저 만들고, **워커를 내린 뒤** 나머지를 올린다. 마이그레이션은 `api` 가

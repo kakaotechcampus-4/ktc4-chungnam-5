@@ -3,6 +3,7 @@
 # 배포 로직은 워크플로 YAML 이 아니라 여기에 둔다.
 #
 # 사용: infra/deploy.sh [커밋 SHA]   (생략하면 origin/main)
+# main 에 있는 커밋만 배포한다 — 리뷰를 거친 코드만 서버에 올리려는 것이다. 핫픽스도 main 에 머지한 뒤 배포한다.
 #
 # .env.prod 는 gitignore 대상이라 git checkout 을 해도 지워지지 않는다.
 # 저장소가 public 이라 git fetch 에 인증이 필요 없다.
