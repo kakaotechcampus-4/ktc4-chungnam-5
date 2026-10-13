@@ -229,9 +229,14 @@ glp1-staging.duckdns.org ┘   (80/443 하나)     └─▶ glp1-staging-api  (
 
 - 80/443 은 운영 Caddy 하나가 맡고 도메인으로 나눈다. 스테이징 api 에는 외부 네트워크 `glp1-edge` 로 닿는다
 - DB·사진·큐는 볼륨이 따로라(`glp1-staging_*`) 운영 데이터와 섞이지 않는다. 데모 키는 운영과 같다
-- 스테이징 컨테이너에는 `mem_limit` 이 있다. 메모리가 모자라면 운영 대신 스테이징이 먼저 죽는다
+- 스테이징 컨테이너에는 `mem_limit`(쓸 수 있는 양, 합 약 1.8GiB)과 `oom_score_adj: 500`(서버 메모리가 모자랄 때 OOM killer 가 운영 대신 스테이징을 먼저 고름)이 있다
 - `deploy.sh` 와 `deploy-staging.sh` 는 같은 잠금(`/tmp/glp1-deploy.lock`)을 써서 한 번에 하나씩 돈다
 - 운영 `.env.prod` 에 `STAGING_DOMAIN` 이 **반드시** 있어야 한다 (비면 운영 배포가 기동 전에 멈춘다)
+- 이 변경 뒤 **첫** `deploy.sh` 전에 서버에서 네트워크를 한 번 만든다. 첫 배포는 서버에 있던 옛 `deploy.sh` 가 돌 수 있어(네트워크를 만들지 않는다) 먼저 손으로 만든다. 실패하면 한 번 더 실행한다 (워커가 내려가 있을 수 있다)
+
+```bash
+docker network inspect glp1-edge >/dev/null 2>&1 || docker network create glp1-edge
+```
 
 ```bash
 /opt/glp1-staging/infra/deploy-staging.sh            # origin/develop
@@ -275,6 +280,7 @@ docker compose -f docker-compose.prod.yml ps                        # 5개 모�
 
 # 스테이징까지 함께: .env.prod 를 복사해 DB_PASSWORD·INTERNAL_SERVICE_TOKEN 만 바꾼다
 cp .env.prod .env.staging
+sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=staging-test-pw|; s|^INTERNAL_SERVICE_TOKEN=.*|INTERNAL_SERVICE_TOKEN=staging-test-token|" .env.staging
 docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml --env-file .env.staging up -d --build --wait
 curl -k https://staging.localhost/health                            # 200
 

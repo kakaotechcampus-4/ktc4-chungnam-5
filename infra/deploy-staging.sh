@@ -9,6 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 # deploy.sh 와 같은 잠금. 운영 배포가 돌고 있으면 끝날 때까지 기다린다.
+# ubuntu 사용자로 실행한다 (CI 도 runuser -u ubuntu). root 가 잠금 파일을 먼저 만들면 ubuntu 가 열지 못한다.
 exec 9>/tmp/glp1-deploy.lock
 flock 9
 docker network inspect glp1-edge >/dev/null 2>&1 || docker network create glp1-edge >/dev/null

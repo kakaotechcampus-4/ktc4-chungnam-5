@@ -25,7 +25,7 @@
 | 접근 키 | 운영과 **같은 `DEMO_KEY`** | APK 하나로 `API_BASE_URL` 만 바꿔 양쪽을 본다. 운영 Caddy 가 두 사이트를 같은 규칙으로 검사한다 |
 | `STAGING_DOMAIN` | **필수** (`${STAGING_DOMAIN:?}`) | 빈 주소의 사이트 블록은 Caddyfile 파싱 오류다. 선택으로 두려면 Caddyfile 을 분기해야 해서 복잡해진다 |
 | 동시 배포 | 두 배포 스크립트가 **같은 `flock` 잠금**을 쓴다. 나중 것은 기다린다 | 빌드가 겹치면 4GiB 에서 스왑으로 밀려 운영이 느려진다. 수동 배포도 막아야 해서 CI concurrency 가 아니라 스크립트에서 막는다 |
-| 메모리 | **스테이징에만** `mem_limit` | compose 에 제한이 없으면 OOM killer 가 운영 Postgres 를 고를 수 있다. 스테이징이 먼저 죽게 한다 |
+| 메모리 | **스테이징에만** `mem_limit` + `oom_score_adj: 500` | `mem_limit` 은 스테이징이 쓸 양만 묶는다. 서버 전체가 모자랄 때 OOM killer 가 운영 Postgres 를 고르지 않게 `oom_score_adj` 로 스테이징을 먼저 죽게 한다 |
 | 배포 방식 | 이번에는 **수동** (Session Manager 에서 `deploy-staging.sh`) | CI(`deploy-staging.yml`)는 운영 H2 워크플로를 만들 때 같이 붙인다 |
 
 검토했지만 고르지 않은 것:
@@ -66,6 +66,7 @@
 - `api` 만 `networks: [default, edge]`
 - `caddy: { profiles: [disabled] }` — 뜨지 않는다
 - `mem_limit`: api 512m, worker 512m, ai 256m, ai-stub 128m, db 384m (상한 합 약 1.8GiB)
+- `oom_score_adj: 500` (db·api·worker·ai·ai-stub): 서버 전체 메모리가 모자랄 때 OOM killer 가 운영 대신 스테이징을 먼저 고른다
 - `networks: { edge: { external: true, name: glp1-edge } }`
 
 ### `infra/docker-compose.prod.yml` (수정)
@@ -106,8 +107,10 @@
 ## 3. 서버 1회 작업
 
 1. DuckDNS 에 `glp1-staging` 추가. cron 의 `domains=` 를 `glp1-demo,glp1-staging` 으로
-2. 운영 `.env.prod` 에 `STAGING_DOMAIN=glp1-staging.duckdns.org` 추가 → `/opt/glp1/infra/deploy.sh`
-   (이 변경이 `main` 에 머지되기 전이면 `deploy.sh origin/develop` 으로 임시 우회)
+2. 운영 `.env.prod` 에 `STAGING_DOMAIN=glp1-staging.duckdns.org` 추가. 첫 `deploy.sh` 전에 네트워크를 손으로 만든다:
+   `docker network inspect glp1-edge >/dev/null 2>&1 || docker network create glp1-edge`
+   → `/opt/glp1/infra/deploy.sh` (이 변경이 `main` 에 머지되기 전이면 `deploy.sh origin/develop` 으로 임시 우회)
+   첫 배포는 서버에 있던 옛 `deploy.sh` 가 돌 수 있어(네트워크를 만들지 않는다) 먼저 만든다. 실패하면 한 번 더 실행한다 (워커가 내려가 있을 수 있다).
 3. `/opt/glp1-staging` 에 clone, `.env.staging` 작성 — `DB_PASSWORD`·`INTERNAL_SERVICE_TOKEN` 은 운영과
    다른 값으로 새로 생성, `DEMO_KEY`·LLM 값은 운영과 같게 → `./deploy-staging.sh`
 4. 스테이징 DB(`glp1-staging-db`)에 영양DB 시드 투입
