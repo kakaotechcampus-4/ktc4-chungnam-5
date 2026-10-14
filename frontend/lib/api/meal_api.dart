@@ -361,12 +361,26 @@ class DailyFeedback {
     required this.feedbackStatus,
     required this.stale,
     this.summary,
+    this.hasRow = false,
+    this.safetyStatus,
   });
 
   /// `PENDING` · `GENERATING` · `READY` · `FAILED`.
   final String feedbackStatus;
+
+  /// `safetyStatus` 가 `SAFE` 일 때만 온다.
   final String? summary;
   final bool stale;
+
+  /// 서버에 그날 요약 행이 있는지(`dailyFeedbackId`). `READY` 인데 행이 없으면
+  /// 요약할 근거(평가된 끼니)가 없어 워커가 만들지 않은 것이다 — 실패가 아니다.
+  final bool hasRow;
+
+  /// `SAFE` · `BLOCKED` · `REVIEW_REQUIRED`. 행이 없으면 null.
+  final String? safetyStatus;
+
+  /// 만들었지만 안전 검사에 걸려 문장을 보여 주지 않는다.
+  bool get isHidden => safetyStatus != null && safetyStatus != 'SAFE';
 
   /// 새로 만들어 달라고 할지.
   bool get needsRefresh => feedbackStatus == 'PENDING' || stale;
@@ -377,6 +391,8 @@ class DailyFeedback {
     feedbackStatus: json['feedbackStatus'] as String,
     summary: json['summary'] as String?,
     stale: json['stale'] as bool? ?? false,
+    hasRow: json['dailyFeedbackId'] != null,
+    safetyStatus: json['safetyStatus'] as String?,
   );
 }
 

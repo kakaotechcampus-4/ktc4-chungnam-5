@@ -469,6 +469,19 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
         actionLabel: '다시 확인하기',
         onAction: () => _loadDaily(date),
       );
+    } else if (!dailyFailed &&
+        d != null &&
+        d.feedbackStatus != 'FAILED' &&
+        !d.isGenerating &&
+        !d.needsRefresh &&
+        (d.isHidden || !d.hasRow)) {
+      // 끝났는데 문장이 없는 두 경우는 실패가 아니다 — 다시 시도해도 같다.
+      body = Text(
+        d.isHidden
+            ? '하루 요약은 보여 드리기 어려워요. 궁금한 점은 담당 의사와 상담해 주세요.'
+            : '요약할 기록이 아직 부족해요. 끼니를 더 기록하면 만들어 드려요.',
+        style: AppTypography.bodySecondary,
+      );
     } else if (dailyFailed ||
         (d != null && !d.isGenerating && !d.needsRefresh)) {
       body = WaitNotice(

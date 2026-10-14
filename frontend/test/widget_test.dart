@@ -870,6 +870,63 @@ void main() {
     expect(find.text('하루 요약 문장'), findsOneWidget);
   });
 
+  testWidgets('a daily summary without a basis is not shown as a failure', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    final api = FakeApi()
+      ..on(
+        'GET /meals/{meal_id}',
+        (_) => (
+          200,
+          fakeOk({
+            'mealId': 'm1',
+            'status': 'EVALUATED',
+            'mealType': 'DINNER',
+            'eatenAt': '2026-10-05T19:00:00+09:00',
+            'items': <Object?>[],
+          }),
+        ),
+      )
+      // 작업은 끝났는데 근거가 없어 행을 만들지 않았다.
+      ..on(
+        'GET /insights/daily',
+        (_) => (
+          200,
+          fakeOk({
+            'dailyFeedbackId': null,
+            'feedbackDate': '2026-10-05',
+            'feedbackStatus': 'READY',
+            'summary': null,
+            'safetyStatus': null,
+            'stale': false,
+          }),
+        ),
+      );
+    await tester.pumpWidget(
+      Provider(
+        create: (_) => ApiClient(session: session, dio: api.dio),
+        child: MaterialApp(
+          home: NextMealSuggestionScreen(
+            mealId: 'm1',
+            eatenAt: DateTime(2026, 10, 5, 12),
+          ),
+        ),
+      ),
+    );
+    await _settle(tester);
+
+    await tester.scrollUntilVisible(
+      find.textContaining('기록이 아직 부족해요'),
+      200,
+    );
+    expect(find.textContaining('만들지 못했어요'), findsNothing);
+    expect(find.text('다시 시도'), findsNothing);
+    expect(api.requests.where((r) => r.path.endsWith('/refresh')), isEmpty);
+  });
+
   testWidgets('changing the satiety on evaluation confirms again', (
     WidgetTester tester,
   ) async {
