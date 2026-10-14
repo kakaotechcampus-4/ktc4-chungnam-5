@@ -941,6 +941,125 @@ void main() {
     );
   });
 
+  testWidgets('a failed meal feedback can be made again by re-confirming', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    final ready =
+        _mockBody('GET /api/v1/meals/{meal_id}/feedback')['data'] as Map;
+    var confirmed = false;
+    final api = FakeApi()
+      ..on(
+        'GET /meals/{meal_id}',
+        (_) => (
+          200,
+          fakeOk({
+            ...(_mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map),
+            'eatenAt': '2026-10-05T12:00:00+09:00',
+            'status': 'EVALUATED',
+            'satiety': {
+              'beforePct': 30,
+              'afterPct': 70,
+              'checkins': [],
+              'hungerReturnMinutes': null,
+            },
+          }),
+        ),
+      )
+      ..on(
+        'GET /meals/{meal_id}/feedback',
+        (_) => (
+          200,
+          fakeOk(
+            confirmed
+                ? ready
+                : {
+                    ...ready,
+                    'feedbackStatus': 'FAILED',
+                    'summary': null,
+                    'suggestions': [],
+                  },
+          ),
+        ),
+      );
+    await tester.pumpWidget(
+      Provider(
+        create: (_) => ApiClient(session: session, dio: api.dio),
+        child: MaterialApp(
+          home: NextMealSuggestionScreen(
+            mealId: 'm1',
+            eatenAt: DateTime(2026, 10, 5, 12),
+          ),
+        ),
+      ),
+    );
+    await _settle(tester);
+    expect(find.text('지금은 제안을 만들지 못했어요.'), findsOneWidget);
+
+    api.on('POST /meals/{meal_id}/confirm', (_) {
+      confirmed = true;
+      return (200, _mockBody('POST /api/v1/meals/{meal_id}/confirm'));
+    });
+    await tester.ensureVisible(find.text('다시 만들기'));
+    await tester.tap(find.text('다시 만들기'));
+    await _settle(tester);
+
+    final post = api.requests.singleWhere((r) => r.path.endsWith('/confirm'));
+    expect((post.data as Map)['satietyAfterPct'], 70);
+    expect(find.text('두부 반 모'), findsOneWidget);
+  });
+
+  testWidgets('a slow analysis can be checked again or left for later', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    var status = 'ANALYZING';
+    final api = FakeApi()
+      ..on(
+        'GET /meals/{meal_id}',
+        (_) => (
+          200,
+          fakeOk({
+            ...(_mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map),
+            'eatenAt': '2026-10-06T12:40:00+09:00',
+            'status': status,
+          }),
+        ),
+      );
+    await tester.pumpWidget(
+      Provider(
+        create: (_) => ApiClient(session: session, dio: api.dio),
+        child: const MaterialApp(
+          home: MealAnalysisScreen(
+            meal: MealCreated(
+              mealId: 'm1',
+              pollInterval: Duration(milliseconds: 100),
+              timeout: Duration(seconds: 2),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    expect(find.text('분석이 오래 걸리고 있어요'), findsOneWidget);
+    expect(find.text('나중에 확인할게요'), findsOneWidget);
+    final asked = api.requests.length;
+    // 간격을 늘려 가므로 100ms 마다 묻지 않는다(그랬다면 20번).
+    expect(asked, lessThan(12));
+
+    status = 'REVIEW_REQUIRED';
+    await tester.ensureVisible(find.text('다시 확인하기'));
+    await tester.tap(find.text('다시 확인하기'));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.byType(MealReviewScreen), findsOneWidget);
+  });
+
   testWidgets('after an amount edit the nutrition line shows the new value', (
     WidgetTester tester,
   ) async {

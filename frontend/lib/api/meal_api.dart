@@ -126,6 +126,7 @@ class MealDetail {
     required this.items,
     this.imageUrl,
     this.clarifyQuestion,
+    this.satietyAfterPct,
   });
 
   final String mealId;
@@ -146,6 +147,10 @@ class MealDetail {
   final String? imageUrl;
   final String? clarifyQuestion;
 
+  /// 확정 때 적은 식후 포만감(`satiety.afterPct`). 확정 전이면 null.
+  /// 끼니 피드백이 실패했을 때 같은 값으로 다시 확정해 재생성을 건다.
+  final int? satietyAfterPct;
+
   /// 최초 분석이 아직 도는 중인지. 고친 뒤의 `ANALYZING` 은 아니다.
   bool get isFirstAnalysis => status == 'ANALYZING' && !isRecalculation;
 
@@ -161,6 +166,8 @@ class MealDetail {
     eatenAtInstant: DateTime.parse(json['eatenAt'] as String),
     imageUrl: json['imageUrl'] as String?,
     clarifyQuestion: json['clarifyQuestion'] as String?,
+    satietyAfterPct:
+        (json['satiety'] as Map<String, dynamic>?)?['afterPct'] as int?,
     items: (json['items'] as List<dynamic>)
         .map((e) => MealItem.fromJson(e as Map<String, dynamic>))
         .toList(),

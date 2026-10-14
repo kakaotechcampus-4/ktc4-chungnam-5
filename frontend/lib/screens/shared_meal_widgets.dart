@@ -400,6 +400,45 @@ class RetryBlock extends StatelessWidget {
   }
 }
 
+/// AI 가 만드는 한 줄(제안·요약·인사이트)을 기다리다 멈춘 자리.
+///
+/// 화면의 나머지는 이미 보이므로 [RetryBlock] 처럼 크게 막지 않고 안내 한 줄과
+/// 작은 버튼만 둔다. 시간이 지나 멈췄으면 "나중에 확인" 을 안내하고
+/// [actionLabel] 로 다시 묻게 하고, 실패했으면 다시 만들게 한다.
+class WaitNotice extends StatelessWidget {
+  const WaitNotice({
+    super.key,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = actionLabel;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(message, style: AppTypography.bodySecondary),
+        if (label != null && onAction != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(label),
+          ),
+      ],
+    );
+  }
+}
+
 /// 보여 줄 게 없는 상태. 실패가 아니므로 버튼을 두지 않는다.
 class EmptyBlock extends StatelessWidget {
   const EmptyBlock({super.key, required this.message});

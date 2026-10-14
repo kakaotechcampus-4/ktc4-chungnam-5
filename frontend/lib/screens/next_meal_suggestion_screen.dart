@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../api/meal_api.dart';
 import '../common/api_format.dart';
+import '../common/polling.dart';
 import '../navigation/nav_icons.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
@@ -51,9 +52,8 @@ class NextMealSuggestionScreen extends StatefulWidget {
 }
 
 class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
-  /// 제안이 준비됐는지 다시 묻는 간격과 횟수(약 30초).
+  /// 제안이 준비됐는지 처음 다시 묻는 간격. 갈수록 늘린다([pollUntil]).
   static const _feedbackPoll = Duration(milliseconds: 1500);
-  static const _feedbackPollLimit = 20;
 
   late final MealApiService _api = MealApiService(context.read<ApiClient>());
 
@@ -62,8 +62,14 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
   bool isLoading = true;
   String? errorMessage;
 
-  /// 제안을 기다리다 포기했는지(실패·시간 초과).
-  bool feedbackUnavailable = false;
+  /// 제안 생성이 실패했는지(`FAILED`). 다시 확정해 새로 만들 수 있다.
+  bool feedbackFailed = false;
+
+  /// 제안을 기다리다 한도를 넘겼는지. 서버는 계속 만든다 — 나중에 볼 수 있다.
+  bool feedbackTimedOut = false;
+
+  /// 확정 때 적은 식후 포만감. 제안을 다시 만들 때(재확정) 그대로 보낸다.
+  int? satietyAfterPct;
 
   /// 끼니 종류(`BREAKFAST` · `LUNCH` · `DINNER` …). 알아내기 전에는 null.
   /// 끼니를 못 불러오면 `UNKNOWN` 으로 두고 저녁이 아닌 것처럼 제안을 보인다.
@@ -77,7 +83,8 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
   /// 하루 요약. [dailyDate] 는 그 날짜(KST).
   DateTime? dailyDate;
   DailyFeedback? daily;
-  bool dailyUnavailable = false;
+  bool dailyFailed = false;
+  bool dailyTimedOut = false;
 
   @override
   void initState() {
@@ -113,7 +120,10 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
       final meal = await _api.fetchMeal(widget.mealId);
       if (!mounted) return;
       eatenAt ??= meal.eatenAt;
-      setState(() => mealType = meal.mealType);
+      setState(() {
+        mealType = meal.mealType;
+        satietyAfterPct = meal.satietyAfterPct;
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => mealType = 'UNKNOWN');
@@ -126,49 +136,89 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
   }
 
   /// 저녁 끼니의 그날 하루 요약을 받는다. 없거나 낡았으면 새로 만들어
-  /// 달라고 하고 준비될 때까지 잠깐씩 다시 묻는다(약 30초). 실패해도 화면은 그대로다.
-  Future<void> _loadDaily(DateTime date) async {
-    setState(() => dailyDate = date);
+  /// 달라고 하고 준비될 때까지 간격을 늘려 가며 다시 묻는다(약 1분).
+  /// [refresh] 면(실패 뒤 "다시 시도") 상태와 상관없이 새로 만들어 달라고 한다.
+  /// 실패해도 화면은 그대로다 — 이 칸만 안내로 바뀐다.
+  Future<void> _loadDaily(DateTime date, {bool refresh = false}) async {
+    setState(() {
+      dailyDate = date;
+      dailyFailed = false;
+      dailyTimedOut = false;
+      if (refresh) daily = null;
+    });
+    final Duration interval;
     try {
-      var result = await _api.fetchDailyFeedback(date);
-      if (!mounted) return;
-      setState(() => daily = result);
-      if (!result.needsRefresh && !result.isGenerating) return;
-      final interval = result.needsRefresh
-          ? await _api.refreshDailyFeedback(date)
-          : _feedbackPoll;
-      for (var i = 0; i < _feedbackPollLimit; i++) {
-        await Future.delayed(interval);
-        if (!mounted) return;
-        result = await _api.fetchDailyFeedback(date);
+      if (!refresh) {
+        final result = await _api.fetchDailyFeedback(date);
         if (!mounted) return;
         setState(() => daily = result);
-        if (!result.isGenerating && !result.needsRefresh) return;
+        if (!result.needsRefresh && !result.isGenerating) return;
+        refresh = result.needsRefresh;
       }
+      interval = refresh
+          ? await _api.refreshDailyFeedback(date)
+          : _feedbackPoll;
     } catch (_) {
-      // 아래 한 줄일 뿐이다. 실패해도 끼니 피드백은 그대로 쓴다.
+      if (mounted) setState(() => dailyFailed = true);
+      return;
     }
-    if (mounted) setState(() => dailyUnavailable = true);
+    final result = await pollUntil<DailyFeedback>(
+      fetch: () => _api.fetchDailyFeedback(date),
+      isDone: (r) => !r.isGenerating && !r.needsRefresh,
+      isActive: () => mounted,
+      onResult: (r) => setState(() => daily = r),
+      first: interval,
+    );
+    if (!mounted) return;
+    if (result == null) setState(() => dailyTimedOut = true);
   }
 
   Future<void> _pollFeedback() async {
-    for (var i = 0; i < _feedbackPollLimit && mounted; i++) {
-      try {
-        final result = await _api.fetchFeedback(widget.mealId);
-        if (!mounted) return;
-        setState(() => feedback = result);
-        if (!result.isPending) {
-          if (result.feedbackStatus == 'FAILED') {
-            setState(() => feedbackUnavailable = true);
-          }
-          return;
-        }
-      } catch (_) {
-        // 한 번 실패는 넘기고 다음 차례에 다시 묻는다.
+    setState(() {
+      feedbackFailed = false;
+      feedbackTimedOut = false;
+    });
+    final result = await pollUntil<MealFeedback>(
+      fetch: () => _api.fetchFeedback(widget.mealId),
+      isDone: (r) => !r.isPending,
+      isActive: () => mounted,
+      onResult: (r) => setState(() => feedback = r),
+      first: _feedbackPoll,
+      askNow: true,
+    );
+    if (!mounted) return;
+    setState(() {
+      if (result == null) {
+        feedbackTimedOut = true;
+      } else if (result.feedbackStatus == 'FAILED') {
+        feedbackFailed = true;
       }
-      await Future.delayed(_feedbackPoll);
+    });
+  }
+
+  /// 제안 생성이 실패했을 때 "다시 만들기". 서버의 재시도 진입점은 재확정이다 —
+  /// 문장이 없으면 생성 작업을 다시 건다(BE `services/feedback.py`). 확정 때와
+  /// 같은 식후 포만감을 보내므로 점수는 바뀌지 않는다.
+  Future<void> _regenerateFeedback() async {
+    final pct = satietyAfterPct;
+    if (pct == null) return;
+    setState(() {
+      feedbackFailed = false;
+      feedback = null;
+    });
+    try {
+      final result = await _api.confirm(widget.mealId, satietyAfterPct: pct);
+      if (!mounted) return;
+      setState(() => evaluation = result);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => feedbackFailed = true);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('다시 만들지 못했어요: $e')));
+      return;
     }
-    if (mounted) setState(() => feedbackUnavailable = true);
+    _pollFeedback();
   }
 
   /// 식사 기록 흐름을 모두 닫고 홈 탭(RootShell 0번)으로 돌아간다.
@@ -363,11 +413,25 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
         ],
       ];
     }
-    if (feedbackUnavailable || feedback?.isPending == false) {
+    if (feedbackTimedOut) {
       return [
-        Text(
-          '지금은 제안을 만들지 못했어요. 나중에 기록 탭에서 다시 볼 수 있어요.',
-          style: AppTypography.bodySecondary,
+        WaitNotice(
+          message: '제안을 만드는 데 시간이 걸리고 있어요. 나중에 기록 탭에서 확인해 주세요.',
+          actionLabel: '다시 확인하기',
+          onAction: _pollFeedback,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+      ];
+    }
+    if (feedbackFailed || feedback?.isPending == false) {
+      final canRegenerate = feedbackFailed && satietyAfterPct != null;
+      return [
+        WaitNotice(
+          message: canRegenerate
+              ? '지금은 제안을 만들지 못했어요.'
+              : '지금은 제안을 만들지 못했어요. 나중에 기록 탭에서 다시 볼 수 있어요.',
+          actionLabel: canRegenerate ? '다시 만들기' : null,
+          onAction: canRegenerate ? _regenerateFeedback : null,
         ),
         const SizedBox(height: AppSpacing.sm),
       ];
@@ -399,9 +463,19 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
     final Widget body;
     if (summary != null) {
       body = Text(summary, style: AppTypography.body);
-    } else if (dailyUnavailable ||
+    } else if (dailyTimedOut && date != null) {
+      body = WaitNotice(
+        message: '하루 요약을 만드는 데 시간이 걸리고 있어요. 나중에 기록 탭에서 확인해 주세요.',
+        actionLabel: '다시 확인하기',
+        onAction: () => _loadDaily(date),
+      );
+    } else if (dailyFailed ||
         (d != null && !d.isGenerating && !d.needsRefresh)) {
-      body = Text('지금은 하루 요약을 만들지 못했어요.', style: AppTypography.bodySecondary);
+      body = WaitNotice(
+        message: '지금은 하루 요약을 만들지 못했어요.',
+        actionLabel: date == null ? null : '다시 시도',
+        onAction: date == null ? null : () => _loadDaily(date, refresh: true),
+      );
     } else {
       body = const SkeletonBox(width: double.infinity, height: 40);
     }
