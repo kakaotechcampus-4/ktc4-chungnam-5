@@ -1,4 +1,4 @@
-"""`app/feedback_agent.py` 단위 테스트. 모델 호출 없음 — 판정·프롬프트·파싱만 본다."""
+"""`app/short_feedback.py` 단위 테스트. 모델 호출 없음 — 판정·프롬프트·파싱만 본다."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from app.feedback_agent import (
+from app.short_feedback import (
     build_daily_prompt,
     build_meal_prompt,
     judge_nutrients,
