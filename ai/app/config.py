@@ -13,7 +13,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ALLOWED_MODELS: frozenset[str] = frozenset(
     {
-        # TODO: 실제 사용할 모델명이 정해지면 채운다. 목록 밖 모델은 기동 시 거부된다.
+        "claude-haiku-5-5",  # LLM_MODEL_VISION — 저비용 비전(/analyze-meal)
+        # TODO: LLM_MODEL_REASONING(소형 추론/추론 모델)은 아직 팀에서 안 정해짐.
     }
 )
 
