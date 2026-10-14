@@ -1244,27 +1244,37 @@ void main() {
     expect(find.text('식사 기록'), findsOneWidget);
   });
 
-  testWidgets('manual input sends the food list as rawText', (
+  testWidgets('search tab sends the picked DB foods with amounts', (
     WidgetTester tester,
   ) async {
     final api = await pumpMealScreen(tester, const MealInputScreen());
 
-    await tester.tap(find.text('직접 입력'));
+    await tester.tap(find.text('검색'));
     await tester.pumpAndSettle();
-    Future<void> addFood(String name, String amount, String unit) async {
-      await tester.enterText(find.byType(TextField).at(0), name);
-      await tester.enterText(find.byType(TextField).at(1), amount);
-      await tester.tap(find.byType(DropdownButton<String>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(unit).last);
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('목록에 추가'));
-      await tester.tap(find.text('목록에 추가'));
-      await tester.pumpAndSettle();
-    }
+    await tester.tap(find.text('음식명을 검색해 주세요.'));
+    await tester.pumpAndSettle();
 
-    await addFood('김치찌개', '300', 'g');
-    await addFood('밥', '1', '인분');
+    // 검색 화면: 치고 잠깐 멈추면 검색한다. 두 개를 고른다.
+    await tester.enterText(find.byType(TextField), '계란');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(
+      api.requests.where((r) => r.path == '/nutrition/candidates'),
+      hasLength(1),
+    );
+    await tester.tap(find.text('계란말이'));
+    await tester.tap(find.text('바로먹는 삶은계란'));
+    await tester.pump();
+    await tester.tap(find.text('음식 추가하기'));
+    await tester.pumpAndSettle();
+
+    // 입력 화면: 기준량(100g)으로 들어온다. 계란말이는 ＋ 두 번(120g).
+    expect(find.text('계란말이'), findsOneWidget);
+    await tester.tap(find.byTooltip('양 늘리기').first);
+    await tester.tap(find.byTooltip('양 늘리기').first);
+    await tester.pump();
+    expect(find.textContaining('232kcal'), findsOneWidget); // 193 × 1.2
+
     await tester.ensureVisible(find.text('분석 시작'));
     await tester.tap(find.text('분석 시작'));
     await _settle(tester);
@@ -1272,7 +1282,10 @@ void main() {
     final post = api.requests.singleWhere(
       (r) => r.method == 'POST' && r.path == '/meals',
     );
-    expect((post.data as Map)['rawText'], '김치찌개 300g, 밥 1인분');
+    expect(
+      (post.data as Map)['rawText'],
+      '계란말이 120g, 바로먹는 삶은계란 100g',
+    );
     expect(find.text('식사 기록'), findsNothing); // 분석 화면으로 넘어갔다.
 
     // 분석 화면의 폴링 대기를 끝낸다.
