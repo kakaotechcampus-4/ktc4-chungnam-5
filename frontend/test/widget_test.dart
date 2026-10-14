@@ -18,6 +18,7 @@ import 'package:frontend/screens/meal_review_screen.dart';
 import 'package:frontend/screens/medication_info_screen.dart';
 import 'package:frontend/screens/next_meal_suggestion_screen.dart';
 import 'package:frontend/state/medication_state.dart';
+import 'package:frontend/state/tab_state.dart';
 import 'package:frontend/state/user_session.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -119,6 +120,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AI 코치'), findsOneWidget);
+  });
+
+  testWidgets('opening the chatbot for a meal shows which meal it is about', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    await _pumpApp(tester);
+    await tester.tap(find.text('나중에'));
+    await tester.pumpAndSettle();
+
+    // 끼니 피드백의 챗봇 버튼이 하는 일.
+    Provider.of<TabState>(
+      tester.element(find.text('홈').first),
+      listen: false,
+    ).openChatbot(mealId: '00000000-0000-0000-0000-000000000456');
+    await _settle(tester);
+
+    expect(find.text('AI 코치'), findsOneWidget);
+    expect(find.textContaining('점심 기록으로 이야기해요'), findsOneWidget);
   });
 
   testWidgets('feedback tab asks short or long, then shows that screen', (

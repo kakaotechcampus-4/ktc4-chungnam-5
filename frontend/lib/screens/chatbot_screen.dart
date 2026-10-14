@@ -1,7 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
+import '../api/meal_api.dart';
+import '../common/api_format.dart';
+import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -42,8 +47,12 @@ class _ChatMessage {
 
 /// AI 탭 — AI 코치(챗봇) 화면. Figma 화면 12 · AI 코치(챗봇) 11 · 12.
 ///
-/// 아직 화면만 만든 단계라 서버와 연결하지 않는다. 보낸 말은 화면 안에서만 쌓이고,
+/// 아직 챗봇 API 가 없어 서버와 대화하지 않는다. 보낸 말은 화면 안에서만 쌓이고,
 /// "＋ 새 대화" 는 쌓인 말을 비운다. 답변은 [_tempReply] 의 임시 문구다.
+///
+/// 끼니 피드백(7번)에서 오면 그 끼니([TabState.chatMealId])로 새 대화를 시작하고
+/// 위에 어느 끼니 이야기인지 보여 준다. API 가 생기면 이 id 로 대화를 만든다
+/// (요청서 A-1 `POST /chat/conversations {mealId}`).
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
 
@@ -56,11 +65,52 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final ScrollController _scroll = ScrollController();
   final List<_ChatMessage> _messages = [];
 
+  late final TabState _tabs = context.read<TabState>();
+
+  /// 지금 대화가 묶인 끼니. null 이면 특정 끼니 없이 연 대화다.
+  String? _mealId;
+
+  /// [_mealId] 끼니 정보(맥락 줄). 못 받아도 대화는 그대로 쓴다.
+  MealDetail? _meal;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs.addListener(_onTabsChanged);
+    _onTabsChanged();
+  }
+
   @override
   void dispose() {
+    _tabs.removeListener(_onTabsChanged);
     _input.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// 다른 끼니로 챗봇을 열면 그 끼니로 새 대화를 시작한다.
+  void _onTabsChanged() {
+    final mealId = _tabs.chatMealId;
+    if (mealId == null || mealId == _mealId) return;
+    // TODO(API): 여기서 POST /chat/conversations {mealId} 로 대화를 만든다.
+    setState(() {
+      _mealId = mealId;
+      _meal = null;
+      _messages.clear();
+    });
+    _input.clear();
+    _loadMeal(mealId);
+  }
+
+  Future<void> _loadMeal(String mealId) async {
+    try {
+      final meal = await MealApiService(
+        context.read<ApiClient>(),
+      ).fetchMeal(mealId);
+      if (mounted && mealId == _mealId) setState(() => _meal = meal);
+    } catch (_) {
+      // 맥락 줄 하나일 뿐이다.
+    }
   }
 
   /// 말을 보낸다. 빈 말은 무시한다.
@@ -120,6 +170,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         child: Column(
           children: [
             _buildHeader(),
+            ?_buildMealContext(),
             Expanded(child: empty ? _buildGreeting() : _buildConversation()),
             _buildQuickQuestions(empty),
             _buildInput(),
@@ -162,6 +213,40 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 어느 끼니 이야기인지(`10월 14일 점심 · 참치김밥, 삶은 계란`). 끼니 없이 연
+  /// 대화거나 아직 못 받았으면 없다.
+  Widget? _buildMealContext() {
+    final meal = _meal;
+    if (meal == null) return null;
+    final when =
+        '${meal.eatenAt.month}월 ${meal.eatenAt.day}일 ${mealTypeLabel(meal.mealType)}';
+    final foods = meal.displayName;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        AppSpacing.sm,
+        AppSpacing.screenHorizontal,
+        0,
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          foods.isEmpty ? '$when 기록으로 이야기해요' : '$when 기록으로 이야기해요 · $foods',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.caption.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
       ),
     );
   }

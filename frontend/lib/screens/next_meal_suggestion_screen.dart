@@ -249,7 +249,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
       snapshot = null;
     }
 
-    tabs.setIndex(TabState.ai);
+    tabs.openChatbot(mealId: widget.mealId);
     if (snapshot != null) {
       final image = snapshot;
       late final OverlayEntry entry;

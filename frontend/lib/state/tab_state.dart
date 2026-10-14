@@ -21,11 +21,17 @@ class TabState extends ChangeNotifier {
 
   int _currentIndex = 0;
   FeedbackKind _feedbackKind = FeedbackKind.short;
+  String? _chatMealId;
 
   int get currentIndex => _currentIndex;
 
   /// 피드백 탭이 지금 보여줄 화면. 탭을 누르면 뜨는 분기 팝업에서 고른다.
   FeedbackKind get feedbackKind => _feedbackKind;
+
+  /// AI 코치가 이야기할 끼니. 끼니 피드백(7번)에서 챗봇으로 오면 그 끼니다.
+  /// null 이면 AI 탭을 바로 누른 것 — 서버가 최근 평가 끼니로 정한다(API 요청서 A-1).
+  /// 다른 탭에 갔다 와도 유지된다(진행 중 대화는 하나).
+  String? get chatMealId => _chatMealId;
 
   void setIndex(int index) {
     assert(
@@ -42,6 +48,14 @@ class TabState extends ChangeNotifier {
     if (_currentIndex == feedback && _feedbackKind == kind) return;
     _currentIndex = feedback;
     _feedbackKind = kind;
+    notifyListeners();
+  }
+
+  /// AI 탭으로 이동하면서 [mealId] 끼니로 대화를 시작하게 한다.
+  void openChatbot({required String mealId}) {
+    if (_currentIndex == ai && _chatMealId == mealId) return;
+    _currentIndex = ai;
+    _chatMealId = mealId;
     notifyListeners();
   }
 }
