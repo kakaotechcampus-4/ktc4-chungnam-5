@@ -1,7 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -26,8 +25,35 @@ String _formatDay(DateTime d) => '${d.year}년 ${_two(d.month)}월 ${_two(d.day)
 /// `18:10`.
 String _formatTime(DateTime d) => '${_two(d.hour)}:${_two(d.minute)}';
 
+/// 양을 화면에 적을 때 정수면 소수점을 뗀다(`1.0` → `1`).
+String _formatAmount(double v) =>
+    v == v.roundToDouble() ? '${v.toInt()}' : v.toString();
+
 /// "끼니" · "식사 시각" 같은 섹션 제목.
 final TextStyle _sectionLabel = AppTypography.sectionHead.copyWith(fontSize: 12.5);
+
+/// 직접 입력 폼의 입력창 글씨. 입력값과 단위 선택이 같은 크기를 쓴다.
+final TextStyle _fieldText = AppTypography.body.copyWith(
+  fontSize: 12.5,
+  height: 1.25,
+  color: AppColors.textPrimary,
+);
+
+/// 직접 입력 탭에서 고를 수 있는 단위.
+const List<String> _units = ['g', '개', '인분'];
+
+/// "목록에 추가"로 쌓은 음식 한 줄. 서버로 보내기 전까지 화면 안에서만 들고 있는다.
+class _FoodEntry {
+  const _FoodEntry({
+    required this.name,
+    required this.amount,
+    required this.unit,
+  });
+
+  final String name;
+  final double amount;
+  final String unit;
+}
 
 class MealInputScreen extends StatefulWidget {
   const MealInputScreen({super.key});
@@ -49,7 +75,12 @@ class _MealInputScreenState extends State<MealInputScreen> {
   /// 분석 요청을 보내는 중. 버튼을 막는다.
   bool _submitting = false;
 
-  final TextEditingController _searchController = TextEditingController();
+  // 직접 입력 탭: 폼 입력값과 "목록에 추가"로 쌓은 음식.
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
+  final FocusNode _nameFocus = FocusNode();
+  String? _unit;
+  final List<_FoodEntry> _foods = [];
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -132,44 +163,66 @@ class _MealInputScreenState extends State<MealInputScreen> {
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _nameController.dispose();
+    _amountController.dispose();
+    _nameFocus.dispose();
     super.dispose();
   }
+
+  /// "목록에 추가" — 입력한 음식을 아래 목록에 쌓고 이름·양 칸을 비운다.
+  /// 단위는 이어서 같은 단위로 적는 일이 많아 그대로 둔다.
+  void _addFood() {
+    final name = _nameController.text.trim();
+    final amount = double.tryParse(_amountController.text.trim());
+    final unit = _unit;
+    if (name.isEmpty) {
+      _showError('음식 이름을 적어 주세요');
+      return;
+    }
+    if (amount == null || amount <= 0) {
+      _showError('양을 0보다 큰 숫자로 적어 주세요');
+      return;
+    }
+    if (unit == null) {
+      _showError('단위를 골라 주세요');
+      return;
+    }
+    setState(() => _foods.add(_FoodEntry(name: name, amount: amount, unit: unit)));
+    _nameController.clear();
+    _amountController.clear();
+    _nameFocus.requestFocus();
+  }
+
+  void _removeFood(int index) => setState(() => _foods.removeAt(index));
+
+  void _clearFoods() => setState(_foods.clear);
 
   /// 분석 시작(`POST /meals`) → AI 분석 진행 화면(4번)으로 교체 이동.
   ///
   /// 교체(`pushReplacement`)라서 분석 이후 화면에서 뒤로 가면 입력 화면이 아니라
   /// 이 화면을 연 탭으로 바로 돌아간다.
   Future<void> _startAnalysis() async {
+    if (_selectedTab == 1) {
+      _startManualAnalysis();
+      return;
+    }
     final photo = _photoBytes;
-    final text = _searchController.text.trim();
-    final usePhoto = _selectedTab == 0;
-    if (usePhoto ? photo == null : text.isEmpty) {
-      _showError(usePhoto ? '사진을 골라 주세요' : '먹은 음식을 적어 주세요');
+    if (photo == null) {
+      _showError('사진을 골라 주세요');
       return;
     }
     setState(() => _submitting = true);
     try {
-      final mealType = _mealTypes[_selectedMealType];
-      final created = usePhoto
-          ? await _api.createWithPhoto(
-              mealType: mealType,
-              eatenAt: _eatenAt,
-              photo: photo!,
-              fileName: _photo?.name ?? 'meal.jpg',
-            )
-          : await _api.createWithText(
-              mealType: mealType,
-              eatenAt: _eatenAt,
-              text: text,
-            );
+      final created = await _api.createWithPhoto(
+        mealType: _mealTypes[_selectedMealType],
+        eatenAt: _eatenAt,
+        photo: photo,
+        fileName: _photo?.name ?? 'meal.jpg',
+      );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => MealAnalysisScreen(
-            meal: created,
-            photo: usePhoto ? photo : null,
-          ),
+          builder: (_) => MealAnalysisScreen(meal: created, photo: photo),
         ),
       );
     } catch (e) {
@@ -177,6 +230,19 @@ class _MealInputScreenState extends State<MealInputScreen> {
       _showError('분석을 시작하지 못했어요: $e');
       setState(() => _submitting = false);
     }
+  }
+
+  /// 직접 입력 탭의 "분석 시작".
+  ///
+  /// 화면만 먼저 만든 단계라 서버로 보내지 않는다. 음식 목록을 서버에 넘기는
+  /// 방식(기존 텍스트 입력으로 이어 붙이기 / `POST /meals` 가 `items[]` 를 받기)이
+  /// 정해지면 여기서 [_foods] 를 보낸다.
+  void _startManualAnalysis() {
+    if (_foods.isEmpty) {
+      _showError('먹은 음식을 추가해 주세요');
+      return;
+    }
+    _showError('직접 입력 분석은 아직 연결되지 않았어요');
   }
 
   void _showError(String message) {
@@ -241,7 +307,7 @@ class _MealInputScreenState extends State<MealInputScreen> {
               if (_selectedTab == 0)
                 _buildPhotoUpload()
               else
-                _buildSearchInput(),
+                _buildManualInput(),
               const SizedBox(height: AppSpacing.lg),
 
               // 끼니 선택
@@ -403,48 +469,138 @@ class _MealInputScreenState extends State<MealInputScreen> {
     );
   }
 
-  Widget _buildSearchInput() {
+  /// "직접 입력" 탭: 음식 이름 · 양 · 단위를 적어 목록에 쌓는다.
+  /// 목록이 비어 있으면 입력 패널만 보이고, 하나라도 쌓이면 그 아래에 목록이 붙는다.
+  Widget _buildManualInput() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: AppRadius.mdRadius,
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
+        _buildAddPanel(),
+        if (_foods.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          _buildFoodList(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAddPanel() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.primaryTint.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              const Icon(
-                Icons.edit_outlined,
-                size: AppLayout.tabIconSize,
-                color: AppColors.inactive,
+              ClipOval(
+                child: Image.asset(
+                  'assets/images/meal_input_food_add.png',
+                  width: 39,
+                  height: 39,
+                  fit: BoxFit.cover,
+                ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  style: AppTypography.body,
-                  decoration: InputDecoration(
-                    hintText: '먹은 음식을 적어 주세요 (예: 현미밥, 된장국)',
-                    hintStyle: AppTypography.bodySecondary,
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.md,
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '음식 추가',
+                    style: AppTypography.cardTitle.copyWith(fontSize: 14),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '먹은 음식을 추가해 주세요.',
+                    style: AppTypography.caption.copyWith(
+                      fontSize: 10.5,
+                      color: AppColors.textSecondary,
                     ),
                   ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          _FieldLabel('음식 이름'),
+          const SizedBox(height: 5),
+          _ClearableField(
+            controller: _nameController,
+            focusNode: _nameFocus,
+            hint: '예) 현미밥, 닭가슴살, 김치',
+            height: 35,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 15),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FieldLabel('양'),
+                    const SizedBox(height: 5),
+                    _ClearableField(
+                      controller: _amountController,
+                      height: 40,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 25),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FieldLabel('단위 (g · 개 · 인분)'),
+                    const SizedBox(height: 5),
+                    _UnitDropdown(
+                      value: _unit,
+                      onChanged: (v) => setState(() => _unit = v),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 15),
+          _AddToListButton(onTap: _addFood),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFoodList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 30,
+          child: Row(
+            children: [
+              Text('추가한 음식', style: AppTypography.cardTitle),
+              const SizedBox(width: 6),
+              _CountBadge(count: _foods.length),
+              const Spacer(),
+              _ClearAllButton(onTap: _clearFoods),
+            ],
+          ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          'AI 가 음식과 양을 알아봐요. 다음 화면에서 고칠 수 있어요.',
-          style: AppTypography.bodySecondary,
-        ),
+        const SizedBox(height: 4),
+        for (var i = 0; i < _foods.length; i++) ...[
+          if (i > 0) const SizedBox(height: 7),
+          _FoodCard(entry: _foods[i], onRemove: () => _removeFood(i)),
+        ],
       ],
     );
   }
@@ -633,6 +789,297 @@ class _DateTimeRow extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 직접 입력 폼의 입력창 테두리 상자(흰 바탕 + 회색 테두리).
+BoxDecoration _fieldBox() => BoxDecoration(
+  color: AppColors.surface,
+  border: Border.all(color: AppColors.border),
+  borderRadius: BorderRadius.circular(10),
+);
+
+/// 입력창 위의 라벨("음식 이름" · "양" · "단위").
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: AppTypography.body.copyWith(
+        fontSize: 13,
+        height: 1.25,
+        color: AppColors.textPrimary,
+      ),
+    );
+  }
+}
+
+/// 글자가 있으면 오른쪽에 지우기(✕) 버튼이 뜨는 입력창.
+class _ClearableField extends StatelessWidget {
+  const _ClearableField({
+    required this.controller,
+    required this.height,
+    this.focusNode,
+    this.hint,
+    this.keyboardType,
+    this.inputFormatters,
+    this.textInputAction,
+  });
+
+  final TextEditingController controller;
+  final double height;
+  final FocusNode? focusNode;
+  final String? hint;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextInputAction? textInputAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      padding: const EdgeInsets.only(left: 7, right: 11),
+      decoration: _fieldBox(),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              keyboardType: keyboardType,
+              inputFormatters: inputFormatters,
+              textInputAction: textInputAction,
+              style: _fieldText,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: _fieldText.copyWith(color: AppColors.textTertiary),
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, _) {
+              if (value.text.isEmpty) return const SizedBox.shrink();
+              return GestureDetector(
+                onTap: controller.clear,
+                child: const Icon(
+                  Icons.cancel,
+                  size: 20,
+                  color: AppColors.textTertiary,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 단위(g · 개 · 인분) 고르기. 아직 안 골랐으면 "단위 선택"이 보인다.
+class _UnitDropdown extends StatelessWidget {
+  const _UnitDropdown({required this.value, required this.onChanged});
+
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.only(left: 7, right: 7),
+      decoration: _fieldBox(),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          hint: Text(
+            '단위 선택',
+            style: _fieldText.copyWith(color: AppColors.textTertiary),
+          ),
+          icon: const Icon(
+            Icons.keyboard_arrow_down,
+            size: 20,
+            color: AppColors.textTertiary,
+          ),
+          style: _fieldText,
+          dropdownColor: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          items: [
+            for (final unit in _units)
+              DropdownMenuItem(value: unit, child: Text(unit)),
+          ],
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+}
+
+/// "목록에 추가" 버튼(빨강2 윤곽 + 연한 배경).
+class _AddToListButton extends StatelessWidget {
+  const _AddToListButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+      side: const BorderSide(color: AppColors.primaryStrong),
+    );
+    return Material(
+      color: AppColors.primaryStrongBg,
+      shape: shape,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: shape,
+        child: SizedBox(
+          height: 37,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.add, size: 16, color: AppColors.primaryStrong),
+              const SizedBox(width: 5),
+              Text(
+                '목록에 추가',
+                style: AppTypography.buttonLabel.copyWith(
+                  color: AppColors.primaryStrong,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "추가한 음식" 옆의 개수 배지.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 14,
+      height: 14,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: AppColors.primaryStrongBg,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        '$count',
+        style: AppTypography.emphasis.copyWith(
+          fontSize: 9,
+          height: 1,
+          color: AppColors.primaryStrong,
+        ),
+      ),
+    );
+  }
+}
+
+/// "전체 삭제" 버튼.
+class _ClearAllButton extends StatelessWidget {
+  const _ClearAllButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(5),
+      side: const BorderSide(color: AppColors.border),
+    );
+    return Material(
+      color: AppColors.surface,
+      shape: shape,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: shape,
+        child: SizedBox(
+          width: 93,
+          height: 30,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.delete_outline,
+                size: 16,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text('전체 삭제', style: _fieldText),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 목록의 음식 한 줄 — 이름과 "양+단위", 오른쪽 ✕ 로 지운다.
+class _FoodCard extends StatelessWidget {
+  const _FoodCard({required this.entry, required this.onRemove});
+
+  final _FoodEntry entry;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: AppRadius.lgRadius,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    entry.name,
+                    style: AppTypography.cardTitle,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  '${_formatAmount(entry.amount)}${entry.unit}',
+                  style: AppTypography.caption.copyWith(fontSize: 9.5),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onRemove,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.close, size: 14, color: AppColors.textTertiary),
+            ),
+          ),
+        ],
       ),
     );
   }
