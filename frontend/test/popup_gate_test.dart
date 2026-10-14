@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/popups/popup_gate.dart';
+import 'package:frontend/state/tab_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final _dailyTitle = find.text('오늘 컨디션 기록');
@@ -132,6 +133,33 @@ void main() {
     gate.showDailyPopupsIfDue(context);
     await _settle(tester);
     expect(_dailyTitle, findsNothing);
+    expect(gate.isShowing, isFalse);
+  });
+
+  testWidgets('the feedback branch waits for an open popup, then returns', (
+    WidgetTester tester,
+  ) async {
+    final context = await _pumpHost(tester);
+    final gate = PopupGate();
+
+    gate.showDailyPopupsIfDue(context);
+    await _settle(tester);
+    final branch = gate.showFeedbackBranch(
+      context,
+      anchorCenterX: 400,
+      bottomOffset: 60,
+    );
+    await _settle(tester);
+    expect(_dailyTitle, findsOneWidget);
+    expect(find.text('장기 피드백'), findsNothing);
+
+    await tester.tap(find.text('나중에'));
+    await _settle(tester);
+    expect(find.text('장기 피드백'), findsOneWidget);
+
+    await tester.tap(find.text('장기 피드백'));
+    await _settle(tester);
+    expect(await branch, FeedbackKind.long);
     expect(gate.isShowing, isFalse);
   });
 }

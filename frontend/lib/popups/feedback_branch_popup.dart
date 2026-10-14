@@ -1,40 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../navigation/nav_icons.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_typography.dart';
-import 'nav_icons.dart';
 
 /// 피드백 탭을 누르면 탭바 위에 뜨는 분기 팝업(Figma 2-b).
-/// 단기 피드백(→ 기록 달력) · 장기 피드백 두 말풍선 중 하나를 고르면 그 값을 돌려주고,
-/// 바깥을 누르면 null 이다.
+/// 단기 피드백(→ 기록 달력) · 장기 피드백 두 말풍선 중 하나를 고르면 그 값으로
+/// 닫히고, 바깥을 누르면 null 이다.
 ///
 /// [anchorCenterX] 는 피드백 탭 아이콘의 가로 중심, [bottomOffset] 은 화면 아래에서
 /// 탭바 윗선까지의 거리다. 두 말풍선의 꼬리가 이 가운데 지점으로 모인다.
-Future<FeedbackKind?> showFeedbackBranchPopup(
-  BuildContext context, {
-  required double anchorCenterX,
-  required double bottomOffset,
-}) {
-  return showGeneralDialog<FeedbackKind>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: '닫기',
-    barrierColor: AppColors.overlay,
-    transitionDuration: const Duration(milliseconds: 320),
-    pageBuilder: (dialogContext, animation, _) => _FeedbackBranchPopup(
-      animation: animation,
-      anchorCenterX: anchorCenterX,
-      bottomOffset: bottomOffset,
-    ),
-    // 딤 배경의 페이드는 route 가 맡고, 말풍선 애니메이션은 팝업 안에서 한다.
-    transitionBuilder: (_, _, _, child) => child,
-  );
-}
-
-class _FeedbackBranchPopup extends StatefulWidget {
-  const _FeedbackBranchPopup({
+///
+/// 직접 띄우지 말고 `PopupGate.showFeedbackBranch` 로 띄운다. [animation] 은
+/// 그 route 의 애니메이션이다.
+class FeedbackBranchPopup extends StatefulWidget {
+  const FeedbackBranchPopup({
+    super.key,
     required this.animation,
     required this.anchorCenterX,
     required this.bottomOffset,
@@ -52,10 +35,10 @@ class _FeedbackBranchPopup extends StatefulWidget {
   static const double _totalWidth = _cardSize * 2 + _cardGap;
 
   @override
-  State<_FeedbackBranchPopup> createState() => _FeedbackBranchPopupState();
+  State<FeedbackBranchPopup> createState() => FeedbackBranchPopupState();
 }
 
-class _FeedbackBranchPopupState extends State<_FeedbackBranchPopup> {
+class FeedbackBranchPopupState extends State<FeedbackBranchPopup> {
   // 말풍선이 꼬리 끝(탭 가운데)에서 커지며 살짝 튀어나왔다 자리 잡는다("뾱").
   // 왼쪽이 먼저, 오른쪽이 조금 늦게 따라 나온다. 효과를 빼려면 [_pop] 을 child 만 돌려주게 하면 된다.
   late final CurvedAnimation _leftPop = _curve(0, 0.8);
@@ -80,8 +63,8 @@ class _FeedbackBranchPopupState extends State<_FeedbackBranchPopup> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final left = (widget.anchorCenterX - _FeedbackBranchPopup._totalWidth / 2)
-        .clamp(8.0, screenWidth - _FeedbackBranchPopup._totalWidth - 8);
+    final left = (widget.anchorCenterX - FeedbackBranchPopup._totalWidth / 2)
+        .clamp(8.0, screenWidth - FeedbackBranchPopup._totalWidth - 8);
 
     return Material(
       type: MaterialType.transparency,
@@ -89,7 +72,7 @@ class _FeedbackBranchPopupState extends State<_FeedbackBranchPopup> {
         children: [
           Positioned(
             left: left,
-            bottom: widget.bottomOffset + _FeedbackBranchPopup._bottomGap,
+            bottom: widget.bottomOffset + FeedbackBranchPopup._bottomGap,
             child: Row(
               children: [
                 _pop(
@@ -102,7 +85,7 @@ class _FeedbackBranchPopupState extends State<_FeedbackBranchPopup> {
                     onTap: () => Navigator.of(context).pop(FeedbackKind.short),
                   ),
                 ),
-                const SizedBox(width: _FeedbackBranchPopup._cardGap),
+                const SizedBox(width: FeedbackBranchPopup._cardGap),
                 _pop(
                   _rightPop,
                   Alignment.bottomLeft,
@@ -138,10 +121,10 @@ class _BranchBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const cardSize = _FeedbackBranchPopup._cardSize;
+    const cardSize = FeedbackBranchPopup._cardSize;
     return SizedBox(
       width: cardSize,
-      height: cardSize + _FeedbackBranchPopup._tailHeight,
+      height: cardSize + FeedbackBranchPopup._tailHeight,
       child: Stack(
         children: [
           Positioned.fill(
@@ -149,7 +132,7 @@ class _BranchBubble extends StatelessWidget {
               painter: _BubblePainter(
                 tailOnRight: tailOnRight,
                 cardHeight: cardSize,
-                tailWidth: _FeedbackBranchPopup._tailWidth,
+                tailWidth: FeedbackBranchPopup._tailWidth,
                 fill: AppColors.surface,
                 border: AppColors.border,
               ),
