@@ -202,23 +202,31 @@ class _MealInputScreenState extends State<MealInputScreen> {
   /// 교체(`pushReplacement`)라서 분석 이후 화면에서 뒤로 가면 입력 화면이 아니라
   /// 이 화면을 연 탭으로 바로 돌아간다.
   Future<void> _startAnalysis() async {
-    if (_selectedTab == 1) {
-      _startManualAnalysis();
+    final manual = _selectedTab == 1;
+    final photo = manual ? null : _photoBytes;
+    if (manual && _foods.isEmpty) {
+      _showError('먹은 음식을 추가해 주세요');
       return;
     }
-    final photo = _photoBytes;
-    if (photo == null) {
+    if (!manual && photo == null) {
       _showError('사진을 골라 주세요');
       return;
     }
     setState(() => _submitting = true);
     try {
-      final created = await _api.createWithPhoto(
-        mealType: _mealTypes[_selectedMealType],
-        eatenAt: _eatenAt,
-        photo: photo,
-        fileName: _photo?.name ?? 'meal.jpg',
-      );
+      final mealType = _mealTypes[_selectedMealType];
+      final created = photo == null
+          ? await _api.createWithText(
+              mealType: mealType,
+              eatenAt: _eatenAt,
+              text: _foodsAsText(),
+            )
+          : await _api.createWithPhoto(
+              mealType: mealType,
+              eatenAt: _eatenAt,
+              photo: photo,
+              fileName: _photo?.name ?? 'meal.jpg',
+            );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
@@ -232,18 +240,14 @@ class _MealInputScreenState extends State<MealInputScreen> {
     }
   }
 
-  /// 직접 입력 탭의 "분석 시작".
+  /// 직접 입력 목록을 `rawText` 한 줄로 만든다(`김치찌개 300g, 밥 1인분`).
   ///
-  /// 화면만 먼저 만든 단계라 서버로 보내지 않는다. 음식 목록을 서버에 넘기는
-  /// 방식(기존 텍스트 입력으로 이어 붙이기 / `POST /meals` 가 `items[]` 를 받기)이
-  /// 정해지면 여기서 [_foods] 를 보낸다.
-  void _startManualAnalysis() {
-    if (_foods.isEmpty) {
-      _showError('먹은 음식을 추가해 주세요');
-      return;
-    }
-    _showError('직접 입력 분석은 아직 연결되지 않았어요');
-  }
+  /// 임시 연결이다. `POST /meals` 는 아직 음식 목록(`items[]`)을 받지 않아 텍스트
+  /// 입력 경로로 보내고, AI 가 다시 음식을 나눈다. BE 가 `items[]` 를 받게 되면
+  /// 목록을 그대로 보내 AI 를 건너뛴다(API 요청서 B-1).
+  String _foodsAsText() => _foods
+      .map((f) => '${f.name} ${_formatAmount(f.amount)}${f.unit}')
+      .join(', ');
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));

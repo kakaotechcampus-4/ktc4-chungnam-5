@@ -13,6 +13,7 @@ import 'package:frontend/screens/home_screen.dart' show StomachGauge;
 import 'package:frontend/api/meal_api.dart';
 import 'package:frontend/screens/meal_analysis_screen.dart';
 import 'package:frontend/screens/meal_evaluation_screen.dart';
+import 'package:frontend/screens/meal_input_screen.dart';
 import 'package:frontend/screens/meal_review_screen.dart';
 import 'package:frontend/screens/medication_info_screen.dart';
 import 'package:frontend/screens/next_meal_suggestion_screen.dart';
@@ -1017,5 +1018,41 @@ void main() {
     await tester.tap(find.text('다시 기록하기'));
     await tester.pumpAndSettle();
     expect(find.text('식사 기록'), findsOneWidget);
+  });
+
+  testWidgets('manual input sends the food list as rawText', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(tester, const MealInputScreen());
+
+    await tester.tap(find.text('직접 입력'));
+    await tester.pumpAndSettle();
+    Future<void> addFood(String name, String amount, String unit) async {
+      await tester.enterText(find.byType(TextField).at(0), name);
+      await tester.enterText(find.byType(TextField).at(1), amount);
+      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(unit).last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('목록에 추가'));
+      await tester.tap(find.text('목록에 추가'));
+      await tester.pumpAndSettle();
+    }
+
+    await addFood('김치찌개', '300', 'g');
+    await addFood('밥', '1', '인분');
+    await tester.ensureVisible(find.text('분석 시작'));
+    await tester.tap(find.text('분석 시작'));
+    await _settle(tester);
+
+    final post = api.requests.singleWhere(
+      (r) => r.method == 'POST' && r.path == '/meals',
+    );
+    expect((post.data as Map)['rawText'], '김치찌개 300g, 밥 1인분');
+    expect(find.text('식사 기록'), findsNothing); // 분석 화면으로 넘어갔다.
+
+    // 분석 화면의 폴링 대기를 끝낸다.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 10));
   });
 }
