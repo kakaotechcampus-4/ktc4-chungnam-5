@@ -12,7 +12,12 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, status
 
-from app.schemas import AnalyzeMealRequest, AnalyzeMealResponse
+from app.schemas import (
+    AnalyzeMealRequest,
+    AnalyzeMealResponse,
+    ShortFeedbackRequest,
+    ShortFeedbackResponse,
+)
 
 app = FastAPI(title="AI Service", version="0.1.0")
 
@@ -36,9 +41,9 @@ def analyze_meal(req: AnalyzeMealRequest) -> AnalyzeMealResponse:
     raise _not_implemented("analyze-meal")
 
 
-# TODO: 계약 확정 후 schemas 의 ShortFeedbackRequest / Response 로 바꾼다.
-@app.post("/short-feedback", tags=["feedback"])
-def short_feedback(req: dict[str, Any]) -> dict[str, Any]:
+@app.post("/short-feedback", response_model=ShortFeedbackResponse, tags=["feedback"])
+def short_feedback(req: ShortFeedbackRequest) -> ShortFeedbackResponse:
+    # TODO: agents/ 의 Feedback Agent 를 붙인다.
     raise _not_implemented("short-feedback")
 
 
