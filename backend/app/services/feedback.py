@@ -15,7 +15,7 @@ from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import satiety as satiety_crud
-from app.models.enums import MealStatus
+from app.models.enums import MealStatus, TaskStatus
 from app.models.meal import Meal
 from app.schemas.feedback import (
     ExpectedSatiety,
@@ -162,23 +162,29 @@ def get_feedback(
         BLOCKED         영영 못 보여 준다. FE 는 상담 안내로
                         바꾼다(`MEDICAL_QUESTION_DETECTED`)    → READY
         REVIEW_REQUIRED 검수를 통과하면 보일 수도 있다         → PENDING
-        내용 없음 · 확정 전                                    → PENDING
+        내용 없음 · 가장 최근 작업이 처리 중(PROCESSING)       → GENERATING
+        내용 없음 · 가장 최근 작업이 격리됨(FAILED)            → FAILED
+        내용 없음 · 가장 최근 작업이 끝남(DONE)                → FAILED
+        내용 없음 (그 밖) · 확정 전                            → PENDING
 
     명세가 주는 것은 값 목록(`:46`)과 예시 둘(`POST /confirm` → `PENDING`, 여기 →
     `READY`)뿐이고 **유도 규칙은 없다.** 그 둘은 이미 만족한다.
 
     **이 GET 은 쓰기를 하지 않는다.** `feedback.meal` 은 확인 API 가 채점과 같은
     트랜잭션에서 넣고(`services/evaluation/__init__.py::confirm`), 워커가 채우면 여기서
-    `READY` 가 된다. FE 는 `PENDING` 인 동안 폴링만 한다.
+    `READY` 가 된다. FE 는 `PENDING` · `GENERATING` 인 동안 폴링만 한다.
 
     제안 화면을 열 때(이 GET) 넣지 않는 이유: 하루 피드백이 끼니 피드백을 근거로 쓰므로
     (`crud/daily_feedback.py::list_day_evidence`), 화면을 안 연 끼니가 하루 요약에서
     조용히 빠진다.
 
-    🔗 TODO: 명세의 `GENERATING` · `FAILED` 는 아직 내지 않는다. 워커는
-    `QUEUE_MAX_ATTEMPTS` 까지 재시도한 뒤 DLQ 로 격리하는데(`worker/loop.py`), 그 상태를
-    여기서 `task_queue` 로 읽어 `FAILED` 를 낼지는 FE 와 합의 후 정한다. 그때까지
-    재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣는다.
+    `FAILED` 는 보여 줄 문장이 없는데 가장 최근 `feedback.meal` 작업이 격리됐거나
+    끝났을 때다 — 어느 쪽이든 기다려도 문장이 오지 않는다.
+    재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣고, 그러면
+    가장 최근 작업이 PENDING 이 되어 여기서도 PENDING 으로 돌아간다.
+    `GENERATING` 은 가장 최근 작업을 워커가 집어 처리 중(`TaskStatus.PROCESSING`)일
+    때다. 워커가 집는 순간 커밋하므로(`infra/queue.py::claim`) 다른 세션인 여기서도
+    보인다. 재시도 대기(backoff) 중인 작업은 PENDING 으로 돌아가 있어 PENDING 이다.
     """
     meal = _owned_meal(db, user_id, meal_id)
 
@@ -212,6 +218,15 @@ def get_feedback(
     # 흡수하는 것과 같은 이유다.
     row = feedback_crud.get_by_meal(db, meal.id)
     if row is None or not (row.body or "").strip():
+        # 보여 줄 문장이 없을 때만 작업 이력을 본다. 문장이 있으면 그게 답이다.
+        task_status = feedback_crud.latest_task_status(db, meal.id)
+        if task_status is TaskStatus.PROCESSING:
+            return MealFeedbackResponse.generating()
+        # DONE 인데 문장이 없으면 더 기다려도 오지 않는다 — AI 가 빈 본문을 줬거나 가드레일이
+        # 지웠다. 워커가 낡은 작업이라 건너뛰고 DONE 으로 끝낸 경우는 여기 오지 않는다:
+        # 건너뛰게 만든 재확정이 새 작업을 함께 넣으므로 가장 최근 작업은 그 새 작업이다.
+        if task_status in (TaskStatus.FAILED, TaskStatus.DONE):
+            return MealFeedbackResponse.failed()
         return MealFeedbackResponse.pending()
 
     # 마스킹은 스키마 팩토리가 한다 — `GET /meals/{mealId}` 도 같은 행을 읽으므로

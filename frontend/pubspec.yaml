@@ -60,6 +60,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  assets:
+    - assets/images/
+
   # 라이선스: assets/fonts/OFL.txt (SIL Open Font License 1.1)
   fonts:
     - family: Pretendard

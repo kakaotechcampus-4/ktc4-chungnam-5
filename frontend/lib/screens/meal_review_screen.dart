@@ -9,7 +9,9 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_add_sheet.dart';
 import 'meal_evaluation_screen.dart';
+import 'meal_item_edit_sheet.dart';
 import 'shared_meal_widgets.dart';
 
 /// 음식 확인·수정 — 분석 결과를 사용자가 고치는 화면(5번).
@@ -113,13 +115,6 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
 
   // ── 양 ──
 
-  /// 단위별 한 칸. 무게·부피는 10, 개수는 1, 그 밖(인분·공기)은 0.5.
-  static double _stepOf(String? unit) => switch (unit) {
-    '개' => 1,
-    'g' || 'ml' => 10,
-    _ => 0.5,
-  };
-
   void _changeAmount(String itemId, double delta) {
     // 연달아 누르면 그려진 카드보다 값이 앞서 있다. 지금 값에서 센다.
     final item = _items.firstWhere((i) => i.itemId == itemId);
@@ -202,76 +197,110 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     }
   }
 
+  /// "＋ 음식 추가" — 시트에서 목록으로 받은 음식을 하나씩 서버에 보낸다.
+  /// 일부만 실패해도 들어간 것은 남으므로, 끝나면 식사를 다시 받아 서버 기준으로 맞춘다.
   Future<void> _addItem() async {
-    final input = await showModalBottomSheet<_NewItem>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheetRadius),
-      builder: (_) => const _AddItemSheet(),
-    );
-    if (input == null || !mounted) return;
+    final entries = await showMealAddSheet(context);
+    if (entries == null || entries.isEmpty || !mounted) return;
     try {
       await _flushAmounts();
-      await _api.addItem(
-        widget.mealId,
-        displayName: input.name,
-        amount: input.amount,
-        unit: input.unit,
+    } catch (_) {
+      return; // _sendAmounts 가 이미 알렸다.
+    }
+    var failed = 0;
+    Object? lastError;
+    for (final entry in entries) {
+      try {
+        await _api.addItem(
+          widget.mealId,
+          displayName: entry.name,
+          amount: entry.amount,
+          unit: entry.unit,
+        );
+      } catch (e) {
+        failed++;
+        lastError = e;
+      }
+    }
+    if (!mounted) return;
+    // 응답에 이름·양이 없어 다시 받는다.
+    await _loadMeal();
+    if (failed > 0 && mounted) {
+      _showError(
+        failed == entries.length
+            ? '추가하지 못했어요: $lastError'
+            : '$failed개는 추가하지 못했어요: $lastError',
       );
-      if (!mounted) return;
-      // 응답에 이름·양이 없어 다시 받는다.
-      await _loadMeal();
-    } catch (e) {
-      if (mounted) _showError('추가하지 못했어요: $e');
     }
   }
 
-  // ── 영양 정보 ──
+  // ── 음식 수정 ──
 
-  /// 공공 DB 후보에서 골라 영양 정보를 정한다.
-  Future<void> _pickNutrition(MealItem item) async {
-    final candidate = await showModalBottomSheet<FoodCandidate>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheetRadius),
-      builder: (_) =>
-          _CandidateSheet(api: _api, initialQuery: item.displayName),
+  /// "음식 수정" 시트로 이름·양·단위·영양정보를 고친다. 저장을 누르면 바뀐
+  /// 것만 서버에 보내고 식사를 다시 받아 온다.
+  Future<void> _editItem(MealItem item) async {
+    final edit = await showMealItemEditSheet(
+      context,
+      item: item,
+      pickCandidate: (query) => showModalBottomSheet<FoodCandidate>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: AppRadius.sheetRadius,
+        ),
+        builder: (_) => _CandidateSheet(api: _api, initialQuery: query),
+      ),
     );
-    if (candidate == null || !mounted) return;
+    if (edit == null || !mounted) return;
     try {
-      // 남은 양 수정을 먼저 보낸다. 후보 지정이 먼저 가면 그 뒤 양 수정으로
-      // 서버 영양 값이 바뀌어 화면과 어긋난다.
+      // 남은 양 수정을 먼저 보낸다. 그 뒤 값이 서버 영양 값을 다시 계산하므로
+      // 영양정보 지정은 항상 마지막에 보낸다.
       await _flushAmounts();
     } catch (_) {
       return; // _sendAmounts 가 이미 알렸다.
     }
     if (!mounted) return;
+    final current = _items.firstWhere(
+      (i) => i.itemId == item.itemId,
+      orElse: () => item,
+    );
     try {
-      final (:nutrition, :notice) = await _api.setNutrition(
-        widget.mealId,
-        item.itemId,
-        foodRefId: candidate.foodRefId,
-      );
-      if (!mounted) return;
-      // 양이 g 으로 환산되지 않아 영양 정보를 붙이지 못한 경우. 양을 g 으로
-      // 바꾸면 다시 고를 수 있다.
-      if (nutrition == null) {
-        _showError(notice ?? '이 양으로는 영양 정보를 계산하지 못했어요. 양을 g 으로 바꿔 보세요.');
+      if (edit.name != current.displayName ||
+          edit.amount != current.amount ||
+          edit.unit != current.unit) {
+        await _api.updateItems(widget.mealId, [
+          MealItem(
+            itemId: current.itemId,
+            displayName: edit.name,
+            amount: edit.amount,
+            unit: edit.unit,
+            confidence: current.confidence,
+            matched: current.matched,
+            nutrition: current.nutrition,
+          ),
+        ]);
       }
-      final current = _items.firstWhere(
-        (i) => i.itemId == item.itemId,
-        orElse: () => item,
-      );
-      final updated = current.copyWith(
-        matched: nutrition != null,
-        nutrition: nutrition,
-      );
-      _replace(updated);
-      _saved[item.itemId] = updated;
+      final candidate = edit.candidate;
+      final manual = edit.manual;
+      if (candidate != null || manual != null) {
+        final (:nutrition, :notice) = await _api.setNutrition(
+          widget.mealId,
+          item.itemId,
+          foodRefId: candidate?.foodRefId,
+          manual: manual,
+        );
+        // 양이 g 으로 환산되지 않아 영양 정보를 붙이지 못한 경우. 양을 g 으로
+        // 바꾸면 다시 고를 수 있다.
+        if (nutrition == null && mounted) {
+          _showError(notice ?? '이 양으로는 영양 정보를 계산하지 못했어요. 양을 g 으로 바꿔 보세요.');
+        }
+      }
+      if (!mounted) return;
+      // 이름·양을 바꾸면 서버가 영양을 다시 계산하므로 통째로 다시 받는다.
+      await _loadMeal();
     } catch (e) {
-      if (mounted) _showError('영양 정보를 바꾸지 못했어요: $e');
+      if (mounted) _showError('음식을 수정하지 못했어요: $e');
     }
   }
 
@@ -351,8 +380,12 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.screenHorizontal,
+      // 상태바·노치 아래에서 한 칸 더 내려 다른 화면 제목과 높이를 맞춘다.
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        AppSpacing.md,
+        AppSpacing.screenHorizontal,
+        0,
       ),
       child: Row(
         children: [
@@ -385,17 +418,55 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
         AppSpacing.screenHorizontal,
         0,
       ),
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
-        color: AppColors.primaryTint,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.quantityBg,
+        borderRadius: BorderRadius.circular(13),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.help_outline, size: 18, color: AppColors.primary),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(question, style: AppTypography.body)),
+          Container(
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: AppColors.quantity,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '?',
+              style: AppTypography.caption.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textInverse,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  question,
+                  style: AppTypography.caption.copyWith(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.quantity,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'AI가 확신하지 못한 항목이 있어요. 확인하거나 수정해 주세요.',
+                  style: AppTypography.caption.copyWith(
+                    fontSize: 9.5,
+                    color: AppColors.quantity,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -403,12 +474,17 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
 
   Widget _buildFoodCard(MealItem item) {
     final nutrition = item.nutrition;
+    final hasNutrition = item.matched && nutrition != null;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
+        // 영양정보가 없으면 테두리를 빨강으로 눈에 띄게 한다.
+        border: Border.all(
+          color: hasNutrition ? AppColors.border : AppColors.primary,
+          width: hasNutrition ? 1 : 1.5,
+        ),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,11 +503,23 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     GestureDetector(
-                      onTap: () => _pickNutrition(item),
-                      child: Text(
-                        '수정',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.primary,
+                      onTap: () => _editItem(item),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          '수정',
+                          style: AppTypography.caption.copyWith(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ),
@@ -449,27 +537,17 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
-          if (item.matched && nutrition != null)
+          if (hasNutrition)
             Text(_nutritionLine(nutrition), style: AppTypography.bodySecondary)
           else
-            GestureDetector(
-              onTap: () => _pickNutrition(item),
-              child: Text(
-                '영양정보 없음 · 찾아서 고르기',
-                style: AppTypography.bodySecondary.copyWith(
-                  color: AppColors.primary,
-                ),
+            Text(
+              '영양정보 없음',
+              style: AppTypography.bodySecondary.copyWith(
+                color: AppColors.primary,
               ),
             ),
           const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              _buildStepper(item),
-              const Spacer(),
-              if (item.confidence != null)
-                _buildConfidenceBadge(item.confidence!),
-            ],
-          ),
+          _buildStepper(item),
         ],
       ),
     );
@@ -489,7 +567,7 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     if (amount == null) {
       return Text('양 모름', style: AppTypography.bodySecondary);
     }
-    final step = _stepOf(item.unit);
+    final step = mealAmountStep(item.unit);
     return Row(
       children: [
         _stepButton(Icons.remove, () => _changeAmount(item.itemId, -step)),
@@ -519,35 +597,25 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     );
   }
 
-  Widget _buildConfidenceBadge(double confidence) {
-    final percent = (confidence * 100).round();
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        '신뢰도 $percent%',
-        style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-      ),
-    );
-  }
-
   Widget _buildAddButton() {
     return GestureDetector(
       onTap: _addItem,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.cardPadding),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.borderStrong),
-          borderRadius: BorderRadius.circular(12),
+      child: CustomPaint(
+        painter: const _DashedBorderPainter(
+          color: AppColors.borderStrong,
+          radius: 13,
         ),
-        alignment: Alignment.center,
-        child: Text('+ 음식 추가', style: AppTypography.body),
+        child: Container(
+          height: 46,
+          alignment: Alignment.center,
+          child: Text(
+            '＋ 음식 추가',
+            style: AppTypography.body.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -581,102 +649,34 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
   }
 }
 
-/// 음식 추가 입력값.
-class _NewItem {
-  const _NewItem(this.name, this.amount, this.unit);
+/// 점선 둥근 사각형 테두리(Figma 음식 추가 버튼).
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({required this.color, required this.radius});
 
-  final String name;
-  final double amount;
-  final String unit;
-}
-
-/// 음식 추가 시트 — 이름·양·단위.
-class _AddItemSheet extends StatefulWidget {
-  const _AddItemSheet();
+  final Color color;
+  final double radius;
 
   @override
-  State<_AddItemSheet> createState() => _AddItemSheetState();
-}
-
-class _AddItemSheetState extends State<_AddItemSheet> {
-  final _name = TextEditingController();
-  final _amount = TextEditingController(text: '1');
-  final _unit = TextEditingController(text: '인분');
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _amount.dispose();
-    _unit.dispose();
-    super.dispose();
-  }
-
-  _NewItem? get _value {
-    final name = _name.text.trim();
-    final amount = double.tryParse(_amount.text.trim());
-    final unit = _unit.text.trim();
-    if (name.isEmpty || amount == null || amount <= 0 || unit.isEmpty) {
-      return null;
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final rect = (Offset.zero & size).deflate(paint.strokeWidth / 2);
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+    const dash = 6.0;
+    const gap = 4.0;
+    for (final metric in path.computeMetrics()) {
+      for (var d = 0.0; d < metric.length; d += dash + gap) {
+        canvas.drawPath(metric.extractPath(d, d + dash), paint);
+      }
     }
-    return _NewItem(name, amount, unit);
   }
 
   @override
-  Widget build(BuildContext context) {
-    final value = _value;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.screenHorizontal,
-        AppSpacing.lg,
-        AppSpacing.screenHorizontal,
-        AppSpacing.lg + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('음식 추가', style: AppTypography.sectionHead),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _name,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: '음식 이름'),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _amount,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(labelText: '양'),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: TextField(
-                  controller: _unit,
-                  decoration: const InputDecoration(labelText: '단위 (g·개·인분)'),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton(
-            onPressed: value == null
-                ? null
-                : () => Navigator.of(context).pop(value),
-            child: const Text('추가'),
-          ),
-        ],
-      ),
-    );
-  }
+  bool shouldRepaint(_DashedBorderPainter old) =>
+      old.color != color || old.radius != radius;
 }
 
 /// 영양 정보 후보 검색 시트 — 공공 식품영양성분 DB.
@@ -751,8 +751,31 @@ class _CandidateSheetState extends State<_CandidateSheet> {
               controller: _query,
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _search(),
+              textAlignVertical: TextAlignVertical.center,
+              style: AppTypography.body.copyWith(fontSize: 15),
               decoration: InputDecoration(
                 hintText: '음식 이름',
+                hintStyle: AppTypography.body.copyWith(
+                  fontSize: 15,
+                  color: AppColors.textTertiary,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.borderStrong),
+                ),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search),
                   onPressed: _search,
