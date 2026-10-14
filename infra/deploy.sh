@@ -9,6 +9,13 @@
 # 저장소가 public 이라 git fetch 에 인증이 필요 없다.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# 운영·스테이징 배포가 겹치지 않게 한 번에 하나씩 돈다 (deploy-staging.sh 와 같은 잠금).
+# 빌드가 겹치면 4GiB 서버가 스왑으로 밀려 운영 응답이 느려진다. 앞 배포가 끝날 때까지 기다린다.
+# ubuntu 사용자로 실행한다 (CI 도 runuser -u ubuntu). root 가 잠금 파일을 먼저 만들면 ubuntu 가 열지 못한다.
+exec 9>/tmp/glp1-deploy.lock
+flock 9
+# 운영 Caddy 가 스테이징 api 에 닿는 외부 네트워크. compose 가 만들지 않으므로 먼저 있어야 한다.
+docker network inspect glp1-edge >/dev/null 2>&1 || docker network create glp1-edge >/dev/null
 git fetch --quiet origin main
 git checkout --quiet --detach "${1:-origin/main}"
 cd infra
