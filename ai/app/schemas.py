@@ -41,6 +41,24 @@ class SafetyStatus(str, Enum):
     REVIEW_REQUIRED = "REVIEW_REQUIRED"
 
 
+class Scope(str, Enum):
+    MEAL = "MEAL"
+    DAILY = "DAILY"
+
+
+class QQS(_Camel):
+    """BE Rule Engine 의 점수. **null 은 "못 쟀다" 다** — 0(바닥)과 다르다.
+
+    근거가 없는 축은 BE 가 채점하지 않고 null 로 둔다 — 성분을 못 구했거나 체중 기록이
+    없는 경우 등(`backend/app/services/evaluation/rule_engine.py`). AI 는 null 인 축을
+    평가하는 문장을 쓰지 않는다.
+    """
+
+    quantity: float | None
+    quality: float | None
+    satiety: float | None
+
+
 # ─────────────────────────── /analyze-meal ───────────────────────────
 
 
@@ -85,7 +103,87 @@ class AnalyzeMealResponse(_Camel):
 
 
 # ─────────────────────────── /short-feedback ───────────────────────────
-# TODO: 계약 미확정 (A-1-2). 확정되면 ai-stub/schemas.py 구조를 기준으로 작성한다.
+
+
+class Nutrition(_Camel):
+    """BE → AI 방향. AI 가 생성하는 값이 아니다."""
+
+    kcal: float | None = None
+    protein_g: float | None = None
+    fat_g: float | None = None
+    carb_g: float | None = None
+    fiber_g: float | None = None
+    sodium_mg: float | None = None
+
+
+class FeedbackItem(_Camel):
+    display_name: str
+    amount: float | None  # null 이면 먹은 양을 모른다. 음식을 빼지 않고 보낸다
+    unit: str | None
+    nutrition: Nutrition | None = None  # null 이면 성분을 못 구했다
+
+
+class SatietyCheckin(_Camel):
+    checkin_offset_hours: float
+    satiety_pct: int = Field(ge=0, le=100)
+
+
+class SatietyContext(_Camel):
+    before_pct: int | None = Field(default=None, ge=0, le=100)
+    after_pct: int | None = Field(default=None, ge=0, le=100)
+    checkins: list[SatietyCheckin] = Field(default_factory=list)
+    hunger_return_minutes: int | None = None
+    user_comment: str | None = None
+
+
+class DailyMealSummary(_Camel):
+    meal_type: MealType
+    summary: str
+    qqs: QQS
+
+
+class ShortFeedbackRequest(_Camel):
+    scope: Scope
+    user_id: str
+    stage: Stage  # 채점 시점의 단계다. 점수와 같은 기준으로 문장을 쓴다
+    qqs: QQS  # 채점은 BE Rule Engine 이 이미 끝냈다
+
+    # scope=MEAL
+    meal_id: str | None = None
+    items: list[FeedbackItem] = Field(default_factory=list)
+    satiety: SatietyContext | None = None
+
+    # scope=DAILY
+    date: dt.date | None = None
+    meals: list[DailyMealSummary] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _scope_fields(self) -> ShortFeedbackRequest:
+        if self.scope is Scope.MEAL and not self.meal_id:
+            raise ValueError("scope=MEAL 에는 mealId 가 필요하다")
+        if self.scope is Scope.DAILY and self.date is None:
+            raise ValueError("scope=DAILY 에는 date 가 필요하다")
+        return self
+
+
+class Suggestion(_Camel):
+    """다음 끼니 제안 한 건. nutrients 는 여기 없다 — BE 가 food_refs 에서 채운다.
+
+    `candidate_food_ref_id` 가 food_refs 에 없으면 BE 는 id 만 버리고 문구는 살린다.
+    """
+
+    food_name: str
+    advice: str
+    # BE /internal/v1 search_foods 로 찾아 채운다. 그 API 가 생기기 전까지는 None
+    candidate_food_ref_id: str | None = None
+
+
+class ShortFeedbackResponse(_Camel):
+    body: str  # 공개 API 에서는 summary 로 나간다
+    model_version: str
+    safety_status: SafetyStatus
+    reasoning: str | None = None
+    suggestions: list[Suggestion] | None = None  # scope=DAILY 면 null
 
 
 # ─────────────────────────── /long-feedback ───────────────────────────
