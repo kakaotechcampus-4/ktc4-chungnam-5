@@ -684,6 +684,34 @@ void main() {
     expect((put.data as Map).containsKey('manual'), isFalse);
   });
 
+  testWidgets('picking a candidate for a counted food switches it to grams', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+    );
+    // 두 번째 음식은 '삶은 계란 2개' — 개는 영양을 계산할 수 없다.
+    await tester.tap(find.text('수정').at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.search).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(ListTile).first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('기준량 100g 으로 바꿨어요'), findsOneWidget);
+
+    await tester.tap(find.text('저장'));
+    await _settle(tester);
+
+    final patch = api.requests.singleWhere((r) => r.method == 'PATCH');
+    final item = ((patch.data as Map)['items'] as List).single as Map;
+    expect(item['unit'], 'g');
+    expect(item['amount'], 100);
+    // 양을 g 으로 바꾼 뒤에 영양을 고른다(그래야 서버가 계산한다).
+    final put = api.requests.indexWhere((r) => r.method == 'PUT');
+    expect(put, greaterThan(api.requests.indexOf(patch)));
+  });
+
   testWidgets('a failed amount edit goes back to the saved amount', (
     WidgetTester tester,
   ) async {
