@@ -33,6 +33,7 @@ class Stage(str, Enum):
     INITIAL = "INITIAL"
     TITRATION = "TITRATION"
     MAINTENANCE = "MAINTENANCE"
+    REDUCED = "REDUCED"  # 직전보다 낮은 용량으로 내렸고 아직 정착 전. BE MedicationStage 와 같다
 
 
 class SafetyStatus(str, Enum):
