@@ -214,6 +214,13 @@ def test_system_prompts_carry_rules_and_user_prompt_does_not():
     assert "균형 잡힌 식사" not in build_meal_prompt(req, judge_nutrients(req))
 
 
+def test_meal_system_prompt_says_only_cards_reach_the_screen():
+    """끼니 화면에는 추천 카드만 나간다. body·reasoning 은 하루 요약·챗봇의 재료다 —
+    프롬프트가 이걸 모델에게 알려야 body 를 화면용 한두 문장으로 줄이지 않는다."""
+    assert "body·reasoning 은 화면에 나가지 않고" in MEAL_SYSTEM_PROMPT
+    assert "카드가 이 끼니에 대한 피드백 역할까지 한다" in MEAL_SYSTEM_PROMPT
+
+
 def test_good_example_in_system_prompt_passes_our_own_parser():
     """예시가 parse_response 를 통과하지 못하면 모델이 예시를 따라 쓴 답이 버려진다."""
     draft = parse_response(_MEAL_EXAMPLE_GOOD, Scope.MEAL)
