@@ -4,6 +4,7 @@ Alembic autogenerate 가 테이블을 발견하려면 모든 모델이 여기서
 """
 
 from app.db.base import Base
+from app.models.chat import ChatConversation, ChatFoodCard, ChatMessage
 from app.models.evaluation import QQSEvaluation
 from app.models.feedback import (
     DailyFeedback,
@@ -22,6 +23,9 @@ from app.models.user import User, UserGoal, UserState
 
 __all__ = [
     "Base",
+    "ChatConversation",
+    "ChatFoodCard",
+    "ChatMessage",
     "DailyFeedback",
     "DailyFeedbackSource",
     "FoodRef",

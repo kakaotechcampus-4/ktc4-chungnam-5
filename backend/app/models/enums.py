@@ -141,6 +141,25 @@ class TaskStatus(str, enum.Enum):
         return self in (TaskStatus.PENDING, TaskStatus.PROCESSING)
 
 
+class ChatMessageRole(str, enum.Enum):
+    """챗봇 메시지를 누가 썼는지."""
+
+    USER = "USER"
+    ASSISTANT = "ASSISTANT"
+
+
+class ChatMessageStatus(str, enum.Enum):
+    """챗봇 메시지 생성 상태. USER 메시지는 항상 READY 다.
+
+    `FeedbackStatus` 를 재사용하지 않는다 — 거기는 `PENDING` 이 있고 응답 전용(DB ENUM
+    아님)이다. 챗봇 답변은 접수와 동시에 GENERATING 자리표시로 저장되므로 PENDING 이 없다.
+    """
+
+    GENERATING = "GENERATING"
+    READY = "READY"
+    FAILED = "FAILED"
+
+
 # ── 여기부터는 응답 전용 ENUM ────────────────────────────────
 #
 # **DB 컬럼이 아니다.** `pg_enum()` 에 넘기지 않으므로 `ALTER TYPE` 마이그레이션도
