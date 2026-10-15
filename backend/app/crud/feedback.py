@@ -226,3 +226,53 @@ def nutrients_by_food_ref(
         }
         resolved[row.id] = SuggestedNutrients(amounts=amounts)
     return resolved
+
+
+class StoredSuggestion(NamedTuple):
+    """`meal_feedbacks.suggestions` 원소 하나를 쓸 수 있는 모양으로 바꾼 것."""
+
+    food_name: str
+    advice: str
+    ref_id: str | None
+
+
+def parse_suggestion(item: object) -> StoredSuggestion | None:
+    """저장된 제안 한 건을 쓸 수 있는 모양으로 바꾼다. 못 쓰면 `None`.
+
+    **이 값은 신뢰할 수 없는 입력이다.** 컬럼이 JSONB 라 DB 는 아무 JSON 이나 받고,
+    쓰는 쪽은 AI 응답을 담을 워커다. 계약이 바뀌거나 부분 응답이 오면 모양이 어긋난다.
+    검증 없이 `item.get(...)` 을 부르면 문자열 원소 하나에 `AttributeError` 가 나고,
+    **그 끼니 피드백 전체(요약·근거까지)를 못 읽는다.** 한 건이 깨졌다고 나머지를
+    버릴 이유는 없다.
+
+    `or ""` 를 쓰는 건 `{"foodName": null}` 때문이다 — 키가 있으면
+    `get(k, "")` 의 기본값이 안 먹어 `None` 이 그대로 나오고, `food_name: str` 에서
+    터진다.
+
+    **crud 에 두는 이유:** 끼니 피드백 화면(`services/feedback.py`)과 챗봇 첫 메시지
+    (`services/chat.py`)가 같은 규칙으로 걸러야 한다. services 끼리는 서로 부르지
+    않으므로(절대 규칙 5) 둘 다 내려다보는 이 컬럼의 파일에 둔다.
+    """
+    if not isinstance(item, dict):
+        return None
+
+    food_name = item.get("foodName") or ""
+    advice = item.get("advice") or ""
+    if not isinstance(food_name, str) or not isinstance(advice, str):
+        return None
+    # **하나라도 비면 버린다.** 명세의 카드는 음식 이름과 조언 문구가 짝이라
+    # (`{foodName, nutrients, advice}`), 한쪽이 없으면 FE 가 반쪽 카드를 그린다.
+    if not food_name or not advice:
+        return None
+
+    ref_id = item.get("candidateFoodRefId")
+    # str 이 아닌 건 조회에 넘기지 않는다 — int 는 `varchar = integer` 로 DB 가
+    # 거부하고, list 는 `set()` 에서 unhashable 로 터진다.
+    return StoredSuggestion(food_name, advice, ref_id if isinstance(ref_id, str) else None)
+
+
+def parse_suggestions(stored: object) -> list[StoredSuggestion]:
+    """저장된 제안 배열 전체. 배열이 아니면 `[]`, 깨진 원소만 빠진다."""
+    if not isinstance(stored, list):
+        return []
+    return [parsed for item in stored if (parsed := parse_suggestion(item)) is not None]
