@@ -90,3 +90,27 @@ def test_food_card_ref_without_food_refs_row_is_allowed(db: Session):
         )
     )
     db.flush()  # 터지지 않으면 통과
+
+
+def test_food_card_position_is_unique_per_message(db: Session):
+    """카드 순서가 겹치면 "몇 번째 카드" 가 모호해진다 — 서비스 버그가 있어도 DB 가 막는다."""
+    user = make_user(db)
+    conversation = ChatConversation(user_id=user.id)
+    db.add(conversation)
+    db.flush()
+    message = ChatMessage(
+        conversation_id=conversation.id,
+        role=ChatMessageRole.ASSISTANT,
+        status=ChatMessageStatus.READY,
+        text="다음 끼니로 이 음식은 어떤가요?",
+        safety_status=SafetyStatus.SAFE,
+    )
+    db.add(message)
+    db.flush()
+    db.add(ChatFoodCard(message_id=message.id, position=0, food_name="두부", advice="a"))
+    db.flush()
+
+    with pytest.raises(IntegrityError):
+        with db.begin_nested():
+            db.add(ChatFoodCard(message_id=message.id, position=0, food_name="쌈채소", advice="b"))
+            db.flush()

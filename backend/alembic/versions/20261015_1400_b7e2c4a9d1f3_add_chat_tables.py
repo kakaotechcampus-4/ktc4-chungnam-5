@@ -98,13 +98,13 @@ def upgrade() -> None:
             ondelete='CASCADE',
         ),
         sa.PrimaryKeyConstraint('id', name='pk_chat_food_cards'),
+        # 이 UNIQUE 의 인덱스가 message_id 로 시작하므로 message_id 단독 인덱스는 두지 않는다.
+        sa.UniqueConstraint('message_id', 'position', name='uq_chat_food_cards_message_id_position'),
     )
-    op.create_index('ix_chat_food_cards_message_id', 'chat_food_cards', ['message_id'])
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index('ix_chat_food_cards_message_id', table_name='chat_food_cards')
     op.drop_table('chat_food_cards')
     op.drop_index('ix_chat_messages_conversation_id_created_at', table_name='chat_messages')
     op.drop_table('chat_messages')

@@ -7,7 +7,17 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, SmallInteger, String, Text, func, text
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    SmallInteger,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -30,7 +40,11 @@ class ChatConversation(Base):
     """기준 끼니. 평가한 끼니가 하나도 없으면 NULL.
 
     `SET NULL` 인 이유: 끼니는 soft delete 라 보통 행이 남지만, 사용자 탈퇴 등으로
-    hard delete 되더라도 대화 기록까지 지울 이유는 없다."""
+    hard delete 되더라도 대화 기록까지 지울 이유는 없다.
+
+    SET NULL 은 hard delete 에서만 일어난다. 끼니는 soft delete 라 **삭제된 끼니를 가리킬
+    수 있다** — 읽는 쪽(A-2 컨텍스트 주입 등)은 raw id 로 읽지 말고
+    `crud/meal.py::get_owned_meal` 로 불러야 한다."""
 
     created_at: Mapped[datetime] = created_at()
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -98,10 +112,10 @@ class ChatFoodCard(Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     message_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("chat_messages.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("chat_messages.id", ondelete="CASCADE"), nullable=False
     )
     position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    """메시지 안에서의 카드 순서. 0 부터."""
+    """메시지 안에서의 카드 순서. 0 부터. 한 메시지 안에서 겹칠 수 없다."""
     food_name: Mapped[str] = mapped_column(String(255), nullable=False)
     advice: Mapped[str] = mapped_column(Text, nullable=False)
     """응답에는 안 나간다. A-5 가 이 카드를 `meal_feedbacks.suggestions` 로 되돌릴 때
@@ -109,3 +123,9 @@ class ChatFoodCard(Base):
     food_ref_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     """AI 가 준 `candidateFoodRefId`. **FK 가 없다** — `food_refs` 에 없는 id 일 수 있고,
     FK 를 걸면 카드 INSERT 가 깨진다. 못 찾으면 `effects: []` 로 나간다."""
+
+    __table_args__ = (
+        # UNIQUE 의 인덱스가 message_id 로 시작하므로 message_id 단독 인덱스는 따로 두지 않는다
+        # (`satiety_checkins` 와 같은 판단).
+        UniqueConstraint("message_id", "position", name="uq_chat_food_cards_message_id_position"),
+    )
