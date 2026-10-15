@@ -47,6 +47,10 @@ class MealNotFoundError(LookupError):
     """없는 식사 · 남의 식사 · 삭제된 식사. 셋 다 404 로 같게 응답한다."""
 
 
+class UserNotFoundError(LookupError):
+    """`users` 행이 없다. 인증 헤더는 형식만 확인하므로 존재하지 않는 id 가 올 수 있다."""
+
+
 def _showable_suggestions(db: Session, meal_id: uuid.UUID) -> list[StoredSuggestion]:
     """기준 끼니의 "현재 추천" 중 지금 보여 줘도 되는 것. 없으면 `[]`.
 
@@ -110,8 +114,11 @@ def start_conversation(
     아니면 `messages: []` 다 — "준비 중" 같은 문구를 지어내면 나중에 갱신되지 않고 낡는다.
     확정 전 끼니를 거르는 이유는 `services/feedback.py::get_feedback` 과 같다 — 음식을
     고치는 중이면 저장된 제안은 고치기 전 끼니를 보고 쓴 것이다.
+
+    없는 사용자면 다른 작업 전에 `UserNotFoundError`.
     """
-    chat_crud.lock_user(db, user_id)
+    if not chat_crud.lock_user(db, user_id):
+        raise UserNotFoundError(f"user {user_id} 를 찾을 수 없습니다.")
 
     if meal_id is not None:
         meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)

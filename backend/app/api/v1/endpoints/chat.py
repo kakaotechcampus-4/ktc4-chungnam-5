@@ -39,6 +39,7 @@ def start_conversation(
     **body 는 생략할 수 있다.** AI 탭에서 바로 "＋ 새 대화" 를 누르면 보낼 값이 없다.
 
     없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다 (소유권 누출 방지).
+    존재하지 않는 사용자는 404 `USER_NOT_FOUND` 다.
     """
     try:
         return ok(
@@ -48,5 +49,7 @@ def start_conversation(
                 meal_id=None if request is None else request.meal_id,
             )
         )
+    except chat_service.UserNotFoundError as exc:
+        raise ApiError(ErrorCode.USER_NOT_FOUND, str(exc), 404) from None
     except chat_service.MealNotFoundError as exc:
         raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None

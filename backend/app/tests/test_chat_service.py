@@ -191,3 +191,13 @@ def test_other_users_open_conversation_is_untouched(db: Session):
     chat_service.start_conversation(db, user_id=user.id, meal_id=None)
 
     assert db.get(ChatConversation, theirs.conversation_id).closed_at is None
+
+
+def test_unknown_user_raises_and_creates_nothing(db: Session):
+    """`users` 행이 없으면 FK 위반(500) 이 아니라 도메인 예외로 끝나야 한다."""
+    ghost = uuid.uuid4()
+
+    with pytest.raises(chat_service.UserNotFoundError):
+        chat_service.start_conversation(db, user_id=ghost, meal_id=None)
+
+    assert db.scalar(select(func.count()).select_from(ChatConversation)) == 0

@@ -18,8 +18,9 @@ from app.models.meal import Meal
 from app.models.user import User
 
 
-def lock_user(db: Session, user_id: uuid.UUID) -> None:
+def lock_user(db: Session, user_id: uuid.UUID) -> bool:
     """같은 사용자의 "새 대화 시작" 을 줄 세운다. 트랜잭션이 끝날 때 풀린다.
+    사용자 행이 있으면 True, 없으면 False (존재 확인이 잠금 쿼리에 얹힌다).
 
     잠그지 않으면 더블탭 두 요청이 둘 다 "열린 대화 없음" 을 보고 INSERT 해 둘째가
     부분 UNIQUE 에 걸려 500 이 난다. 잠그면 둘째가 첫째의 커밋을 기다렸다가 그 대화를
@@ -27,8 +28,18 @@ def lock_user(db: Session, user_id: uuid.UUID) -> None:
 
     **`users` 를 읽지만 여기 둔다.** 잠금의 목적이 챗봇 불변식이라서다
     (`crud/feedback.py::nutrients_by_food_ref` 가 `food_refs` 를 읽는 것과 같은 판단).
+
+    **`FOR UPDATE` 가 아니라 `FOR NO KEY UPDATE`(`key_share=True`) 다.** `feedback.meal` 워커는
+    `meals` 를 잠근 뒤 `meal_feedbacks` 를 upsert 하는데, 그 `user_id` FK 검사가 `users` 에
+    `FOR KEY SHARE` 를 건다. 여기서 `users` 를 `FOR UPDATE` 로 쥔 채 `chat_conversations`
+    (`meal_id` FK → `meals` KEY SHARE)를 넣으면 두 쪽의 잠금 순서가 맞물려 교착한다.
+    `NO KEY UPDATE` 는 KEY SHARE 와 충돌하지 않으면서 자기끼리는 충돌하므로, 같은 사용자의
+    A-1 끼리만 줄 세우고 그 사용자의 다른 쓰기(FK 검사)는 막지 않는다.
     """
-    db.execute(select(User.id).where(User.id == user_id).with_for_update())
+    row = db.execute(
+        select(User.id).where(User.id == user_id).with_for_update(key_share=True)
+    ).scalar_one_or_none()
+    return row is not None
 
 
 def latest_evaluated_meal_id(db: Session, user_id: uuid.UUID) -> uuid.UUID | None:

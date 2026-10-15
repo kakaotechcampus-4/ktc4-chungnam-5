@@ -111,3 +111,10 @@ def test_missing_user_header_is_401(client: TestClient):
     res = client.post(_URL, json={})
 
     assert res.status_code == 401
+
+
+def test_unknown_user_is_404_user_not_found(client: TestClient):
+    res = client.post(_URL, json={}, headers=_h(uuid.uuid4()))
+
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "USER_NOT_FOUND"
