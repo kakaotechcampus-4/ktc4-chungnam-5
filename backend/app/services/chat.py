@@ -39,8 +39,8 @@ _EFFECT_UNITS: Final[dict[NutrientCode, EffectUnit]] = {
     NutrientCode.CALORIE: "kcal",
     NutrientCode.SODIUM: "mg",
 }
-"""여기 없는 성분은 `g` 다. 지금 `nutrients_by_food_ref` 는 PROTEIN · FIBER 만 싣지만,
-대상이 늘어도 단위가 틀리지 않게 전체를 정해 둔다."""
+"""여기 없는 성분은 `g` 다. `nutrients_by_food_ref` 는 값을 컬럼 단위 그대로 주므로
+(`calories` kcal · `sodium_mg` mg · 나머지 g) 숫자는 바꾸지 않고 단위만 붙인다."""
 
 
 class MealNotFoundError(LookupError):

@@ -21,6 +21,9 @@ class SuggestionNutrient(CamelModel):
 
     code: NutrientCode
     amount_g: float
+    """100g 당 양. ⚠️ **이름과 달리 항상 g 은 아니다** — 컬럼 단위 그대로라 CALORIE 는
+    kcal, SODIUM 은 mg 숫자다(`crud/feedback.py::_SUGGESTION_NUTRIENTS`). 응답 모양을
+    바꾸지 않으려고 이름을 유지했다."""
 
 
 class FeedbackSuggestion(CamelModel):

@@ -96,26 +96,28 @@ def upsert(
 
 
 class SuggestedNutrients(NamedTuple):
-    """제안 음식 하나가 채워 주는 성분. 키는 명세 `NutrientCode`."""
+    """제안 음식 하나가 채워 주는 성분. 키는 명세 `NutrientCode`, 값은 컬럼 단위(kcal · g · mg) 그대로."""
 
     amounts: dict[NutrientCode, Decimal]
 
 
 _SUGGESTION_NUTRIENTS: Final[tuple[tuple[NutrientCode, str], ...]] = (
+    (NutrientCode.CALORIE, "calories"),
     (NutrientCode.PROTEIN, "protein_g"),
+    (NutrientCode.FAT, "fat_g"),
+    (NutrientCode.CARB, "carbohydrate_g"),
     (NutrientCode.FIBER, "fiber_g"),
+    (NutrientCode.SODIUM, "sodium_mg"),
 )
-"""제안에 실을 성분.
+"""제안에 실을 성분 — `NutrientCode` 전부다. 이 음식이 채워 주는 성분을 빠짐없이 보여 준다.
 
-명세 예시는 제안마다 한 줄씩만 보여 준다(두부→PROTEIN, 나물→FIBER) — **어느 성분을
-고르는지는 적혀 있지 않고** AI 도 알려 주지 않는다(`ai-stub/schemas.py::Suggestion`
-에는 `foodName` · `advice` · `candidateFoodRefId` 뿐이다).
+AI 는 성분을 알려 주지 않으므로(`ai-stub/schemas.py::Suggestion` 에는 `foodName` ·
+`advice` · `candidateFoodRefId` 뿐이다) `food_refs` 에서 값이 있는 것을 싣는다.
 
-그래서 "값이 있는 것을 싣는다" 로 했고, 대상은 **채우라고 권할 수 있는 성분 둘**이다.
-나트륨은 제안의 근거가 되지 않는다 — "나트륨을 더 채워요" 는 이 앱이 할 말이 아니다
-(절대 규칙 1, 의료 판단 금지에 닿는다).
-
-⚠️ 명세 확인 필요: 성분 선택 규칙이 없다. 팀 안건으로 올릴 것.
+⚠️ **값은 컬럼 단위 그대로다 — 단위 변환을 하지 않는다.** CALORIE 는 kcal, SODIUM 은
+mg, 나머지는 g 숫자다(100g 환산만 한다). 끼니 피드백 응답의 필드 이름이 `amountG` 라도
+CALORIE · SODIUM 값은 g 이 아니다 — FE 는 코드로 단위를 정해 표시해야 한다. 챗봇 카드는
+`unit` 필드를 따로 싣는다(`services/chat.py::_EFFECT_UNITS`).
 """
 
 

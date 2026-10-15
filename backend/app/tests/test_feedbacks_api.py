@@ -30,6 +30,14 @@ _SPEC_FIELDS = {
 }
 
 
+_ONLY_PROTEIN_FIBER = {
+    "calories": None, "fat_g": None, "carbohydrate_g": None, "sodium_mg": None,
+}
+"""`make_food_ref` 기본값은 6개 성분이 다 차 있다. 성분 하나의 규칙(환산 · NaN 등)만 보는
+테스트는 나머지를 비워 단언을 그 성분에 묶는다 — 전 성분 노출은
+`test_suggestion_nutrients_cover_every_code_in_column_units` 가 본다."""
+
+
 def _h(user_id: uuid.UUID) -> dict[str, str]:
     return {"X-User-Id": str(user_id)}
 
@@ -532,7 +540,7 @@ def test_suggestion_nutrients_come_from_food_refs(client: TestClient, db: Sessio
     user, meal = _meal(db)
     make_food_ref(
         db, food_ref_id="KFD_TOFU", name="두부",
-        protein_g=Decimal("10"), fiber_g=Decimal("2"),
+        protein_g=Decimal("10"), fiber_g=Decimal("2"), **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db, meal,
@@ -550,6 +558,33 @@ def test_suggestion_nutrients_come_from_food_refs(client: TestClient, db: Sessio
     assert suggestion["foodName"] == "두부 반 모"
     assert {n["code"]: n["amountG"] for n in suggestion["nutrients"]} == {
         "PROTEIN": 10.0, "FIBER": 2.0,
+    }
+
+
+def test_suggestion_nutrients_cover_every_code_in_column_units(
+    client: TestClient, db: Session
+) -> None:
+    """6개 성분을 모두 싣고, 값은 **컬럼 단위 그대로**다 — `amountG` 라는 이름이어도
+    CALORIE 는 kcal, SODIUM 은 mg 숫자다. g 으로 바꾸지 않는다."""
+    user, meal = _meal(db)
+    make_food_ref(
+        db, food_ref_id="KFD_ALL", name="현미밥",
+        calories=Decimal("100"), protein_g=Decimal("10"), fat_g=Decimal("3"),
+        carbohydrate_g=Decimal("20"), fiber_g=Decimal("2"), sodium_mg=Decimal("100"),
+    )
+    _add_feedback(
+        db, meal,
+        suggestions=[{"foodName": "현미밥 반 공기", "advice": "식이섬유를 채워요",
+                      "candidateFoodRefId": "KFD_ALL"}],
+    )
+
+    (suggestion,) = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]["suggestions"]
+
+    assert {n["code"]: n["amountG"] for n in suggestion["nutrients"]} == {
+        "CALORIE": 100.0, "PROTEIN": 10.0, "FAT": 3.0,
+        "CARB": 20.0, "FIBER": 2.0, "SODIUM": 100.0,
     }
 
 
@@ -589,6 +624,7 @@ def test_nutrients_are_scaled_to_100g(client: TestClient, db: Session) -> None:
         serving_size=Decimal("200.000"),
         protein_g=Decimal("3.000"),
         fiber_g=None,
+        **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db,
@@ -616,7 +652,7 @@ def test_nan_nutrient_is_omitted_not_null(client: TestClient, db: Session) -> No
     user, meal = _meal(db)
     make_food_ref(
         db, food_ref_id="KFD_NAN", name="정체불명",
-        protein_g=Decimal("NaN"), fiber_g=Decimal("2.000"),
+        protein_g=Decimal("NaN"), fiber_g=Decimal("2.000"), **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db,
@@ -646,6 +682,7 @@ def test_tiny_serving_size_does_not_overflow(client: TestClient, db: Session) ->
     make_food_ref(
         db, food_ref_id="KFD_TINY", name="농축액",
         serving_size=Decimal("0.001"), protein_g=Decimal("9999999.999"), fiber_g=None,
+        **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db, meal,

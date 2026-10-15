@@ -43,7 +43,10 @@ def _open_conversations(db: Session, user_id) -> int:
 
 def test_explicit_meal_gets_intro_message_with_cards(db: Session):
     user = make_user(db)
-    make_food_ref(db, food_ref_id="KFD_TOFU", name="두부", protein_g=8, fiber_g=1)
+    make_food_ref(
+        db, food_ref_id="KFD_TOFU", name="두부", protein_g=8, fiber_g=1,
+        calories=None, fat_g=None, carbohydrate_g=None, sodium_mg=None,
+    )
     meal = _evaluated_meal_with_suggestions(db, user.id)
 
     result = chat_service.start_conversation(db, user_id=user.id, meal_id=meal.id)
@@ -63,6 +66,27 @@ def test_explicit_meal_gets_intro_message_with_cards(db: Session):
         (NutrientCode.FIBER, 1.0, "g"),
     }
     assert salad.effects == []  # candidateFoodRefId 가 없다
+
+
+def test_effects_cover_every_code_with_column_units(db: Session):
+    """칩은 6개 성분 전부다. 값은 컬럼 숫자 그대로이고 단위만 붙는다 — kcal · mg 를 g 으로 바꾸지 않는다."""
+    user = make_user(db)
+    make_food_ref(
+        db, food_ref_id="KFD_TOFU", name="두부",
+        calories=100, protein_g=8, fat_g=3, carbohydrate_g=2, fiber_g=1, sodium_mg=100,
+    )
+    meal = _evaluated_meal_with_suggestions(db, user.id, suggestions=[_TOFU])
+
+    result = chat_service.start_conversation(db, user_id=user.id, meal_id=meal.id)
+
+    assert {(e.code, e.amount, e.unit) for e in result.messages[0].food_cards[0].effects} == {
+        (NutrientCode.CALORIE, 100.0, "kcal"),
+        (NutrientCode.PROTEIN, 8.0, "g"),
+        (NutrientCode.FAT, 3.0, "g"),
+        (NutrientCode.CARB, 2.0, "g"),
+        (NutrientCode.FIBER, 1.0, "g"),
+        (NutrientCode.SODIUM, 100.0, "mg"),
+    }
 
 
 def test_cards_are_stored_with_advice_and_ref(db: Session):
