@@ -7,15 +7,16 @@
 from __future__ import annotations
 
 import uuid
-from typing import Literal
-
 from pydantic import ConfigDict
 
-from app.models.enums import ChatMessageRole, ChatMessageStatus, NutrientCode, SafetyStatus
+from app.models.enums import (
+    ChatMessageRole,
+    ChatMessageStatus,
+    NutrientCode,
+    NutrientUnit,
+    SafetyStatus,
+)
 from app.schemas.base import CamelModel, KstDatetime
-
-EffectUnit = Literal["g", "mg", "kcal"]
-
 
 class FoodCardEffect(CamelModel):
     """영양 효과 칩 하나. `amount` 는 `food_refs` 의 **100g 당** 성분량이다
@@ -23,7 +24,7 @@ class FoodCardEffect(CamelModel):
 
     code: NutrientCode
     amount: float
-    unit: EffectUnit
+    unit: NutrientUnit
 
 
 class FoodCardResponse(CamelModel):

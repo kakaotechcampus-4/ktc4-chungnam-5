@@ -61,12 +61,12 @@ def _build_suggestions(db: Session, stored: object) -> list[FeedbackSuggestion]:
             food_name=item.food_name,
             advice=item.advice,
             nutrients=[
-                SuggestionNutrient(code=code, amount_g=float(amount))
-                for code, amount in (
-                    by_ref[item.ref_id].amounts
+                SuggestionNutrient(code=n.code, amount=float(n.amount), unit=n.unit)
+                for n in (
+                    by_ref[item.ref_id].nutrients
                     if item.ref_id is not None and item.ref_id in by_ref
-                    else {}
-                ).items()
+                    else []
+                )
             ],
         )
         for item in items

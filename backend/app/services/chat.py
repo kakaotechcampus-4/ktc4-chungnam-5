@@ -20,13 +20,11 @@ from app.models.enums import (
     ChatMessageRole,
     ChatMessageStatus,
     MealStatus,
-    NutrientCode,
     SafetyStatus,
 )
 from app.schemas.chat import (
     ChatMessageResponse,
     ConversationResponse,
-    EffectUnit,
     FoodCardEffect,
     FoodCardResponse,
 )
@@ -34,14 +32,6 @@ from app.schemas.chat import (
 INTRO_TEXT: Final = "다음 끼니로 이 음식은 어떤가요?"
 """새 대화의 첫 AI 메시지. **AI 가 쓴 문장이 아니라 BE 고정 문구**다 — A-1 은 201 동기
 응답이라 AI 를 부를 수 없다. 끼니 종류별 문구는 두지 않기로 했다(설계 결정)."""
-
-_EFFECT_UNITS: Final[dict[NutrientCode, EffectUnit]] = {
-    NutrientCode.CALORIE: "kcal",
-    NutrientCode.SODIUM: "mg",
-}
-"""여기 없는 성분은 `g` 다. `nutrients_by_food_ref` 는 값을 컬럼 단위 그대로 주므로
-(`calories` kcal · `sodium_mg` mg · 나머지 g) 숫자는 바꾸지 않고 단위만 붙인다."""
-
 
 class MealNotFoundError(LookupError):
     """없는 식사 · 남의 식사 · 삭제된 식사. 셋 다 404 로 같게 응답한다."""
@@ -76,10 +66,10 @@ def _card_responses(db: Session, cards: list[ChatFoodCard]) -> list[FoodCardResp
             food_card_id=card.id,
             food_name=card.food_name,
             effects=[
-                FoodCardEffect(code=code, amount=float(amount), unit=_EFFECT_UNITS.get(code, "g"))
-                for code, amount in (
-                    by_ref[card.food_ref_id].amounts if card.food_ref_id in by_ref else {}
-                ).items()
+                FoodCardEffect(code=n.code, amount=float(n.amount), unit=n.unit)
+                for n in (
+                    by_ref[card.food_ref_id].nutrients if card.food_ref_id in by_ref else []
+                )
             ],
         )
         for card in cards

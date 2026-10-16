@@ -146,7 +146,7 @@ def test_detail_feedback_suggestions_are_objects_like_the_feedback_endpoint(clie
         {
             "foodName": "두부 반 모",
             "advice": "단백질을 채워요",
-            "nutrients": [{"code": "PROTEIN", "amountG": 8.0}],
+            "nutrients": [{"code": "PROTEIN", "amount": 8.0, "unit": "g"}],
         },
         {"foodName": "나물", "advice": "식이섬유", "nutrients": []},
     ]

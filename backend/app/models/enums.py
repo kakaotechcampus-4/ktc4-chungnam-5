@@ -178,6 +178,17 @@ class NutrientCode(str, enum.Enum):
     SODIUM = "SODIUM"
 
 
+class NutrientUnit(str, enum.Enum):
+    """성분량의 단위. 응답 `{ code, amount, unit }` 의 `unit` 이다.
+
+    값이 소문자인 건 명세가 `g | mg | kcal` 로 적어서다 — 표시 문자열 그대로 쓴다.
+    """
+
+    G = "g"
+    MG = "mg"
+    KCAL = "kcal"
+
+
 class NutrientState(str, enum.Enum):
     """목표 대비 현재 위치. 목표가 미정이면 None 이고 이 값은 안 나간다."""
 

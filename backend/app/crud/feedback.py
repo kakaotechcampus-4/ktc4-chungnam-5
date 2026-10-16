@@ -14,7 +14,7 @@ from sqlalchemy import Numeric, and_, cast, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models.enums import NutrientCode, SafetyStatus, TaskStatus
+from app.models.enums import NutrientCode, NutrientUnit, SafetyStatus, TaskStatus
 from app.models.feedback import MealFeedback
 from app.models.food import FoodRef
 from app.models.task import Task
@@ -95,29 +95,36 @@ def upsert(
     return meal_feedback_id
 
 
+class SuggestedNutrient(NamedTuple):
+    """제안 음식이 채워 주는 성분 한 줄. 응답 `{ code, amount, unit }` 그대로다."""
+
+    code: NutrientCode
+    amount: Decimal
+    unit: NutrientUnit
+
+
 class SuggestedNutrients(NamedTuple):
-    """제안 음식 하나가 채워 주는 성분. 키는 명세 `NutrientCode`, 값은 컬럼 단위(kcal · g · mg) 그대로."""
+    """제안 음식 하나가 채워 주는 성분들. `_SUGGESTION_NUTRIENTS` 순서다."""
 
-    amounts: dict[NutrientCode, Decimal]
+    nutrients: list[SuggestedNutrient]
 
 
-_SUGGESTION_NUTRIENTS: Final[tuple[tuple[NutrientCode, str], ...]] = (
-    (NutrientCode.CALORIE, "calories"),
-    (NutrientCode.PROTEIN, "protein_g"),
-    (NutrientCode.FAT, "fat_g"),
-    (NutrientCode.CARB, "carbohydrate_g"),
-    (NutrientCode.FIBER, "fiber_g"),
-    (NutrientCode.SODIUM, "sodium_mg"),
+_SUGGESTION_NUTRIENTS: Final[tuple[tuple[NutrientCode, str, NutrientUnit], ...]] = (
+    (NutrientCode.CALORIE, "calories", NutrientUnit.KCAL),
+    (NutrientCode.PROTEIN, "protein_g", NutrientUnit.G),
+    (NutrientCode.FAT, "fat_g", NutrientUnit.G),
+    (NutrientCode.CARB, "carbohydrate_g", NutrientUnit.G),
+    (NutrientCode.FIBER, "fiber_g", NutrientUnit.G),
+    (NutrientCode.SODIUM, "sodium_mg", NutrientUnit.MG),
 )
 """제안에 실을 성분 — `NutrientCode` 전부다. 이 음식이 채워 주는 성분을 빠짐없이 보여 준다.
 
 AI 는 성분을 알려 주지 않으므로(`ai-stub/schemas.py::Suggestion` 에는 `foodName` ·
 `advice` · `candidateFoodRefId` 뿐이다) `food_refs` 에서 값이 있는 것을 싣는다.
 
-⚠️ **값은 컬럼 단위 그대로다 — 단위 변환을 하지 않는다.** CALORIE 는 kcal, SODIUM 은
-mg, 나머지는 g 숫자다(100g 환산만 한다). 끼니 피드백 응답의 필드 이름이 `amountG` 라도
-CALORIE · SODIUM 값은 g 이 아니다 — FE 는 코드로 단위를 정해 표시해야 한다. 챗봇 카드는
-`unit` 필드를 따로 싣는다(`services/chat.py::_EFFECT_UNITS`).
+**값은 컬럼 단위 그대로다 — 단위 변환을 하지 않는다**(100g 환산만 한다). 세 번째 칸이
+그 컬럼의 단위이고 응답 `unit` 으로 그대로 나간다. 끼니 피드백(`suggestions[].nutrients[]`)과
+챗봇 카드(`effects[]`)가 이 표 하나를 쓴다 — 단위를 따로 적으면 한쪽만 틀린다.
 """
 
 
@@ -200,7 +207,7 @@ def nutrients_by_food_ref(
     # 못 읽게 된다 — NaN · 0 기준량을 거른 것과 같은 이유다.
     columns = [
         cast(getattr(FoodRef, field) * 100 / FoodRef.serving_size, Numeric(18, 3))
-        for _, field in _SUGGESTION_NUTRIENTS
+        for _, field, _ in _SUGGESTION_NUTRIENTS
     ]
     stmt = select(FoodRef.id, *columns).where(
         and_(
@@ -214,19 +221,19 @@ def nutrients_by_food_ref(
 
     resolved: dict[str, SuggestedNutrients] = {}
     for row in db.execute(stmt):
-        amounts = {
-            code: value
-            for (code, _), value in zip(_SUGGESTION_NUTRIENTS, row[1:], strict=True)
+        nutrients = [
+            SuggestedNutrient(code=code, amount=value, unit=unit)
+            for (code, _, unit), value in zip(_SUGGESTION_NUTRIENTS, row[1:], strict=True)
             # NULL 은 "모른다" 다. 0 으로 채우면 "이 음식에는 단백질이 없다" 가 된다.
             #
             # NaN 도 같이 거른다 — `'NaN'::numeric` 은 성분 컬럼에 그냥 저장되고
             # `is not None` 을 통과한다. 그대로 두면 `float('nan')` 이 되어 JSON 에
-            # `null` 로 직렬화되는데, `amount_g: float` 는 **required non-nullable**
+            # `null` 로 직렬화되는데, `amount: float` 는 **required non-nullable**
             # 이라 응답이 자기 OpenAPI 계약을 어긴다. 생성 클라이언트가
-            # `amountG: number` 로 받아 그대로 계산하면 FE 가 터진다.
+            # `amount: number` 로 받아 그대로 계산하면 FE 가 터진다.
             if value is not None and value.is_finite()
-        }
-        resolved[row.id] = SuggestedNutrients(amounts=amounts)
+        ]
+        resolved[row.id] = SuggestedNutrients(nutrients=nutrients)
     return resolved
 
 
