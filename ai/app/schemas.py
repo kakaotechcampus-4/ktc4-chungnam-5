@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as dt
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 
@@ -45,18 +45,14 @@ class SafetyStatus(str, Enum):
 
 
 class AnalyzeMealRequest(_Camel):
+    """팀 결정: 텍스트 입력은 BE 가 food_refs 로 직접 매칭하고 AI 를 거치지 않는다.
+    그래서 AI 는 사진 경로만 받는다 — image_url 은 필수다."""
+
     meal_id: str
     meal_type: MealType
     eaten_at: dt.datetime
     stage: Stage
-    image_url: str | None = None  # presigned URL. AI 는 S3 권한이 없다
-    raw_text: str | None = None  # 이미지와 함께 올 수도 있다
-
-    @model_validator(mode="after")
-    def _need_image_or_text(self) -> AnalyzeMealRequest:
-        if not self.image_url and not self.raw_text:
-            raise ValueError("imageUrl 과 rawText 중 최소 하나는 있어야 한다")
-        return self
+    image_url: str  # presigned URL. AI 는 S3 권한이 없다
 
 
 class RecognizedItem(_Camel):
