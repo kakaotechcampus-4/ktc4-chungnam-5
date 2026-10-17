@@ -32,6 +32,8 @@ from sqlalchemy.orm import Session
 from app.core.time import KST
 from app.crud import chat as chat_crud
 from app.crud import evaluation as evaluation_crud
+from app.crud import feedback as feedback_crud
+from app.crud import food as food_crud
 from app.crud import insight as insight_crud
 from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
@@ -47,7 +49,7 @@ from app.models.enums import (
 )
 from app.models.evaluation import QQSEvaluation
 from app.services.chat import showable_suggestions
-from app.worker.job import Skip
+from app.worker.job import Job, Skip
 
 logger = logging.getLogger("worker.chat_reply")
 
@@ -199,3 +201,104 @@ def call_ai(ctx: _Ctx, ai: AiClient) -> dict[str, Any] | None:
     if ctx.fail_reason is not None:
         return None
     return ai.chat(ctx.request)
+
+
+def _safety(raw: object) -> SafetyStatus | None:
+    try:
+        return SafetyStatus(raw)
+    except ValueError:
+        return None
+
+
+def _fail(db: Session, reply: ChatMessage, reason: str) -> dict[str, Any]:
+    chat_crud.finish_message(db, reply, status=ChatMessageStatus.FAILED)
+    logger.warning("챗봇 답변 실패 messageId=%s reason=%s", reply.id, reason)
+    return {"messageId": str(reply.id), "status": "FAILED", "reason": reason}
+
+
+def _lock_generating(db: Session, message_id: uuid.UUID) -> ChatMessage | None:
+    """답변을 잠그고 다시 본다. 아직 GENERATING 일 때만 돌려준다.
+
+    워커 루프에서는 새 세션이라 identity map 이 비어 있지만, `JOB.run_inline` 은 `load` 와
+    같은 세션을 쓴다. 그래서 다시 읽기 전에 비운다.
+    """
+    db.expire_all()
+    reply = chat_crud.lock_message_for_worker(db, message_id)
+    if reply is None or reply.status is not ChatMessageStatus.GENERATING:
+        logger.info("챗봇 답변 건너뜀 messageId=%s reason=STALE", message_id)
+        return None
+    return reply
+
+
+def apply(
+    db: Session, task: ClaimedTask, ctx: _Ctx, result: dict[str, Any] | None
+) -> dict[str, Any]:
+    """답변을 잠그고 다시 본 뒤 READY 또는 FAILED 로 쓴다."""
+    # AI 를 기다리는 동안(최대 45초) 잠그지 않았다 — 그사이 사용자가 다시 보내 A-2 가
+    # 만료 처리로 FAILED 를 썼을 수 있다. 그 답을 늦게 온 응답으로 되살리지 않는다.
+    reply = _lock_generating(db, ctx.message_id)
+    if reply is None:
+        return {"skipped": "STALE"}
+    if ctx.fail_reason is not None:
+        return _fail(db, reply, ctx.fail_reason)
+
+    safety = _safety(result.get("safetyStatus")) if isinstance(result, dict) else None
+    if safety is None:
+        return _fail(db, reply, "BAD_RESPONSE")
+
+    if safety is not SafetyStatus.SAFE:
+        # 챗봇에는 사람 검수 흐름이 없다 — REVIEW_REQUIRED 도 노출하지 않는다 (규칙 1).
+        # 문장 · 카드는 버린다. 명세: BLOCKED 면 text null, foodCards [].
+        chat_crud.finish_message(
+            db, reply, status=ChatMessageStatus.READY, safety_status=SafetyStatus.BLOCKED
+        )
+        logger.info("챗봇 답변 완료 messageId=%s safetyStatus=BLOCKED", reply.id)
+        return {
+            "messageId": str(reply.id), "status": "READY", "safetyStatus": "BLOCKED", "cardCount": 0,
+        }
+
+    text = result.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return _fail(db, reply, "EMPTY_TEXT")
+
+    # 카드는 끼니 제안과 모양이 같다({foodName, advice, candidateFoodRefId}) — 같은 규칙으로
+    # 거른다. 이름 · 조언이 빈 카드와 깨진 원소는 버린다.
+    cards = feedback_crud.parse_suggestions(result.get("foodCards"))
+    # 공공 DB 에 없는 id 는 "이 음식" 이라는 거짓 링크라 버린다 — `feedback_meal._stored_suggestions` 와 같다.
+    known = food_crud.existing_ids(db, {c.ref_id for c in cards if c.ref_id is not None})
+
+    chat_crud.finish_message(
+        db, reply, status=ChatMessageStatus.READY, text=text, safety_status=SafetyStatus.SAFE
+    )
+    for position, card in enumerate(cards):
+        chat_crud.add_food_card(
+            db,
+            message_id=reply.id,
+            position=position,
+            food_name=card.food_name,
+            advice=card.advice,
+            food_ref_id=card.ref_id if card.ref_id in known else None,
+        )
+
+    # 커밋하지 않는다. 큐가 DONE 과 함께 한 번에 커밋한다(`queue.complete`).
+    # 로그 · 반환값에는 식별자와 개수만 — 질문 · 답 · 음식명은 남기지 않는다 (규칙 6).
+    logger.info("챗봇 답변 완료 messageId=%s safetyStatus=SAFE cards=%d", reply.id, len(cards))
+    return {
+        "messageId": str(reply.id), "status": "READY", "safetyStatus": "SAFE", "cardCount": len(cards),
+    }
+
+
+def on_ai_error(
+    db: Session, task: ClaimedTask, ctx: _Ctx, exc: Exception
+) -> dict[str, Any]:
+    """AI 가 실패했다. **재시도하지 않고** 바로 FAILED 로 둔다 — FE 는 30초만 기다린다.
+
+    예외 메시지에 AI 응답 일부가 섞일 수 있어 타입만 남긴다 (규칙 6).
+    """
+    reply = _lock_generating(db, ctx.message_id)
+    if reply is None:
+        return {"skipped": "STALE"}
+    return _fail(db, reply, f"AI_ERROR:{type(exc).__name__}")
+
+
+JOB = Job(load=load, call_ai=call_ai, apply=apply, on_ai_error=on_ai_error)

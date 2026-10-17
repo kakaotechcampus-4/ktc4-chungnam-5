@@ -43,6 +43,7 @@ from app.tests.factories import (
     make_qqs_evaluation,
     make_user,
 )
+from app.worker.dispatch import get_job
 from app.worker.job import Skip
 from app.worker.jobs import chat_reply
 
@@ -297,3 +298,169 @@ def test_load_marks_expired_reply_and_call_ai_does_not_call(db: Session):
     assert ctx.fail_reason == "EXPIRED"
     assert ctx.request is None
     assert chat_reply.call_ai(ctx, ai=None) is None  # ai 를 건드리면 AttributeError
+
+
+# ─────────────────────────── apply · on_ai_error ───────────────────────────
+
+
+class FakeAi:
+    """`/chat` 호출을 기록하고 정해진 응답을 돌려주는 가짜 AI (`ai-stub/schemas.py` ChatResponse 모양).
+
+    `on_call` 은 AI 를 기다리는 사이에 일어난 일(만료 처리 등)을 흉내 낸다.
+    """
+
+    def __init__(self, *, response: dict[str, Any] | None = None, error: Exception | None = None, on_call=None):
+        self.response = response if response is not None else {
+            "text": "시금치 말고 이런 음식은 어떤가요?",
+            "modelVersion": "stub-chat-0",
+            "safetyStatus": "SAFE",
+            "foodCards": [],
+        }
+        self.error = error
+        self.on_call = on_call
+        self.calls: list[dict[str, Any]] = []
+
+    def chat(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.calls.append(payload)
+        if self.on_call is not None:
+            self.on_call()
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+
+run = chat_reply.JOB.run_inline
+
+
+def _pending_reply(db: Session) -> uuid.UUID:
+    user = make_user(db)
+    conversation_id = _open(db, user.id)
+    return _send(db, user.id, conversation_id, "다른 음식 추천해줘")
+
+
+def _cards(db: Session, message_id: uuid.UUID) -> list[ChatFoodCard]:
+    return list(
+        db.scalars(
+            select(ChatFoodCard).where(ChatFoodCard.message_id == message_id).order_by(ChatFoodCard.position)
+        )
+    )
+
+
+def test_safe_answer_is_saved_with_cards(db: Session):
+    make_food_ref(db, food_ref_id="KFD_LETTUCE", name="상추")
+    reply_id = _pending_reply(db)
+    ai = FakeAi(response={
+        "text": "시금치 말고 이런 음식은 어떤가요?",
+        "modelVersion": "stub-chat-0",
+        "safetyStatus": "SAFE",
+        "foodCards": [
+            {"foodName": "쌈채소 한 접시", "advice": "식이섬유를 채워요", "candidateFoodRefId": "KFD_LETTUCE"},
+            {"foodName": "두부 반 모", "advice": "단백질을 채워요", "candidateFoodRefId": "NOT_IN_DB"},
+            {"foodName": "", "advice": "이름 없는 카드"},
+            "깨진 원소",
+        ],
+    })
+
+    result = run(db, _task(reply_id), ai)
+
+    reply = db.get(ChatMessage, reply_id)
+    assert (reply.status, reply.safety_status, reply.text) == (
+        ChatMessageStatus.READY, SafetyStatus.SAFE, "시금치 말고 이런 음식은 어떤가요?",
+    )
+    cards = _cards(db, reply_id)
+    assert [(c.position, c.food_name, c.advice, c.food_ref_id) for c in cards] == [
+        (0, "쌈채소 한 접시", "식이섬유를 채워요", "KFD_LETTUCE"),
+        (1, "두부 반 모", "단백질을 채워요", None),  # 공공 DB 에 없는 id 는 거짓 링크라 버린다
+    ]
+    assert result == {
+        "messageId": str(reply_id), "status": "READY", "safetyStatus": "SAFE", "cardCount": 2,
+    }
+    [call] = ai.calls
+    assert call["text"] == "다른 음식 추천해줘"
+
+
+@pytest.mark.parametrize("safety", ["BLOCKED", "REVIEW_REQUIRED"])
+def test_unsafe_answer_is_saved_blocked_without_text_or_cards(db: Session, safety):
+    reply_id = _pending_reply(db)
+    ai = FakeAi(response={
+        "text": "약물 관련 판단은 담당 의료진과 상의해 주세요.",
+        "modelVersion": "stub-chat-0",
+        "safetyStatus": safety,
+        "foodCards": [{"foodName": "두부", "advice": "x", "candidateFoodRefId": None}],
+    })
+
+    run(db, _task(reply_id), ai)
+
+    reply = db.get(ChatMessage, reply_id)
+    assert (reply.status, reply.safety_status, reply.text) == (
+        ChatMessageStatus.READY, SafetyStatus.BLOCKED, None,
+    )
+    assert _cards(db, reply_id) == []
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"text": "   ", "modelVersion": "m", "safetyStatus": "SAFE", "foodCards": []},
+        {"text": None, "modelVersion": "m", "safetyStatus": "SAFE"},
+        {"text": "답", "modelVersion": "m", "safetyStatus": "WHAT"},
+    ],
+    ids=["blank-text", "null-text", "unknown-safety"],
+)
+def test_unusable_answer_is_failed(db: Session, response):
+    reply_id = _pending_reply(db)
+
+    run(db, _task(reply_id), FakeAi(response=response))
+
+    reply = db.get(ChatMessage, reply_id)
+    assert (reply.status, reply.text, reply.safety_status) == (ChatMessageStatus.FAILED, None, None)
+
+
+def test_ai_error_fails_immediately_without_retry(db: Session):
+    reply_id = _pending_reply(db)
+
+    result = run(db, _task(reply_id), FakeAi(error=RuntimeError("AI 500")))  # raise 하지 않는다
+
+    assert db.get(ChatMessage, reply_id).status is ChatMessageStatus.FAILED
+    assert result["status"] == "FAILED"
+
+
+def test_expired_reply_is_failed_without_calling_ai(db: Session):
+    reply_id = _pending_reply(db)
+    _age(db, reply_id, chat_crud.CHAT_REPLY_STALE_SEC + 1)
+    ai = FakeAi()
+
+    result = run(db, _task(reply_id), ai)
+
+    assert ai.calls == []
+    assert db.get(ChatMessage, reply_id).status is ChatMessageStatus.FAILED
+    assert result == {"messageId": str(reply_id), "status": "FAILED", "reason": "EXPIRED"}
+
+
+def test_late_answer_does_not_overwrite_reply_failed_meanwhile(db: Session):
+    """AI 를 기다리는 사이 사용자가 다시 보내 A-2 가 만료 처리로 FAILED 를 썼다."""
+    reply_id = _pending_reply(db)
+    ai = FakeAi(on_call=lambda: _finish(db, reply_id, ChatMessageStatus.FAILED))
+
+    result = run(db, _task(reply_id), ai)
+
+    assert db.get(ChatMessage, reply_id).status is ChatMessageStatus.FAILED
+    assert _cards(db, reply_id) == []
+    assert result == {"skipped": "STALE"}
+
+
+def test_ai_error_does_not_touch_reply_failed_meanwhile(db: Session):
+    reply_id = _pending_reply(db)
+    ai = FakeAi(
+        error=RuntimeError("AI 500"),
+        on_call=lambda: _finish(db, reply_id, ChatMessageStatus.READY, "다른 답", SafetyStatus.SAFE),
+    )
+
+    result = run(db, _task(reply_id), ai)
+
+    assert db.get(ChatMessage, reply_id).text == "다른 답"
+    assert result == {"skipped": "STALE"}
+
+
+def test_dispatch_knows_chat_reply():
+    assert get_job("chat.reply") is chat_reply.JOB
