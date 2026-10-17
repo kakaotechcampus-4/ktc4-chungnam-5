@@ -8,9 +8,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Final
 
-from sqlalchemy import ColumnElement, func, select, update
+from sqlalchemy import ColumnElement, Date, cast, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.chat import ChatConversation, ChatFoodCard, ChatMessage
@@ -196,3 +197,65 @@ def finish_message(
     message.text = text
     message.safety_status = safety_status
     db.flush()
+
+
+def get_message_for_worker(
+    db: Session, message_id: uuid.UUID
+) -> tuple[ChatMessage, bool] | None:
+    """워커 전용 — 메시지와 그 만료 여부(`CHAT_REPLY_STALE_SEC`). 없으면 None.
+
+    워커에는 "요청한 사용자" 가 없어 소유권을 보지 않는다. API 경로에서는 쓰지 말 것.
+    """
+    row = db.execute(select(ChatMessage, _stale()).where(ChatMessage.id == message_id)).first()
+    return None if row is None else (row[0], bool(row[1]))
+
+
+def lock_message_for_worker(db: Session, message_id: uuid.UUID) -> ChatMessage | None:
+    """워커 전용 — 답변을 잠그고 다시 읽는다. AI 를 기다리는 사이 A-2 가 만료 처리로
+    FAILED 를 썼을 수 있어, 쓰기 직전에 잠근 값으로 다시 판단한다.
+
+    `FOR NO KEY UPDATE` 다 — 카드 INSERT 의 FK 검사(KEY SHARE)와 충돌하지 않는다.
+    """
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.id == message_id)
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def get_conversation_for_worker(
+    db: Session, conversation_id: uuid.UUID
+) -> ChatConversation | None:
+    """워커 전용 — 소유자도 닫힘 여부도 보지 않는다. 닫힌 대화의 마지막 질문에도 답은 쓴다."""
+    return db.get(ChatConversation, conversation_id)
+
+
+def list_messages(db: Session, conversation_id: uuid.UUID) -> list[ChatMessage]:
+    """대화의 메시지 전부, 오래된 순. `id` 는 `created_at` 이 같을 때의 결정적 순서다."""
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.conversation_id == conversation_id)
+        .order_by(ChatMessage.created_at, ChatMessage.id)
+    )
+    return list(db.execute(stmt).scalars())
+
+
+def list_evaluated_meals_on(db: Session, user_id: uuid.UUID, day: date) -> list[Meal]:
+    """그 날(KST) 먹은 확정된 살아있는 끼니, 먹은 순.
+
+    확정 전 끼니는 점수가 없거나 낡았다. KST 로 자르는 이유는 `crud/meal.py::kst_day` 와 같다
+    — UTC 로 자르면 밤 11시 야식이 다음날이 된다.
+    """
+    stmt = (
+        select(Meal)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.status == MealStatus.EVALUATED,
+            cast(func.timezone("Asia/Seoul", Meal.eaten_at), Date) == day,
+        )
+        .order_by(Meal.eaten_at, Meal.created_at)
+    )
+    return list(db.execute(stmt).scalars())

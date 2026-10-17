@@ -53,12 +53,15 @@ class ReplyInProgressError(RuntimeError):
     """직전 답변이 아직 생성 중이다 (연속 전송 방지, 409)."""
 
 
-def _showable_suggestions(db: Session, meal_id: uuid.UUID) -> list[StoredSuggestion]:
+def showable_suggestions(db: Session, meal_id: uuid.UUID) -> list[StoredSuggestion]:
     """기준 끼니의 "현재 추천" 중 지금 보여 줘도 되는 것. 없으면 `[]`.
 
     끼니 피드백 화면(`services/feedback.py::get_feedback`)이 `READY` 로 내용을 싣는 조건과
     같다 — SAFE 이고 본문이 있을 때만. 거기서 안 보이는 추천이 챗봇에서 보이면 안 된다
     (BLOCKED · 검수 전 문장은 절대 규칙 1).
+
+    `chat.reply` 워커가 기준 끼니 컨텍스트를 만들 때도 이 함수를 쓴다 — 커밋하지 않는 읽기라
+    워커가 불러도 된다(`worker/dispatch.py::get_job` 독스트링).
     """
     row = feedback_crud.get_by_meal(db, meal_id)
     if row is None or row.safety_status is not SafetyStatus.SAFE:
@@ -133,7 +136,7 @@ def start_conversation(
         evaluated = base_meal_id is not None
 
     suggestions = (
-        _showable_suggestions(db, base_meal_id)
+        showable_suggestions(db, base_meal_id)
         if evaluated and base_meal_id is not None
         else []
     )
