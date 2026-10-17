@@ -8,10 +8,13 @@ BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ChatRequest` · `ChatResponse` 다
 **재시도하지 않는다.** FE 는 30초만 폴링한다 — 재시도(최대 3회 × 45초)는 FE 가 포기한 뒤
 늦은 답만 붙인다. AI 가 실패하면 `on_ai_error` 가 바로 FAILED 로 두고 FE 가 "다시 보내기" 를
 띄운다. 워커가 죽어 GENERATING 이 남으면 `crud/chat.py::CHAT_REPLY_STALE_SEC` 뒤 만료로 본다.
+`load` · `apply` 가 DB 순단 등으로 터져 큐가 다시 집은 작업(`attempts >= 1`)도 AI 를 부르지 않고
+FAILED 로 닫는다 — 큐의 재시도가 AI 재시도로 새지 않게.
 
 순서 (load 1~3 · call_ai 4 · apply 5~6):
   1. 답변 자리표시를 읽는다. 없거나 GENERATING 이 아니면 건너뛴다
-  2. 만료됐으면 AI 를 부르지 않고 FAILED 로 끝낸다 — FE 가 포기한 질문에 LLM 비용을 쓰지 않는다
+  2. 만료됐거나 재시도로 다시 집힌 작업이면 AI 를 부르지 않고 FAILED 로 끝낸다 — FE 가 포기한
+     질문에 LLM 비용을 쓰지 않는다
   3. 질문 · 지난 대화 · 컨텍스트를 모은다
   4. AI 를 부른다
   5. 답변을 잠그고 다시 본다 — 그사이 만료 처리로 FAILED 가 됐으면 쓰지 않는다
@@ -39,7 +42,7 @@ from app.crud import meal as meal_crud
 from app.crud import medication as medication_crud
 from app.infra.ai import AiClient
 from app.infra.queue import ClaimedTask
-from app.models.chat import ChatConversation, ChatMessage
+from app.models.chat import ChatConversation, ChatFoodCard, ChatMessage
 from app.models.enums import (
     ChatMessageRole,
     ChatMessageStatus,
@@ -56,6 +59,10 @@ logger = logging.getLogger("worker.chat_reply")
 HISTORY_LIMIT: Final = 20
 """AI 에 싣는 지난 대화 상한. 오래된 것부터 버린다 — 토큰 비용이 대화 길이에 비례해 늘지 않게."""
 
+FOOD_NAME_MAX: Final[int] = ChatFoodCard.food_name.type.length
+"""카드 음식명 상한 — 컬럼(`String(255)`)에서 가져와 둘이 어긋나지 않게 한다. 넘는 이름을
+INSERT 하면 DataError 로 `apply` 가 터지고 큐 재시도가 AI 를 또 부른다."""
+
 
 @dataclass(frozen=True)
 class _Ctx:
@@ -63,7 +70,7 @@ class _Ctx:
 
     message_id: uuid.UUID
     fail_reason: str | None
-    """있으면 AI 를 부르지 않고 FAILED 로 끝낸다 (`EXPIRED` · `NO_QUESTION`)."""
+    """있으면 AI 를 부르지 않고 FAILED 로 끝낸다 (`EXPIRED` · `RETRIED` · `NO_QUESTION`)."""
     request: dict[str, Any] | None
 
 
@@ -172,6 +179,11 @@ def load(db: Session, task: ClaimedTask) -> _Ctx | Skip:
     reply, stale = found
     if stale:
         return _Ctx(message_id=reply.id, fail_reason="EXPIRED", request=None)
+    # `attempts` 는 이번 시도 이전까지 집힌 횟수다(첫 시도 0, `queue.py::claim`). 1 이상이면 앞선
+    # 시도가 AI 를 부른 뒤 `apply` 에서 터졌거나 워커가 죽은 것이다 — 다시 부르면 FE 가 포기한
+    # 뒤 LLM 비용만 더 쓴다. 위의 GENERATING 확인 뒤라 이미 끝난 답은 그대로 건너뛴다.
+    if task.attempts > 0:
+        return _Ctx(message_id=reply.id, fail_reason="RETRIED", request=None)
 
     conversation = chat_crud.get_conversation_for_worker(db, reply.conversation_id)
     messages = chat_crud.list_messages(db, reply.conversation_id)
@@ -262,8 +274,14 @@ def apply(
         return _fail(db, reply, "EMPTY_TEXT")
 
     # 카드는 끼니 제안과 모양이 같다({foodName, advice, candidateFoodRefId}) — 같은 규칙으로
-    # 거른다. 이름 · 조언이 빈 카드와 깨진 원소는 버린다.
-    cards = feedback_crud.parse_suggestions(result.get("foodCards"))
+    # 거른다. 이름 · 조언이 빈 카드와 깨진 원소는 버린다. 거기에 챗봇이 더 거른다:
+    # 공백뿐인 이름 · 조언(`parse_suggestion` 은 `" "` 를 통과시킨다)과 컬럼보다 긴 이름.
+    # 긴 이름은 자르지 않고 버린다 — 잘린 이름은 다른 음식을 가리킬 수 있다.
+    cards = [
+        c
+        for c in feedback_crud.parse_suggestions(result.get("foodCards"))
+        if c.food_name.strip() and c.advice.strip() and len(c.food_name) <= FOOD_NAME_MAX
+    ]
     # 공공 DB 에 없는 id 는 "이 음식" 이라는 거짓 링크라 버린다 — `feedback_meal._stored_suggestions` 와 같다.
     known = food_crud.existing_ids(db, {c.ref_id for c in cards if c.ref_id is not None})
 

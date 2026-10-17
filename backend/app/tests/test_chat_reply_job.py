@@ -17,7 +17,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.time import KST
@@ -399,21 +399,61 @@ def test_unsafe_answer_is_saved_blocked_without_text_or_cards(db: Session, safet
 
 
 @pytest.mark.parametrize(
-    "response",
+    ("response", "reason"),
     [
-        {"text": "   ", "modelVersion": "m", "safetyStatus": "SAFE", "foodCards": []},
-        {"text": None, "modelVersion": "m", "safetyStatus": "SAFE"},
-        {"text": "답", "modelVersion": "m", "safetyStatus": "WHAT"},
+        ({"text": "   ", "modelVersion": "m", "safetyStatus": "SAFE", "foodCards": []}, "EMPTY_TEXT"),
+        ({"text": None, "modelVersion": "m", "safetyStatus": "SAFE"}, "EMPTY_TEXT"),
+        ({"text": "답", "modelVersion": "m", "safetyStatus": "WHAT"}, "BAD_RESPONSE"),
     ],
     ids=["blank-text", "null-text", "unknown-safety"],
 )
-def test_unusable_answer_is_failed(db: Session, response):
+def test_unusable_answer_is_failed(db: Session, response, reason):
     reply_id = _pending_reply(db)
 
-    run(db, _task(reply_id), FakeAi(response=response))
+    result = run(db, _task(reply_id), FakeAi(response=response))
 
     reply = db.get(ChatMessage, reply_id)
     assert (reply.status, reply.text, reply.safety_status) == (ChatMessageStatus.FAILED, None, None)
+    assert result == {"messageId": str(reply_id), "status": "FAILED", "reason": reason}
+
+
+def _safe(cards: list[Any]) -> dict[str, Any]:
+    return {"text": "답", "modelVersion": "m", "safetyStatus": "SAFE", "foodCards": cards}
+
+
+def test_card_with_too_long_name_is_dropped_not_truncated(db: Session):
+    """`food_name` 은 String(255) 다. 넘는 카드를 넣으면 DataError 로 apply 가 터지고, 큐가
+    재시도하면 AI 를 또 부르며 답은 GENERATING 에 남는다. 자르면 다른 음식이 되므로 버린다."""
+    reply_id = _pending_reply(db)
+    limit = chat_reply.FOOD_NAME_MAX
+    ai = FakeAi(response=_safe([
+        {"foodName": "가" * limit, "advice": "경계값은 남긴다"},
+        {"foodName": "나" * (limit + 1), "advice": "넘으면 버린다"},
+        {"foodName": "두부 반 모", "advice": "단백질을 채워요"},
+    ]))
+
+    result = run(db, _task(reply_id), ai)
+
+    assert db.get(ChatMessage, reply_id).status is ChatMessageStatus.READY
+    assert [(c.position, c.food_name) for c in _cards(db, reply_id)] == [
+        (0, "가" * limit), (1, "두부 반 모"),
+    ]
+    assert result["cardCount"] == 2
+    assert limit == 255
+
+
+def test_cards_with_blank_name_or_advice_are_dropped(db: Session):
+    reply_id = _pending_reply(db)
+    ai = FakeAi(response=_safe([
+        {"foodName": "   ", "advice": "이름이 공백"},
+        {"foodName": "조언 공백", "advice": " \t\n"},
+        {"foodName": "두부 반 모", "advice": "단백질을 채워요"},
+    ]))
+
+    run(db, _task(reply_id), ai)
+
+    assert db.get(ChatMessage, reply_id).status is ChatMessageStatus.READY
+    assert [(c.position, c.food_name) for c in _cards(db, reply_id)] == [(0, "두부 반 모")]
 
 
 def test_ai_error_fails_immediately_without_retry(db: Session):
@@ -435,6 +475,32 @@ def test_expired_reply_is_failed_without_calling_ai(db: Session):
     assert ai.calls == []
     assert db.get(ChatMessage, reply_id).status is ChatMessageStatus.FAILED
     assert result == {"messageId": str(reply_id), "status": "FAILED", "reason": "EXPIRED"}
+
+
+def test_retried_task_fails_without_calling_ai(db: Session):
+    """load/apply 가 DB 순단 등으로 터져 큐가 다시 집은 작업이다. FE 는 30초 만에 포기했으므로
+    AI(=LLM 비용)를 또 부르지 않고 FAILED 로 닫는다."""
+    reply_id = _pending_reply(db)
+    retry = ClaimedTask(
+        id=uuid.uuid4(), type="chat.reply", payload={"messageId": str(reply_id)}, attempts=1
+    )
+    ai = FakeAi()
+
+    result = run(db, retry, ai)
+
+    assert ai.calls == []
+    assert db.get(ChatMessage, reply_id).status is ChatMessageStatus.FAILED
+    assert result == {"messageId": str(reply_id), "status": "FAILED", "reason": "RETRIED"}
+
+
+def test_retried_task_still_skips_reply_that_is_not_generating(db: Session):
+    reply_id = _pending_reply(db)
+    _finish(db, reply_id, ChatMessageStatus.READY, "이미 답함", SafetyStatus.SAFE)
+    retry = ClaimedTask(
+        id=uuid.uuid4(), type="chat.reply", payload={"messageId": str(reply_id)}, attempts=1
+    )
+
+    assert isinstance(chat_reply.load(db, retry), Skip)
 
 
 def test_late_answer_does_not_overwrite_reply_failed_meanwhile(db: Session):
@@ -460,6 +526,41 @@ def test_ai_error_does_not_touch_reply_failed_meanwhile(db: Session):
 
     assert db.get(ChatMessage, reply_id).text == "다른 답"
     assert result == {"skipped": "STALE"}
+
+
+def test_ai_error_through_worker_loop_ends_done_with_failed_reply_and_no_retry(sessions):
+    """`process_one` 까지 이어서 본다 — AI 예외가 `queue.fail`(재시도)로 새지 않고 DONE 으로
+    끝나야 한다. 진짜 큐 · 커밋하는 세션이라 사용자는 테스트가 직접 지운다."""
+    from app.infra.queue import DbTaskQueue
+    from app.models.enums import TaskStatus
+    from app.models.task import Task
+    from app.models.user import User
+    from app.worker.loop import process_one
+
+    with sessions() as setup:
+        user = make_user(setup)
+        setup.commit()
+        user_id = user.id
+        conversation_id = _open(setup, user_id)
+        reply_id = _send(setup, user_id, conversation_id, "다른 음식 추천해줘")
+    try:
+        queue = DbTaskQueue(sessions)
+        lease = queue.claim()
+        assert lease is not None and lease.task.payload == {"messageId": str(reply_id)}
+        ai = FakeAi(error=RuntimeError("AI 500"))
+
+        process_one(queue, ai, lease)  # raise 하면 워커 루프가 queue.fail 로 넘긴다
+
+        assert len(ai.calls) == 1
+        with sessions() as check:
+            task = check.get(Task, lease.task.id)
+            assert (task.status, task.attempts, task.last_error) == (TaskStatus.DONE, 1, None)
+            assert task.result["reason"] == "AI_ERROR:RuntimeError"
+            assert check.get(ChatMessage, reply_id).status is ChatMessageStatus.FAILED
+    finally:
+        with sessions() as cleanup:
+            cleanup.execute(delete(User).where(User.id == user_id))
+            cleanup.commit()
 
 
 def test_dispatch_knows_chat_reply():
