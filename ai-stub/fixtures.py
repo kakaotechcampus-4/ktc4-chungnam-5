@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from schemas import (
     AnalyzeMealResponse,
+    ChatFoodCard,
+    ChatResponse,
     LongFeedbackResponse,
     RecognizedItem,
     SafetyStatus,
@@ -106,5 +108,33 @@ def long_feedback_blocked() -> LongFeedbackResponse:
         trend_summary=BLOCKED_MESSAGE,
         recommendation="",
         model_version="stub-long-0",
+        safety_status=SafetyStatus.BLOCKED,
+    )
+
+
+def chat() -> ChatResponse:
+    return ChatResponse(
+        text="시금치 말고 이런 음식은 어떤가요?",
+        model_version="stub-chat-0",
+        safety_status=SafetyStatus.SAFE,
+        food_cards=[
+            ChatFoodCard(
+                food_name="쌈채소 한 접시",
+                advice="식이섬유로 포만감을 채워요",
+                candidate_food_ref_id="D004512",
+            ),
+            ChatFoodCard(
+                food_name="두부 반 모",
+                advice="단백질을 조금 더 채워요",
+                candidate_food_ref_id=None,  # 매칭 실패 — BE 는 effects: [] 로 내보낸다
+            ),
+        ],
+    )
+
+
+def chat_blocked() -> ChatResponse:
+    return ChatResponse(
+        text=None,
+        model_version="stub-chat-0",
         safety_status=SafetyStatus.BLOCKED,
     )
