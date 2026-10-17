@@ -58,3 +58,12 @@ def test_parse_response_empty_items():
 def test_parse_response_rejects_malformed_json():
     with pytest.raises(Exception):
         _parse_response("not json")
+
+
+def test_parse_response_strips_markdown_code_fence():
+    """게이트웨이가 JSON 스키마 강제를 지원하는지 몰라서, ```json ... ``` 로 감싸서
+    줘도 파싱되도록 방어한다."""
+    response = '```json\n{"items": [{"originalFoodName": "김밥", "estimatedAmount": 1, "unit": "줄", "confidence": 0.7}]}\n```'
+    result = _parse_response(response)
+    assert len(result) == 1
+    assert result[0].original_food_name == "김밥"

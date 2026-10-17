@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-import anthropic
+import httpx
 from pydantic import BaseModel
 
 from app.config import get_settings
@@ -21,8 +21,7 @@ from app.schemas import RecognizedItem
 
 
 class _ImageAnalysisResult(BaseModel):
-    """비전 모델 출력 스키마. `items` 하나만 감싼다 — 응답 최상위가 배열이면
-    `output_config.format`의 JSON 스키마가 object를 요구해서 못 쓴다."""
+    """비전 모델 출력 스키마. `items` 하나만 감싼다."""
 
     items: list[RecognizedItem]
 
@@ -35,45 +34,43 @@ async def analyze_food(meal_type: str, image_url: str) -> list[RecognizedItem]:
 
 
 async def _call_vision_model(image_url: str, prompt: str) -> str:
-    """Claude 비전 모델을 호출해 JSON 문자열을 받는다.
+    """`LLM_VISION_URL`(mlapi.run 게이트웨이, Gemini Flash)을 호출해 JSON 문자열을 받는다.
 
-    이미지를 직접 다운로드해서 base64 로 보내지 않는다 — `image_url` 은 presigned
-    URL 이라, Anthropic 서버가 바로 fetch 하도록 `source.type="url"`로 넘긴다
-    (AI 는 S3 권한이 없으니 애초에 직접 받을 방법도 없다).
+    ⚠️ 가정(미확정): 게이트웨이의 실제 요청/응답 스펙 문서를 아직 못 받아서, 가장
+    흔한 관례인 OpenAI 호환 chat completions 형식으로 가정하고 짰다 — 요청은
+    `{"messages": [...]}`, 응답은 `choices[0].message.content`. 실제 스펙 받으면
+    이 함수만 고치면 된다 (호출부 `analyze_food`는 안 바뀜).
     """
     settings = get_settings()
-    client = anthropic.AsyncAnthropic(
-        api_key=settings.LLM_API_KEY.get_secret_value(),
-        base_url=settings.LLM_BASE_URL,
-        timeout=settings.LLM_TIMEOUT_SEC,
-        max_retries=settings.LLM_MAX_RETRIES,
-    )
-    response = await client.messages.create(
-        model=settings.LLM_MODEL_VISION,
-        max_tokens=2048,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "url", "url": image_url}},
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
-        output_config={
-            "format": {
-                "type": "json_schema",
-                "schema": _ImageAnalysisResult.model_json_schema(by_alias=True),
-            }
-        },
-    )
 
-    if response.stop_reason == "refusal":
-        # 의료 조언 등으로 거절된 경우 — 여긴 음식 인식만 책임지므로 빈 결과로
-        # 처리한다. BLOCKED 로 감싸는 건 main.py/safety_guard.py 의 일이다.
-        return '{"items": []}'
+    last_error: Exception | None = None
+    async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT_SEC) as client:
+        for attempt in range(settings.LLM_MAX_RETRIES + 1):
+            try:
+                response = await client.post(
+                    settings.LLM_VISION_URL,
+                    headers={
+                        "Authorization": f"Bearer {settings.LLM_API_KEY.get_secret_value()}"
+                    },
+                    json={
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "image_url", "image_url": {"url": image_url}},
+                                    {"type": "text", "text": prompt},
+                                ],
+                            }
+                        ],
+                    },
+                )
+                response.raise_for_status()
+                return response.json()["choices"][0]["message"]["content"]
+            except (httpx.HTTPStatusError, httpx.TransportError) as exc:
+                last_error = exc
 
-    return next(block.text for block in response.content if block.type == "text")
+    assert last_error is not None
+    raise last_error
 
 
 def _build_prompt(meal_type: str) -> str:
@@ -89,7 +86,9 @@ mealType: {meal_type}
 - unit: 섭취량 단위
 - confidence: 이 인식에 대한 확신도 (0~1)
 
-결과는 JSON 형식으로 반환하세요."""
+결과는 다른 설명 없이 아래 형태의 JSON만 반환하세요.
+
+{{"items": [{{"originalFoodName": "...", "estimatedAmount": 0, "unit": "...", "confidence": 0}}]}}"""
 
 
 def _parse_response(response: str) -> list[RecognizedItem]:
@@ -98,5 +97,15 @@ def _parse_response(response: str) -> list[RecognizedItem]:
     `candidate_food_ref_id`/`clarify_question`은 여기서 비워 둔다 — 전자는 tool
     연동 전까지 항상 None, 후자는 1차 개발 범위 밖(명세 기준)이라 RecognizedItem
     기본값(None)을 그대로 쓴다.
+
+    게이트웨이가 `output_config.format` 같은 스키마 강제를 지원하는지 몰라서,
+    마크다운 코드펜스(```json ... ```)로 감싸서 줄 가능성까지 방어적으로 벗겨낸다.
     """
-    return _ImageAnalysisResult.model_validate_json(response).items
+    return _ImageAnalysisResult.model_validate_json(_strip_code_fence(response)).items
+
+
+def _strip_code_fence(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    return text

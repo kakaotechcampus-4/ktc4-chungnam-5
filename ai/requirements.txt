@@ -2,9 +2,7 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 pydantic-settings==2.15.0
-# Claude API 호출
-anthropic==1.13.0
-# BE /internal/v1 tool 호출
+# LLM 게이트웨이 호출, BE /internal/v1 tool 호출 — SDK 없이 직접 POST (README)
 httpx==0.28.1
 
 # 테스트
