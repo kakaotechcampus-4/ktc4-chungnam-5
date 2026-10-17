@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import uuid
-from pydantic import ConfigDict
+from typing import Annotated
+
+from pydantic import ConfigDict, StringConstraints
 
 from app.models.enums import (
     ChatMessageRole,
@@ -63,3 +65,30 @@ class CreateConversationRequest(CamelModel):
     model_config = ConfigDict(extra="forbid")
 
     meal_id: uuid.UUID | None = None
+
+
+CHAT_REPLY_POLL_INTERVAL_MS = 1000
+CHAT_REPLY_TIMEOUT_MS = 30000
+"""FE 가 답변을 기다리는 상한. 서버의 만료 기준(`crud/chat.py::CHAT_REPLY_STALE_SEC`)은
+이보다 넉넉하다 — FE 가 포기한 뒤에도 워커가 답을 쓸 수는 있다."""
+
+
+class SendMessageRequest(CamelModel):
+    """A-2 요청. 공백만 보낸 메시지는 빈 메시지다 — AI 를 부를 이유가 없다.
+
+    extra="forbid": `message` 같은 오타 필드가 조용히 무시되면 `text` 누락 422 와 섞여
+    원인을 찾기 어렵다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class SendMessageResponse(CamelModel):
+    """A-2 응답 (202). FE 는 `assistantMessageId` 가 READY · FAILED 가 될 때까지 폴링한다."""
+
+    user_message: ChatMessageResponse
+    assistant_message_id: uuid.UUID
+    poll_interval_ms: int
+    timeout_ms: int
