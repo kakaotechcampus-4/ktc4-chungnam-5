@@ -11,10 +11,11 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
-from app.food_analyzer import _build_prompt, _parse_response, analyze_food
+from app.food_analyzer import _build_prompt, _call_vision_model, _parse_response, analyze_food
 
 
 def test_analyze_food_parses_model_response(monkeypatch):
@@ -58,6 +59,71 @@ def test_parse_response_empty_items():
 def test_parse_response_rejects_malformed_json():
     with pytest.raises(Exception):
         _parse_response("not json")
+
+
+def test_call_vision_model_uses_dev_claude_when_set(monkeypatch):
+    """`DEV_VISION_MODEL`이 설정되면 게이트웨이 대신 Claude 직접 호출로 가야 한다
+    (게이트웨이 스펙 확정 전까지의 임시 경로)."""
+    calls = {}
+
+    async def _fake_claude_directly(image_url: str, prompt: str, model: str) -> str:
+        calls["args"] = (image_url, prompt, model)
+        return '{"items": []}'
+
+    monkeypatch.setattr(
+        "app.food_analyzer.get_settings",
+        lambda: SimpleNamespace(DEV_VISION_MODEL="claude-haiku-5-5"),
+    )
+    monkeypatch.setattr("app.food_analyzer._call_claude_directly", _fake_claude_directly)
+
+    result = asyncio.run(_call_vision_model("https://example.com/x.jpg", "prompt"))
+
+    assert calls["args"] == ("https://example.com/x.jpg", "prompt", "claude-haiku-5-5")
+    assert result == '{"items": []}'
+
+
+def test_call_vision_model_uses_gateway_when_dev_model_unset(monkeypatch):
+    """`DEV_VISION_MODEL`이 비어있으면(기본값) 원래 설계대로 게이트웨이를 쓴다."""
+
+    fake_settings = SimpleNamespace(
+        DEV_VISION_MODEL=None,
+        LLM_VISION_URL="https://mlapi.run/vision-uuid",
+        LLM_TIMEOUT_SEC=5.0,
+        LLM_MAX_RETRIES=0,
+        LLM_API_KEY=SimpleNamespace(get_secret_value=lambda: "secret"),
+    )
+    monkeypatch.setattr("app.food_analyzer.get_settings", lambda: fake_settings)
+
+    async def _fail_if_called(*args, **kwargs):
+        raise AssertionError("게이트웨이 경로인데 Claude 직접 호출이 불렸다")
+
+    monkeypatch.setattr("app.food_analyzer._call_claude_directly", _fail_if_called)
+
+    class _FakeResponse:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> dict:
+            return {"choices": [{"message": {"content": '{"items": []}'}}]}
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_exc_info):
+            return False
+
+        async def post(self, url: str, headers: dict, json: dict) -> _FakeResponse:
+            assert url == "https://mlapi.run/vision-uuid"
+            return _FakeResponse()
+
+    monkeypatch.setattr(
+        "app.food_analyzer.httpx.AsyncClient", lambda timeout=None: _FakeClient()
+    )
+
+    result = asyncio.run(_call_vision_model("https://example.com/x.jpg", "prompt"))
+
+    assert result == '{"items": []}'
 
 
 def test_parse_response_strips_markdown_code_fence():

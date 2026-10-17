@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import anthropic
 import httpx
 from pydantic import BaseModel
 
@@ -40,8 +41,14 @@ async def _call_vision_model(image_url: str, prompt: str) -> str:
     흔한 관례인 OpenAI 호환 chat completions 형식으로 가정하고 짰다 — 요청은
     `{"messages": [...]}`, 응답은 `choices[0].message.content`. 실제 스펙 받으면
     이 함수만 고치면 된다 (호출부 `analyze_food`는 안 바뀜).
+
+    `settings.DEV_VISION_MODEL`이 설정돼 있으면 게이트웨이 대신 Claude API를 직접
+    호출한다 — 스펙 확인 전까지 실제 사진 분석이 되는지 보기 위한 임시 경로다.
     """
     settings = get_settings()
+
+    if settings.DEV_VISION_MODEL is not None:
+        return await _call_claude_directly(image_url, prompt, settings.DEV_VISION_MODEL)
 
     last_error: Exception | None = None
     async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT_SEC) as client:
@@ -71,6 +78,41 @@ async def _call_vision_model(image_url: str, prompt: str) -> str:
 
     assert last_error is not None
     raise last_error
+
+
+async def _call_claude_directly(image_url: str, prompt: str, model: str) -> str:
+    """⚠️ 임시(개발용) — `config.py::Settings.DEV_VISION_MODEL` 참고. 게이트웨이
+    스펙 받으면 이 함수와 호출부 분기를 통째로 지운다."""
+    settings = get_settings()
+    client = anthropic.AsyncAnthropic(
+        api_key=settings.LLM_API_KEY.get_secret_value(),
+        timeout=settings.LLM_TIMEOUT_SEC,
+        max_retries=settings.LLM_MAX_RETRIES,
+    )
+    response = await client.messages.create(
+        model=model,
+        max_tokens=2048,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "url", "url": image_url}},
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
+        output_config={
+            "format": {
+                "type": "json_schema",
+                "schema": _ImageAnalysisResult.model_json_schema(by_alias=True),
+            }
+        },
+    )
+
+    if response.stop_reason == "refusal":
+        return '{"items": []}'
+
+    return next(block.text for block in response.content if block.type == "text")
 
 
 def _build_prompt(meal_type: str) -> str:

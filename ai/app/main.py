@@ -12,9 +12,14 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, status
 
-from app.schemas import AnalyzeMealRequest, AnalyzeMealResponse
+from app.food_analyzer import analyze_food
+from app.schemas import AnalyzeMealRequest, AnalyzeMealResponse, SafetyStatus
 
 app = FastAPI(title="AI Service", version="0.1.0")
+
+# 사람이 읽을 수 있는 라벨일 뿐, 실제 모델 식별자가 아니다 — 실제 모델은
+# LLM_VISION_URL(mlapi.run/<UUID>)이 가리키고, 그 UUID는 비밀로 다룬다(config.py).
+_VISION_MODEL_VERSION = "gemini-flash-gateway"
 
 
 def _not_implemented(feature: str) -> HTTPException:
@@ -31,9 +36,16 @@ def health() -> dict[str, str]:
 
 
 @app.post("/analyze-meal", response_model=AnalyzeMealResponse, tags=["analyze"])
-def analyze_meal(req: AnalyzeMealRequest) -> AnalyzeMealResponse:
-    # TODO: agents/ 의 Food Analyzer 를 붙인다.
-    raise _not_implemented("analyze-meal")
+async def analyze_meal(req: AnalyzeMealRequest) -> AnalyzeMealResponse:
+    items = await analyze_food(req.meal_type.value, req.image_url)
+    return AnalyzeMealResponse(
+        meal_id=req.meal_id,
+        model_version=_VISION_MODEL_VERSION,
+        # 음식 인식만 하고 자유 텍스트 조언을 생성하지 않는 엔드포인트라 늘 SAFE다 —
+        # safety_guard.py(의료 조언 검사)는 자유 텍스트를 만드는 short/long-feedback용이다.
+        safety_status=SafetyStatus.SAFE,
+        items=items,
+    )
 
 
 # TODO: 계약 확정 후 schemas 의 ShortFeedbackRequest / Response 로 바꾼다.
