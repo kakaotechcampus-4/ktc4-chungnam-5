@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
@@ -38,45 +37,6 @@ def _owned_meal(db: Session, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal:
     return meal
 
 
-class _StoredSuggestion(NamedTuple):
-    food_name: str
-    advice: str
-    ref_id: str | None
-
-
-def _coerce(item: object) -> _StoredSuggestion | None:
-    """저장된 제안 한 건을 쓸 수 있는 모양으로 바꾼다. 못 쓰면 `None`.
-
-    **이 값은 신뢰할 수 없는 입력이다.** 컬럼이 JSONB 라 DB 는 아무 JSON 이나 받고,
-    쓰는 쪽은 AI 응답을 담을 워커다. 계약이 바뀌거나 부분 응답이 오면 모양이 어긋난다.
-    검증 없이 `item.get(...)` 을 부르면 문자열 원소 하나에 `AttributeError` 가 나고,
-    **그 끼니 피드백 전체(요약·근거까지)를 못 읽는다.** 한 건이 깨졌다고 나머지를
-    버릴 이유는 없다.
-
-    `or ""` 를 쓰는 건 `{"foodName": null}` 때문이다 — 키가 있으면
-    `get(k, "")` 의 기본값이 안 먹어 `None` 이 그대로 나오고, `food_name: str` 에서
-    터진다.
-
-    문구가 하나라도 비면 버린다. `nutrients` 만 남은 카드는 FE 에 그릴 게 없다.
-    """
-    if not isinstance(item, dict):
-        return None
-
-    food_name = item.get("foodName") or ""
-    advice = item.get("advice") or ""
-    if not isinstance(food_name, str) or not isinstance(advice, str):
-        return None
-    # **하나라도 비면 버린다.** 명세의 카드는 음식 이름과 조언 문구가 짝이라
-    # (`{foodName, nutrients, advice}`), 한쪽이 없으면 FE 가 반쪽 카드를 그린다.
-    if not food_name or not advice:
-        return None
-
-    ref_id = item.get("candidateFoodRefId")
-    # str 이 아닌 건 조회에 넘기지 않는다 — int 는 `varchar = integer` 로 DB 가
-    # 거부하고, list 는 `set()` 에서 unhashable 로 터진다.
-    return _StoredSuggestion(food_name, advice, ref_id if isinstance(ref_id, str) else None)
-
-
 def _build_suggestions(db: Session, stored: object) -> list[FeedbackSuggestion]:
     """저장된 제안에 성분을 채운다.
 
@@ -86,12 +46,9 @@ def _build_suggestions(db: Session, stored: object) -> list[FeedbackSuggestion]:
 
     **참조를 못 찾아도 항목을 버리지 않는다.** `nutrients` 만 비운다 — 제안 문구
     ("두부 반 모를 더해요")는 성분 숫자가 없어도 그대로 쓸모가 있다. 모양이 깨진
-    항목만 `_coerce` 가 걸러낸다.
+    항목만 `crud/feedback.py::parse_suggestion` 이 걸러낸다.
     """
-    if not isinstance(stored, list):
-        return []
-
-    items = [parsed for item in stored if (parsed := _coerce(item)) is not None]
+    items = feedback_crud.parse_suggestions(stored)
     if not items:
         return []
 
@@ -104,12 +61,12 @@ def _build_suggestions(db: Session, stored: object) -> list[FeedbackSuggestion]:
             food_name=item.food_name,
             advice=item.advice,
             nutrients=[
-                SuggestionNutrient(code=code, amount_g=float(amount))
-                for code, amount in (
-                    by_ref[item.ref_id].amounts
+                SuggestionNutrient(code=n.code, amount=float(n.amount), unit=n.unit)
+                for n in (
+                    by_ref[item.ref_id].nutrients
                     if item.ref_id is not None and item.ref_id in by_ref
-                    else {}
-                ).items()
+                    else []
+                )
             ],
         )
         for item in items

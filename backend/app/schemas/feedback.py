@@ -9,7 +9,7 @@ from typing import Final
 
 from pydantic import ConfigDict, Field
 
-from app.models.enums import FeedbackStatus, NutrientCode, SafetyStatus
+from app.models.enums import FeedbackStatus, NutrientCode, NutrientUnit, SafetyStatus
 from app.schemas.base import CamelModel
 
 if TYPE_CHECKING:  # ORM 모델만 피한다 — 열거형은 응답 값이라 런타임에 필요하다.
@@ -20,7 +20,9 @@ class SuggestionNutrient(CamelModel):
     """제안 음식이 채워 주는 성분 한 줄. 명세 `suggestions[].nutrients[]`."""
 
     code: NutrientCode
-    amount_g: float
+    amount: float
+    """100g 당 양. 단위는 `unit` 이다(`crud/feedback.py::_SUGGESTION_NUTRIENTS`)."""
+    unit: NutrientUnit
 
 
 class FeedbackSuggestion(CamelModel):
