@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.crud import chat as chat_crud
 from app.models.chat import ChatConversation
-from app.models.enums import MedicationStage
+from app.models.enums import ChatMessageRole, ChatMessageStatus, MedicationStage
 from app.models.medication import MedicationSnapshot
 from app.models.user import User
 from app.services import chat as chat_service
@@ -94,3 +94,45 @@ def test_lock_user_does_not_block_fk_child_writes(
 def test_lock_user_reports_missing_row(sessions: sessionmaker[Session]):
     with sessions() as session:
         assert chat_crud.lock_user(session, uuid.uuid4()) is False
+
+
+def test_concurrent_sends_to_same_conversation_second_is_rejected(
+    sessions: sessionmaker[Session], committed_user: uuid.UUID
+):
+    """더블탭 — 대화 잠금이 없으면 둘 다 "GENERATING 없음" 을 보고 답변 자리표시를 둘 만든다."""
+    with sessions() as setup:
+        conversation_id = chat_service.start_conversation(
+            setup, user_id=committed_user, meal_id=None
+        ).conversation_id
+
+    holder = sessions()
+    try:
+        assert chat_crud.lock_open_conversation(
+            holder, user_id=committed_user, conversation_id=conversation_id
+        ) is not None
+
+        def second_tap():
+            with sessions() as other:
+                return chat_service.send_message(
+                    other, user_id=committed_user, conversation_id=conversation_id, text="둘째"
+                )
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(second_tap)
+            with pytest.raises(TimeoutError):
+                future.result(timeout=1)
+
+            chat_crud.add_message(
+                holder,
+                conversation_id=conversation_id,
+                role=ChatMessageRole.ASSISTANT,
+                status=ChatMessageStatus.GENERATING,
+                text=None,
+                safety_status=None,
+            )
+            holder.commit()
+
+            with pytest.raises(chat_service.ReplyInProgressError):
+                future.result(timeout=10)
+    finally:
+        holder.close()
