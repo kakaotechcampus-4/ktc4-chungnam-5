@@ -170,7 +170,17 @@ def lock_open_conversation(
 def find_generating_reply(
     db: Session, conversation_id: uuid.UUID
 ) -> tuple[ChatMessage, bool] | None:
-    """대화에서 아직 생성 중인 답변과 그 만료 여부. 없으면 None."""
+    """대화에서 아직 생성 중인 답변과 그 만료 여부. 없으면 None. 찾은 답변은 **잠근다.**
+
+    잠그지 않으면 A-2 의 만료 처리(`send_message` 가 FAILED 로 UPDATE)가 그 사이 워커가 커밋한
+    READY 를 덮어쓴다 — 읽은 GENERATING 은 낡은 값이다. 잠그면 워커의 커밋을 기다렸다가
+    Postgres 가 `status = GENERATING` 을 다시 평가해, 방금 READY 가 된 답은 빠지고(None)
+    새 메시지가 정상으로 붙는다.
+
+    **교착하지 않는다.** A-2 는 대화 잠금(`lock_open_conversation`) → 메시지 잠금 순이고, 워커는
+    메시지 잠금(`lock_message_for_worker`)만 잡는다. 순서가 뒤집히는 쪽이 없다.
+    `FOR NO KEY UPDATE` 라 카드 INSERT 의 FK 검사(KEY SHARE)와도 충돌하지 않는다.
+    """
     row = db.execute(
         select(ChatMessage, _stale())
         .where(
@@ -180,6 +190,8 @@ def find_generating_reply(
         )
         .order_by(ChatMessage.created_at.desc())
         .limit(1)
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
     ).first()
     return None if row is None else (row[0], bool(row[1]))
 

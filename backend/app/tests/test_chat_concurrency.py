@@ -10,12 +10,12 @@ from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.crud import chat as chat_crud
-from app.models.chat import ChatConversation
-from app.models.enums import ChatMessageRole, ChatMessageStatus, MedicationStage
+from app.models.chat import ChatConversation, ChatMessage
+from app.models.enums import ChatMessageRole, ChatMessageStatus, MedicationStage, SafetyStatus
 from app.models.medication import MedicationSnapshot
 from app.models.user import User
 from app.services import chat as chat_service
@@ -136,3 +136,58 @@ def test_concurrent_sends_to_same_conversation_second_is_rejected(
                 future.result(timeout=10)
     finally:
         holder.close()
+
+
+def test_expiry_path_does_not_overwrite_reply_the_worker_just_made_ready(
+    sessions: sessionmaker[Session], committed_user: uuid.UUID
+):
+    """A-2 가 만료된 GENERATING 을 FAILED 로 닫으려는 순간 워커가 READY 를 커밋하는 경쟁.
+
+    `find_generating_reply` 가 잠그지 않으면 A-2 는 낡은 GENERATING 을 보고 UPDATE 해
+    워커가 막 쓴 READY 를 FAILED 로 덮는다. 잠그면 워커의 커밋을 기다렸다가 WHERE 를
+    다시 평가해 그 답이 빠지고, 새 메시지는 정상으로 붙는다."""
+    with sessions() as setup:
+        conversation_id = chat_service.start_conversation(
+            setup, user_id=committed_user, meal_id=None
+        ).conversation_id
+        reply_id = chat_service.send_message(
+            setup, user_id=committed_user, conversation_id=conversation_id, text="첫 질문"
+        ).assistant_message_id
+        setup.execute(
+            update(ChatMessage)
+            .where(ChatMessage.id == reply_id)
+            .values(
+                created_at=func.clock_timestamp()
+                - func.make_interval(0, 0, 0, 0, 0, 0, chat_crud.CHAT_REPLY_STALE_SEC + 1)
+            )
+        )
+        setup.commit()
+
+    holder = sessions()  # 워커 역할 — 답변을 잠근다
+    try:
+        message = chat_crud.lock_message_for_worker(holder, reply_id)
+        assert message is not None
+
+        def resend():
+            with sessions() as other:
+                return chat_service.send_message(
+                    other, user_id=committed_user, conversation_id=conversation_id, text="둘째"
+                )
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(resend)
+            with pytest.raises(TimeoutError):
+                future.result(timeout=1)
+
+            chat_crud.finish_message(
+                holder, message, status=ChatMessageStatus.READY, text="늦었지만 답", safety_status=SafetyStatus.SAFE
+            )
+            holder.commit()
+
+            future.result(timeout=10)  # 예외 없이 접수된다
+    finally:
+        holder.close()
+
+    with sessions() as check:
+        reply = check.get(ChatMessage, reply_id)
+        assert (reply.status, reply.text) == (ChatMessageStatus.READY, "늦었지만 답")
