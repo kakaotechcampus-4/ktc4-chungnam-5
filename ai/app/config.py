@@ -33,13 +33,6 @@ class Settings(BaseSettings):
     LLM_MAX_RETRIES: int = 1
     """재시도는 비용 × 지연의 곱셈이라 기본값을 낮게 둔다."""
 
-    DEV_VISION_MODEL: str | None = None
-    """⚠️ 임시(개발용). mlapi.run 게이트웨이 요청/응답 스펙을 아직 못 받아서, 이 값이
-    설정되면 게이트웨이 대신 Claude API를 직접 호출해 실제 사진 분석을 확인한다
-    (여러 모델을 바꿔가며 테스트할 수 있게 이름을 뺐다. 예: `claude-haiku-5-5`).
-    게이트웨이 스펙 받으면 이 필드와 관련 분기를 통째로 지운다 — `LLM_VISION_URL`
-    구조(팀 공유 계약)는 그대로 둔다."""
-
     @field_validator("LLM_VISION_URL", "LLM_REASONING_URL")
     @classmethod
     def _gateway_host_only(cls, value: str) -> str:

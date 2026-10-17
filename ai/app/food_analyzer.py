@@ -13,7 +13,8 @@
 
 from __future__ import annotations
 
-import anthropic
+import base64
+
 import httpx
 from pydantic import BaseModel
 
@@ -37,34 +38,40 @@ async def analyze_food(meal_type: str, image_url: str) -> list[RecognizedItem]:
 async def _call_vision_model(image_url: str, prompt: str) -> str:
     """`LLM_VISION_URL`(mlapi.run 게이트웨이, Gemini Flash)을 호출해 JSON 문자열을 받는다.
 
-    ⚠️ 가정(미확정): 게이트웨이의 실제 요청/응답 스펙 문서를 아직 못 받아서, 가장
-    흔한 관례인 OpenAI 호환 chat completions 형식으로 가정하고 짰다 — 요청은
-    `{"messages": [...]}`, 응답은 `choices[0].message.content`. 실제 스펙 받으면
-    이 함수만 고치면 된다 (호출부 `analyze_food`는 안 바뀜).
-
-    `settings.DEV_VISION_MODEL`이 설정돼 있으면 게이트웨이 대신 Claude API를 직접
-    호출한다 — 스펙 확인 전까지 실제 사진 분석이 되는지 보기 위한 임시 경로다.
+    실제 호출로 확인된 스펙(2026-10-17):
+    - 엔드포인트는 `LLM_VISION_URL` 바로 뒤에 `/v1/chat/completions`를 붙여야 한다 —
+      URL 자체에 바로 POST하면 404 `model_not_found`.
+    - 이미지는 외부 URL 참조(`image_url.url`에 presigned URL)는 안 받는다 —
+      500 `UnicodeDecodeError`로 터진다. base64 data URI로 직접 인코딩해서 보내야 한다.
+      `image_url`은 presigned URL이라 AI가 별도 권한 없이 일반 HTTPS GET으로 받을 수
+      있다(S3 API를 쓰는 게 아니라서 README 규칙과 안 어긋난다).
+    - 응답은 OpenAI 호환 형식 — `choices[0].message.content`.
     """
     settings = get_settings()
+    endpoint = f"{settings.LLM_VISION_URL}/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {settings.LLM_API_KEY.get_secret_value()}"}
 
-    if settings.DEV_VISION_MODEL is not None:
-        return await _call_claude_directly(image_url, prompt, settings.DEV_VISION_MODEL)
-
-    last_error: Exception | None = None
     async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT_SEC) as client:
+        image_response = await client.get(image_url)
+        image_response.raise_for_status()
+        media_type = image_response.headers.get("content-type", "image/jpeg").split(";")[0]
+        data_uri = (
+            f"data:{media_type};base64,"
+            f"{base64.b64encode(image_response.content).decode('ascii')}"
+        )
+
+        last_error: Exception | None = None
         for attempt in range(settings.LLM_MAX_RETRIES + 1):
             try:
                 response = await client.post(
-                    settings.LLM_VISION_URL,
-                    headers={
-                        "Authorization": f"Bearer {settings.LLM_API_KEY.get_secret_value()}"
-                    },
+                    endpoint,
+                    headers=headers,
                     json={
                         "messages": [
                             {
                                 "role": "user",
                                 "content": [
-                                    {"type": "image_url", "image_url": {"url": image_url}},
+                                    {"type": "image_url", "image_url": {"url": data_uri}},
                                     {"type": "text", "text": prompt},
                                 ],
                             }
@@ -78,41 +85,6 @@ async def _call_vision_model(image_url: str, prompt: str) -> str:
 
     assert last_error is not None
     raise last_error
-
-
-async def _call_claude_directly(image_url: str, prompt: str, model: str) -> str:
-    """⚠️ 임시(개발용) — `config.py::Settings.DEV_VISION_MODEL` 참고. 게이트웨이
-    스펙 받으면 이 함수와 호출부 분기를 통째로 지운다."""
-    settings = get_settings()
-    client = anthropic.AsyncAnthropic(
-        api_key=settings.LLM_API_KEY.get_secret_value(),
-        timeout=settings.LLM_TIMEOUT_SEC,
-        max_retries=settings.LLM_MAX_RETRIES,
-    )
-    response = await client.messages.create(
-        model=model,
-        max_tokens=2048,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "url", "url": image_url}},
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
-        output_config={
-            "format": {
-                "type": "json_schema",
-                "schema": _ImageAnalysisResult.model_json_schema(by_alias=True),
-            }
-        },
-    )
-
-    if response.stop_reason == "refusal":
-        return '{"items": []}'
-
-    return next(block.text for block in response.content if block.type == "text")
 
 
 def _build_prompt(meal_type: str) -> str:

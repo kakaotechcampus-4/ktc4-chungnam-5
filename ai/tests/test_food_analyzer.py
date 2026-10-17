@@ -61,32 +61,12 @@ def test_parse_response_rejects_malformed_json():
         _parse_response("not json")
 
 
-def test_call_vision_model_uses_dev_claude_when_set(monkeypatch):
-    """`DEV_VISION_MODEL`이 설정되면 게이트웨이 대신 Claude 직접 호출로 가야 한다
-    (게이트웨이 스펙 확정 전까지의 임시 경로)."""
-    calls = {}
-
-    async def _fake_claude_directly(image_url: str, prompt: str, model: str) -> str:
-        calls["args"] = (image_url, prompt, model)
-        return '{"items": []}'
-
-    monkeypatch.setattr(
-        "app.food_analyzer.get_settings",
-        lambda: SimpleNamespace(DEV_VISION_MODEL="claude-haiku-5-5"),
-    )
-    monkeypatch.setattr("app.food_analyzer._call_claude_directly", _fake_claude_directly)
-
-    result = asyncio.run(_call_vision_model("https://example.com/x.jpg", "prompt"))
-
-    assert calls["args"] == ("https://example.com/x.jpg", "prompt", "claude-haiku-5-5")
-    assert result == '{"items": []}'
-
-
-def test_call_vision_model_uses_gateway_when_dev_model_unset(monkeypatch):
-    """`DEV_VISION_MODEL`이 비어있으면(기본값) 원래 설계대로 게이트웨이를 쓴다."""
+def test_call_vision_model_downloads_image_and_posts_to_gateway(monkeypatch):
+    """실제 호출로 확인된 스펙(2026-10-17): `LLM_VISION_URL`을 httpx.get으로 먼저
+    받아 base64 data URI로 바꾼 뒤 `<LLM_VISION_URL>/v1/chat/completions`로 POST해야
+    한다 — 외부 URL을 그대로 넘기면 게이트웨이가 500으로 거부한다."""
 
     fake_settings = SimpleNamespace(
-        DEV_VISION_MODEL=None,
         LLM_VISION_URL="https://mlapi.run/vision-uuid",
         LLM_TIMEOUT_SEC=5.0,
         LLM_MAX_RETRIES=0,
@@ -94,12 +74,14 @@ def test_call_vision_model_uses_gateway_when_dev_model_unset(monkeypatch):
     )
     monkeypatch.setattr("app.food_analyzer.get_settings", lambda: fake_settings)
 
-    async def _fail_if_called(*args, **kwargs):
-        raise AssertionError("게이트웨이 경로인데 Claude 직접 호출이 불렸다")
+    class _FakeImageResponse:
+        content = b"fake-image-bytes"
+        headers = {"content-type": "image/jpeg"}
 
-    monkeypatch.setattr("app.food_analyzer._call_claude_directly", _fail_if_called)
+        def raise_for_status(self) -> None:
+            pass
 
-    class _FakeResponse:
+    class _FakeChatResponse:
         def raise_for_status(self) -> None:
             pass
 
@@ -113,9 +95,15 @@ def test_call_vision_model_uses_gateway_when_dev_model_unset(monkeypatch):
         async def __aexit__(self, *_exc_info):
             return False
 
-        async def post(self, url: str, headers: dict, json: dict) -> _FakeResponse:
-            assert url == "https://mlapi.run/vision-uuid"
-            return _FakeResponse()
+        async def get(self, url: str) -> _FakeImageResponse:
+            assert url == "https://example.com/x.jpg"
+            return _FakeImageResponse()
+
+        async def post(self, url: str, headers: dict, json: dict) -> _FakeChatResponse:
+            assert url == "https://mlapi.run/vision-uuid/v1/chat/completions"
+            image_block = json["messages"][0]["content"][0]
+            assert image_block["image_url"]["url"].startswith("data:image/jpeg;base64,")
+            return _FakeChatResponse()
 
     monkeypatch.setattr(
         "app.food_analyzer.httpx.AsyncClient", lambda timeout=None: _FakeClient()

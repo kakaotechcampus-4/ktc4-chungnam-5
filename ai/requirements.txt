@@ -4,8 +4,6 @@ uvicorn[standard]==0.52.4
 pydantic-settings==2.15.0
 # LLM 게이트웨이 호출, BE /internal/v1 tool 호출 — SDK 없이 직접 POST (README)
 httpx==0.28.1
-# ⚠️ 임시(개발용) — config.py::DEV_VISION_MODEL 경로용. 게이트웨이 스펙 확정되면 제거
-anthropic==1.13.0
 
 # 테스트
 pytest==9.1.1
