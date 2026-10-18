@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
@@ -121,3 +122,30 @@ def add_food_card(
     db.add(card)
     db.flush()
     return card
+
+
+def get_card_for_meal(
+    db: Session, *, card_id: uuid.UUID, user_id: uuid.UUID, meal_id: uuid.UUID
+) -> tuple[ChatFoodCard, datetime] | None:
+    """A-5 "이걸로 바꾸기" 가 쓸 카드와, 그 카드가 만들어진 시각(메시지 `created_at`).
+
+    카드 → 메시지 → 대화를 한 번에 JOIN 해 **대화의 주인과 기준 끼니가 둘 다 맞을 때만**
+    돌려준다. 없는 카드 · 남의 카드 · 다른 끼니 대화의 카드를 구분하지 않고 모두 `None` 이다
+    — `crud/meal.py::get_owned_meal` 처럼 "남의 카드 id 는 존재한다" 는 정보를 흘리지 않는다.
+
+    닫힌 대화(`closed_at`)의 카드도 돌려준다. 열린 대화도 사용자가 닫기 전까지 계속 열려
+    있어 "닫힘" 은 카드가 낡았는지를 말해 주지 않는다 — 낡음은 호출부가 메시지 시각과
+    끼니의 마지막 확정 시각으로 판정한다.
+    """
+    stmt = (
+        select(ChatFoodCard, ChatMessage.created_at)
+        .join(ChatMessage, ChatMessage.id == ChatFoodCard.message_id)
+        .join(ChatConversation, ChatConversation.id == ChatMessage.conversation_id)
+        .where(
+            ChatFoodCard.id == card_id,
+            ChatConversation.user_id == user_id,
+            ChatConversation.meal_id == meal_id,
+        )
+    )
+    row = db.execute(stmt).one_or_none()
+    return None if row is None else (row[0], row[1])
