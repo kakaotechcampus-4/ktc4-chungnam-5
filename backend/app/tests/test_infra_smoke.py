@@ -4,14 +4,14 @@ from sqlalchemy import inspect, text
 
 
 def test_migrations_created_all_tables(db):
-    """alembic upgrade head 가 돌았으면 도메인 테이블 19개 + alembic_version = 20."""
+    """alembic upgrade head 가 돌았으면 도메인 테이블 22개 + alembic_version = 23."""
     table_count = db.execute(
         text(
             "SELECT count(*) FROM information_schema.tables "
             "WHERE table_schema = 'public'"
         )
     ).scalar_one()
-    assert table_count == 20
+    assert table_count == 23
 
 
 def test_users_table_exists(db):

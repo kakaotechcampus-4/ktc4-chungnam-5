@@ -154,7 +154,7 @@ def _stored_suggestions(db: Session, raw: object) -> list[dict[str, Any]] | None
     제안 자체는 버리지 않는다 — "두부 반 모" 는 성분 숫자 없이도 쓸모가 있다.
 
     모양이 깨진 원소(dict 가 아닌 것)는 버린다. 문구가 빈 원소는 읽는 쪽
-    (`services/feedback.py::_coerce`)이 거르므로 여기서 또 판단하지 않는다.
+    (`crud/feedback.py::parse_suggestion`)이 거르므로 여기서 또 판단하지 않는다.
     """
     if not isinstance(raw, list):
         return None

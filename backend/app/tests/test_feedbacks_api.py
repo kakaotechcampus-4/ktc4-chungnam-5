@@ -30,6 +30,14 @@ _SPEC_FIELDS = {
 }
 
 
+_ONLY_PROTEIN_FIBER = {
+    "calories": None, "fat_g": None, "carbohydrate_g": None, "sodium_mg": None,
+}
+"""`make_food_ref` 기본값은 6개 성분이 다 차 있다. 성분 하나의 규칙(환산 · NaN 등)만 보는
+테스트는 나머지를 비워 단언을 그 성분에 묶는다 — 전 성분 노출은
+`test_suggestion_nutrients_cover_every_code_in_column_units` 가 본다."""
+
+
 def _h(user_id: uuid.UUID) -> dict[str, str]:
     return {"X-User-Id": str(user_id)}
 
@@ -532,7 +540,7 @@ def test_suggestion_nutrients_come_from_food_refs(client: TestClient, db: Sessio
     user, meal = _meal(db)
     make_food_ref(
         db, food_ref_id="KFD_TOFU", name="두부",
-        protein_g=Decimal("10"), fiber_g=Decimal("2"),
+        protein_g=Decimal("10"), fiber_g=Decimal("2"), **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db, meal,
@@ -548,9 +556,41 @@ def test_suggestion_nutrients_come_from_food_refs(client: TestClient, db: Sessio
 
     assert set(suggestion) == {"foodName", "nutrients", "advice"}
     assert suggestion["foodName"] == "두부 반 모"
-    assert {n["code"]: n["amountG"] for n in suggestion["nutrients"]} == {
-        "PROTEIN": 10.0, "FIBER": 2.0,
-    }
+    assert suggestion["nutrients"] == [
+        {"code": "PROTEIN", "amount": 10.0, "unit": "g"},
+        {"code": "FIBER", "amount": 2.0, "unit": "g"},
+    ]
+
+
+def test_suggestion_nutrients_cover_every_code_in_column_units(
+    client: TestClient, db: Session
+) -> None:
+    """6개 성분을 모두 싣고, 값은 **컬럼 단위 그대로**다 — CALORIE 는 kcal, SODIUM 은
+    mg 숫자이고 `unit` 이 그 단위를 말한다. g 으로 바꾸지 않는다."""
+    user, meal = _meal(db)
+    make_food_ref(
+        db, food_ref_id="KFD_ALL", name="현미밥",
+        calories=Decimal("100"), protein_g=Decimal("10"), fat_g=Decimal("3"),
+        carbohydrate_g=Decimal("20"), fiber_g=Decimal("2"), sodium_mg=Decimal("100"),
+    )
+    _add_feedback(
+        db, meal,
+        suggestions=[{"foodName": "현미밥 반 공기", "advice": "식이섬유를 채워요",
+                      "candidateFoodRefId": "KFD_ALL"}],
+    )
+
+    (suggestion,) = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]["suggestions"]
+
+    assert suggestion["nutrients"] == [
+        {"code": "CALORIE", "amount": 100.0, "unit": "kcal"},
+        {"code": "PROTEIN", "amount": 10.0, "unit": "g"},
+        {"code": "FAT", "amount": 3.0, "unit": "g"},
+        {"code": "CARB", "amount": 20.0, "unit": "g"},
+        {"code": "FIBER", "amount": 2.0, "unit": "g"},
+        {"code": "SODIUM", "amount": 100.0, "unit": "mg"},
+    ]
 
 
 def test_dead_food_ref_keeps_the_advice(client: TestClient, db: Session) -> None:
@@ -589,6 +629,7 @@ def test_nutrients_are_scaled_to_100g(client: TestClient, db: Session) -> None:
         serving_size=Decimal("200.000"),
         protein_g=Decimal("3.000"),
         fiber_g=None,
+        **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db,
@@ -603,20 +644,22 @@ def test_nutrients_are_scaled_to_100g(client: TestClient, db: Session) -> None:
         f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
     ).json()["data"]
 
-    assert data["suggestions"][0]["nutrients"] == [{"code": "PROTEIN", "amountG": 1.5}]
+    assert data["suggestions"][0]["nutrients"] == [
+        {"code": "PROTEIN", "amount": 1.5, "unit": "g"}
+    ]
 
 
 def test_nan_nutrient_is_omitted_not_null(client: TestClient, db: Session) -> None:
     """NaN 성분은 키째 뺀다 — NULL 과 같은 "모른다" 다.
 
     `'NaN'::numeric` 은 성분 컬럼에 그냥 저장되고 `is not None` 을 통과한다. 그대로
-    두면 `amountG: null` 이 나가는데, 스키마상 **required non-nullable** 이라 응답이
+    두면 `amount: null` 이 나가는데, 스키마상 **required non-nullable** 이라 응답이
     자기 OpenAPI 계약을 어긴다.
     """
     user, meal = _meal(db)
     make_food_ref(
         db, food_ref_id="KFD_NAN", name="정체불명",
-        protein_g=Decimal("NaN"), fiber_g=Decimal("2.000"),
+        protein_g=Decimal("NaN"), fiber_g=Decimal("2.000"), **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db,
@@ -632,7 +675,9 @@ def test_nan_nutrient_is_omitted_not_null(client: TestClient, db: Session) -> No
     ).json()["data"]
 
     # 멀쩡한 FIBER 만 남는다. PROTEIN 은 null 로도 0 으로도 나가지 않는다.
-    assert data["suggestions"][0]["nutrients"] == [{"code": "FIBER", "amountG": 2.0}]
+    assert data["suggestions"][0]["nutrients"] == [
+        {"code": "FIBER", "amount": 2.0, "unit": "g"}
+    ]
 
 
 def test_tiny_serving_size_does_not_overflow(client: TestClient, db: Session) -> None:
@@ -646,6 +691,7 @@ def test_tiny_serving_size_does_not_overflow(client: TestClient, db: Session) ->
     make_food_ref(
         db, food_ref_id="KFD_TINY", name="농축액",
         serving_size=Decimal("0.001"), protein_g=Decimal("9999999.999"), fiber_g=None,
+        **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db, meal,

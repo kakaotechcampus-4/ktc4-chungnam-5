@@ -16,6 +16,7 @@ from app.db.session import get_db
 from app.models.enums import SafetyStatus
 from app.schemas.feedback import (
     MealFeedbackResponse,
+    ReplaceSuggestionRequest,
     SatietyCheckinRequest,
     SatietyCheckinResponse,
 )
@@ -66,6 +67,44 @@ def get_meal_feedback(
             ErrorCode.MEDICAL_QUESTION_DETECTED,
             "의료 판단이 필요한 내용이라 피드백 대신 상담을 안내해요.",
         )
+    return ok(view)
+
+
+@router.put(
+    "/meals/{meal_id}/feedback/suggestions",
+    response_model=ApiResponse[MealFeedbackResponse],
+    summary="다음 끼니 추천 교체",
+    responses=error_responses(401, 404, 409, 422),
+)
+def replace_meal_suggestion(
+    meal_id: uuid.UUID,
+    request: ReplaceSuggestionRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[MealFeedbackResponse]:
+    """챗봇 카드의 "이걸로 바꾸기" — 그 카드 한 장으로 이 끼니의 다음 끼니 추천을 바꾼다.
+
+    `suggestions` 를 카드 1장으로 **전체 교체**하고, 본문 · 판정 · 점수는 그대로 둔다.
+    응답은 `GET /meals/{mealId}/feedback` 과 같은 모양이다.
+
+    - 404 `NOT_FOUND`: 끼니가 없음 · 남의 것 · 삭제됨, 또는 카드가 없음 · 남의 것 ·
+      다른 끼니 대화의 카드. 소유권 누출을 막으려고 구분하지 않는다.
+    - 409 `NOT_CONFIRMED`: 끼니가 확정 상태가 아니다.
+    - 409 `CONFLICT`: 카드가 끼니를 고쳐 재확정하기 전에 만들어졌거나, 끼니 피드백이 아직
+      보여 줄 수 있는 상태가 아니다. 새 대화를 열면 지금 끼니 기준의 카드를 받는다.
+
+    교체는 피드백이 `SAFE` 일 때만 일어나므로 `MEDICAL_QUESTION_DETECTED` 분기가 없다.
+    """
+    try:
+        view = feedback_service.replace_suggestion(
+            db, user_id=user_id, meal_id=meal_id, food_card_id=request.food_card_id
+        )
+    except (feedback_service.MealNotFoundError, feedback_service.FoodCardNotFoundError) as exc:
+        raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None
+    except feedback_service.MealNotConfirmedError as exc:
+        raise ApiError(ErrorCode.NOT_CONFIRMED, str(exc), 409) from None
+    except feedback_service.SuggestionConflictError as exc:
+        raise ApiError(ErrorCode.CONFLICT, str(exc), 409) from None
     return ok(view)
 
 

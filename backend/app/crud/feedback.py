@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Final, NamedTuple
 
@@ -14,7 +15,7 @@ from sqlalchemy import Numeric, and_, cast, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models.enums import NutrientCode, SafetyStatus, TaskStatus
+from app.models.enums import NutrientCode, NutrientUnit, SafetyStatus, TaskStatus
 from app.models.feedback import MealFeedback
 from app.models.food import FoodRef
 from app.models.task import Task
@@ -45,6 +46,25 @@ def latest_task_status(db: Session, meal_id: uuid.UUID) -> TaskStatus | None:
     """
     stmt = (
         select(Task.status)
+        .where(
+            Task.type == FEEDBACK_TASK_TYPE,
+            Task.payload["mealId"].astext == str(meal_id),
+        )
+        .order_by(Task.created_at.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def latest_task_created_at(db: Session, meal_id: uuid.UUID) -> datetime | None:
+    """이 끼니의 가장 최근 `feedback.meal` 작업이 들어간 시각. 작업이 없으면 None.
+
+    `confirm` 은 추천을 새로 만들어야 할 때(처음 확정 · 음식 수정 · 점수 변화 · 문장 없음)
+    채점과 같은 트랜잭션에서 이 작업을 넣는다. 그래서 이 시각이 곧 "추천을 마지막으로 다시
+    만들기 시작한 시각" 이다 — A-5 가 그보다 앞서 만든 챗봇 카드를 낡은 것으로 본다.
+    """
+    stmt = (
+        select(Task.created_at)
         .where(
             Task.type == FEEDBACK_TASK_TYPE,
             Task.payload["mealId"].astext == str(meal_id),
@@ -95,27 +115,36 @@ def upsert(
     return meal_feedback_id
 
 
+class SuggestedNutrient(NamedTuple):
+    """제안 음식이 채워 주는 성분 한 줄. 응답 `{ code, amount, unit }` 그대로다."""
+
+    code: NutrientCode
+    amount: Decimal
+    unit: NutrientUnit
+
+
 class SuggestedNutrients(NamedTuple):
-    """제안 음식 하나가 채워 주는 성분. 키는 명세 `NutrientCode`."""
+    """제안 음식 하나가 채워 주는 성분들. `_SUGGESTION_NUTRIENTS` 순서다."""
 
-    amounts: dict[NutrientCode, Decimal]
+    nutrients: list[SuggestedNutrient]
 
 
-_SUGGESTION_NUTRIENTS: Final[tuple[tuple[NutrientCode, str], ...]] = (
-    (NutrientCode.PROTEIN, "protein_g"),
-    (NutrientCode.FIBER, "fiber_g"),
+_SUGGESTION_NUTRIENTS: Final[tuple[tuple[NutrientCode, str, NutrientUnit], ...]] = (
+    (NutrientCode.CALORIE, "calories", NutrientUnit.KCAL),
+    (NutrientCode.PROTEIN, "protein_g", NutrientUnit.G),
+    (NutrientCode.FAT, "fat_g", NutrientUnit.G),
+    (NutrientCode.CARB, "carbohydrate_g", NutrientUnit.G),
+    (NutrientCode.FIBER, "fiber_g", NutrientUnit.G),
+    (NutrientCode.SODIUM, "sodium_mg", NutrientUnit.MG),
 )
-"""제안에 실을 성분.
+"""제안에 실을 성분 — `NutrientCode` 전부다. 이 음식이 채워 주는 성분을 빠짐없이 보여 준다.
 
-명세 예시는 제안마다 한 줄씩만 보여 준다(두부→PROTEIN, 나물→FIBER) — **어느 성분을
-고르는지는 적혀 있지 않고** AI 도 알려 주지 않는다(`ai-stub/schemas.py::Suggestion`
-에는 `foodName` · `advice` · `candidateFoodRefId` 뿐이다).
+AI 는 성분을 알려 주지 않으므로(`ai-stub/schemas.py::Suggestion` 에는 `foodName` ·
+`advice` · `candidateFoodRefId` 뿐이다) `food_refs` 에서 값이 있는 것을 싣는다.
 
-그래서 "값이 있는 것을 싣는다" 로 했고, 대상은 **채우라고 권할 수 있는 성분 둘**이다.
-나트륨은 제안의 근거가 되지 않는다 — "나트륨을 더 채워요" 는 이 앱이 할 말이 아니다
-(절대 규칙 1, 의료 판단 금지에 닿는다).
-
-⚠️ 명세 확인 필요: 성분 선택 규칙이 없다. 팀 안건으로 올릴 것.
+**값은 컬럼 단위 그대로다 — 단위 변환을 하지 않는다**(100g 환산만 한다). 세 번째 칸이
+그 컬럼의 단위이고 응답 `unit` 으로 그대로 나간다. 끼니 피드백(`suggestions[].nutrients[]`)과
+챗봇 카드(`effects[]`)가 이 표 하나를 쓴다 — 단위를 따로 적으면 한쪽만 틀린다.
 """
 
 
@@ -198,7 +227,7 @@ def nutrients_by_food_ref(
     # 못 읽게 된다 — NaN · 0 기준량을 거른 것과 같은 이유다.
     columns = [
         cast(getattr(FoodRef, field) * 100 / FoodRef.serving_size, Numeric(18, 3))
-        for _, field in _SUGGESTION_NUTRIENTS
+        for _, field, _ in _SUGGESTION_NUTRIENTS
     ]
     stmt = select(FoodRef.id, *columns).where(
         and_(
@@ -212,17 +241,98 @@ def nutrients_by_food_ref(
 
     resolved: dict[str, SuggestedNutrients] = {}
     for row in db.execute(stmt):
-        amounts = {
-            code: value
-            for (code, _), value in zip(_SUGGESTION_NUTRIENTS, row[1:], strict=True)
+        nutrients = [
+            SuggestedNutrient(code=code, amount=value, unit=unit)
+            for (code, _, unit), value in zip(_SUGGESTION_NUTRIENTS, row[1:], strict=True)
             # NULL 은 "모른다" 다. 0 으로 채우면 "이 음식에는 단백질이 없다" 가 된다.
             #
             # NaN 도 같이 거른다 — `'NaN'::numeric` 은 성분 컬럼에 그냥 저장되고
             # `is not None` 을 통과한다. 그대로 두면 `float('nan')` 이 되어 JSON 에
-            # `null` 로 직렬화되는데, `amount_g: float` 는 **required non-nullable**
+            # `null` 로 직렬화되는데, `amount: float` 는 **required non-nullable**
             # 이라 응답이 자기 OpenAPI 계약을 어긴다. 생성 클라이언트가
-            # `amountG: number` 로 받아 그대로 계산하면 FE 가 터진다.
+            # `amount: number` 로 받아 그대로 계산하면 FE 가 터진다.
             if value is not None and value.is_finite()
-        }
-        resolved[row.id] = SuggestedNutrients(amounts=amounts)
+        ]
+        resolved[row.id] = SuggestedNutrients(nutrients=nutrients)
     return resolved
+
+
+class StoredSuggestion(NamedTuple):
+    """`meal_feedbacks.suggestions` 원소 하나를 쓸 수 있는 모양으로 바꾼 것."""
+
+    food_name: str
+    advice: str
+    ref_id: str | None
+
+
+def parse_suggestion(item: object) -> StoredSuggestion | None:
+    """저장된 제안 한 건을 쓸 수 있는 모양으로 바꾼다. 못 쓰면 `None`.
+
+    **이 값은 신뢰할 수 없는 입력이다.** 컬럼이 JSONB 라 DB 는 아무 JSON 이나 받고,
+    쓰는 쪽은 AI 응답을 담을 워커다. 계약이 바뀌거나 부분 응답이 오면 모양이 어긋난다.
+    검증 없이 `item.get(...)` 을 부르면 문자열 원소 하나에 `AttributeError` 가 나고,
+    **그 끼니 피드백 전체(요약·근거까지)를 못 읽는다.** 한 건이 깨졌다고 나머지를
+    버릴 이유는 없다.
+
+    `or ""` 를 쓰는 건 `{"foodName": null}` 때문이다 — 키가 있으면
+    `get(k, "")` 의 기본값이 안 먹어 `None` 이 그대로 나오고, `food_name: str` 에서
+    터진다.
+
+    **crud 에 두는 이유:** 끼니 피드백 화면(`services/feedback.py`)과 챗봇 첫 메시지
+    (`services/chat.py`)가 같은 규칙으로 걸러야 한다. services 끼리는 서로 부르지
+    않으므로(절대 규칙 5) 둘 다 내려다보는 이 컬럼의 파일에 둔다.
+    """
+    if not isinstance(item, dict):
+        return None
+
+    food_name = item.get("foodName") or ""
+    advice = item.get("advice") or ""
+    if not isinstance(food_name, str) or not isinstance(advice, str):
+        return None
+    # **하나라도 비면 버린다.** 명세의 카드는 음식 이름과 조언 문구가 짝이라
+    # (`{foodName, nutrients, advice}`), 한쪽이 없으면 FE 가 반쪽 카드를 그린다.
+    if not food_name or not advice:
+        return None
+
+    ref_id = item.get("candidateFoodRefId")
+    # str 이 아닌 건 조회에 넘기지 않는다 — int 는 `varchar = integer` 로 DB 가
+    # 거부하고, list 는 `set()` 에서 unhashable 로 터진다.
+    return StoredSuggestion(food_name, advice, ref_id if isinstance(ref_id, str) else None)
+
+
+def parse_suggestions(stored: object) -> list[StoredSuggestion]:
+    """저장된 제안 배열 전체. 배열이 아니면 `[]`, 깨진 원소만 빠진다."""
+    if not isinstance(stored, list):
+        return []
+    return [parsed for item in stored if (parsed := parse_suggestion(item)) is not None]
+
+
+def is_showable(row: MealFeedback | None) -> bool:
+    """이 피드백을 지금 사용자에게 보여 줘도 되는지 — 본문이 있고 `SAFE` 일 때만.
+
+    끼니 피드백 화면이 내용을 싣는 조건(`services/feedback.py::get_feedback` 의 READY ·
+    SAFE 경로)과 같다. 다음 끼니 추천은 이 행에 함께 들어 있으므로 추천도 같은 조건을
+    따른다 — `body` 가 비었거나(생성 중 · 실패 · 무효화) 가드레일을 통과하지 못한 행의
+    추천은 화면에 보이지 않는다.
+    """
+    if row is None or row.safety_status is not SafetyStatus.SAFE:
+        return False
+    return bool((row.body or "").strip())
+
+
+def replace_suggestions(
+    db: Session, row: MealFeedback, suggestions: list[dict[str, Any]]
+) -> None:
+    """다음 끼니 추천만 바꾼다. flush 까지만 — 커밋은 `services/` 가 한다 (절대 규칙 5).
+
+    `body` · `reasoning` · `safety_status` 는 건드리지 않는다 — 사용자가 고른 것은 추천뿐이고,
+    판정은 같은 행의 본문에 붙은 것이다.
+
+    **Core `UPDATE` 가 아니라 ORM 속성 대입이다.** 호출부는 이 행을 방금 읽었고 같은
+    세션에서 곧바로 응답을 조립한다. `UPDATE` 문으로 쓰면 세션의 객체가 옛 값을 들고
+    있어(`expire_on_commit=False`) 응답에 옛 추천이 나간다.
+
+    새 리스트를 대입하므로 JSONB 변경이 감지된다(제자리 수정은 감지되지 않는다).
+    """
+    row.suggestions = suggestions
+    db.flush()

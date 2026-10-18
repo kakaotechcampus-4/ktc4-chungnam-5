@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    chat,
     daily_feedbacks,
     dashboard,
     evaluations,
@@ -30,3 +31,4 @@ api_router.include_router(feedbacks.router, tags=["feedbacks"])
 api_router.include_router(insights.router, tags=["insights"])
 api_router.include_router(daily_feedbacks.router, tags=["insights"])
 api_router.include_router(home.router, tags=["home"])
+api_router.include_router(chat.router, tags=["chat"])

@@ -35,13 +35,14 @@ AI 쪽은 끼니와 하루를 같은 `/short-feedback` 으로 받는다 — AI �
 from __future__ import annotations
 
 from app.worker.job import Job
-from app.worker.jobs import analyze_meal, feedback_daily, feedback_long, feedback_meal
+from app.worker.jobs import analyze_meal, chat_reply, feedback_daily, feedback_long, feedback_meal
 
 _JOBS: dict[str, Job] = {
     "meal.analyze": analyze_meal.JOB,
     "feedback.daily": feedback_daily.JOB,
     "feedback.meal": feedback_meal.JOB,
     "feedback.long": feedback_long.JOB,
+    "chat.reply": chat_reply.JOB,
 }
 
 # 계약은 정해졌지만 아직 구현이 없는 것들. 알 수 없는 타입과 구분해서 알려 준다.
