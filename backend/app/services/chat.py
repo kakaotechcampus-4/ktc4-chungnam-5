@@ -217,3 +217,15 @@ def get_conversation(
     if conversation is None:
         raise ConversationNotFoundError(f"conversation {conversation_id} 를 찾을 수 없습니다.")
     return _conversation_response(db, conversation)
+
+
+def get_latest_conversation(db: Session, *, user_id: uuid.UUID) -> ConversationResponse | None:
+    """진행 중인(열린) 대화 (A-4). AI 탭에 들어올 때 이어 볼 대화다. 없으면 None.
+
+    닫힌 대화로 거슬러 가지 않는다 — "＋ 새 대화" 가 닫은 대화를 다시 띄우면 안 된다.
+    없는 사용자도 None 이다 — 대화가 없는 것과 같고, 사용자 확인 쿼리를 더할 이유가 없다.
+    """
+    conversation = chat_crud.get_open_conversation(db, user_id)
+    if conversation is None:
+        return None
+    return _conversation_response(db, conversation)

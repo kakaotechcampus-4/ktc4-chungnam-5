@@ -134,3 +134,47 @@ def test_missing_user_header_is_401(client: TestClient):
     res = client.get(f"{_URL}/{uuid.uuid4()}")
 
     assert res.status_code == 401
+
+
+# --- A-4 GET /chat/conversations/latest ---
+
+
+def test_latest_without_conversation_is_200_null(client: TestClient, db: Session):
+    """명세: 대화가 없으면 `data: null` (200). `latest` 가 UUID 경로에 잡혀 422 가 나면 안 된다
+    — 라우트 등록 순서를 지킨다."""
+    user = make_user(db)
+
+    res = client.get(f"{_URL}/latest", headers=_h(user.id))
+
+    assert res.status_code == 200
+    assert res.json() == {"success": True, "data": None, "error": None}
+
+
+def test_latest_returns_open_conversation(client: TestClient, db: Session):
+    user = make_user(db)
+    conversation = chat_crud.create_conversation(db, user_id=user.id, meal_id=None)
+    _ask(db, conversation.id, reply_safety=SafetyStatus.SAFE)
+
+    res = client.get(f"{_URL}/latest", headers=_h(user.id))
+
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert data["conversationId"] == str(conversation.id)
+    assert [m["role"] for m in data["messages"]] == ["USER", "ASSISTANT"]
+
+
+def test_latest_blocked_last_reply_carries_medical_code(client: TestClient, db: Session):
+    user = make_user(db)
+    conversation = chat_crud.create_conversation(db, user_id=user.id, meal_id=None)
+    _ask(db, conversation.id, reply_safety=SafetyStatus.BLOCKED)
+
+    res = client.get(f"{_URL}/latest", headers=_h(user.id))
+
+    assert res.status_code == 200
+    assert res.json()["error"]["code"] == "MEDICAL_QUESTION_DETECTED"
+
+
+def test_latest_missing_user_header_is_401(client: TestClient):
+    res = client.get(f"{_URL}/latest")
+
+    assert res.status_code == 401

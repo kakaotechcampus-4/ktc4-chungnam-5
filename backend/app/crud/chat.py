@@ -155,3 +155,12 @@ def list_food_cards(db: Session, message_ids: list[uuid.UUID]) -> list[ChatFoodC
         .order_by(ChatFoodCard.message_id, ChatFoodCard.position)
     )
     return list(db.execute(stmt).scalars())
+
+
+def get_open_conversation(db: Session, user_id: uuid.UUID) -> ChatConversation | None:
+    """user_id 의 열린 대화. 없으면 None. 부분 UNIQUE `uq_chat_conversations_open` 이라
+    많아야 하나이고, 그 인덱스를 탄다."""
+    stmt = select(ChatConversation).where(
+        ChatConversation.user_id == user_id, ChatConversation.closed_at.is_(None)
+    )
+    return db.execute(stmt).scalar_one_or_none()

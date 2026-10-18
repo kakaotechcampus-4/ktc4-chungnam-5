@@ -146,3 +146,36 @@ def test_soft_deleted_base_meal_is_null(db: Session):
     result = chat_service.get_conversation(db, user_id=user.id, conversation_id=conversation.id)
 
     assert result.meal_id is None
+
+
+# --- A-4 `get_latest_conversation` ---
+
+
+def test_latest_is_none_without_conversation(db: Session):
+    user = make_user(db)
+
+    assert chat_service.get_latest_conversation(db, user_id=user.id) is None
+
+
+def test_latest_is_the_open_conversation(db: Session):
+    user = make_user(db)
+    chat_service.start_conversation(db, user_id=user.id, meal_id=None)  # 곧 닫힌다
+    current = chat_service.start_conversation(db, user_id=user.id, meal_id=None)
+    _message(db, current.conversation_id)
+
+    result = chat_service.get_latest_conversation(db, user_id=user.id)
+
+    assert result is not None
+    assert result.conversation_id == current.conversation_id
+    assert len(result.messages) == 1
+
+
+def test_latest_ignores_closed_and_others_conversations(db: Session):
+    """닫힌 대화만 남았으면 이어 볼 대화가 없다. 남의 열린 대화는 당연히 안 보인다."""
+    user = make_user(db)
+    stranger = make_user(db, nickname="남")
+    _conversation(db, user.id)
+    chat_crud.close_open_conversation(db, user.id)
+    _conversation(db, stranger.id)
+
+    assert chat_service.get_latest_conversation(db, user_id=user.id) is None

@@ -73,6 +73,30 @@ def _conversation_ok(view: ConversationResponse) -> ApiResponse[ConversationResp
     return ok(view)
 
 
+# `/latest` 를 `/{conversation_id}` 보다 **먼저** 등록한다. 순서가 바뀌면 "latest" 가
+# UUID 경로 파라미터에 잡혀 422 가 난다 (`test_latest_without_conversation_is_200_null`).
+@router.get(
+    "/chat/conversations/latest",
+    response_model=ApiResponse[ConversationResponse | None],
+    summary="진행 중인 대화 이어 보기",
+    responses=error_responses(401, 422),
+)
+def get_latest_conversation(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[ConversationResponse | None]:
+    """AI 탭에 들어올 때 이어 볼 열린 대화. 메시지 모양은 A-3 과 같다.
+
+    **열린 대화가 없으면 200 `data: null` 이다** — 에러가 아니라 "아직 없음" 이고, FE 는
+    이때 `POST /chat/conversations` 로 새 대화를 연다. 닫힌 대화는 돌려주지 않는다.
+    마지막 답이 BLOCKED 면 A-3 처럼 `MEDICAL_QUESTION_DETECTED` 가 붙는다.
+    """
+    view = chat_service.get_latest_conversation(db, user_id=user_id)
+    if view is None:
+        return ok(None)
+    return _conversation_ok(view)
+
+
 @router.get(
     "/chat/conversations/{conversation_id}",
     response_model=ApiResponse[ConversationResponse],
