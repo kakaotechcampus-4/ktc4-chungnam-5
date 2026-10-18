@@ -17,6 +17,8 @@ import fixtures
 from schemas import (
     AnalyzeMealRequest,
     AnalyzeMealResponse,
+    ChatRequest,
+    ChatResponse,
     LongFeedbackRequest,
     LongFeedbackResponse,
     ShortFeedbackRequest,
@@ -88,3 +90,10 @@ def long_feedback(req: LongFeedbackRequest, scenario: ScenarioDep) -> LongFeedba
     if scenario is Scenario.BLOCKED:
         return fixtures.long_feedback_blocked()
     return fixtures.long_feedback()
+
+
+@app.post("/chat", response_model=ChatResponse, tags=["chat"])
+def chat(req: ChatRequest, scenario: ScenarioDep) -> ChatResponse:
+    if scenario is Scenario.BLOCKED:
+        return fixtures.chat_blocked()
+    return fixtures.chat()
