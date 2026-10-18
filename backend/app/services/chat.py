@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from typing import Final
 
 from sqlalchemy.orm import Session
@@ -15,7 +16,7 @@ from app.crud import chat as chat_crud
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud.feedback import StoredSuggestion
-from app.models.chat import ChatFoodCard, ChatMessage
+from app.models.chat import ChatConversation, ChatFoodCard, ChatMessage
 from app.models.enums import (
     ChatMessageRole,
     ChatMessageStatus,
@@ -39,6 +40,10 @@ class MealNotFoundError(LookupError):
 
 class UserNotFoundError(LookupError):
     """`users` 행이 없다. 인증 헤더는 형식만 확인하므로 존재하지 않는 id 가 올 수 있다."""
+
+
+class ConversationNotFoundError(LookupError):
+    """없는 대화 · 남의 대화. 둘 다 404 로 같게 응답한다."""
 
 
 def _showable_suggestions(db: Session, meal_id: uuid.UUID) -> list[StoredSuggestion]:
@@ -161,3 +166,54 @@ def start_conversation(
         meal_id=base_meal_id,
         messages=messages,
     )
+
+
+def _conversation_response(db: Session, conversation: ChatConversation) -> ConversationResponse:
+    """대화 · 메시지 · 카드를 응답으로 조립한다 (A-3 · A-4 공통). 읽기만 한다.
+
+    메시지 · 카드 · `food_refs` 를 각각 **한 번** 읽는다 — 메시지마다 읽으면 N+1 이다.
+
+    `mealId` 는 기준 끼니가 살아 있을 때만 싣는다. 끼니는 soft delete 라 대화가 삭제된
+    끼니를 가리킬 수 있고(`models/chat.py::ChatConversation.meal_id`), 그 id 로 A-5 를
+    부르면 404 다. 소유 · 삭제 판정은 `meal_crud.get_owned_meal` 하나에 맡긴다.
+    """
+    meal_id: uuid.UUID | None = None
+    if conversation.meal_id is not None:
+        meal = meal_crud.get_owned_meal(
+            db, user_id=conversation.user_id, meal_id=conversation.meal_id
+        )
+        meal_id = None if meal is None else meal.id
+
+    messages = chat_crud.list_messages(db, conversation.id)
+    cards = chat_crud.list_food_cards(db, [message.id for message in messages])
+    cards_by_message: dict[uuid.UUID, list[FoodCardResponse]] = defaultdict(list)
+    # `_card_responses` 는 넣은 순서를 지키므로 zip 으로 메시지에 되돌린다.
+    for card, view in zip(cards, _card_responses(db, cards), strict=True):
+        cards_by_message[card.message_id].append(view)
+
+    return ConversationResponse(
+        conversation_id=conversation.id,
+        meal_id=meal_id,
+        messages=[
+            _message_response(message, cards_by_message[message.id]) for message in messages
+        ],
+    )
+
+
+def get_conversation(
+    db: Session, *, user_id: uuid.UUID, conversation_id: uuid.UUID
+) -> ConversationResponse:
+    """대화의 메시지 전부, 오래된 순 (A-3). FE 가 답변 폴링에도 쓴다.
+
+    **닫힌 대화도 보여 준다** — 읽기뿐이고, "＋ 새 대화" 뒤에도 폴링 중이던 답은 워커가
+    쓴다. 없는 대화 · 남의 대화는 `ConversationNotFoundError`.
+
+    만료된(`GENERATING` 으로 오래 남은) 답은 손대지 않고 그대로 보여 준다. FE 는 자기
+    타임아웃으로 끊고, 다음 A-2 가 그 답을 FAILED 로 닫는다.
+    """
+    conversation = chat_crud.get_owned_conversation(
+        db, user_id=user_id, conversation_id=conversation_id
+    )
+    if conversation is None:
+        raise ConversationNotFoundError(f"conversation {conversation_id} 를 찾을 수 없습니다.")
+    return _conversation_response(db, conversation)
