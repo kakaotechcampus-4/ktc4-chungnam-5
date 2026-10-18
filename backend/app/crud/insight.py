@@ -2,10 +2,10 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.enums import FeedbackPeriodType
+from app.models.enums import FeedbackPeriodType, SafetyStatus
 from app.models.feedback import LongTermFeedback
 from app.models.task import Task
 
@@ -45,3 +45,22 @@ def get_latest_refresh_task(
         .order_by(Task.created_at.desc())
         .limit(1)
     ).scalar_one_or_none()
+
+
+def get_latest_safe(db: Session, user_id: uuid.UUID) -> LongTermFeedback | None:
+    """챗봇 컨텍스트용 — 가장 최근에 갱신된, 보여 줘도 되는 장기 피드백.
+
+    SAFE 이고 `trend_summary` 가 공백이 아닐 때만이다. 장기 피드백 화면에서 안 보이는
+    문장을 챗봇이 AI 에 되먹이면 안 된다 (규칙 1).
+    """
+    stmt = (
+        select(LongTermFeedback)
+        .where(
+            LongTermFeedback.user_id == user_id,
+            LongTermFeedback.safety_status == SafetyStatus.SAFE,
+            func.length(func.btrim(LongTermFeedback.trend_summary)) > 0,
+        )
+        .order_by(LongTermFeedback.updated_at.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none()

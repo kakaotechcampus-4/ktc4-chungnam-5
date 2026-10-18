@@ -13,7 +13,12 @@ from app.core.deps import get_current_user_id
 from app.core.errors import ApiError, ErrorCode
 from app.core.response import ApiResponse, error_responses, ok
 from app.db.session import get_db
-from app.schemas.chat import ConversationResponse, CreateConversationRequest
+from app.schemas.chat import (
+    ConversationResponse,
+    CreateConversationRequest,
+    SendMessageRequest,
+    SendMessageResponse,
+)
 from app.services import chat as chat_service
 
 router = APIRouter()
@@ -53,3 +58,36 @@ def start_conversation(
         raise ApiError(ErrorCode.USER_NOT_FOUND, str(exc), 404) from None
     except chat_service.MealNotFoundError as exc:
         raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None
+
+
+@router.post(
+    "/chat/conversations/{conversation_id}/messages",
+    response_model=ApiResponse[SendMessageResponse],
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="사용자 메시지 보내기",
+    responses=error_responses(401, 404, 409, 422),
+)
+def send_message(
+    conversation_id: uuid.UUID,
+    request: SendMessageRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[SendMessageResponse]:
+    """사용자 메시지를 접수하고 AI 답변 생성을 시작한다.
+
+    답변은 비동기다 — `assistantMessageId` 가 `READY` · `FAILED` 가 될 때까지
+    `pollIntervalMs` 간격으로, 최대 `timeoutMs` 동안 대화를 다시 조회한다.
+
+    없는 대화 · 남의 대화 · 닫힌 대화는 전부 404 로 같게 응답한다 (소유권 누출 방지).
+    이전 답변이 아직 생성 중이면 409 `CONFLICT` 다.
+    """
+    try:
+        return ok(
+            chat_service.send_message(
+                db, user_id=user_id, conversation_id=conversation_id, text=request.text
+            )
+        )
+    except chat_service.ConversationNotFoundError as exc:
+        raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None
+    except chat_service.ReplyInProgressError as exc:
+        raise ApiError(ErrorCode.CONFLICT, str(exc), 409) from None
