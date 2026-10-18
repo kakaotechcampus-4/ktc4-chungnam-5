@@ -66,3 +66,16 @@ def test_success_returns_the_json_body():
     client = HttpAiClient("http://ai.test", transport=httpx.MockTransport(respond))
 
     assert client.analyze_meal({}) == {"ok": True}
+
+
+def test_chat_posts_to_chat_path():
+    seen: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        return httpx.Response(200, json={"ok": True})
+
+    client = HttpAiClient("http://ai.test", transport=httpx.MockTransport(respond))
+
+    assert client.chat({"text": "안녕"}) == {"ok": True}
+    assert seen == ["/chat"]

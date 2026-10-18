@@ -8,8 +8,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
+from typing import Final
 
-from sqlalchemy import func, select, update
+from sqlalchemy import ColumnElement, Date, cast, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.chat import ChatConversation, ChatFoodCard, ChatMessage
@@ -134,12 +136,150 @@ def get_owned_conversation(
     return db.execute(stmt).scalar_one_or_none()
 
 
+CHAT_REPLY_STALE_SEC: Final = 120
+"""GENERATING 답변을 **만료** 로 보는 나이(초). lease(`QUEUE_LEASE_SEC`)와 같은 값이다.
+
+워커는 AI 실패를 재시도하지 않고 바로 FAILED 로 두지만(`worker/jobs/chat_reply.py`),
+워커 프로세스가 죽으면 아무도 상태를 바꾸지 않는다. 그대로 두면 409 때문에 그 대화에
+다시는 못 보낸다. FE 는 30초만 기다리므로 120초 지난 답은 아무도 기다리지 않는다."""
+
+
+def _stale() -> ColumnElement[bool]:
+    # `now()` 가 아니라 `clock_timestamp()` 다 — `created_at` 이 `clock_timestamp()` 로 찍히고,
+    # `now()` 는 트랜잭션 시작 시각이라 같은 트랜잭션에서 넣은 행과 비교가 어긋난다.
+    return ChatMessage.created_at < func.clock_timestamp() - func.make_interval(
+        0, 0, 0, 0, 0, 0, CHAT_REPLY_STALE_SEC
+    )
+
+
+def lock_open_conversation(
+    db: Session, *, user_id: uuid.UUID, conversation_id: uuid.UUID
+) -> ChatConversation | None:
+    """user_id 소유의 **열린** 대화를 잠그고 가져온다. 없음 · 남의 것 · 닫힘은 None.
+
+    같은 대화로의 연속 전송(더블탭)을 줄 세운다. 잠그지 않으면 두 요청이 둘 다
+    "GENERATING 없음" 을 보고 답변 자리표시를 둘 만든다.
+
+    **`FOR NO KEY UPDATE`(`key_share=True`) 다.** 메시지 INSERT 의 FK 검사는 이 행에
+    KEY SHARE 를 거는데 그것과 충돌하지 않는다. A-1 의 닫기(`closed_at` UPDATE)와는
+    충돌하므로 두 요청이 줄을 서고, 닫힌 뒤 깨어나면 Postgres 가 WHERE 를 다시 평가해
+    None 이 된다 — 닫힌 대화에 메시지가 붙지 않는다.
+    """
+    stmt = (
+        select(ChatConversation)
+        .where(
+            ChatConversation.id == conversation_id,
+            ChatConversation.user_id == user_id,
+            ChatConversation.closed_at.is_(None),
+        )
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def find_generating_reply(
+    db: Session, conversation_id: uuid.UUID
+) -> tuple[ChatMessage, bool] | None:
+    """대화에서 아직 생성 중인 답변과 그 만료 여부. 없으면 None. 찾은 답변은 **잠근다.**
+
+    잠그지 않으면 A-2 의 만료 처리(`send_message` 가 FAILED 로 UPDATE)가 그 사이 워커가 커밋한
+    READY 를 덮어쓴다 — 읽은 GENERATING 은 낡은 값이다. 잠그면 워커의 커밋을 기다렸다가
+    Postgres 가 `status = GENERATING` 을 다시 평가해, 방금 READY 가 된 답은 빠지고(None)
+    새 메시지가 정상으로 붙는다.
+
+    **교착하지 않는다.** A-2 는 대화 잠금(`lock_open_conversation`) → 메시지 잠금 순이고, 워커는
+    메시지 잠금(`lock_message_for_worker`)만 잡는다. 순서가 뒤집히는 쪽이 없다.
+    `FOR NO KEY UPDATE` 라 카드 INSERT 의 FK 검사(KEY SHARE)와도 충돌하지 않는다.
+    """
+    row = db.execute(
+        select(ChatMessage, _stale())
+        .where(
+            ChatMessage.conversation_id == conversation_id,
+            ChatMessage.role == ChatMessageRole.ASSISTANT,
+            ChatMessage.status == ChatMessageStatus.GENERATING,
+        )
+        .order_by(ChatMessage.created_at.desc())
+        .limit(1)
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
+    ).first()
+    return None if row is None else (row[0], bool(row[1]))
+
+
+def finish_message(
+    db: Session,
+    message: ChatMessage,
+    *,
+    status: ChatMessageStatus,
+    text: str | None = None,
+    safety_status: SafetyStatus | None = None,
+) -> None:
+    """답변의 최종 상태를 쓴다. FAILED 면 `text` · `safety_status` 를 비운다(기본값)."""
+    message.status = status
+    message.text = text
+    message.safety_status = safety_status
+    db.flush()
+
+
+def get_message_for_worker(
+    db: Session, message_id: uuid.UUID
+) -> tuple[ChatMessage, bool] | None:
+    """워커 전용 — 메시지와 그 만료 여부(`CHAT_REPLY_STALE_SEC`). 없으면 None.
+
+    워커에는 "요청한 사용자" 가 없어 소유권을 보지 않는다. API 경로에서는 쓰지 말 것.
+    """
+    row = db.execute(select(ChatMessage, _stale()).where(ChatMessage.id == message_id)).first()
+    return None if row is None else (row[0], bool(row[1]))
+
+
+def lock_message_for_worker(db: Session, message_id: uuid.UUID) -> ChatMessage | None:
+    """워커 전용 — 답변을 잠그고 다시 읽는다. AI 를 기다리는 사이 A-2 가 만료 처리로
+    FAILED 를 썼을 수 있어, 쓰기 직전에 잠근 값으로 다시 판단한다.
+
+    `FOR NO KEY UPDATE` 다 — 카드 INSERT 의 FK 검사(KEY SHARE)와 충돌하지 않는다.
+    """
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.id == message_id)
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def get_conversation_for_worker(
+    db: Session, conversation_id: uuid.UUID
+) -> ChatConversation | None:
+    """워커 전용 — 소유자도 닫힘 여부도 보지 않는다. 닫힌 대화의 마지막 질문에도 답은 쓴다."""
+    return db.get(ChatConversation, conversation_id)
+
+
 def list_messages(db: Session, conversation_id: uuid.UUID) -> list[ChatMessage]:
     """대화의 메시지 전부, 오래된 순. `id` 는 `created_at` 이 같을 때의 결정적 순서다."""
     stmt = (
         select(ChatMessage)
         .where(ChatMessage.conversation_id == conversation_id)
         .order_by(ChatMessage.created_at, ChatMessage.id)
+    )
+    return list(db.execute(stmt).scalars())
+
+
+def list_evaluated_meals_on(db: Session, user_id: uuid.UUID, day: date) -> list[Meal]:
+    """그 날(KST) 먹은 확정된 살아있는 끼니, 먹은 순.
+
+    확정 전 끼니는 점수가 없거나 낡았다. KST 로 자르는 이유는 `crud/meal.py::kst_day` 와 같다
+    — UTC 로 자르면 밤 11시 야식이 다음날이 된다.
+    """
+    stmt = (
+        select(Meal)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.status == MealStatus.EVALUATED,
+            cast(func.timezone("Asia/Seoul", Meal.eaten_at), Date) == day,
+        )
+        .order_by(Meal.eaten_at, Meal.created_at)
     )
     return list(db.execute(stmt).scalars())
 
