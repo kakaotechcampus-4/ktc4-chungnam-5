@@ -497,11 +497,27 @@ class MealApiService {
   Future<({MealNutrition? nutrition, String? notice})> setNutrition(
     String mealId,
     String itemId, {
-    required String foodRefId,
+    String? foodRefId,
+    MealNutrition? manual,
   }) async {
+    assert(
+      (foodRefId == null) != (manual == null),
+      'foodRefId 와 manual 중 하나만 준다',
+    );
     final result = await _client.put(
       '/meals/$mealId/items/$itemId/nutrition',
-      body: {'foodRefId': foodRefId},
+      body: {
+        'foodRefId': ?foodRefId,
+        if (manual != null)
+          'manual': {
+            'kcal': ?manual.kcal,
+            'proteinG': ?manual.proteinG,
+            'fatG': ?manual.fatG,
+            'carbG': ?manual.carbG,
+            'fiberG': ?manual.fiberG,
+            'sodiumMg': ?manual.sodiumMg,
+          },
+      },
     );
     final nutrition = result.dataMap['nutrition'];
     return (

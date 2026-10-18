@@ -1,0 +1,25 @@
+name: OIDC 연결 확인
+# 배포 계획서 H1 — GitHub Actions 가 AWS 액세스 키 없이 OIDC 로 배포 역할
+# `ktc-github-deploy` 를 받을 수 있는지만 확인한다. 서버(EC2)는 건드리지 않는다.
+#
+# 수동 실행 전용이다. Actions 탭 → "OIDC 연결 확인" → Run workflow.
+# 출력에 `assumed-role/ktc-github-deploy` 가 보이면 통과다.
+# `workflow_dispatch` 버튼은 기본 브랜치(develop)에 이 파일이 있어야 나타난다.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write # 빠지면 GitHub 이 OIDC 토큰을 발급하지 않는다
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ktc-github-deploy
+          aws-region: ap-northeast-2
+
+      - run: aws sts get-caller-identity
