@@ -289,6 +289,11 @@ def replace_suggestion(
     확정 시각" 이다. 카드는 메시지 `created_at`(`clock_timestamp()`)이 그보다 앞이면
     고치기 전 끼니를 보고 만든 것이다. 확정된 끼니에는 점수 행이 항상 있지만, 없으면 비교할
     기준이 없으므로 막는다.
+
+    점수 행 시각만으로는 **포만감만 고친 재확정**을 못 잡는다 — upsert 라 시각이 그대로인데,
+    `services/evaluation::_is_stale_feedback` 은 점수가 바뀌었다고 피드백을 비우고 추천을 다시
+    만든다. 그래서 가장 최근 `feedback.meal` 작업이 들어간 시각(`latest_task_created_at`)도
+    본다 — 추천을 새로 만들 때마다 확정이 같은 트랜잭션에서 넣는 작업이다.
     """
     meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id, for_update=True)
     if meal is None:
@@ -304,7 +309,12 @@ def replace_suggestion(
     card, card_created_at = found
 
     evaluation = evaluation_crud.get_by_meal(db, meal.id)
-    if evaluation is None or card_created_at < evaluation.computed_at:
+    regenerated_at = feedback_crud.latest_task_created_at(db, meal.id)
+    if (
+        evaluation is None
+        or card_created_at < evaluation.computed_at
+        or (regenerated_at is not None and card_created_at < regenerated_at)
+    ):
         raise SuggestionConflictError("끼니가 바뀌어 이 추천은 쓸 수 없습니다.")
 
     row = feedback_crud.get_by_meal(db, meal.id)

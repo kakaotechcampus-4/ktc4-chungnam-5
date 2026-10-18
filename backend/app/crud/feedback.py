@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Final, NamedTuple
 
@@ -45,6 +46,25 @@ def latest_task_status(db: Session, meal_id: uuid.UUID) -> TaskStatus | None:
     """
     stmt = (
         select(Task.status)
+        .where(
+            Task.type == FEEDBACK_TASK_TYPE,
+            Task.payload["mealId"].astext == str(meal_id),
+        )
+        .order_by(Task.created_at.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def latest_task_created_at(db: Session, meal_id: uuid.UUID) -> datetime | None:
+    """이 끼니의 가장 최근 `feedback.meal` 작업이 들어간 시각. 작업이 없으면 None.
+
+    `confirm` 은 추천을 새로 만들어야 할 때(처음 확정 · 음식 수정 · 점수 변화 · 문장 없음)
+    채점과 같은 트랜잭션에서 이 작업을 넣는다. 그래서 이 시각이 곧 "추천을 마지막으로 다시
+    만들기 시작한 시각" 이다 — A-5 가 그보다 앞서 만든 챗봇 카드를 낡은 것으로 본다.
+    """
+    stmt = (
+        select(Task.created_at)
         .where(
             Task.type == FEEDBACK_TASK_TYPE,
             Task.payload["mealId"].astext == str(meal_id),

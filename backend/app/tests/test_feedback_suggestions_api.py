@@ -16,7 +16,14 @@ from app.crud import chat as chat_crud
 from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.models.chat import ChatMessage
-from app.models.enums import ChatMessageRole, ChatMessageStatus, MealStatus, SafetyStatus
+from app.models.enums import (
+    ChatMessageRole,
+    ChatMessageStatus,
+    MealStatus,
+    SafetyStatus,
+    TaskStatus,
+)
+from app.models.task import Task
 from app.tests.factories import (
     make_food_ref,
     make_meal,
@@ -422,3 +429,71 @@ def test_missing_header_is_401(client: TestClient, db: Session) -> None:
     res = client.put(_url(meal.id), json={"foodCardId": str(uuid.uuid4())})
 
     assert res.status_code == 401
+
+
+# ── 최종 리뷰 반영 ──────────────────────────────────────────
+
+
+def _add_feedback_task(db: Session, meal, *, after_card=None) -> None:
+    """`confirm` 이 추천을 새로 만들 때 넣는 `feedback.meal` 작업. `after_card` 를 주면 그
+    카드보다 뒤에 들어간 것으로 시각을 민다 — 테스트 세션 안에서는 `now()` 가 고정이다."""
+    task = Task(
+        type=feedback_crud.FEEDBACK_TASK_TYPE,
+        payload={"mealId": str(meal.id)},
+        status=TaskStatus.DONE,
+    )
+    db.add(task)
+    db.flush()
+    if after_card is not None:
+        task.created_at = db.get(ChatMessage, after_card.message_id).created_at + timedelta(seconds=1)
+        db.flush()
+
+
+def test_card_older_than_regenerated_feedback_is_conflict(client: TestClient, db: Session) -> None:
+    """포만감만 고쳐 재확정 — 점수 행 시각은 그대로지만 추천은 다시 만들어졌다.
+
+    `_is_stale_feedback` 이 점수 변화를 보고 피드백을 비운 뒤 작업을 다시 넣는다. 카드는
+    그 전 추천의 복사본이라 새 추천을 덮으면 안 된다.
+    """
+    user = make_user(db)
+    meal = _confirmed_meal(db, user.id, suggestions=[_TOFU])
+    card = _card(db, user_id=user.id, meal_id=meal.id)
+    _add_feedback_task(db, meal, after_card=card)
+
+    _assert_error(_put(client, user.id, meal.id, card.id), 409, "CONFLICT")
+
+
+def test_card_newer_than_feedback_task_is_ok(client: TestClient, db: Session) -> None:
+    """확정 때 들어간 작업보다 뒤에 만든 카드 — 평소 흐름이다. 막으면 안 된다."""
+    user = make_user(db)
+    meal = _confirmed_meal(db, user.id, suggestions=[_TOFU])
+    _add_feedback_task(db, meal)
+    card = _card(db, user_id=user.id, meal_id=meal.id)
+
+    assert _put(client, user.id, meal.id, card.id).status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("status", "safety"),
+    [
+        (ChatMessageStatus.READY, SafetyStatus.BLOCKED),
+        (ChatMessageStatus.READY, SafetyStatus.REVIEW_REQUIRED),
+        (ChatMessageStatus.GENERATING, None),
+        (ChatMessageStatus.FAILED, None),
+    ],
+    ids=["BLOCKED", "REVIEW_REQUIRED", "GENERATING", "FAILED"],
+)
+def test_card_of_unshowable_message_is_404(
+    client: TestClient, db: Session, status, safety
+) -> None:
+    """가드레일을 통과하지 못했거나 완성되지 않은 메시지의 카드는 없는 카드로 본다.
+    받으면 검수 안 된 문구가 SAFE 피드백의 추천으로 옮겨진다(절대 규칙 1)."""
+    user = make_user(db)
+    meal = _confirmed_meal(db, user.id, suggestions=[_TOFU])
+    card = _card(db, user_id=user.id, meal_id=meal.id)
+    message = db.get(ChatMessage, card.message_id)
+    message.status = status
+    message.safety_status = safety
+    db.flush()
+
+    _assert_error(_put(client, user.id, meal.id, card.id), 404, "NOT_FOUND")
