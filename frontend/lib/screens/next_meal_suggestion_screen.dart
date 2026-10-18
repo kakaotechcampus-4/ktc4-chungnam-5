@@ -20,8 +20,8 @@ import 'shared_meal_widgets.dart';
 ///
 /// Figma `S6BHeo0ZebzY4PAQOSp0EW` node `1:1800`(화면 7 - 단기 피드백(수정)).
 ///
-/// 제안 문장은 AI 가 만들어 늦게 온다. 처음 `GET /meals/{id}/feedback` 을
-/// 부르면 서버가 생성 작업을 걸고, 준비될 때까지(`PENDING`·`GENERATING`)
+/// 제안 문장은 AI 가 만들어 늦게 온다. 생성 작업은 확정(`POST /confirm`)이 걸고,
+/// 이 화면은 준비될 때까지(`PENDING`·`GENERATING`) `GET /meals/{id}/feedback` 을
 /// 잠깐씩 다시 묻는다. Q·Q·S 와 영양소 상태는 그와 상관없이 먼저 보인다.
 ///
 /// 끼니 종류에 따라 아래가 달라진다.
@@ -792,18 +792,11 @@ class _NutrientRow extends StatelessWidget {
   }
 }
 
-/// 제안 카드 — 음식 이름, 채우거나 줄이는 영양 칩, 한 줄 조언. 사진·아이콘은 없다.
+/// 제안 카드 — 음식 이름, 100g당 영양 칩, 한 줄 조언. 사진·아이콘은 없다.
 class _SuggestionCard extends StatelessWidget {
   const _SuggestionCard({required this.suggestion});
 
   final MealSuggestion suggestion;
-
-  static String _nutrientLabel(String code) => switch (code) {
-    'PROTEIN' => '단백질',
-    'FIBER' => '식이섬유',
-    'SODIUM' => '나트륨',
-    _ => code,
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -825,25 +818,7 @@ class _SuggestionCard extends StatelessWidget {
           ),
           if (s.nutrients.isNotEmpty) ...[
             const SizedBox(height: 5),
-            Wrap(
-              spacing: 5,
-              runSpacing: 4,
-              children: [
-                for (final n in s.nutrients)
-                  // 채우면 초록, 줄이면(음수) 빨강2 계열.
-                  _Chip(
-                    text:
-                        '${_nutrientLabel(n.code)} '
-                        '${n.amountG < 0 ? '−' : '+'}${n.amountG.abs().toInt()}g',
-                    background: n.amountG < 0
-                        ? AppColors.primaryStrongBg
-                        : AppColors.qualityBg,
-                    foreground: n.amountG < 0
-                        ? AppColors.primaryStrong
-                        : AppColors.quality,
-                  ),
-              ],
-            ),
+            NutrientAmountChips(nutrients: s.nutrients),
           ],
           const SizedBox(height: 5),
           Text(

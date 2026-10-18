@@ -100,6 +100,55 @@ Future<void> _openFeedback(WidgetTester tester, String branch) async {
   await _settle(tester);
 }
 
+/// 챗봇 말 하나(`ChatMessageResponse`).
+Map<String, Object?> _chatMessage(
+  String id, {
+  String role = 'ASSISTANT',
+  String status = 'READY',
+  String? text,
+  List<Object?> foodCards = const [],
+  String? safetyStatus,
+}) => {
+  'messageId': id,
+  'role': role,
+  'status': status,
+  'text': text,
+  'foodCards': foodCards,
+  'safetyStatus': safetyStatus ?? (role == 'USER' || status != 'READY' ? null : 'SAFE'),
+  'createdAt': '2026-10-18T12:00:00+09:00',
+};
+
+/// 챗봇 API 가 아직 mock 스키마에 없어 테스트마다 붙인다. 새 대화는 받은 끼니의
+/// 추천 카드 하나로 시작한다(BE `services/chat.py::start_conversation`).
+FakeApi _chatApi() => FakeApi()
+  ..on('POST /chat/conversations', (o) {
+    final mealId = (o.data as Map?)?['mealId'];
+    return (
+      201,
+      fakeOk({
+        'conversationId': 'c1',
+        'mealId': mealId,
+        'messages': [
+          if (mealId != null)
+            _chatMessage(
+              'intro',
+              text: '다음 끼니로 이 음식은 어떤가요?',
+              foodCards: [
+                {
+                  'foodCardId': 'f1',
+                  'foodName': '두부 반 모',
+                  'effects': [
+                    {'code': 'PROTEIN', 'amount': 8.0, 'unit': 'g'},
+                    {'code': 'SODIUM', 'amount': 7.5, 'unit': 'mg'},
+                  ],
+                },
+              ],
+            ),
+        ],
+      }),
+    );
+  });
+
 void main() {
   testWidgets('bottom nav shows 홈 · 피드백 · AI · 마이 and switches tabs', (
     WidgetTester tester,
@@ -126,7 +175,8 @@ void main() {
     WidgetTester tester,
   ) async {
     _useDesignSize(tester);
-    await _pumpApp(tester);
+    final api = _chatApi();
+    await _pumpApp(tester, api: api);
     await tester.tap(find.text('나중에'));
     await tester.pumpAndSettle();
 
@@ -139,6 +189,115 @@ void main() {
 
     expect(find.text('AI 코치'), findsOneWidget);
     expect(find.textContaining('점심 기록으로 이야기해요'), findsOneWidget);
+    // 서버가 그 끼니의 추천을 첫 말로 넣어 준다. 칩은 100g 당 함량이다.
+    expect(find.text('다음 끼니로 이 음식은 어떤가요?'), findsOneWidget);
+    expect(find.text('두부 반 모'), findsOneWidget);
+    expect(find.text('100g당'), findsOneWidget);
+    expect(find.text('단백질 8g'), findsOneWidget);
+    expect(find.text('나트륨 7.5mg'), findsOneWidget);
+    final start = api.requests.singleWhere(
+      (r) => r.method == 'POST' && r.path == '/chat/conversations',
+    );
+    expect(start.data, {'mealId': '00000000-0000-0000-0000-000000000456'});
+  });
+
+  testWidgets('AI tab resumes or starts a chat and waits for the reply', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    var polls = 0;
+    final api = _chatApi()
+      ..on('GET /chat/conversations/latest', (_) => (200, fakeOk(null)))
+      ..on(
+        'POST /chat/conversations/{conversation_id}/messages',
+        (_) => (
+          202,
+          fakeOk({
+            'userMessage': _chatMessage('u1', role: 'USER', text: '오늘 어땠어?'),
+            'assistantMessageId': 'a1',
+            'pollIntervalMs': 1000,
+            'timeoutMs': 30000,
+          }),
+        ),
+      )
+      ..on('GET /chat/conversations/{conversation_id}', (_) {
+        polls++;
+        return (
+          200,
+          fakeOk({
+            'conversationId': 'c1',
+            'mealId': null,
+            'messages': [
+              _chatMessage('u1', role: 'USER', text: '오늘 어땠어?'),
+              polls < 2
+                  ? _chatMessage('a1', status: 'GENERATING')
+                  : _chatMessage('a1', text: '단백질을 잘 챙기셨어요.'),
+            ],
+          }),
+        );
+      });
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에'));
+    await tester.pumpAndSettle();
+    // 앱 시작 때는 챗봇 서버를 부르지 않는다.
+    expect(api.requests.where((r) => r.path.startsWith('/chat')), isEmpty);
+
+    await tester.tap(find.text('AI'));
+    await _settle(tester);
+    // 이어 볼 대화가 없으면 끼니 없이 새로 연다.
+    expect(
+      api.requests.where((r) => r.path.startsWith('/chat')).map(
+        (r) => '${r.method} ${r.path}',
+      ),
+      ['GET /chat/conversations/latest', 'POST /chat/conversations'],
+    );
+    expect(find.text('안녕하세요 :)'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '오늘 어땠어?');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+    expect(find.text('오늘 어땠어?'), findsOneWidget);
+    expect(find.text('답을 만들고 있어요…'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('답을 만들고 있어요…'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('단백질을 잘 챙기셨어요.'), findsOneWidget);
+    expect(polls, 2);
+  });
+
+  testWidgets('a medical question gets the counselling notice', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final api = _chatApi()
+      ..on(
+        'GET /chat/conversations/latest',
+        (_) => (
+          200,
+          fakeOk({
+            'conversationId': 'c1',
+            'mealId': null,
+            'messages': [
+              _chatMessage('u1', role: 'USER', text: '약 끊어도 돼?'),
+              _chatMessage('a1', safetyStatus: 'BLOCKED'),
+            ],
+          }),
+        ),
+      );
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AI'));
+    await _settle(tester);
+
+    expect(find.textContaining('담당 의사와 상담해 주세요'), findsOneWidget);
+    expect(
+      api.requests.where((r) => r.method == 'POST' && r.path.startsWith('/chat')),
+      isEmpty,
+    );
   });
 
   testWidgets('feedback tab asks short or long, then shows that screen', (

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../api/meal_api.dart';
+import '../common/api_format.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -361,6 +363,61 @@ class MealCardSkeleton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 음식 100g 에 든 영양소 칩(`100g당` `단백질 8g` `식이섬유 2.1g`). 끼니 피드백 제안과
+/// 챗봇 음식 카드가 같이 쓴다. 비어 있으면 아무것도 그리지 않는다.
+///
+/// 값은 "먹으면 늘어나는 양" 이 아니라 그 음식의 함량이라 `+` 를 붙이지 않는다.
+class NutrientAmountChips extends StatelessWidget {
+  const NutrientAmountChips({super.key, required this.nutrients});
+
+  final List<NutrientAmount> nutrients;
+
+  /// `단백질 8g` · `나트륨 350mg` · `칼로리 120kcal`. 10 미만만 소수 한 자리.
+  static String format(NutrientAmount n) {
+    final v = n.amount;
+    final fixed = v.toStringAsFixed(1);
+    final number = v >= 10 || fixed.endsWith('.0')
+        ? v.round().toString()
+        : fixed;
+    return '${nutrientLabel(n.code)} $number${n.unit}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (nutrients.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 5,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          '100g당',
+          style: AppTypography.caption.copyWith(
+            fontSize: 9,
+            color: AppColors.textTertiary,
+          ),
+        ),
+        for (final n in nutrients)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.qualityBg,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Text(
+              format(n),
+              style: AppTypography.emphasis.copyWith(
+                fontSize: 9,
+                height: 1.25,
+                color: AppColors.quality,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

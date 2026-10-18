@@ -28,6 +28,17 @@ String mealTypeLabel(String mealType) => switch (mealType) {
   _ => mealType,
 };
 
+/// 영양소 코드(BE `NutrientCode`).
+String nutrientLabel(String code) => switch (code) {
+  'CALORIE' => '칼로리',
+  'PROTEIN' => '단백질',
+  'FAT' => '지방',
+  'CARB' => '탄수화물',
+  'FIBER' => '식이섬유',
+  'SODIUM' => '나트륨',
+  _ => code,
+};
+
 /// 날짜만 있는 값(`2026-08-21`). 시간대 변환 없이 그대로 읽는다.
 DateTime parseApiDate(String value) => DateTime.parse(value);
 
