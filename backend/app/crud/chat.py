@@ -125,6 +125,17 @@ def add_food_card(
     return card
 
 
+def get_owned_conversation(
+    db: Session, *, user_id: uuid.UUID, conversation_id: uuid.UUID
+) -> ChatConversation | None:
+    """user_id 소유의 대화. 없음 · 남의 것은 None. **닫힌 대화도 돌려준다** — 조회는
+    읽기뿐이고, 워커가 닫힌 대화의 마지막 질문에도 답을 쓰므로 폴링 중이던 FE 가 받아야 한다."""
+    stmt = select(ChatConversation).where(
+        ChatConversation.id == conversation_id, ChatConversation.user_id == user_id
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
 CHAT_REPLY_STALE_SEC: Final = 120
 """GENERATING 답변을 **만료** 로 보는 나이(초). lease(`QUEUE_LEASE_SEC`)와 같은 값이다.
 
@@ -271,3 +282,25 @@ def list_evaluated_meals_on(db: Session, user_id: uuid.UUID, day: date) -> list[
         .order_by(Meal.eaten_at, Meal.created_at)
     )
     return list(db.execute(stmt).scalars())
+
+
+def list_food_cards(db: Session, message_ids: list[uuid.UUID]) -> list[ChatFoodCard]:
+    """여러 메시지의 카드를 한 번에, 메시지별 `position` 순. 메시지마다 읽으면 N+1 이다.
+    `uq_chat_food_cards_message_id_position` 의 인덱스를 탄다."""
+    if not message_ids:
+        return []
+    stmt = (
+        select(ChatFoodCard)
+        .where(ChatFoodCard.message_id.in_(message_ids))
+        .order_by(ChatFoodCard.message_id, ChatFoodCard.position)
+    )
+    return list(db.execute(stmt).scalars())
+
+
+def get_open_conversation(db: Session, user_id: uuid.UUID) -> ChatConversation | None:
+    """user_id 의 열린 대화. 없으면 None. 부분 UNIQUE `uq_chat_conversations_open` 이라
+    많아야 하나이고, 그 인덱스를 탄다."""
+    stmt = select(ChatConversation).where(
+        ChatConversation.user_id == user_id, ChatConversation.closed_at.is_(None)
+    )
+    return db.execute(stmt).scalar_one_or_none()
