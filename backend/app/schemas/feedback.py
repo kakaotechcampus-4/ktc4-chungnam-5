@@ -145,6 +145,19 @@ class MealFeedbackResponse(CamelModel):
         )
 
 
+class ReplaceSuggestionRequest(CamelModel):
+    """`PUT /meals/{mealId}/feedback/suggestions` 요청 — 챗봇 카드 한 장.
+
+    extra="forbid": `foodCardID` 같은 오타를 조용히 무시하면 필수 필드 누락으로 바뀌어
+    원인을 찾기 어렵다 — 422 로 바로 알린다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    food_card_id: uuid.UUID
+    """챗봇 메시지의 `foodCards[].foodCardId`."""
+
+
 _MAX_HUNGER_MINUTES: Final = 2880
 """48시간. `checkin_offset_hours` 상한과 같은 창이다."""
 

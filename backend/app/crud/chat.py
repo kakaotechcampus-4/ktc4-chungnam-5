@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Final
 
 from sqlalchemy import ColumnElement, Date, cast, func, select, update
@@ -304,3 +304,37 @@ def get_open_conversation(db: Session, user_id: uuid.UUID) -> ChatConversation |
         ChatConversation.user_id == user_id, ChatConversation.closed_at.is_(None)
     )
     return db.execute(stmt).scalar_one_or_none()
+
+
+def get_card_for_meal(
+    db: Session, *, card_id: uuid.UUID, user_id: uuid.UUID, meal_id: uuid.UUID
+) -> tuple[ChatFoodCard, datetime] | None:
+    """A-5 "이걸로 바꾸기" 가 쓸 카드와, 그 카드가 만들어진 시각(메시지 `created_at`).
+
+    카드 → 메시지 → 대화를 한 번에 JOIN 해 **대화의 주인과 기준 끼니가 둘 다 맞을 때만**
+    돌려준다. 없는 카드 · 남의 카드 · 다른 끼니 대화의 카드를 구분하지 않고 모두 `None` 이다
+    — `crud/meal.py::get_owned_meal` 처럼 "남의 카드 id 는 존재한다" 는 정보를 흘리지 않는다.
+
+    카드가 달린 메시지가 `READY` · `SAFE` 가 아니면(생성 중 · 실패 · 가드레일 차단 · 검수 전)
+    없는 카드로 본다.
+
+    닫힌 대화(`closed_at`)의 카드도 돌려준다. 열린 대화도 사용자가 닫기 전까지 계속 열려
+    있어 "닫힘" 은 카드가 낡았는지를 말해 주지 않는다 — 낡음은 호출부가 메시지 시각과
+    끼니의 마지막 확정 시각으로 판정한다.
+    """
+    stmt = (
+        select(ChatFoodCard, ChatMessage.created_at)
+        .join(ChatMessage, ChatMessage.id == ChatFoodCard.message_id)
+        .join(ChatConversation, ChatConversation.id == ChatMessage.conversation_id)
+        .where(
+            ChatFoodCard.id == card_id,
+            ChatConversation.user_id == user_id,
+            ChatConversation.meal_id == meal_id,
+            # 완성됐고 가드레일을 통과한 메시지의 카드만 — 아니면 검수 안 된 문구가 SAFE
+            # 피드백의 추천으로 옮겨진다 (절대 규칙 1).
+            ChatMessage.status == ChatMessageStatus.READY,
+            ChatMessage.safety_status == SafetyStatus.SAFE,
+        )
+    )
+    row = db.execute(stmt).one_or_none()
+    return None if row is None else (row[0], row[1])

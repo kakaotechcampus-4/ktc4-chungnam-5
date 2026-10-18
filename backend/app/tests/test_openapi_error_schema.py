@@ -35,6 +35,7 @@ AUTHENTICATED_ROUTES = [
     ("/api/v1/home", "get"),
     ("/api/v1/chat/conversations", "post"),
     ("/api/v1/chat/conversations/{conversation_id}/messages", "post"),
+    ("/api/v1/meals/{meal_id}/feedback/suggestions", "put"),
 ]
 
 

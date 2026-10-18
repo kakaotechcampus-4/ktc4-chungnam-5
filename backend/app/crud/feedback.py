@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Final, NamedTuple
 
@@ -45,6 +46,25 @@ def latest_task_status(db: Session, meal_id: uuid.UUID) -> TaskStatus | None:
     """
     stmt = (
         select(Task.status)
+        .where(
+            Task.type == FEEDBACK_TASK_TYPE,
+            Task.payload["mealId"].astext == str(meal_id),
+        )
+        .order_by(Task.created_at.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def latest_task_created_at(db: Session, meal_id: uuid.UUID) -> datetime | None:
+    """이 끼니의 가장 최근 `feedback.meal` 작업이 들어간 시각. 작업이 없으면 None.
+
+    `confirm` 은 추천을 새로 만들어야 할 때(처음 확정 · 음식 수정 · 점수 변화 · 문장 없음)
+    채점과 같은 트랜잭션에서 이 작업을 넣는다. 그래서 이 시각이 곧 "추천을 마지막으로 다시
+    만들기 시작한 시각" 이다 — A-5 가 그보다 앞서 만든 챗봇 카드를 낡은 것으로 본다.
+    """
+    stmt = (
+        select(Task.created_at)
         .where(
             Task.type == FEEDBACK_TASK_TYPE,
             Task.payload["mealId"].astext == str(meal_id),
@@ -285,3 +305,34 @@ def parse_suggestions(stored: object) -> list[StoredSuggestion]:
     if not isinstance(stored, list):
         return []
     return [parsed for item in stored if (parsed := parse_suggestion(item)) is not None]
+
+
+def is_showable(row: MealFeedback | None) -> bool:
+    """이 피드백을 지금 사용자에게 보여 줘도 되는지 — 본문이 있고 `SAFE` 일 때만.
+
+    끼니 피드백 화면이 내용을 싣는 조건(`services/feedback.py::get_feedback` 의 READY ·
+    SAFE 경로)과 같다. 다음 끼니 추천은 이 행에 함께 들어 있으므로 추천도 같은 조건을
+    따른다 — `body` 가 비었거나(생성 중 · 실패 · 무효화) 가드레일을 통과하지 못한 행의
+    추천은 화면에 보이지 않는다.
+    """
+    if row is None or row.safety_status is not SafetyStatus.SAFE:
+        return False
+    return bool((row.body or "").strip())
+
+
+def replace_suggestions(
+    db: Session, row: MealFeedback, suggestions: list[dict[str, Any]]
+) -> None:
+    """다음 끼니 추천만 바꾼다. flush 까지만 — 커밋은 `services/` 가 한다 (절대 규칙 5).
+
+    `body` · `reasoning` · `safety_status` 는 건드리지 않는다 — 사용자가 고른 것은 추천뿐이고,
+    판정은 같은 행의 본문에 붙은 것이다.
+
+    **Core `UPDATE` 가 아니라 ORM 속성 대입이다.** 호출부는 이 행을 방금 읽었고 같은
+    세션에서 곧바로 응답을 조립한다. `UPDATE` 문으로 쓰면 세션의 객체가 옛 값을 들고
+    있어(`expire_on_commit=False`) 응답에 옛 추천이 나간다.
+
+    새 리스트를 대입하므로 JSONB 변경이 감지된다(제자리 수정은 감지되지 않는다).
+    """
+    row.suggestions = suggestions
+    db.flush()
