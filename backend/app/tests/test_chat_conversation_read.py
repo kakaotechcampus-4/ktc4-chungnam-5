@@ -179,3 +179,24 @@ def test_latest_ignores_closed_and_others_conversations(db: Session):
     _conversation(db, stranger.id)
 
     assert chat_service.get_latest_conversation(db, user_id=user.id) is None
+
+
+@pytest.mark.parametrize(
+    "safety_status", [SafetyStatus.BLOCKED, SafetyStatus.REVIEW_REQUIRED]
+)
+def test_unsafe_reply_hides_text_and_cards_even_if_stored(db: Session, safety_status):
+    """SAFE 가 아닌 답의 문장 · 카드는 저장돼 있어도 내보내지 않는다 (절대 규칙 1).
+    지금은 워커가 BLOCKED 를 `text=None` · 카드 없이 쓰지만, 읽는 쪽도 SAFE 만 노출해야
+    쓰는 쪽이 바뀌어도 새지 않는다 (`services/home.py` · `insight.py` 와 같은 판단)."""
+    user = make_user(db)
+    conversation = _conversation(db, user.id)
+    reply = _message(db, conversation.id, text="검수 전 문장", safety_status=safety_status)
+    _card(db, reply.id, 0, "두부 반 모")
+
+    [view] = chat_service.get_conversation(
+        db, user_id=user.id, conversation_id=conversation.id
+    ).messages
+
+    assert view.safety_status is safety_status
+    assert view.text is None
+    assert view.food_cards == []

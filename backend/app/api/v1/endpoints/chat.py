@@ -77,14 +77,16 @@ def _conversation_ok(view: ConversationResponse) -> ApiResponse[ConversationResp
 # UUID 경로 파라미터에 잡혀 422 가 난다 (`test_latest_without_conversation_is_200_null`).
 @router.get(
     "/chat/conversations/latest",
-    response_model=ApiResponse[ConversationResponse | None],
+    # `ConversationResponse | None` 로 쓰지 않는다 — `ApiResponse.data` 가 이미 nullable 이라
+    # 구조가 같은 스키마가 이름만 달리 하나 더 생긴다 (`ApiResponse_Union_...`).
+    response_model=ApiResponse[ConversationResponse],
     summary="진행 중인 대화 이어 보기",
     responses=error_responses(401, 422),
 )
 def get_latest_conversation(
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
-) -> ApiResponse[ConversationResponse | None]:
+) -> ApiResponse[ConversationResponse]:
     """AI 탭에 들어올 때 이어 볼 열린 대화. 메시지 모양은 A-3 과 같다.
 
     **열린 대화가 없으면 200 `data: null` 이다** — 에러가 아니라 "아직 없음" 이고, FE 는

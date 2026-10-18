@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.crud import chat as chat_crud
-from app.models.enums import ChatMessageRole, ChatMessageStatus, SafetyStatus
-from app.tests.factories import make_user
+from app.models.enums import ChatMessageRole, ChatMessageStatus, MealStatus, SafetyStatus
+from app.tests.factories import make_meal, make_user
 
 _URL = "/api/v1/chat/conversations"
 _MESSAGE_FIELDS = {
@@ -178,3 +178,36 @@ def test_latest_missing_user_header_is_401(client: TestClient):
     res = client.get(f"{_URL}/latest")
 
     assert res.status_code == 401
+
+
+def test_closed_conversation_is_200(client: TestClient, db: Session):
+    """"＋ 새 대화" 뒤에도 폴링 중이던 대화를 받는다 — A-2 와 달리 닫힘은 404 사유가 아니다."""
+    user = make_user(db)
+    old = client.post(_URL, json={}, headers=_h(user.id)).json()["data"]["conversationId"]
+    client.post(_URL, json={}, headers=_h(user.id))  # old 를 닫는다
+
+    res = client.get(f"{_URL}/{old}", headers=_h(user.id))
+
+    assert res.status_code == 200
+    assert res.json()["data"]["conversationId"] == old
+
+
+def test_live_base_meal_id_is_serialized(client: TestClient, db: Session):
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.EVALUATED)
+    conversation = chat_crud.create_conversation(db, user_id=user.id, meal_id=meal.id)
+
+    res = client.get(f"{_URL}/{conversation.id}", headers=_h(user.id))
+
+    assert res.json()["data"]["mealId"] == str(meal.id)
+
+
+def test_latest_with_only_closed_conversations_is_200_null(client: TestClient, db: Session):
+    user = make_user(db)
+    chat_crud.create_conversation(db, user_id=user.id, meal_id=None)
+    chat_crud.close_open_conversation(db, user.id)
+
+    res = client.get(f"{_URL}/latest", headers=_h(user.id))
+
+    assert res.status_code == 200
+    assert res.json()["data"] is None

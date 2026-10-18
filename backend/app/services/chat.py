@@ -194,10 +194,26 @@ def _conversation_response(db: Session, conversation: ChatConversation) -> Conve
     return ConversationResponse(
         conversation_id=conversation.id,
         meal_id=meal_id,
-        messages=[
-            _message_response(message, cards_by_message[message.id]) for message in messages
-        ],
+        messages=[_readable_message(message, cards_by_message[message.id]) for message in messages],
     )
+
+
+def _readable_message(
+    message: ChatMessage, cards: list[FoodCardResponse]
+) -> ChatMessageResponse:
+    """SAFE 가 아닌 답은 저장된 문장 · 카드가 있어도 비워 내보낸다 (절대 규칙 1).
+
+    지금은 워커가 BLOCKED 를 `text=None` · 카드 없이 쓰지만, 쓰는 쪽에만 기대지 않고
+    읽는 쪽도 SAFE 만 노출한다 (`services/home.py` · `insight.py` 와 같은 판단).
+    GENERATING · FAILED 는 원래 문장이 없어 결과가 같다. USER 메시지는 판정 대상이 아니다.
+    """
+    view = _message_response(message, cards)
+    if (
+        message.role is ChatMessageRole.ASSISTANT
+        and message.safety_status is not SafetyStatus.SAFE
+    ):
+        return view.model_copy(update={"text": None, "food_cards": []})
+    return view
 
 
 def get_conversation(
