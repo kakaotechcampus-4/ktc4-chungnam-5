@@ -27,6 +27,15 @@ x-be-env: &be-env
   LOCAL_STORAGE_BASE_URL: http://api:8000/media
   INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?}
 
+# api · worker 는 같은 이미지다. 빌드 인자는 deploy.sh · deploy-staging.sh 가 git 에서 읽어
+# export 한다(H3) — 운영은 릴리스 태그와 전체 SHA, 스테이징은 SHA 만. 직접 compose 를 부르면
+# 둘 다 비어 /health 가 null 을 낸다.
+x-be-build: &be-build
+  context: ../backend
+  args:
+    GIT_SHA: ${GIT_SHA:-}
+    APP_VERSION: ${APP_VERSION:-}
+
 x-python-health: &python-health
   test:
     - CMD
@@ -57,8 +66,7 @@ services:
     restart: unless-stopped
 
   api:
-    build:
-      context: ../backend
+    build: *be-build
     image: glp1-prod-be
     container_name: glp1-prod-api
     # 기동할 때마다 스키마를 최신으로 맞춘다. 마이그레이션은 api 만 돌린다 —
@@ -81,8 +89,7 @@ services:
     restart: unless-stopped
 
   worker:
-    build:
-      context: ../backend
+    build: *be-build
     image: glp1-prod-be
     container_name: glp1-prod-worker
     command: ["python", "-m", "app.worker_main"]

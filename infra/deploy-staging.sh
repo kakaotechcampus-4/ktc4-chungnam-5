@@ -15,6 +15,11 @@ flock 9
 docker network inspect glp1-edge >/dev/null 2>&1 || docker network create glp1-edge >/dev/null
 git fetch --quiet origin develop
 git checkout --quiet --detach "${1:-origin/develop}"
+# 스테이징은 수시로 배포하므로 버전 없이 SHA 만 싣는다 (/health 의 version 은 null).
+# APP_VERSION 을 비워 export 하는 건 셸에 남은 값이 이미지에 섞이지 않게 하려는 것이다.
+GIT_SHA=$(git rev-parse HEAD)
+APP_VERSION=
+export GIT_SHA APP_VERSION
 cd infra
 COMPOSE=(docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml --env-file .env.staging)
 "${COMPOSE[@]}" build

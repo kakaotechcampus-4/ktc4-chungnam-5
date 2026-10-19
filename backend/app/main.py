@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any
 
@@ -49,5 +50,19 @@ app.openapi = custom_openapi
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, str | None]:
+    """살아 있는지와 **지금 떠 있는 빌드**.
+
+    `version` 은 운영 릴리스 태그(`v2026.10.19`), `sha` 는 그 이미지를 만든 **전체** 커밋
+    SHA 다. 둘 다 `infra/deploy.sh` 가 git 에서 읽어 이미지 빌드 인자로 넘기고
+    (`backend/Dockerfile` 의 `ARG` → `ENV`), 여기서 그대로 낸다. 배포 워크플로가
+    `"sha":"<GITHUB_SHA>"` 를 찾아 이번 커밋이 실제로 떠 있는지 확인하므로 값을 자르지 않는다.
+
+    빈 값은 `null` 이다 — 스테이징과 태그 없는 배포는 `APP_VERSION` 이 빈 문자열이고,
+    로컬 실행은 둘 다 없다.
+    """
+    return {
+        "status": "ok",
+        "version": os.environ.get("APP_VERSION") or None,
+        "sha": os.environ.get("GIT_SHA") or None,
+    }
