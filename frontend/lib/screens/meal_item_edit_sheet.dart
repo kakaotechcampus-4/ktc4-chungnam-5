@@ -78,6 +78,15 @@ class _MealItemEditSheetState extends State<_MealItemEditSheet> {
   _NutritionMode _mode = _NutritionMode.pick;
   FoodCandidate? _candidate;
 
+  /// 후보를 고르면서 양을 기준량(g)으로 바꿨는지. 안내 문구에 쓴다.
+  bool _switchedToGrams = false;
+
+  /// 서버가 영양을 계산할 수 있는 단위(BE `services.meal.to_grams`).
+  /// 개·인분은 g 으로 바꿀 근거가 DB 에 없어 계산하지 않는다 — 앱도 g 으로만 계산한다.
+  static const _gramUnits = {'g', 'ml'};
+
+  bool get _unitIsGrams => _gramUnits.contains(_unit);
+
   late final _kcal = _fieldFor(widget.item.nutrition?.kcal);
   late final _protein = _fieldFor(widget.item.nutrition?.proteinG);
   late final _fat = _fieldFor(widget.item.nutrition?.fatG);
@@ -126,6 +135,14 @@ class _MealItemEditSheetState extends State<_MealItemEditSheet> {
     if (picked == null || !mounted) return;
     setState(() {
       _candidate = picked;
+      // 개·인분이면 영양이 비므로 양을 그 음식의 기준량(g)으로 바꾼다.
+      // 기준량은 "1인분" 이 아니라 성분값의 기준이라 사용자가 고치도록 안내한다.
+      final serving = picked.servingSizeG;
+      _switchedToGrams = !_unitIsGrams && serving != null && serving > 0;
+      if (_switchedToGrams) {
+        _unit = 'g';
+        _amount = serving!;
+      }
       final n = _scaled(picked);
       _kcal.text = _textOf(n.kcal);
       _protein.text = _textOf(n.proteinG);
@@ -140,7 +157,7 @@ class _MealItemEditSheetState extends State<_MealItemEditSheet> {
 
   /// 후보의 영양은 기준량(보통 100g) 값이다. 양이 g 이면 먹은 양으로 환산해
   /// 서버가 저장할 값과 같게 보여 준다. g 이 아니면 기준량 그대로다.
-  bool _isScaled(FoodCandidate c) => _unit == 'g' && (c.servingSizeG ?? 0) > 0;
+  bool _isScaled(FoodCandidate c) => _unitIsGrams && (c.servingSizeG ?? 0) > 0;
 
   MealNutrition _scaled(FoodCandidate c) {
     final n = c.nutrition;
@@ -590,6 +607,7 @@ class _MealItemEditSheetState extends State<_MealItemEditSheet> {
                   ),
                 ),
               ),
+              ?_gramsNotice(c),
               const SizedBox(height: AppSpacing.md),
               row('칼로리 (kcal)', n.kcal, 'kcal'),
               row('단백질 (g)', n.proteinG, 'g'),
@@ -613,6 +631,28 @@ class _MealItemEditSheetState extends State<_MealItemEditSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 영양을 g 으로만 계산한다는 안내. 단위를 개·인분으로 되돌렸으면 경고한다.
+  Widget? _gramsNotice(FoodCandidate c) {
+    final String text;
+    if (!_unitIsGrams) {
+      text = '영양 정보는 g 으로만 계산해요. 양을 g 으로 바꿔 주세요.';
+    } else if (_switchedToGrams) {
+      text = '양을 기준량 ${_formatNumber(c.servingSizeG!)}g 으로 바꿨어요. 먹은 만큼 고쳐 주세요.';
+    } else {
+      return null;
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs, right: 28),
+      child: Text(
+        text,
+        style: AppTypography.caption.copyWith(
+          fontSize: 10,
+          color: _unitIsGrams ? AppColors.textSecondary : AppColors.primary,
+        ),
       ),
     );
   }
