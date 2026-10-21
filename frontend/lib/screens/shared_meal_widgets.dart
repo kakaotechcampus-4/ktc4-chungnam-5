@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/meal_api.dart';
 import '../common/api_format.dart';
+import '../common/api_image.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -128,6 +129,7 @@ class MealCard extends StatelessWidget {
     required this.quantityLabel,
     required this.quality,
     required this.satiety,
+    this.thumbnailUrl,
     this.onTap,
     this.showChevron = false,
   });
@@ -149,6 +151,9 @@ class MealCard extends StatelessWidget {
   final int? quality;
   final int? satiety;
 
+  /// 서버가 준 사진 경로(`/media/...`). 사진 없이 기록했으면 null — 빈 자리만 보인다.
+  final String? thumbnailUrl;
+
   final VoidCallback? onTap;
   final bool showChevron;
 
@@ -165,13 +170,16 @@ class MealCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 실제 사진은 S3 URL 로 교체한다. 지금은 자리만 잡는다.
-              Container(
-                width: _thumbnailSize,
-                height: _thumbnailSize,
-                decoration: const BoxDecoration(
+              ClipRRect(
+                borderRadius: AppRadius.mdRadius,
+                child: Container(
+                  width: _thumbnailSize,
+                  height: _thumbnailSize,
                   color: AppColors.surfaceSage,
-                  borderRadius: AppRadius.mdRadius,
+                  child: switch (thumbnailUrl) {
+                    final url? => ApiImage(url),
+                    null => null,
+                  },
                 ),
               ),
               const SizedBox(width: AppSpacing.md),

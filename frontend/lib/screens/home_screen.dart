@@ -513,6 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
           quantityLabel: meal.scores?.quantityDisplay,
           quality: meal.scores?.quality,
           satiety: meal.scores?.satiety,
+          thumbnailUrl: meal.thumbnailUrl,
           showChevron: true,
           onTap: () => _openMeal(meal),
         ),

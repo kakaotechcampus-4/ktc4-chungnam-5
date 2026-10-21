@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/api/api_client.dart';
 import 'package:frontend/api/medication_api.dart';
 import 'package:frontend/common/api_format.dart';
+import 'package:frontend/common/api_image.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/popups/daily_condition_popup.dart';
 import 'package:frontend/screens/home_screen.dart' show StomachGauge;
@@ -945,6 +946,25 @@ void main() {
     expect(find.text('80'), findsOneWidget); // 질
     expect(find.textContaining('단백질 부족'), findsOneWidget);
     expect(find.text('다음 끼니 제안 보기'), findsOneWidget);
+  });
+
+  testWidgets('home meal card shows the meal photo', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final home = fakeExample('GET /api/v1/home');
+    final today = (home['data'] as Map<String, dynamic>)['today'];
+    final meals = (today as Map<String, dynamic>)['meals'] as List<dynamic>;
+    (meals.first as Map<String, dynamic>)['thumbnailUrl'] =
+        '/media/meals/lunch.png';
+    final api = FakeApi()..on('GET /home', (_) => (200, home));
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+
+    // 사진이 있는 끼니만 사진을 그리고, 없는 끼니는 빈 자리다.
+    final photos = tester.widgetList<ApiImage>(find.byType(ApiImage));
+    expect(photos.map((p) => p.path), ['/media/meals/lunch.png']);
   });
 
   testWidgets('home meal card opens the next meal suggestion', (
