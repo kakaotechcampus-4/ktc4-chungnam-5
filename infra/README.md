@@ -110,18 +110,22 @@ PENDING          1  2026-09-20 10:15:40+00:00
 
 | 파일 | 역할 |
 |---|---|
-| `docker-compose.prod.yml` | `db` · `api` · `worker` · `ai` · `caddy` (+ 데모용 `ai-stub`). compose 프로젝트 이름은 `glp1-prod` |
-| `Caddyfile` | HTTPS(Let's Encrypt) + 데모 키 검사 |
+| `docker-compose.prod.yml` | `db` · `api-blue` · `api-green` · `worker` · `ai` · `caddy` (+ 일회성 `migrate`, 데모용 `ai-stub`). compose 프로젝트 이름은 `glp1-prod` |
+| `caddy/Caddyfile` | HTTPS(Let's Encrypt) + 데모 키 검사. 디렉터리째 마운트한다 |
 | `.env.prod.example` | 서버의 `.env.prod` 에 채울 키 목록. 비밀값은 **서버의 `.env.prod` 에만** 둔다 |
-| `deploy.sh` | 배포 스크립트. 사람과 CI 가 같은 스크립트를 쓴다 |
+| `deploy.sh` | 배포 스크립트. 사람과 CI 가 같은 스크립트를 쓴다. 잠금 · checkout 뒤 `bg-deploy.sh` 를 부른다 |
+| `bg-deploy.sh` · `bg-lib.sh` | Blue/Green 무중단 배포 로직 (운영 · 스테이징 공통) |
+| `bg-switch.sh` | 롤백. 정지해 둔 옛 쪽으로 되돌린다 |
 | `docker-compose.staging.yml` | 스테이징(develop) 스택. 운영 파일 위에 덮어써 이름·이미지·볼륨을 `glp1-staging` 으로 가른다 |
 | `deploy-staging.sh` | 스테이징 배포 스크립트. `deploy.sh` 와 같은 잠금을 써서 둘이 동시에 돌지 않는다 |
 
 ```
-인터넷 ──80/443──▶ caddy ──▶ api:8000 ──▶ db:5432
-                              ▲   │
-                    /internal │   ▼ (큐: task_queue 테이블)
-                              ai ◀── worker
+                         ┌─▶ api-blue  ─┐
+인터넷 ──80/443──▶ caddy ┤  (한쪽만 받음) ├──▶ db:5432
+                         └─▶ api-green ─┘
+                         api(별칭) ▲   │
+                       /internal  │   ▼ (큐: task_queue 테이블)
+                                  ai ◀── worker
 ```
 
 ### 접근 규칙 (Caddyfile, 위에서부터)
@@ -147,7 +151,7 @@ chmod 600 .env.prod
 docker compose -f docker-compose.prod.yml logs -f caddy   # 인증서 발급 로그 확인
 ```
 
-스키마는 `api` 가 기동할 때마다 `alembic upgrade head` 로 맞춘다. 공공 영양DB 시드는
+스키마는 배포마다 `migrate`(일회성 `alembic upgrade head`)가 새 api 를 띄우기 전에 맞춘다. 공공 영양DB 시드는
 **처음 한 번만** 넣는다 (336,351건):
 
 ```bash
@@ -155,33 +159,56 @@ docker exec -i glp1-prod-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_
   < seed/food_refs_20260828.dump
 ```
 
-### 다시 배포
+### 다시 배포 (Blue/Green)
 
-`main` 에 병합되면 GitHub Actions 가 `ssm send-command` 로 `deploy.sh` 를 부른다.
+버전 태그(`v2026.10.23`)를 push 하면 GitHub Actions 가 `ssm send-command` 로 `deploy.sh` 를 부른다.
 급할 때는 Session Manager 에서 직접 실행한다.
 
 ```bash
-/opt/glp1/infra/deploy.sh            # origin/main
-/opt/glp1/infra/deploy.sh <커밋 SHA>  # main 의 특정 커밋. 롤백도 이것으로 한다 (아래)
+/opt/glp1/infra/deploy.sh                # origin/main
+/opt/glp1/infra/deploy.sh v2026.10.23    # 버전 태그 또는 main 의 특정 커밋 SHA
 ```
 
-`main` 에 있는 커밋만 배포할 수 있다(`git fetch origin main`). 리뷰를 거친 코드만 서버에 올리려는
-규칙이다 — 핫픽스도 `main` 에 머지한 뒤 배포한다.
+`main` 에 있는 커밋만 배포할 수 있다. 리뷰를 거친 코드만 서버에 올리려는 규칙이다 — 핫픽스도
+`main` 에 머지한 뒤 배포한다.
 
-**롤백 = `deploy.sh <이전 SHA>`.** `--wait` 가 실패해도 이미 바뀐 컨테이너는 그대로라 이걸로 되돌린다.
-단, 되돌리는 구간에 마이그레이션이 있으면 옛 코드가 DB 의 새 리비전을 몰라 `api` 기동이 실패한다.
-그때는 **새 이미지가 떠 있는 동안 먼저** DB 를 내린 뒤 이전 SHA 로 배포한다.
+api 는 `api-blue` · `api-green` 두 벌이고, 한쪽만 요청을 받는다. `bg-deploy.sh` 의 흐름:
+
+1. 받지 않는 쪽 이미지를 빌드한다 (`glp1-prod-be:<버전>`, 태그 없는 배포는 SHA 앞 7자). 그동안 지금 쪽이 계속 받는다
+2. 워커를 내리고 `migrate` 로 마이그레이션 — **옛 api 가 계속 받는 중이라 옛 코드와 호환되는 마이그레이션만** 넣는다 (Expand / Contract)
+3. 새 쪽을 띄우고 `/health/ready`(DB 까지 확인)로 healthy 를 기다린 뒤, Caddy 안에서도 닿는지 본다
+4. upstream 파일을 새 쪽으로 바꾸고 `caddy reload` — Caddy 는 다시 만들지 않으므로 끊기지 않는다
+5. worker · ai 를 새 이미지로 올리고, 옛 쪽 api 는 **정지만** 해 둔다 (롤백용)
+
+1~3 중 하나라도 실패하면 전환하지 않고 끝난다. 사용자는 계속 옛 쪽을 쓰고, 워커도 옛 이미지로 다시 켜진다.
+지금 받는 쪽과 같은 버전을 다시 배포하면 빌드 전에 막는다 — 같은 태그로 빌드하면 롤백할 이미지가 덮어써진다.
+
+배포 상태는 git 밖 `/opt/glp1-bg` 에 있다:
 
 ```bash
-docker exec glp1-prod-api alembic downgrade <이전 SHA 의 head 리비전>
-/opt/glp1/infra/deploy.sh <이전 SHA>
+cat /opt/glp1-bg/prod.env               # ACTIVE=green, BLUE_TAG=v2026.10.22, GREEN_TAG=v2026.10.23
+cat /opt/glp1-bg/upstreams/prod.caddy   # import gate glp1-prod-api-green:8000 {args[0]}
 ```
 
-`deploy.sh` 는 이미지를 먼저 만들고, **워커를 내린 뒤** 나머지를 올린다. 마이그레이션은 `api` 가
-기동할 때 도는데, 옛 워커가 그와 겹치면 잠금·enum 문제로 마이그레이션이나 워커가 터질 수 있어서다
-(예: `9a1c4e7b2d3f`). 그래서 배포 중 워커는 마이그레이션 · `api` 기동 동안 잠시 멈춘다.
-작업은 큐(`task_queue`)에 남아 있다가 새 워커가 처리한다. 손으로 배포할 때도 `up` 을 직접
-부르지 말고 `deploy.sh` 를 쓴다.
+**롤백 = `bg-switch.sh`.** 정지해 둔 옛 쪽을 다시 켜고 Caddy 를 그쪽으로 돌린다. 다시 빌드하지 않는다.
+트래픽 전환은 20초 안팎, 워커 교체까지 1분쯤 걸린다. 한 번 더 부르면 다시 새 쪽으로 간다.
+
+```bash
+/opt/glp1/infra/bg-switch.sh prod
+curl -s https://glp1-demo.duckdns.org/health    # version 이 이전 버전이면 완료
+```
+
+DB 는 되돌리지 않는다. 옛 코드와 호환되지 않는 마이그레이션이 들어갔다면 `bg-switch.sh` 로는 안 된다.
+그때는 새 이미지가 떠 있는 동안 먼저 DB 를 내린 뒤 이전 버전으로 다시 배포한다
+(이전 버전 이미지는 이미 지워졌을 수 있어 다시 빌드한다).
+
+```bash
+docker exec glp1-prod-api-<지금 쪽> alembic downgrade <이전 버전의 head 리비전>
+/opt/glp1/infra/deploy.sh <이전 버전 태그>
+```
+
+손으로 배포할 때도 `up` 을 직접 부르지 말고 `deploy.sh` 를 쓴다. compose 를 직접 부르면 이미지 태그가
+비어(`:none`) api · worker 이미지를 찾지 못한다.
 
 ### 운영 중 자주 쓰는 것
 
@@ -191,10 +218,13 @@ docker compose -f docker-compose.prod.yml ps
 docker logs -f glp1-prod-worker
 
 # .env.prod 를 고친 뒤에는 restart 가 아니라 up -d 로 컨테이너를 다시 만든다 (환경변수는 생성 시점에 읽힌다)
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d caddy
+# caddy 를 다시 만드는 동안 80/443 이 잠깐 끊긴다. Caddyfile 만 바꿨으면 reload 로 충분하다 (끊기지 않음)
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --no-deps caddy
+docker exec glp1-prod-caddy caddy reload --config /etc/caddy/Caddyfile
 ```
 
-- 디스크는 50GB 고정이다. 차면 `docker system df` 로 보고 `docker system prune -af` 로 정리한다.
+- 디스크는 50GB 고정이다. 차면 `docker system df` 로 보고 정리한다. `docker system prune -af` 는
+  롤백용으로 정지해 둔 api 컨테이너와 이미지까지 지운다 — 쓴 뒤에는 다음 배포 전까지 `bg-switch.sh` 가 안 된다.
   **`docker volume prune` 은 쓰지 않는다** — `db-data` · `media` · `caddy_data` 가 지워진다.
 - 서버는 **중지하지 말고 재부팅만** 한다. 중지 → 시작하면 공인 IP 가 바뀐다 (DuckDNS cron 이 따라가지만 몇 분 끊긴다).
 
@@ -221,11 +251,13 @@ docker rm -f glp1-prod-ai-stub
 돌려 보려는 것이다. 설계: `docs/superpowers/specs/2026-10-13-staging-env-design.md`
 
 ```
-glp1-demo.duckdns.org    ┐                     ┌─▶ glp1-prod-api     (main,    /opt/glp1)
+glp1-demo.duckdns.org    ┐                     ┌─▶ glp1-prod-api-{blue,green}     (main,    /opt/glp1)
                          ├─▶ glp1-prod-caddy ──┤
-glp1-staging.duckdns.org ┘   (80/443 하나)     └─▶ glp1-staging-api  (develop, /opt/glp1-staging)
+glp1-staging.duckdns.org ┘   (80/443 하나)     └─▶ glp1-staging-api-{blue,green}  (develop, /opt/glp1-staging)
                                                     glp1-edge 네트워크
 ```
+
+- 스테이징도 같은 Blue/Green 으로 올라간다. 롤백은 `/opt/glp1-staging/infra/bg-switch.sh staging`
 
 - 80/443 은 운영 Caddy 하나가 맡고 도메인으로 나눈다. 스테이징 api 에는 외부 네트워크 `glp1-edge` 로 닿는다
 - DB·사진·큐는 볼륨이 따로라(`glp1-staging_*`) 운영 데이터와 섞이지 않는다. 데모 키는 운영과 같다
@@ -266,24 +298,33 @@ docker compose -p glp1-staging stop                  # 데모 당일 등 잠시 
 컨테이너 이름·이미지 태그(`glp1-prod-*`), 볼륨·네트워크(프로젝트 `glp1-prod`), 포트(80·443)가
 개발용과 겹치지 않는다.
 
+배포 스크립트(`bg-deploy.sh`)를 그대로 쓴다. 상태 디렉터리만 `GLP1_BG_DIR` 로 바꾼다.
+Git Bash 에서는 `MSYS_NO_PATHCONV=1` 이 필요하다 — 없으면 `docker exec` 에 넘기는 `/etc/...` 경로를
+Windows 경로로 바꿔 버린다. `bg-switch.sh` 는 `flock` 이 있어야 해서 Git Bash 에서는 돌지 않는다.
+
 ```bash
 cd infra
 cp .env.prod.example .env.prod      # DOMAIN=localhost, STAGING_DOMAIN=staging.localhost, 나머지는 아무 시험 값
-docker network create glp1-edge     # 운영 compose 가 요구하는 외부 네트워크 (배포 스크립트는 알아서 만든다)
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build --wait
+docker network create glp1-edge     # 운영 compose 가 요구하는 외부 네트워크 (deploy.sh 는 알아서 만든다)
+export MSYS_NO_PATHCONV=1 GLP1_BG_DIR="$HOME/.glp1-bg-local"   # 저장소 밖
+GIT_SHA=$(git rev-parse HEAD) APP_VERSION= ./bg-deploy.sh prod
+# ⚠️ 끝에서 docker image prune · builder prune 이 돈다 — 이 PC 의 이름 없는 이미지·오래된 빌드 캐시도 지운다
 
 curl -k https://localhost/health                                    # 200
 curl -k https://localhost/docs                                      # 403
 curl -k -H "X-Demo-Key: <값>" https://localhost/docs                # 200
 curl -k -H "X-Demo-Key: <값>" https://localhost/internal/v1/foods   # 404
-docker compose -f docker-compose.prod.yml ps                        # 5개 모두 healthy
+docker compose -p glp1-prod ps                                      # 모두 healthy
 
 # 스테이징까지 함께: .env.prod 를 복사해 DB_PASSWORD·INTERNAL_SERVICE_TOKEN 만 바꾼다
 cp .env.prod .env.staging
 sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=staging-test-pw|; s|^INTERNAL_SERVICE_TOKEN=.*|INTERNAL_SERVICE_TOKEN=staging-test-token|" .env.staging
-docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml --env-file .env.staging up -d --build --wait
+GIT_SHA=$(git rev-parse HEAD) APP_VERSION= ./bg-deploy.sh staging
 curl -k https://staging.localhost/health                            # 200
 
 docker compose -p glp1-staging down
-docker compose -f docker-compose.prod.yml down    # -v 를 붙이면 DB·사진·인증서 볼륨까지 지운다
+docker compose -p glp1-prod down    # -v 를 붙이면 DB·사진·인증서 볼륨까지 지운다
+rm -rf "$GLP1_BG_DIR"
 ```
+
+같은 커밋으로 두 번 배포하면 "이미 떠 있는 버전" 으로 막힌다. 다시 시험할 때는 `GIT_SHA` 를 바꾼다.
