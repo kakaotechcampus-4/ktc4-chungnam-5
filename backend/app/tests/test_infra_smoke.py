@@ -1,6 +1,10 @@
 """테스트 인프라가 실제 Postgres 에 붙고 마이그레이션이 적용됐는지만 확인한다."""
 
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import OperationalError
+
+from app.db.session import get_db
+from app.main import app
 
 
 def test_migrations_created_all_tables(db):
@@ -53,6 +57,29 @@ def test_health_empty_version_is_null(client, monkeypatch):
     monkeypatch.setenv("GIT_SHA", "740c7f855850638aab9dd6bc828ecb897534c1be")
 
     assert client.get("/health").json()["version"] is None
+
+
+def test_health_ready_checks_db(client):
+    """Blue/Green 전환 전 확인 — DB 에 붙으면 200."""
+    response = client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_health_ready_is_503_when_db_is_down(client):
+    """DB 에 못 붙는 새 api 로는 전환하지 않도록 503 을 낸다."""
+
+    class _DownSession:
+        def execute(self, *args, **kwargs):
+            raise OperationalError("select 1", {}, Exception("connection refused"))
+
+    app.dependency_overrides[get_db] = lambda: _DownSession()
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable"}
 
 
 def test_users_has_height_cm_column(db):

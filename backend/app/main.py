@@ -2,12 +2,17 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from app.api.v1 import api_router
 from app.core.response import register_exception_handlers
+from app.db.session import get_db
 from app.infra.storage import StorageSettings
 
 app = FastAPI(title="GLP-1 Meal Coach API", version="0.1.0")
@@ -66,3 +71,20 @@ async def health() -> dict[str, str | None]:
         "version": os.environ.get("APP_VERSION") or None,
         "sha": os.environ.get("GIT_SHA") or None,
     }
+
+
+@app.get("/health/ready")
+def health_ready(db: Session = Depends(get_db)) -> JSONResponse:
+    """요청을 받을 준비가 됐는지 — DB 에 `select 1` 까지 해 본다.
+
+    Blue/Green 배포가 새 api 로 트래픽을 넘기기 **전에** 이 경로로 확인한다
+    (컨테이너 healthcheck, `infra/bg-deploy.sh` 의 Caddy 쪽 확인). `/health` 는 DB 를
+    보지 않아서 DB 에 못 붙는 api 로도 전환될 수 있다. `/health` 는 Caddy·배포 워크플로가
+    키 없이 부르는 경로라 그대로 두고, 여기만 DB 를 본다. Caddy 는 `/health` 만 키 없이
+    통과시키므로 이 경로는 밖에서 보이지 않는다.
+    """
+    try:
+        db.execute(text("select 1"))
+    except SQLAlchemyError:
+        return JSONResponse(status_code=503, content={"status": "unavailable"})
+    return JSONResponse(content={"status": "ok"})
