@@ -5,7 +5,7 @@
 #
 # 운영 compose 위에 docker-compose.staging.yml 을 덮어써 이름·이미지·볼륨을 glp1-staging 으로 가른다.
 # 80/443 은 운영 Caddy 가 맡고, glp1-edge 네트워크로 스테이징 api 에 닿는다.
-# 흐름은 deploy.sh 와 같다 — 워커를 먼저 내리는 이유도 거기 적혀 있다.
+# 흐름은 deploy.sh 와 같다 — 잠금 · checkout 뒤에 bg-deploy.sh 가 Blue/Green 으로 올린다.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 # deploy.sh 와 같은 잠금. 운영 배포가 돌고 있으면 끝날 때까지 기다린다.
@@ -20,11 +20,5 @@ git checkout --quiet --detach "${1:-origin/develop}"
 GIT_SHA=$(git rev-parse HEAD)
 APP_VERSION=
 export GIT_SHA APP_VERSION
-cd infra
-COMPOSE=(docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml --env-file .env.staging)
-"${COMPOSE[@]}" build
-"${COMPOSE[@]}" stop worker
-"${COMPOSE[@]}" up -d --wait
-# dangling 이미지만 지우므로 운영 이미지(glp1-prod-*)는 남는다
-docker image prune -f
-docker builder prune -f --filter until=72h
+# 나머지는 운영과 같은 Blue/Green 로직이다. 이미지 정리는 glp1-staging-be 만 건드린다.
+exec infra/bg-deploy.sh staging
