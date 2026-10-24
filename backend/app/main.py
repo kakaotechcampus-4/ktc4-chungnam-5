@@ -10,20 +10,28 @@ from app.api.v1 import api_router
 from app.core.response import register_exception_handlers
 from app.infra.storage import StorageSettings
 
+def mount_media(app: FastAPI, settings: StorageSettings) -> None:
+    """`LocalDiskStorage` 가 저장한 파일을 `/media` 로 서빙한다. **로컬 디스크일 때만.**
+
+    S3 로 바꾸면 사진은 presigned URL 이 S3 를 직접 가리키므로 이 길이 필요 없다. 열어 두면
+    서버 디스크의 옛 사진이 계속 나가고, 데모 키를 없애는 순간 누구나 볼 수 있다
+    (배포 계획서 I절 — 그래서 데모 키 제거 전에 S3 로 바꾼다).
+    """
+    if settings.STORAGE_TYPE != "local":
+        return
+    Path(settings.LOCAL_STORAGE_DIR).mkdir(parents=True, exist_ok=True)
+    app.mount(
+        "/media",
+        StaticFiles(directory=settings.LOCAL_STORAGE_DIR),
+        name="media",
+    )
+
+
 app = FastAPI(title="GLP-1 Meal Coach API", version="0.1.0")
 
 register_exception_handlers(app)
 app.include_router(api_router)
-
-# LocalDiskStorage 가 저장한 파일을 서빙한다. 실제 S3Storage 로 교체되면 이 마운트는
-# 필요 없어진다 — presigned URL 이 S3 를 직접 가리키게 된다.
-_storage_settings = StorageSettings()
-Path(_storage_settings.LOCAL_STORAGE_DIR).mkdir(parents=True, exist_ok=True)
-app.mount(
-    "/media",
-    StaticFiles(directory=_storage_settings.LOCAL_STORAGE_DIR),
-    name="media",
-)
+mount_media(app, StorageSettings())
 
 
 def custom_openapi() -> dict[str, Any]:
