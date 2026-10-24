@@ -21,6 +21,7 @@ from app.crud import medication as medication_crud
 from app.crud import meal as meal_crud
 from app.crud.evaluation import NutrientTotals
 from app.infra.queue import enqueue
+from app.infra.storage import build_file_storage
 from app.models.enums import MealItemSource, MealStatus, MealType, NutrientCode, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.models.meal import Meal, MealItem, SatietyLog
@@ -186,13 +187,15 @@ def _build_scores(
 
 
 def _build_thumbnail_url(image_key: str | None) -> str | None:
-    """image_key 를 실제 접근 가능한 URL 로 바꾼다.
+    """image_key 를 앱이 열 수 있는 주소로 바꾼다. 사진이 없으면 None.
 
-    TODO: 6번(POST /meals)에서 infra/ FileStorage 붙이면 presigned URL 로 교체.
+    주소 규칙은 저장소가 정한다 (`infra/storage.py::FileStorage.client_url`) — 로컬 디스크면
+    `/media/…`(앱이 서버 주소를 붙인다), S3 면 presigned URL. 여기서 경로를 직접 만들면
+    S3 로 바꿨을 때 업로드는 S3 로 가는데 화면엔 서버 경로가 나가 사진이 깨진다.
     """
     if image_key is None:
         return None
-    return f"/media/{image_key}"
+    return build_file_storage().client_url(image_key)
 
 
 def encode_cursor(eaten_at: datetime, meal_id: uuid.UUID) -> str:
