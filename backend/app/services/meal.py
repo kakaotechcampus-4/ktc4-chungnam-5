@@ -542,7 +542,8 @@ def update_items(
             unit=update.request.unit,
             amount_g=update.amount_g,
             # 이름이 그대로면 기존 링크를 지킨다. 다시 찾으면 AI 가 정확히 연결해 둔
-            # 항목이 끊길 수 있다 — 이름 매칭은 흔한 음식에 None 을 주기 때문이다
+            # 항목이 끊기거나 다른 행으로 바뀔 수 있다 — 이름 매칭은 정확히 같은 이름만,
+            # GENERAL 먼저 찾기 때문이다
             # (`endpoints/meal_items.py` 의 update_meal_items 독스트링 참고).
             # 지킬 링크가 없을 때(`food_ref_id IS NULL`)는 얘기가 다르다. AI 가
             # `candidateFoodRefId` 를 못 줬다는 뜻이고 이름 매칭은 워커가 쓰지 않는
