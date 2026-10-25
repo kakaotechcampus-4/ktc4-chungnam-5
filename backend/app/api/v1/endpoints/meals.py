@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
@@ -15,6 +16,8 @@ from app.infra.storage import FileStorage, get_file_storage
 from app.models.enums import MealStatus, MealType
 from app.schemas.meal import (
     MealCalendarResponse,
+    MealCreateFoodItem,
+    MealCreateFoodsRequest,
     MealCreateResponse,
     MealDeleteResponse,
     MealDetailResponse,
@@ -53,14 +56,17 @@ def _has_known_image_signature(data: bytes) -> bool:
 
 @dataclass
 class _ParsedMealInput:
-    """멀티파트(사진)·JSON(텍스트) 두 형식을 같은 모양으로 정리한 결과."""
+    """멀티파트(사진)·JSON(고른 음식) 두 형식을 같은 모양으로 정리한 결과.
+
+    `image_bytes` · `items` 중 정확히 하나만 차 있다.
+    """
 
     meal_type: MealType
     eaten_at: datetime
-    raw_text: str | None
     image_bytes: bytes | None
     image_filename: str | None
     satiety_before_pct: int | None
+    items: list[MealCreateFoodItem] | None
 
 
 def _parse_meal_type(value: object) -> MealType:
@@ -134,38 +140,62 @@ async def _parse_multipart_input(request: Request) -> _ParsedMealInput:
     return _ParsedMealInput(
         meal_type=_parse_meal_type(form.get("mealType")),
         eaten_at=_parse_eaten_at(form.get("eatenAt")),
-        raw_text=None,
         image_bytes=image_bytes,
         image_filename=image.filename,
         satiety_before_pct=_parse_satiety_before_pct(form.get("satietyBeforePct")),
+        items=None,
     )
 
 
+def _parse_items(value: object) -> list[MealCreateFoodItem]:
+    """검색 탭에서 고른 음식 목록. 모양 검증은 `MealCreateFoodsRequest` 에 맡긴다."""
+    try:
+        return MealCreateFoodsRequest.model_validate({"items": value}).items
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        location = ".".join(str(part) for part in first["loc"])
+        raise HTTPException(
+            status_code=422, detail=f"{location}: {first['msg']}"
+        ) from exc
+
+
 async def _parse_json_input(request: Request) -> _ParsedMealInput:
-    """텍스트 입력. AI 가 인식할 게 없으니 `rawText` 가 필수다."""
+    """JSON 입력 — 검색 탭에서 사용자가 고른 공공 DB 음식(`items[]`).
+
+    예전에는 고른 목록을 `rawText`(`"계란말이 120g, 바나나 100g"`)로 이어 붙여 받아
+    AI 에게 다시 나누게 했다. 이미 고른 `foodRefId` 를 버리고 이름으로 다시 추측하는
+    셈이라 `items[]` 로 바꿨다. `rawText` 가 오면 조용히 무시하지 않고 거부한다 —
+    무시하면 옛 FE 의 요청이 "items 가 없다" 는 엉뚱한 이유로 실패한다.
+    """
     try:
         body = await request.json()
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="잘못된 JSON 입니다.") from exc
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail="JSON 객체여야 합니다.")
 
-    raw_text = body.get("rawText")
-    if not raw_text or not str(raw_text).strip():
-        raise HTTPException(status_code=422, detail="rawText 는 필수입니다.")
+    if "rawText" in body:
+        raise HTTPException(
+            status_code=422,
+            detail="rawText 는 더 이상 받지 않습니다. 고른 음식을 items 로 보내 주세요.",
+        )
+    if body.get("items") is None:
+        raise HTTPException(status_code=422, detail="items 는 필수입니다.")
 
     return _ParsedMealInput(
         meal_type=_parse_meal_type(body.get("mealType")),
         eaten_at=_parse_eaten_at(body.get("eatenAt")),
-        raw_text=str(raw_text).strip(),
         image_bytes=None,
         image_filename=None,
         satiety_before_pct=_parse_satiety_before_pct(body.get("satietyBeforePct")),
+        items=_parse_items(body["items"]),
     )
 
 
 async def parse_meal_input(request: Request) -> _ParsedMealInput:
     """`Depends()` 전용. body 를 `await` 해야 해서 async 다 — DB·디스크는 건드리지 않는다.
 
-    `Content-Type` 으로 두 형식을 나눈다 — multipart 면 사진, JSON 이면 텍스트다.
+    `Content-Type` 으로 두 형식을 나눈다 — multipart 면 사진, JSON 이면 고른 음식이다.
     FastAPI 는 `Form` 과 `Body`(JSON) 를 같은 라우트에 동시에 선언할 수 없어서,
     `Request` 를 직접 받아 수동으로 분기한다.
     """
@@ -185,15 +215,31 @@ async def parse_meal_input(request: Request) -> _ParsedMealInput:
     "/meals",
     status_code=202,
     response_model=ApiResponse[MealCreateResponse],
-    responses=error_responses(401, 422),
+    responses={
+        201: {
+            "model": ApiResponse[MealCreateResponse],
+            "description": "고른 음식(items[])으로 등록 — 분석 없이 REVIEW_REQUIRED",
+        },
+        **error_responses(401, 404, 422),
+    },
 )
 def create_meal(
+    response: Response,
     parsed: _ParsedMealInput = Depends(parse_meal_input),
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
     storage: FileStorage = Depends(get_file_storage),
 ) -> ApiResponse[MealCreateResponse]:
-    """사진 또는 텍스트로 식사를 등록한다. 실제 분석은 워커가 비동기로 한다 (202).
+    """사진 또는 고른 음식으로 식사를 등록한다.
+
+    사진은 실제 분석을 워커가 비동기로 한다 (202).
+
+    ## 고른 음식(`items[]`)은 분석하지 않는다 (201)
+
+    검색 탭에서 공공 DB 음식을 직접 고른 경우다. 이미 정확한 `foodRefId` 와 g 이
+    있으니 AI 에게 다시 추측시키지 않고 그대로 항목을 만들어 `REVIEW_REQUIRED` 로
+    돌려준다 — 기다릴 작업이 없으므로 202 가 아니라 201 이다. 없는 `foodRefId` 가
+    섞이면 404 다(`PUT .../nutrition` 과 같다).
 
     **일부러 `def` 다.** body 파싱(진짜 비동기 I/O)은 `parse_meal_input` 의존성이
     이미 끝내고 넘겨주고, 여기 남은 건 DB 쓰기·디스크 저장(둘 다 동기)뿐이다.
@@ -203,11 +249,38 @@ def create_meal(
     사진 인식·`meal_items` 채우기(`worker/jobs/analyze_meal.py`)는 이번 범위 밖이다
     — 큐에 작업만 넣고, 실제 AI 연동 로직은 아직 스켈레톤(TODO) 상태로 남겨둔다.
     """
-    image_key: str | None = None
-    if parsed.image_bytes is not None:
-        ext = Path(parsed.image_filename or "").suffix or ".jpg"
-        image_key = f"meals/{uuid.uuid4()}{ext}"
-        storage.save(image_key, parsed.image_bytes)
+    if parsed.items is not None:
+        try:
+            names = nutrition_service.get_food_names(
+                db, food_ref_ids=[item.food_ref_id for item in parsed.items]
+            )
+        except nutrition_service.FoodRefNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        response.status_code = 201
+        return ok(
+            meal_service.create_meal_from_foods(
+                db,
+                user_id=user_id,
+                meal_type=parsed.meal_type,
+                eaten_at=parsed.eaten_at,
+                satiety_before_pct=parsed.satiety_before_pct,
+                foods=[
+                    meal_service.SelectedFood(
+                        food_ref_id=item.food_ref_id,
+                        display_name=names[item.food_ref_id],
+                        amount=item.amount,
+                        unit=item.unit,
+                    )
+                    for item in parsed.items
+                ],
+            )
+        )
+
+    # 여기 왔으면 사진이다 — `image_bytes` · `items` 중 하나만 차 있다(`_ParsedMealInput`).
+    ext = Path(parsed.image_filename or "").suffix or ".jpg"
+    image_key = f"meals/{uuid.uuid4()}{ext}"
+    storage.save(image_key, parsed.image_bytes)
 
     return ok(
         meal_service.create_meal(
@@ -216,7 +289,6 @@ def create_meal(
             meal_type=parsed.meal_type,
             eaten_at=parsed.eaten_at,
             image_key=image_key,
-            raw_text=parsed.raw_text,
             satiety_before_pct=parsed.satiety_before_pct,
         )
     )

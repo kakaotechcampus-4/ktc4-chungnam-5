@@ -23,6 +23,16 @@ def existing_ids(db: Session, food_ref_ids: set[str]) -> set[str]:
     return set(db.execute(select(FoodRef.id).where(FoodRef.id.in_(food_ref_ids))).scalars())
 
 
+def get_names_by_ids(db: Session, food_ref_ids: set[str]) -> dict[str, str]:
+    """넘긴 id 중 실재하는 것의 `{id: 이름}`. 없는 id 는 결과에서 빠진다."""
+    if not food_ref_ids:
+        return {}
+    rows = db.execute(
+        select(FoodRef.id, FoodRef.name).where(FoodRef.id.in_(food_ref_ids))
+    ).all()
+    return {food_ref_id: name for food_ref_id, name in rows}
+
+
 def normalize_name(name: str) -> str:
     """이름 비교용 정규화 — 공백과 밑줄을 지운다.
 
