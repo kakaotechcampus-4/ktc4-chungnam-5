@@ -25,6 +25,10 @@ x-be-env: &be-env
   AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai:8000}
   # 워커가 AI 에 넘기는 imageUrl 의 앞부분. AI 컨테이너가 사진을 받아 가는 내부 주소다.
   LOCAL_STORAGE_BASE_URL: http://api:8000/media
+  # 사진 저장소 (배포 계획서 I절). 기본은 로컬 디스크(media 볼륨). s3 로 바꾸면 S3_BUCKET 이
+  # 필수다 — 비어 있으면 api 가 기동하지 않는다. AWS 키는 넣지 않는다(인스턴스 역할로 받는다).
+  STORAGE_TYPE: ${STORAGE_TYPE:-local}
+  S3_BUCKET: ${S3_BUCKET:-}
   INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?}
 
 # api · worker 는 같은 이미지다. 빌드 인자는 deploy.sh · deploy-staging.sh 가 git 에서 읽어
