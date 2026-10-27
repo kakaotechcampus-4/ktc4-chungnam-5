@@ -81,7 +81,8 @@ def health_ready(db: Session = Depends(get_db)) -> JSONResponse:
     (컨테이너 healthcheck, `infra/bg-deploy.sh` 의 Caddy 쪽 확인). `/health` 는 DB 를
     보지 않아서 DB 에 못 붙는 api 로도 전환될 수 있다. `/health` 는 Caddy·배포 워크플로가
     키 없이 부르는 경로라 그대로 두고, 여기만 DB 를 본다. Caddy 는 `/health` 만 키 없이
-    통과시키므로 이 경로는 밖에서 보이지 않는다.
+    통과시키므로 이 경로는 키(또는 팀원 IP) 없이는 밖에서 보이지 않는다. 보여도 DB 상태만
+    알려 줄 뿐이다.
     """
     try:
         db.execute(text("select 1"))
