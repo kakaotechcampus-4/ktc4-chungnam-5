@@ -1841,7 +1841,7 @@
           "feedbacks"
         ],
         "summary": "단기 피드백 + 다음 끼니 추천",
-        "description": "이 끼니에 대한 AI 피드백과 다음 끼니 제안.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다\n(`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).\n\n**아직 피드백이 없어도 200 이다** — `feedbackStatus: PENDING`. 에러가 아니라\n\"아직\" 이고, 404 로 내리면 FE 가 \"없는 식사\" 와 구분하지 못한다.\n\n`safetyStatus` 가 `SAFE` 가 아니면 `summary` · `suggestions` 가 비어 나간다\n(명세: \"상담 안내로 대체\"). FE 는 그 필드를 보고 안내 화면으로 바꾼다.",
+        "description": "이 끼니에 대한 AI 피드백과 다음 끼니 제안.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다\n(`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).\n\n**아직 피드백이 없어도 200 이다** — `feedbackStatus: PENDING`(대기) ·\n`GENERATING`(생성 중) · `FAILED`(재시도 소진 · 문장 없이 끝남). 에러가 아니라 \"아직\" 이거나\n\"문장만 없음\" 이고, 404 로 내리면 FE 가 \"없는 식사\" 와 구분하지 못한다.\n\n`safetyStatus` 가 `SAFE` 가 아니면 `summary` · `suggestions` 가 비어 나간다\n(명세: \"상담 안내로 대체\"). FE 는 그 필드를 보고 안내 화면으로 바꾼다.",
         "operationId": "get_meal_feedback_api_v1_meals__meal_id__feedback_get",
         "parameters": [
           {
@@ -1894,6 +1894,106 @@
           },
           "404": {
             "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meals/{meal_id}/feedback/suggestions": {
+      "put": {
+        "tags": [
+          "feedbacks"
+        ],
+        "summary": "다음 끼니 추천 교체",
+        "description": "챗봇 카드의 \"이걸로 바꾸기\" — 그 카드 한 장으로 이 끼니의 다음 끼니 추천을 바꾼다.\n\n`suggestions` 를 카드 1장으로 **전체 교체**하고, 본문 · 판정 · 점수는 그대로 둔다.\n응답은 `GET /meals/{mealId}/feedback` 과 같은 모양이다.\n\n- 404 `NOT_FOUND`: 끼니가 없음 · 남의 것 · 삭제됨, 또는 카드가 없음 · 남의 것 ·\n  다른 끼니 대화의 카드. 소유권 누출을 막으려고 구분하지 않는다.\n- 409 `NOT_CONFIRMED`: 끼니가 확정 상태가 아니다.\n- 409 `CONFLICT`: 카드가 끼니를 고쳐 재확정하기 전에 만들어졌거나, 끼니 피드백이 아직\n  보여 줄 수 있는 상태가 아니다. 새 대화를 열면 지금 끼니 기준의 카드를 받는다.\n\n교체는 피드백이 `SAFE` 일 때만 일어나므로 `MEDICAL_QUESTION_DETECTED` 분기가 없다.",
+        "operationId": "replace_meal_suggestion_api_v1_meals__meal_id__feedback_suggestions_put",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceSuggestionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealFeedbackResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
             "content": {
               "application/json": {
                 "schema": {
@@ -2384,9 +2484,337 @@
         }
       }
     },
+    "/api/v1/chat/conversations": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "새 대화 시작",
+        "description": "진행 중인 대화를 닫고 새 대화를 연다.\n\n`mealId` 가 없으면 서버가 가장 최근 확정 끼니로 정한다. 기준 끼니에 보여 줄 추천이\n있으면 추천 카드를 담은 AI 메시지 1개, 없으면 `messages: []` 다.\n\n**body 는 생략할 수 있다.** AI 탭에서 바로 \"＋ 새 대화\" 를 누르면 보낼 값이 없다.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다 (소유권 누출 방지).\n존재하지 않는 사용자는 404 `USER_NOT_FOUND` 다.",
+        "operationId": "start_conversation_api_v1_chat_conversations_post",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CreateConversationRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ConversationResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/conversations/{conversation_id}/messages": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "사용자 메시지 보내기",
+        "description": "사용자 메시지를 접수하고 AI 답변 생성을 시작한다.\n\n답변은 비동기다 — `assistantMessageId` 가 `READY` · `FAILED` 가 될 때까지\n`pollIntervalMs` 간격으로, 최대 `timeoutMs` 동안 대화를 다시 조회한다.\n\n없는 대화 · 남의 대화 · 닫힌 대화는 전부 404 로 같게 응답한다 (소유권 누출 방지).\n이전 답변이 아직 생성 중이면 409 `CONFLICT` 다.",
+        "operationId": "send_message_api_v1_chat_conversations__conversation_id__messages_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_SendMessageResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "상태 충돌 — CONFLICT · PROFILE_REQUIRED · STAGE_NOT_SET · NOT_CONFIRMED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/conversations/latest": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "진행 중인 대화 이어 보기",
+        "description": "AI 탭에 들어올 때 이어 볼 열린 대화. 메시지 모양은 A-3 과 같다.\n\n**열린 대화가 없으면 200 `data: null` 이다** — 에러가 아니라 \"아직 없음\" 이고, FE 는\n이때 `POST /chat/conversations` 로 새 대화를 연다. 닫힌 대화는 돌려주지 않는다.\n마지막 답이 BLOCKED 면 A-3 처럼 `MEDICAL_QUESTION_DETECTED` 가 붙는다.",
+        "operationId": "get_latest_conversation_api_v1_chat_conversations_latest_get",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ConversationResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "메시지 목록 · 답변 폴링",
+        "description": "대화의 메시지 전부를 오래된 순으로 준다.\n\nFE 는 A-2 의 `assistantMessageId` 가 `READY` · `FAILED` 가 될 때까지 이걸 폴링한다.\n마지막 답이 가드레일에 막혔으면(`safetyStatus: BLOCKED`) 200 에\n`MEDICAL_QUESTION_DETECTED` 가 붙는다.\n\n**닫힌 대화도 200 이다** — \"＋ 새 대화\" 뒤에도 폴링 중이던 답을 받을 수 있다.\n없는 대화 · 남의 대화는 404 로 같게 응답한다 (소유권 누출 방지).",
+        "operationId": "get_conversation_api_v1_chat_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ConversationResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
+        "description": "살아 있는지와 **지금 떠 있는 빌드**.\n\n`version` 은 운영 릴리스 태그(`v2026.10.19`), `sha` 는 그 이미지를 만든 **전체** 커밋\nSHA 다. 둘 다 `infra/deploy.sh` 가 git 에서 읽어 이미지 빌드 인자로 넘기고\n(`backend/Dockerfile` 의 `ARG` → `ENV`), 여기서 그대로 낸다. 배포 워크플로가\n`\"sha\":\"<GITHUB_SHA>\"` 를 찾아 이번 커밋이 실제로 떠 있는지 확인하므로 값을 자르지 않는다.\n\n빈 값은 `null` 이다 — 스테이징과 태그 없는 배포는 `APP_VERSION` 이 빈 문자열이고,\n로컬 실행은 둘 다 없다.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -2395,7 +2823,14 @@
               "application/json": {
                 "schema": {
                   "additionalProperties": {
-                    "type": "string"
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "type": "object",
                   "title": "Response Health Health Get"
@@ -2461,6 +2896,39 @@
         ],
         "title": "AnalysisStep",
         "description": "분석 진행 단계 하나. 명세서의 `steps` 배열 원소.\n\n`frozen=True` 다 — 아래 `RECALCULATION_STEPS` 가 인스턴스를 모든 응답이\n공유하므로, 누군가 한 응답에서 고치면 그 뒤 모든 응답이 바뀐다."
+      },
+      "ApiResponse_ConversationResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[ConversationResponse]"
       },
       "ApiResponse_CurrentMedicationResponse_": {
         "properties": {
@@ -3254,6 +3722,39 @@
         ],
         "title": "ApiResponse[SatietyCheckinResponse]"
       },
+      "ApiResponse_SendMessageResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SendMessageResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "ApiResponse[SendMessageResponse]"
+      },
       "ApiResponse_UserProfileResponse_": {
         "properties": {
           "success": {
@@ -3369,6 +3870,141 @@
         ],
         "title": "CalendarSummary",
         "description": "그 달 전체 요약."
+      },
+      "ChatMessageResponse": {
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Messageid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ChatMessageRole"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChatMessageStatus"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "foodCards": {
+            "items": {
+              "$ref": "#/components/schemas/FoodCardResponse"
+            },
+            "type": "array",
+            "title": "Foodcards"
+          },
+          "safetyStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SafetyStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "messageId",
+          "role",
+          "status",
+          "text",
+          "foodCards",
+          "safetyStatus",
+          "createdAt"
+        ],
+        "title": "ChatMessageResponse",
+        "description": "명세 「공통 Message Data Structure」."
+      },
+      "ChatMessageRole": {
+        "type": "string",
+        "enum": [
+          "USER",
+          "ASSISTANT"
+        ],
+        "title": "ChatMessageRole",
+        "description": "챗봇 메시지를 누가 썼는지."
+      },
+      "ChatMessageStatus": {
+        "type": "string",
+        "enum": [
+          "GENERATING",
+          "READY",
+          "FAILED"
+        ],
+        "title": "ChatMessageStatus",
+        "description": "챗봇 메시지 생성 상태. USER 메시지는 항상 READY 다.\n\n`FeedbackStatus` 를 재사용하지 않는다 — 거기는 `PENDING` 이 있고 응답 전용(DB ENUM\n아님)이다. 챗봇 답변은 접수와 동시에 GENERATING 자리표시로 저장되므로 PENDING 이 없다."
+      },
+      "ConversationResponse": {
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversationid"
+          },
+          "mealId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mealid"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessageResponse"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversationId",
+          "mealId",
+          "messages"
+        ],
+        "title": "ConversationResponse",
+        "description": "A-1 · A-3 · A-4 공통 응답."
+      },
+      "CreateConversationRequest": {
+        "properties": {
+          "mealId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mealid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CreateConversationRequest",
+        "description": "A-1 요청. body 를 아예 안 보내도 된다(엔드포인트가 `None` 으로 받는다).\n\nextra=\"forbid\": `mealID` 같은 오타가 조용히 무시되면 \"기준 끼니 없음\" 으로 처리되어\n엉뚱한 끼니의 추천이 뜬다."
       },
       "CurrentMedicationResponse": {
         "properties": {
@@ -3994,6 +4630,55 @@
         "title": "FoodCandidate",
         "description": "`GET /nutrition/candidates` 의 후보 한 건.\n\n⚠️ **여기의 `nutrition` 은 `servingSizeG` 기준량의 값이다** — 사용자가 먹은\n양으로 환산된 값이 아니다. 같은 `NutritionInfo` 모델을 쓰지만 의미가 다르다:\nmeal item 응답의 `nutrition` 은 이미 섭취량만큼 환산돼 있다\n(`services.nutrition.resolve_by_name`).\n\n이 엔드포인트는 사용자가 무엇을 얼마나 먹었는지 모른다. 양이 붙는 건 후보를\n고른 뒤 `PUT /meals/{mealId}/items/{itemId}/nutrition` 에서다. FE 가 후보\n목록에 열량을 보여줄 때 \"100g 당\" 같은 기준을 함께 적어야 하는 이유다."
       },
+      "FoodCardEffect": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NutrientCode"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/NutrientUnit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "amount",
+          "unit"
+        ],
+        "title": "FoodCardEffect",
+        "description": "영양 효과 칩 하나. `amount` 는 `food_refs` 의 **100g 당** 성분량이다\n(`crud/feedback.py::nutrients_by_food_ref` — 끼니 피드백 화면과 같은 숫자)."
+      },
+      "FoodCardResponse": {
+        "properties": {
+          "foodCardId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Foodcardid"
+          },
+          "foodName": {
+            "type": "string",
+            "title": "Foodname"
+          },
+          "effects": {
+            "items": {
+              "$ref": "#/components/schemas/FoodCardEffect"
+            },
+            "type": "array",
+            "title": "Effects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "foodCardId",
+          "foodName",
+          "effects"
+        ],
+        "title": "FoodCardResponse"
+      },
       "GiSeverity": {
         "type": "string",
         "enum": [
@@ -4315,7 +5000,7 @@
           "period": {
             "$ref": "#/components/schemas/InsightPeriod"
           },
-          "status": {
+          "feedbackStatus": {
             "$ref": "#/components/schemas/FeedbackStatus"
           },
           "dataSufficient": {
@@ -4374,7 +5059,7 @@
         "type": "object",
         "required": [
           "period",
-          "status",
+          "feedbackStatus",
           "dataSufficient",
           "trendSummary",
           "recommendation",
@@ -4395,8 +5080,7 @@
                 "minimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -4412,8 +5096,7 @@
                 "minimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -4429,8 +5112,7 @@
                 "minimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -4446,8 +5128,7 @@
                 "minimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -4463,8 +5144,7 @@
                 "minimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -4480,8 +5160,7 @@
                 "minimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -4932,8 +5611,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Amount"
@@ -5126,8 +5804,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Amount"
@@ -5371,8 +6048,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,3}0*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -5495,8 +6171,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,3}0*$"
+                "type": "string"
               }
             ],
             "title": "Dosemg"
@@ -5829,6 +6504,16 @@
         "title": "NutrientStatus",
         "description": "영양소 하나의 목표 대비 현재. (Rule Engine 미구현이라 항상 빈 배열 — TODO)"
       },
+      "NutrientUnit": {
+        "type": "string",
+        "enum": [
+          "g",
+          "mg",
+          "kcal"
+        ],
+        "title": "NutrientUnit",
+        "description": "성분량의 단위. 응답 `{ code, amount, unit }` 의 `unit` 이다.\n\n값이 소문자인 건 명세가 `g | mg | kcal` 로 적어서다 — 표시 문자열 그대로 쓴다."
+      },
       "NutritionCandidatesResponse": {
         "properties": {
           "candidates": {
@@ -6048,8 +6733,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Heightcm"
@@ -6062,8 +6746,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Weightkg"
@@ -6076,8 +6759,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Baselineintake"
@@ -6176,8 +6858,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -6193,8 +6874,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -6210,8 +6890,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -6269,6 +6948,22 @@
         ],
         "title": "QqsScores",
         "description": "세 축의 점수. 0~100 정수이고, 근거가 없으면 null 이다.\n\n합계도 가중치도 없다 (절대 규칙 3 · D9)."
+      },
+      "ReplaceSuggestionRequest": {
+        "properties": {
+          "foodCardId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Foodcardid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "foodCardId"
+        ],
+        "title": "ReplaceSuggestionRequest",
+        "description": "`PUT /meals/{mealId}/feedback/suggestions` 요청 — 챗봇 카드 한 장.\n\nextra=\"forbid\": `foodCardID` 같은 오타를 조용히 무시하면 필수 필드 누락으로 바뀌어\n원인을 찾기 어렵다 — 422 로 바로 알린다."
       },
       "SafetyStatus": {
         "type": "string",
@@ -6454,6 +7149,52 @@
         "title": "ScoreAxis",
         "description": "Q/Q/S 세 축. 응답 `stageEmphasis` 가 이 값들의 부분집합이다.\n\n명세 「열거형」에 이름이 없어서 여기서 정의한다 — `stageEmphasis` 예시\n(`[\"SATIETY\", \"QUALITY\"]`)의 원소가 곧 점수 축이다."
       },
+      "SendMessageRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "SendMessageRequest",
+        "description": "A-2 요청. 공백만 보낸 메시지는 빈 메시지다 — AI 를 부를 이유가 없다.\n\nextra=\"forbid\": `message` 같은 오타 필드가 조용히 무시되면 `text` 누락 422 와 섞여\n원인을 찾기 어렵다."
+      },
+      "SendMessageResponse": {
+        "properties": {
+          "userMessage": {
+            "$ref": "#/components/schemas/ChatMessageResponse"
+          },
+          "assistantMessageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assistantmessageid"
+          },
+          "pollIntervalMs": {
+            "type": "integer",
+            "title": "Pollintervalms"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeoutms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "userMessage",
+          "assistantMessageId",
+          "pollIntervalMs",
+          "timeoutMs"
+        ],
+        "title": "SendMessageResponse",
+        "description": "A-2 응답 (202). FE 는 `assistantMessageId` 가 READY · FAILED 가 될 때까지 폴링한다."
+      },
       "StageChange": {
         "properties": {
           "date": {
@@ -6493,15 +7234,19 @@
           "code": {
             "$ref": "#/components/schemas/NutrientCode"
           },
-          "amountG": {
+          "amount": {
             "type": "number",
-            "title": "Amountg"
+            "title": "Amount"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/NutrientUnit"
           }
         },
         "type": "object",
         "required": [
           "code",
-          "amountG"
+          "amount",
+          "unit"
         ],
         "title": "SuggestionNutrient",
         "description": "제안 음식이 채워 주는 성분 한 줄. 명세 `suggestions[].nutrients[]`."
@@ -6569,8 +7314,7 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Weightkg"
