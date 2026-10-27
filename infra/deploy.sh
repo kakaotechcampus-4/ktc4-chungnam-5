@@ -35,17 +35,6 @@ GIT_SHA=$TARGET
 APP_VERSION=$(git describe --tags --exact-match --match 'v*' "$TARGET" 2>/dev/null || true)
 export GIT_SHA APP_VERSION
 echo "배포: ${APP_VERSION:-(버전 없음)} $GIT_SHA"
-cd infra
-COMPOSE=(docker compose -f docker-compose.prod.yml --env-file .env.prod)
-# 이미지를 먼저 만든다. 빌드 동안은 옛 컨테이너가 계속 일한다.
-"${COMPOSE[@]}" build
-# 마이그레이션 전에 옛 워커를 내린다. api 는 기동할 때 마이그레이션을 돌리고 worker 는 그 뒤에
-# 교체되므로, 그대로 두면 옛 워커가 마이그레이션과 겹친다 — 행 잠금을 쥐고 있으면 ADD COLUMN 이
-# 막히고, 새 enum 값을 옛 코드가 읽으면 터진다 (예: 9a1c4e7b2d3f). 처리 중인 작업은
-# stop_grace_period(60초) 안에 끝내고 내려간다. 첫 배포처럼 워커가 없으면 아무것도 안 한다.
-"${COMPOSE[@]}" stop worker
-# --wait: 모든 서비스가 healthy 가 될 때까지 기다리고, 아니면 실패로 끝낸다 (CI 가 실패를 본다)
-"${COMPOSE[@]}" up -d --wait
-# 디스크는 50GB 고정이라 빌드할 때마다 쌓이는 이미지·캐시를 지운다
-docker image prune -f
-docker builder prune -f --filter until=72h
+# 나머지는 Blue/Green 공통 로직이다. exec 해도 잠금(fd 9)은 그대로 이어진다.
+# 실패하면 0 이 아닌 코드로 끝나 CI 가 실패를 본다.
+exec infra/bg-deploy.sh prod
