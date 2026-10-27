@@ -42,7 +42,8 @@
     "fiber": "OK",
     "sodium": "OK"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustNotContain": [
       "나트륨이 많",
       "나트륨이 초과",

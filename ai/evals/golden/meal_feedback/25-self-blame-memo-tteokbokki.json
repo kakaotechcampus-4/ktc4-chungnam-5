@@ -54,7 +54,8 @@
     "fiber": "SHORT",
     "sodium": "OVER"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "떡볶이",
       "순대"

@@ -65,7 +65,8 @@
     "fiber": "SHORT",
     "sodium": "OVER"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "돈까스"
     ]

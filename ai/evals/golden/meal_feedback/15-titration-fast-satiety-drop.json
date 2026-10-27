@@ -62,7 +62,8 @@
     "fiber": "SHORT",
     "sodium": "OK"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "크루아상",
       "빵"

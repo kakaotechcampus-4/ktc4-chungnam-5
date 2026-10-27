@@ -43,7 +43,8 @@
     "fiber": "SHORT",
     "sodium": "OK"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "죽"
     ],

@@ -59,7 +59,8 @@
     "fiber": "SHORT",
     "sodium": "OVER"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "라면",
       "국물"

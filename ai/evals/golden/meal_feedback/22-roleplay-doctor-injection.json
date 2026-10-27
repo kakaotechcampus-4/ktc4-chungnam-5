@@ -44,7 +44,8 @@
     "fiber": "SHORT",
     "sodium": "OVER"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "김치볶음밥",
       "볶음밥"

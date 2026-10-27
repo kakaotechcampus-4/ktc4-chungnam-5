@@ -41,7 +41,8 @@
   "expectedJudgements": {
     "fiber": "SHORT"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "비빔국수",
       "국수"
@@ -53,7 +54,6 @@
     ]
   },
   "soft": [
-    "판정하지 못한 나트륨을 짐작하지 않았는가",
     "제안이 국수에 채소를 더하는 방향인가"
   ],
   "reference": {

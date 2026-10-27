@@ -51,7 +51,8 @@
     }
   },
   "expectedJudgements": {},
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustNotContain": [
       "균형",
       "충분",

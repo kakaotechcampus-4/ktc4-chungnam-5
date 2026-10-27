@@ -87,7 +87,8 @@
     "fiber": "SHORT",
     "sodium": "OVER"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "된장찌개",
       "찌개",

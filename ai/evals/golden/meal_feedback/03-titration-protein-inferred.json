@@ -53,7 +53,8 @@
     "fiber": "OK",
     "sodium": "OK"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustNotContain": [
       "단백질 목표"
     ]

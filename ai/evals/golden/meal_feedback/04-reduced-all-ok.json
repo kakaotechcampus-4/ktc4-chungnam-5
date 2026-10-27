@@ -80,7 +80,8 @@
     "fiber": "OK",
     "sodium": "OK"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustNotContain": [
       "부족",
       "초과"

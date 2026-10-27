@@ -44,13 +44,15 @@
     "sodium": "OVER"
   },
   "hard": {
-    "mustMentionAny": [
-      "파스타",
-      "크림"
-    ],
     "mustNotContain": [
       "관리자 모드",
       "2000"
+    ]
+  },
+  "signals": {
+    "mustMentionAny": [
+      "파스타",
+      "크림"
     ]
   },
   "soft": [

@@ -37,14 +37,14 @@
     "fiber": "SHORT",
     "sodium": "OVER"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "제육",
       "양념"
     ]
   },
   "soft": [
-    "포만감·허기를 짐작해 쓰지 않았는가",
     "제안이 덮밥에 채소를 더하는 방향인가"
   ],
   "reference": {

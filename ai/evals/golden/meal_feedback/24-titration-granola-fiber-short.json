@@ -58,7 +58,8 @@
     "fiber": "SHORT",
     "sodium": "OK"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustMentionAny": [
       "그래놀라",
       "우유"

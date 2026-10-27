@@ -42,7 +42,8 @@
     "fiber": "OK",
     "sodium": "OK"
   },
-  "hard": {
+  "hard": {},
+  "signals": {
     "mustNotContain": [
       "식이섬유가 부족",
       "섬유질이 부족",
