@@ -91,9 +91,6 @@ fi
 SWITCHED=1
 write_state "$NEXT"
 
-# 여기서 실패해도 이미 새 쪽이 받고 있다. 옛 쪽 정리까지 마치고 마지막에 실패로 끝낸다.
-OTHERS_RC=0
-"${COMPOSE[@]}" up -d --wait --no-deps "${OTHERS[@]}" || OTHERS_RC=$?
 # 옛 쪽으로 들어간 요청이 끝날 시간
 sleep 15
 # rm 하지 않는다. 롤백(bg-switch.sh)용으로 남긴다
@@ -101,6 +98,12 @@ sleep 15
 # 첫 전환 전의 옛 단일 api. compose 파일에서 빠진 서비스라 compose 로는 내릴 수 없다.
 # 첫 전환이 이 앞에서 실패했으면 다음 배포가 지운다. 없으면 아무것도 안 한다.
 docker rm -f "glp1-$ENV-api" >/dev/null 2>&1 || true
+
+# 워커 · ai 는 옛 api 를 내린 뒤에 띄운다. 그래야 api 별칭(사진 주소, ai 의 /internal 역호출)이
+# 새 쪽 하나만 가리킨다. 워커가 그만큼 더 쉬지만 큐가 DB 라 일감은 기다렸다 처리된다.
+# 여기서 실패해도 이미 새 쪽이 받고 있다. 이미지 정리까지 마치고 마지막에 실패로 끝낸다.
+OTHERS_RC=0
+"${COMPOSE[@]}" up -d --wait --no-deps "${OTHERS[@]}" || OTHERS_RC=$?
 
 # 디스크는 50GB 고정이다. 롤백용 태그 하나와 지금 태그만 남긴다.
 prune_be_images

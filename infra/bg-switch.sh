@@ -32,9 +32,10 @@ caddy_can_reach "$TARGET"
 switch_to "$TARGET"
 write_state "$TARGET"
 
-# 워커도 같은 버전으로 맞춘다
+# 워커도 같은 버전으로 맞춘다. 옛 api 를 내린 뒤에 띄워야 api 별칭이 한쪽만 가리킨다 (bg-deploy.sh 와 같다).
+# ai 는 되돌리지 않는다 — 롤백 뒤에는 새 ai 가 옛 api 의 /internal 을 부른다 (Deployment.md J4).
 "${COMPOSE[@]}" stop worker
-"${COMPOSE[@]}" up -d --wait --no-deps worker
 sleep 15
 "${COMPOSE[@]}" stop -t 30 "api-$ACTIVE"
+"${COMPOSE[@]}" up -d --wait --no-deps worker
 echo "완료: $ENV → $TARGET ($TARGET_TAG)"

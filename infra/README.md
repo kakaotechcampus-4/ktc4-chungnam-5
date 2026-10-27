@@ -178,7 +178,9 @@ api 는 `api-blue` · `api-green` 두 벌이고, 한쪽만 요청을 받는다. 
 2. 워커를 내리고 `migrate` 로 마이그레이션 — **옛 api 가 계속 받는 중이라 옛 코드와 호환되는 마이그레이션만** 넣는다 (Expand / Contract)
 3. 새 쪽을 띄우고 `/health/ready`(DB 까지 확인)로 healthy 를 기다린 뒤, Caddy 안에서도 닿는지 본다
 4. upstream 파일을 새 쪽으로 바꾸고 `caddy reload` — Caddy 는 다시 만들지 않으므로 끊기지 않는다
-5. worker · ai 를 새 이미지로 올리고, 옛 쪽 api 는 **정지만** 해 둔다 (롤백용)
+5. 옛 요청이 끝나길 15초 기다린 뒤 옛 쪽 api 를 **정지만** 해 둔다 (롤백용)
+6. worker · ai 를 새 이미지로 올린다. 옛 쪽을 정지한 뒤라 내부 별칭 `api`(사진 주소, ai 의 `/internal` 역호출)가
+   새 쪽 하나만 가리킨다
 
 1~3 중 하나라도 실패하면 전환하지 않고 끝난다. 사용자는 계속 옛 쪽을 쓰고, 워커도 옛 이미지로 다시 켜진다.
 지금 받는 쪽과 같은 버전을 다시 배포하면 빌드 전에 막는다 — 같은 태그로 빌드하면 롤백할 이미지가 덮어써진다.
@@ -197,6 +199,10 @@ cat /opt/glp1-bg/upstreams/prod.caddy   # import gate glp1-prod-api-green:8000 {
 /opt/glp1/infra/bg-switch.sh prod
 curl -s https://glp1-demo.duckdns.org/health    # version 이 이전 버전이면 완료
 ```
+
+ai 도 되돌리지 않는다. 롤백 뒤에는 **새 ai 가 옛 api 의 내부 API(`/internal/v1`)를 부른다.** 그래서 내부 API 도
+마이그레이션과 같은 규칙(Expand / Contract)을 따른다 — 엔드포인트·필드는 추가만 하고, 삭제나 의미 변경은
+ai 가 더 이상 쓰지 않게 된 다음 배포에서 한다.
 
 DB 는 되돌리지 않는다. 옛 코드와 호환되지 않는 마이그레이션이 들어갔다면 `bg-switch.sh` 로는 안 된다.
 그때는 새 이미지가 떠 있는 동안 먼저 DB 를 내린 뒤 이전 버전으로 다시 배포한다
