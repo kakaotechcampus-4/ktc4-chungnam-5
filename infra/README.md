@@ -298,7 +298,9 @@ docker compose -p glp1-staging stop                  # 데모 당일 등 잠시 
 컨테이너 이름·이미지 태그(`glp1-prod-*`), 볼륨·네트워크(프로젝트 `glp1-prod`), 포트(80·443)가
 개발용과 겹치지 않는다.
 
-배포 스크립트(`bg-deploy.sh`)를 그대로 쓴다. 상태 디렉터리만 `GLP1_BG_DIR` 로 바꾼다.
+배포 스크립트(`bg-deploy.sh`)를 그대로 쓴다. 상태 디렉터리만 `GLP1_BG_DIR` 로 바꾸고,
+`BG_SKIP_PRUNE=1` 로 끝의 `docker image prune` · `builder prune` 을 건너뛴다 — 서버 디스크 정리용이라
+이 PC 의 다른 프로젝트 이미지·빌드 캐시까지 지운다. 이 프로젝트의 옛 `glp1-<env>-be` 태그 정리는 그대로 돈다.
 Git Bash 에서는 `MSYS_NO_PATHCONV=1` 이 필요하다 — 없으면 `docker exec` 에 넘기는 `/etc/...` 경로를
 Windows 경로로 바꿔 버린다. `bg-switch.sh` 는 `flock` 이 있어야 해서 Git Bash 에서는 돌지 않는다.
 
@@ -306,9 +308,8 @@ Windows 경로로 바꿔 버린다. `bg-switch.sh` 는 `flock` 이 있어야 해
 cd infra
 cp .env.prod.example .env.prod      # DOMAIN=localhost, STAGING_DOMAIN=staging.localhost, 나머지는 아무 시험 값
 docker network create glp1-edge     # 운영 compose 가 요구하는 외부 네트워크 (deploy.sh 는 알아서 만든다)
-export MSYS_NO_PATHCONV=1 GLP1_BG_DIR="$HOME/.glp1-bg-local"   # 저장소 밖
+export MSYS_NO_PATHCONV=1 GLP1_BG_DIR="$HOME/.glp1-bg-local" BG_SKIP_PRUNE=1   # 상태는 저장소 밖
 GIT_SHA=$(git rev-parse HEAD) APP_VERSION= ./bg-deploy.sh prod
-# ⚠️ 끝에서 docker image prune · builder prune 이 돈다 — 이 PC 의 이름 없는 이미지·오래된 빌드 캐시도 지운다
 
 curl -k https://localhost/health                                    # 200
 curl -k https://localhost/docs                                      # 403

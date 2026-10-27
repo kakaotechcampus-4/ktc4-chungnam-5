@@ -104,8 +104,11 @@ docker rm -f "glp1-$ENV-api" >/dev/null 2>&1 || true
 
 # 디스크는 50GB 고정이다. 롤백용 태그 하나와 지금 태그만 남긴다.
 prune_be_images
-docker image prune -f
-docker builder prune -f --filter until=72h
+# 아래 둘은 이 프로젝트 것만이 아니라 그 PC 전체를 지운다. 로컬 확인에서는 BG_SKIP_PRUNE=1 로 건너뛴다.
+if [ -z "${BG_SKIP_PRUNE:-}" ]; then
+  docker image prune -f
+  docker builder prune -f --filter until=72h
+fi
 if [ "$OTHERS_RC" -ne 0 ]; then
   echo "api 는 $NEXT 로 전환했지만 ${OTHERS[*]} 가 healthy 가 아니다 — docker ps 로 확인한다" >&2
   exit "$OTHERS_RC"
