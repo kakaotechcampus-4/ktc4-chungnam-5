@@ -20,8 +20,8 @@
     "items": [
       {
         "displayName": "닭가슴살 샐러드",
-        "amount": 1,
-        "unit": "팩",
+        "amount": 250,
+        "unit": "g",
         "nutrition": {
           "kcal": 350,
           "proteinG": 40,

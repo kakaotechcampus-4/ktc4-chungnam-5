@@ -1,12 +1,11 @@
 {
-  "id": "10-partial-nutrition-kimchi-unknown",
-  "description": "유지기 점심. 김치는 양·성분을 모른다 — 김치의 나트륨을 짐작해 쓰면 안 된다",
+  "id": "10-fiber-blank-in-one-item",
+  "description": "유지기 점심. 김치의 식이섬유가 DB 에 비어 있어 식이섬유는 판정 못 했다 — 식이섬유를 평가하면 안 된다",
   "tags": [
     "meal:LUNCH",
     "stage:MAINTENANCE",
     "gap:sodium_over",
-    "gap:fiber_short",
-    "data:partial_nutrition"
+    "data:nutrient_blank"
   ],
   "input": {
     "scope": "MEAL",
@@ -21,8 +20,8 @@
     "items": [
       {
         "displayName": "순두부찌개",
-        "amount": 1,
-        "unit": "그릇",
+        "amount": 400,
+        "unit": "g",
         "nutrition": {
           "kcal": 300,
           "proteinG": 18,
@@ -32,8 +31,8 @@
       },
       {
         "displayName": "공깃밥",
-        "amount": 1,
-        "unit": "공기",
+        "amount": 210,
+        "unit": "g",
         "nutrition": {
           "kcal": 300,
           "proteinG": 5,
@@ -42,10 +41,15 @@
         }
       },
       {
-        "displayName": "김치",
-        "amount": null,
-        "unit": null,
-        "nutrition": null
+        "displayName": "배추김치",
+        "amount": 50,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 15,
+          "proteinG": 1,
+          "fiberG": null,
+          "sodiumMg": 600
+        }
       }
     ],
     "satiety": {
@@ -62,34 +66,35 @@
     }
   },
   "expectedJudgements": {
-    "fiber": "SHORT",
     "sodium": "OVER"
   },
   "hard": {
     "mustMentionAny": [
       "순두부",
       "찌개",
-      "국물"
+      "국물",
+      "김치"
     ],
     "mustNotContain": [
-      "김치에서 나트륨",
-      "김치까지 더하면"
+      "식이섬유",
+      "섬유질"
     ]
   },
   "soft": [
-    "성분을 모르는 김치에 숫자나 원인을 붙이지 않았는가"
+    "판정하지 못한 식이섬유를 짐작해 평가하지 않았는가",
+    "나트륨 원인을 찌개 국물·김치로 짚었는가"
   ],
   "reference": {
-    "body": "순두부찌개 국물에서 나트륨이 1500mg 나와 한 끼 한도의 두 배 가까이 됐고, 채소는 적은 편이었어요.",
-    "reasoning": "유지기에는 먹는 양이 줄어든 만큼, 한 끼 안에 채소가 빠지면 영양이 모자라기 쉬워요.",
+    "body": "순두부찌개 국물에서 나트륨이 1500mg 나왔고, 김치까지 더하면 한 끼 한도의 두 배를 훌쩍 넘었어요.",
+    "reasoning": "유지기에는 먹는 양이 줄어든 만큼, 한 끼 안에서 짠 국물이 차지하는 몫이 커지기 쉬워요.",
     "suggestions": [
-      {
-        "foodName": "시금치나물 한 접시",
-        "advice": "찌개 상차림에 반찬으로 더하기 쉬워 이번에 빠진 채소를 채워 줘요"
-      },
       {
         "foodName": "두부구이 반 모",
         "advice": "순두부 대신 국물 없는 두부 요리로 바꾸면 비슷한 맛에 나트륨을 덜 수 있어요"
+      },
+      {
+        "foodName": "백김치 한 접시",
+        "advice": "배추김치 대신 곁들이면 짠맛이 한결 덜해요"
       }
     ]
   }

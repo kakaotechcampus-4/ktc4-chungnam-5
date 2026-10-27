@@ -21,8 +21,8 @@
     "items": [
       {
         "displayName": "크림파스타",
-        "amount": 1,
-        "unit": "접시",
+        "amount": 350,
+        "unit": "g",
         "nutrition": {
           "kcal": 800,
           "proteinG": 20,

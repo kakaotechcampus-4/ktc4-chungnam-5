@@ -19,8 +19,8 @@
     "items": [
       {
         "displayName": "나물비빔밥",
-        "amount": 1,
-        "unit": "그릇",
+        "amount": 450,
+        "unit": "g",
         "nutrition": {
           "kcal": 550,
           "proteinG": 11,
@@ -30,8 +30,8 @@
       },
       {
         "displayName": "사과",
-        "amount": 0.5,
-        "unit": "개",
+        "amount": 100,
+        "unit": "g",
         "nutrition": {
           "kcal": 50,
           "proteinG": 0.2,

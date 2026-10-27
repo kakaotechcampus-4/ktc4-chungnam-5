@@ -1,7 +1,8 @@
 """끼니 피드백 golden dataset 과 hard 검사기(`evals/meal_feedback.py`) 테스트. 모델 호출 없음.
 
 데이터셋 자체가 틀리면 모델을 탓하게 된다. 그래서 모델을 붙이기 전에 세 가지를 먼저 본다.
-- 케이스가 계약(`ShortFeedbackRequest`)을 지키고, 간식 끼니가 섞이지 않았다
+- 케이스가 계약(`ShortFeedbackRequest`)과 피드백 단계의 모양(양은 g, 음식은 DB 매핑)을 지키고,
+  간식 끼니가 섞이지 않았다
 - `expectedJudgements` 가 `judge_nutrients` 와 맞는다 — BE 채점 기준 사본이 어긋나면 여기서 깨진다
 - 사람이 쓴 모범 답안은 hard 검사를 통과하고, 나쁜 답은 걸린다
 """
@@ -48,6 +49,16 @@ def test_case_is_one_main_meal(case):
     assert case.request.scope is Scope.MEAL
     meal_tags = [t for t in case.tags if t.startswith("meal:")]
     assert len(meal_tags) == 1 and meal_tags[0] in MEAL_TAGS
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda c: c.id)
+def test_items_look_like_feedback_stage(case):
+    """피드백 요청 단계의 항목은 양이 g 으로 정해져 있고 음식이 food_refs 에 매핑돼 있다.
+    성분 값 하나하나는 DB 에 비어 있을 수 있다 — 그건 nutrition 안의 null 로 둔다."""
+    for item in case.request.items:
+        assert item.unit == "g"
+        assert item.amount is not None and item.amount > 0
+        assert item.nutrition is not None
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c.id)
@@ -122,6 +133,6 @@ def test_suggestion_count_and_duplicates(count):
 
 def test_loader_reads_hard_fields():
     case = _case("10")
-    assert case.must_mention_any == ["순두부", "찌개", "국물"]
-    assert "김치에서 나트륨" in case.must_not_contain
+    assert case.must_mention_any == ["순두부", "찌개", "국물", "김치"]
+    assert case.must_not_contain == ["식이섬유", "섬유질"]
     assert case.soft

@@ -21,8 +21,8 @@
     "items": [
       {
         "displayName": "참치김밥",
-        "amount": 1,
-        "unit": "줄",
+        "amount": 230,
+        "unit": "g",
         "nutrition": {
           "kcal": 480,
           "proteinG": 16,
@@ -32,8 +32,8 @@
       },
       {
         "displayName": "라면",
-        "amount": 1,
-        "unit": "개",
+        "amount": 550,
+        "unit": "g",
         "nutrition": {
           "kcal": 500,
           "proteinG": 10,

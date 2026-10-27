@@ -19,8 +19,8 @@
     "items": [
       {
         "displayName": "짬뽕",
-        "amount": 1,
-        "unit": "그릇",
+        "amount": 900,
+        "unit": "g",
         "nutrition": {
           "kcal": 690,
           "proteinG": 30,
@@ -30,8 +30,8 @@
       },
       {
         "displayName": "단무지",
-        "amount": 3,
-        "unit": "조각",
+        "amount": 30,
+        "unit": "g",
         "nutrition": {
           "kcal": 10,
           "proteinG": 0.1,

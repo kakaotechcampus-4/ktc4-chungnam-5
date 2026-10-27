@@ -1,0 +1,78 @@
+{
+  "id": "18-initial-fiber-short-soft-food",
+  "description": "시작기 점심. 식이섬유만 부족 — 시작기라 생채소·잡곡 같은 고섬유 음식을 무리하게 권하지 않아야 한다",
+  "tags": [
+    "meal:LUNCH",
+    "stage:INITIAL",
+    "gap:fiber_short"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "INITIAL",
+    "qqs": {
+      "quantity": 100,
+      "quality": 60,
+      "satiety": 70
+    },
+    "mealId": "golden-meal-18",
+    "items": [
+      {
+        "displayName": "계란죽",
+        "amount": 300,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 280,
+          "proteinG": 12,
+          "fiberG": 0.8,
+          "sodiumMg": 500
+        }
+      },
+      {
+        "displayName": "두유",
+        "amount": 190,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 110,
+          "proteinG": 6,
+          "fiberG": 1.0,
+          "sodiumMg": 120
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OK"
+  },
+  "hard": {
+    "mustMentionAny": [
+      "죽",
+      "두유"
+    ]
+  },
+  "soft": [
+    "시작기에 맞게 익힌·부드러운 채소 쪽으로 제안했는가 (생채소·잡곡을 밀지 않았는가)"
+  ],
+  "reference": {
+    "body": "계란죽에 두유를 곁들여 속 편한 한 끼였는데, 채소가 들어갈 자리는 없었어요.",
+    "reasoning": "시작기에는 속이 예민해서, 부드럽게 익힌 채소부터 조금씩 더하는 게 편해요.",
+    "suggestions": [
+      {
+        "foodName": "애호박나물 한 접시",
+        "advice": "푹 익혀 부드러워 죽 옆에 곁들이기 편해요"
+      },
+      {
+        "foodName": "단호박찜 한 조각",
+        "advice": "달고 무른 식감이라 시작기에도 부담 없이 채소를 더할 수 있어요"
+      }
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "id": "24-titration-granola-fiber-short",
+  "description": "증량기 아침. 그래놀라·우유 — 나트륨은 OK, 식이섬유만 부족",
+  "tags": [
+    "meal:BREAKFAST",
+    "stage:TITRATION",
+    "gap:fiber_short",
+    "satiety:checkins"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 100,
+      "quality": 62,
+      "satiety": 55
+    },
+    "mealId": "golden-meal-24",
+    "items": [
+      {
+        "displayName": "그래놀라",
+        "amount": 50,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 220,
+          "proteinG": 5,
+          "fiberG": 3.0,
+          "sodiumMg": 80
+        }
+      },
+      {
+        "displayName": "우유",
+        "amount": 200,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 130,
+          "proteinG": 6.5,
+          "fiberG": 0,
+          "sodiumMg": 100
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 65,
+      "checkins": [
+        {
+          "checkinOffsetHours": 2,
+          "satietyPct": 40
+        }
+      ],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OK"
+  },
+  "hard": {
+    "mustMentionAny": [
+      "그래놀라",
+      "우유"
+    ],
+    "mustNotContain": [
+      "나트륨이 많",
+      "짰"
+    ]
+  },
+  "soft": [
+    "식이섬유 부족만 짚고 나트륨 문제를 지어내지 않았는가",
+    "제안이 그래놀라에 얹기 쉬운 음식인가"
+  ],
+  "reference": {
+    "body": "그래놀라에 우유로 가볍게 챙긴 아침이었는데, 식이섬유는 끼니 목표의 절반에 못 미쳤어요.",
+    "reasoning": "용량을 맞춰 가는 시기에는 먹는 양이 줄기 쉬워서, 적은 양 안에 채소나 과일이 들어가야 해요.",
+    "suggestions": [
+      {
+        "foodName": "블루베리 한 줌",
+        "advice": "그래놀라 위에 얹기만 하면 빠진 식이섬유를 채워 줘요"
+      },
+      {
+        "foodName": "사과 반 개",
+        "advice": "우유와 같이 먹기 쉬운 아침 과일이에요"
+      }
+    ]
+  }
+}

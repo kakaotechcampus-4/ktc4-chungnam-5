@@ -20,8 +20,8 @@
     "items": [
       {
         "displayName": "야채죽",
-        "amount": 1,
-        "unit": "그릇",
+        "amount": 350,
+        "unit": "g",
         "nutrition": {
           "kcal": 320,
           "proteinG": 9,
@@ -31,8 +31,8 @@
       },
       {
         "displayName": "바나나",
-        "amount": 1,
-        "unit": "개",
+        "amount": 120,
+        "unit": "g",
         "nutrition": {
           "kcal": 90,
           "proteinG": 1.1,

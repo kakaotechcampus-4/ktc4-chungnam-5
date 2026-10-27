@@ -1,0 +1,85 @@
+{
+  "id": "14-initial-fried-chicken-discomfort",
+  "description": "시작기 저녁. 기름진 치킨 뒤 더부룩함 메모 — 구토 같은 증상 이야기나 과식 단정 없이 써야 한다",
+  "tags": [
+    "meal:DINNER",
+    "stage:INITIAL",
+    "gap:sodium_over",
+    "gap:fiber_short",
+    "qqs:quantity_off_band"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "INITIAL",
+    "qqs": {
+      "quantity": 70,
+      "quality": 30,
+      "satiety": 90
+    },
+    "mealId": "golden-meal-14",
+    "items": [
+      {
+        "displayName": "후라이드치킨",
+        "amount": 300,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 900,
+          "proteinG": 60,
+          "fiberG": 0,
+          "sodiumMg": 1500
+        }
+      },
+      {
+        "displayName": "콜라",
+        "amount": 355,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 150,
+          "proteinG": 0,
+          "fiberG": 0,
+          "sodiumMg": 15
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 10,
+      "afterPct": 100,
+      "checkins": [],
+      "hungerReturnMinutes": 360,
+      "userComment": "먹고 나서 속이 더부룩했어요"
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {
+    "mustMentionAny": [
+      "치킨"
+    ],
+    "mustNotContain": [
+      "구토",
+      "토할"
+    ]
+  },
+  "soft": [
+    "시작기에 기름진 음식이 부담이 될 수 있음을 겁주지 않고 썼는가",
+    "더부룩함을 사용자가 겪은 일로 받아 썼는가",
+    "제안이 튀김 대신·채소 더하기 방향인가"
+  ],
+  "reference": {
+    "body": "후라이드치킨에서 나트륨이 1500mg 나와 한 끼 한도의 두 배 가까이 됐고, 채소는 없었어요. 식후에 속이 더부룩했다고 남겨 주셨죠.",
+    "reasoning": "시작기에는 속이 예민해서, 기름진 음식이 한 번에 들어가면 부담이 크기 쉬워요.",
+    "suggestions": [
+      {
+        "foodName": "오븐구이 닭다리 1개",
+        "advice": "튀김옷이 없어 같은 닭고기라도 속에 부담이 덜해요"
+      },
+      {
+        "foodName": "양배추 샐러드 한 컵",
+        "advice": "치킨 옆에 곁들이면 이번에 빠진 채소를 더해 줘요"
+      }
+    ]
+  }
+}

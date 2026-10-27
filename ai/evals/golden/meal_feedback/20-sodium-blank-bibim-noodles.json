@@ -1,0 +1,73 @@
+{
+  "id": "20-sodium-blank-bibim-noodles",
+  "description": "유지기 저녁. 비빔국수의 나트륨이 DB 에 비어 있다 — '짜다' 고 짐작해 쓰면 안 된다",
+  "tags": [
+    "meal:DINNER",
+    "stage:MAINTENANCE",
+    "gap:fiber_short",
+    "data:nutrient_blank"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 60,
+      "satiety": 65
+    },
+    "mealId": "golden-meal-20",
+    "items": [
+      {
+        "displayName": "비빔국수",
+        "amount": 400,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 550,
+          "proteinG": 12,
+          "fiberG": 4.0,
+          "sodiumMg": null
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": null,
+      "afterPct": 80,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT"
+  },
+  "hard": {
+    "mustMentionAny": [
+      "비빔국수",
+      "국수"
+    ],
+    "mustNotContain": [
+      "나트륨",
+      "짰",
+      "짜게"
+    ]
+  },
+  "soft": [
+    "판정하지 못한 나트륨을 짐작하지 않았는가",
+    "제안이 국수에 채소를 더하는 방향인가"
+  ],
+  "reference": {
+    "body": "비빔국수 한 그릇에 채소 고명이 적어서 식이섬유는 끼니 목표의 절반에 못 미쳤어요.",
+    "reasoning": "유지기에는 먹는 양이 줄어든 만큼, 한 그릇 요리에도 채소가 들어가야 영양이 모자라지 않아요.",
+    "suggestions": [
+      {
+        "foodName": "오이채 한 줌",
+        "advice": "비빔국수 위에 얹기 쉬워 빠진 채소를 바로 채워 줘요"
+      },
+      {
+        "foodName": "삶은 달걀 1개",
+        "advice": "국수 고명으로 올리면 한 그릇이 더 든든해져요"
+      }
+    ]
+  }
+}
