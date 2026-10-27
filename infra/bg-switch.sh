@@ -17,6 +17,7 @@ flock 9
 [ -f "$STATE" ] || { echo "상태 파일이 없다: $STATE" >&2; exit 1; }
 # shellcheck source=/dev/null
 . "$STATE"
+check_state
 TARGET=$(other "$ACTIVE")
 TARGET_TAG=$(tag_of "$TARGET")
 [ -n "$TARGET_TAG" ] || { echo "되돌릴 쪽이 없다 (첫 전환 직후)" >&2; exit 1; }

@@ -39,6 +39,7 @@ else
     exit 1
   fi
 fi
+check_state
 
 if [ "$NEXT" = blue ]; then BLUE_TAG=$TAG; else GREEN_TAG=$TAG; fi
 BE_TAG=$TAG

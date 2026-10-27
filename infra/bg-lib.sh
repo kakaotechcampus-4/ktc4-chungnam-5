@@ -47,6 +47,22 @@ ensure_upstreams() {
   done
 }
 
+# 상태 파일의 ACTIVE 와 Caddy 가 실제로 받는 쪽(upstream 파일)이 같은지. 전환(reload)과 상태 기록
+# 사이에 끊기면 둘이 어긋나고, 그대로 진행하면 지금 받는 쪽 컨테이너를 다시 만들거나 내린다.
+# 첫 전환(ACTIVE 가 빈 값)이면 upstream 은 옛 단일 api 여야 한다 — 다만 지난 첫 전환이 Caddy 를 띄운 뒤
+# 확인에서 실패했으면 upstream 은 blue 인데 blue 는 내려가 있다. 받는 사용자가 없으므로 그대로 진행한다.
+check_state() {
+  local serving
+  serving=$(sed -n 's/^import gate glp1-[a-z]*-api-\(blue\|green\):8000 .*/\1/p' "$UPSTREAM")
+  [ "$serving" = "$ACTIVE" ] && return 0
+  if [ -z "$ACTIVE" ] && [ "$(docker container inspect -f '{{.State.Running}}' "glp1-$ENV-api-$serving" 2>/dev/null)" != true ]; then
+    return 0
+  fi
+  echo "상태 파일은 ACTIVE=${ACTIVE:-(없음)} 인데 Caddy 는 ${serving:-옛 단일 api} 로 받는다 — 지난 배포·롤백이 전환 직후 끊겼다." >&2
+  echo "$UPSTREAM 과 docker ps 를 보고 $STATE 를 맞춘 뒤 다시 실행한다" >&2
+  return 1
+}
+
 caddy_reload() { docker exec "$CADDY" caddy reload --config /etc/caddy/Caddyfile; }
 
 # Caddy 안에서 그쪽 api 에 직접 닿고 DB 까지 붙는지. 컨테이너 healthcheck 는 자기 안에서만 본다.
