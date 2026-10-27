@@ -1,0 +1,64 @@
+{
+  "id": "07-satiety-unscored",
+  "description": "유지기 점심. 포만감 기록이 없어 Satiety 가 null — 포만감을 평가하면 안 된다",
+  "tags": [
+    "meal:LUNCH",
+    "stage:MAINTENANCE",
+    "gap:sodium_over",
+    "gap:fiber_short",
+    "qqs:satiety_null"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 74,
+      "satiety": null
+    },
+    "mealId": "golden-meal-07",
+    "items": [
+      {
+        "displayName": "제육덮밥",
+        "amount": 1,
+        "unit": "그릇",
+        "nutrition": {
+          "kcal": 750,
+          "proteinG": 28,
+          "fiberG": 3.0,
+          "sodiumMg": 1400
+        }
+      }
+    ],
+    "satiety": null
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {
+    "mustMentionAny": [
+      "제육",
+      "양념"
+    ]
+  },
+  "soft": [
+    "포만감·허기를 짐작해 쓰지 않았는가",
+    "제안이 덮밥에 채소를 더하는 방향인가"
+  ],
+  "reference": {
+    "body": "제육덮밥 양념에서 나트륨이 1400mg 나와 한 끼 한도를 두 배 가까이 넘었고, 채소는 적은 편이었어요.",
+    "reasoning": "유지기에는 먹는 양이 줄어든 만큼 한 끼 안에서 채소 비중을 챙겨야 영양이 모자라지 않아요.",
+    "suggestions": [
+      {
+        "foodName": "양배추 샐러드 한 컵",
+        "advice": "덮밥 옆에 두면 양념 맛을 덜어 주고 빠진 채소를 채워 줘요"
+      },
+      {
+        "foodName": "콩나물무침 한 접시",
+        "advice": "다음 덮밥 때 반찬으로 더하기 쉬운 채소예요"
+      }
+    ]
+  }
+}

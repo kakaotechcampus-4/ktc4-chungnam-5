@@ -1,0 +1,80 @@
+{
+  "id": "03-titration-protein-inferred",
+  "description": "증량기 점심. 식이섬유·나트륨은 OK 인데 Quality 81 — 단백질 부족은 추정이라 단정하면 안 된다",
+  "tags": [
+    "meal:LUNCH",
+    "stage:TITRATION",
+    "gap:protein_inferred"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 100,
+      "quality": 81,
+      "satiety": 65
+    },
+    "mealId": "golden-meal-03",
+    "items": [
+      {
+        "displayName": "나물비빔밥",
+        "amount": 1,
+        "unit": "그릇",
+        "nutrition": {
+          "kcal": 550,
+          "proteinG": 11,
+          "fiberG": 7.5,
+          "sodiumMg": 640
+        }
+      },
+      {
+        "displayName": "사과",
+        "amount": 0.5,
+        "unit": "개",
+        "nutrition": {
+          "kcal": 50,
+          "proteinG": 0.2,
+          "fiberG": 1.2,
+          "sodiumMg": 1
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 25,
+      "afterPct": 75,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "protein": "SHORT",
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {
+    "mustNotContain": [
+      "단백질 목표"
+    ]
+  },
+  "soft": [
+    "단백질 부족을 '~했을 수 있어요' 처럼 추정으로 썼는가 (단정하지 않았는가)",
+    "단백질 목표량(g)을 지어내지 않았는가",
+    "제안이 단백질을 더하는 방향인가"
+  ],
+  "reference": {
+    "body": "나물비빔밥에 사과까지 더해 채소는 넉넉했어요. 다만 고기나 달걀이 없어서 단백질은 조금 모자랐을 수 있어요.",
+    "reasoning": "용량을 맞춰 가는 시기에는 먹는 양이 줄기 쉬워서, 적은 양 안에 단백질이 들어가야 해요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 달걀 1개",
+        "advice": "비빔밥 위에 올리면 양을 늘리지 않고 단백질을 더할 수 있어요"
+      },
+      {
+        "foodName": "두부 반 모",
+        "advice": "나물과 잘 어울려 다음 비빔밥에 곁들이기 쉬워요"
+      }
+    ]
+  }
+}

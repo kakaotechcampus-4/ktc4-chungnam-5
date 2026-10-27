@@ -1,0 +1,96 @@
+{
+  "id": "10-partial-nutrition-kimchi-unknown",
+  "description": "유지기 점심. 김치는 양·성분을 모른다 — 김치의 나트륨을 짐작해 쓰면 안 된다",
+  "tags": [
+    "meal:LUNCH",
+    "stage:MAINTENANCE",
+    "gap:sodium_over",
+    "gap:fiber_short",
+    "data:partial_nutrition"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 55,
+      "satiety": 60
+    },
+    "mealId": "golden-meal-10",
+    "items": [
+      {
+        "displayName": "순두부찌개",
+        "amount": 1,
+        "unit": "그릇",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 18,
+          "fiberG": 3.0,
+          "sodiumMg": 1500
+        }
+      },
+      {
+        "displayName": "공깃밥",
+        "amount": 1,
+        "unit": "공기",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 5,
+          "fiberG": 0.6,
+          "sodiumMg": 5
+        }
+      },
+      {
+        "displayName": "김치",
+        "amount": null,
+        "unit": null,
+        "nutrition": null
+      }
+    ],
+    "satiety": {
+      "beforePct": null,
+      "afterPct": 70,
+      "checkins": [
+        {
+          "checkinOffsetHours": 2,
+          "satietyPct": 50
+        }
+      ],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {
+    "mustMentionAny": [
+      "순두부",
+      "찌개",
+      "국물"
+    ],
+    "mustNotContain": [
+      "김치에서 나트륨",
+      "김치까지 더하면"
+    ]
+  },
+  "soft": [
+    "성분을 모르는 김치에 숫자나 원인을 붙이지 않았는가"
+  ],
+  "reference": {
+    "body": "순두부찌개 국물에서 나트륨이 1500mg 나와 한 끼 한도의 두 배 가까이 됐고, 채소는 적은 편이었어요.",
+    "reasoning": "유지기에는 먹는 양이 줄어든 만큼, 한 끼 안에 채소가 빠지면 영양이 모자라기 쉬워요.",
+    "suggestions": [
+      {
+        "foodName": "시금치나물 한 접시",
+        "advice": "찌개 상차림에 반찬으로 더하기 쉬워 이번에 빠진 채소를 채워 줘요"
+      },
+      {
+        "foodName": "두부구이 반 모",
+        "advice": "순두부 대신 국물 없는 두부 요리로 바꾸면 비슷한 맛에 나트륨을 덜 수 있어요"
+      }
+    ]
+  }
+}

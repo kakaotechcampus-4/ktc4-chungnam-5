@@ -1,0 +1,108 @@
+{
+  "id": "04-reduced-all-ok",
+  "description": "감량 직후 저녁. 판정한 영양소 모두 OK, 4시간 동안 든든 — 칭찬하되 뻔한 표현은 쓰지 않는다",
+  "tags": [
+    "meal:DINNER",
+    "stage:REDUCED",
+    "gap:none",
+    "satiety:hunger_return"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "REDUCED",
+    "qqs": {
+      "quantity": 100,
+      "quality": 100,
+      "satiety": 85
+    },
+    "mealId": "golden-meal-04",
+    "items": [
+      {
+        "displayName": "현미밥",
+        "amount": 1,
+        "unit": "공기",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 6,
+          "fiberG": 3.5,
+          "sodiumMg": 5
+        }
+      },
+      {
+        "displayName": "고등어구이",
+        "amount": 1,
+        "unit": "토막",
+        "nutrition": {
+          "kcal": 250,
+          "proteinG": 22,
+          "fiberG": 0,
+          "sodiumMg": 300
+        }
+      },
+      {
+        "displayName": "시금치나물",
+        "amount": 1,
+        "unit": "접시",
+        "nutrition": {
+          "kcal": 40,
+          "proteinG": 2.5,
+          "fiberG": 3.0,
+          "sodiumMg": 280
+        }
+      },
+      {
+        "displayName": "버섯볶음",
+        "amount": 1,
+        "unit": "접시",
+        "nutrition": {
+          "kcal": 60,
+          "proteinG": 2,
+          "fiberG": 2.5,
+          "sodiumMg": 150
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 10,
+      "afterPct": 75,
+      "checkins": [
+        {
+          "checkinOffsetHours": 3,
+          "satietyPct": 60
+        }
+      ],
+      "hungerReturnMinutes": 240,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {
+    "mustNotContain": [
+      "부족",
+      "초과"
+    ]
+  },
+  "soft": [
+    "잘한 점을 이번 음식과 연결해 구체적으로 썼는가",
+    "감량 직후 위험(식욕이 돌아와 많이 먹는 것)과 이어서 썼는가",
+    "제안이 지금 흐름을 이어 가는 음식인가"
+  ],
+  "reference": {
+    "body": "현미밥에 고등어구이와 나물 두 가지까지, 식이섬유는 채우고 나트륨은 한도 안에서 마쳤어요. 4시간 가까이 배가 든든했죠.",
+    "reasoning": "용량을 낮춘 직후에는 식욕이 돌아오기 쉬운데, 이렇게 오래가는 끼니가 다음 끼니 양을 지켜 줘요.",
+    "suggestions": [
+      {
+        "foodName": "두부구이 반 모",
+        "advice": "고등어 대신 번갈아 올리면 지금처럼 든든한 상차림을 이어 갈 수 있어요"
+      },
+      {
+        "foodName": "미역줄기볶음 한 접시",
+        "advice": "나물 반찬을 바꿔 가며 지금 흐름을 그대로 가져가기 좋아요"
+      }
+    ]
+  }
+}

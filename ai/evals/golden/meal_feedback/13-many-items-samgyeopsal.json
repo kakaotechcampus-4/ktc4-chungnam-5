@@ -1,0 +1,119 @@
+{
+  "id": "13-many-items-samgyeopsal",
+  "description": "유지기 저녁. 음식 5개 — 나트륨 원인이 고기가 아니라 된장찌개·쌈장임을 골라내야 한다",
+  "tags": [
+    "meal:DINNER",
+    "stage:MAINTENANCE",
+    "gap:sodium_over",
+    "gap:fiber_short",
+    "data:many_items"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 52,
+      "satiety": 75
+    },
+    "mealId": "golden-meal-13",
+    "items": [
+      {
+        "displayName": "삼겹살구이",
+        "amount": 150,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 500,
+          "proteinG": 26,
+          "fiberG": 0,
+          "sodiumMg": 80
+        }
+      },
+      {
+        "displayName": "상추쌈",
+        "amount": 1,
+        "unit": "접시",
+        "nutrition": {
+          "kcal": 15,
+          "proteinG": 1.2,
+          "fiberG": 1.5,
+          "sodiumMg": 10
+        }
+      },
+      {
+        "displayName": "쌈장",
+        "amount": 1,
+        "unit": "큰술",
+        "nutrition": {
+          "kcal": 40,
+          "proteinG": 2,
+          "fiberG": 0.8,
+          "sodiumMg": 450
+        }
+      },
+      {
+        "displayName": "된장찌개",
+        "amount": 1,
+        "unit": "그릇",
+        "nutrition": {
+          "kcal": 150,
+          "proteinG": 10,
+          "fiberG": 2.5,
+          "sodiumMg": 1300
+        }
+      },
+      {
+        "displayName": "공깃밥",
+        "amount": 1,
+        "unit": "공기",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 5,
+          "fiberG": 0.6,
+          "sodiumMg": 5
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 15,
+      "afterPct": 95,
+      "checkins": [],
+      "hungerReturnMinutes": 300,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {
+    "mustMentionAny": [
+      "된장찌개",
+      "찌개",
+      "쌈장"
+    ],
+    "mustNotContain": [
+      "삼겹살에서 나트륨",
+      "고기에서 나트륨"
+    ]
+  },
+  "soft": [
+    "나트륨 원인을 된장찌개·쌈장으로 정확히 골랐는가",
+    "상추쌈을 먹은 사실을 반영했는가"
+  ],
+  "reference": {
+    "body": "상추쌈으로 채소를 곁들였지만, 된장찌개 하나에서만 나트륨이 1300mg 나와 쌈장까지 더하면 한 끼 한도의 두 배를 넘었어요.",
+    "reasoning": "유지기에는 먹는 양이 줄어든 만큼 짠 국물이 차지하는 비중이 커지기 쉬워요.",
+    "suggestions": [
+      {
+        "foodName": "오이무침 한 접시",
+        "advice": "고기 먹을 때 찌개 대신 곁들이면 국물 없이도 입가심이 돼요"
+      },
+      {
+        "foodName": "버섯구이 한 접시",
+        "advice": "삼겹살과 같이 구워 먹기 쉽고 이번에 모자랐던 채소를 더해 줘요"
+      }
+    ]
+  }
+}

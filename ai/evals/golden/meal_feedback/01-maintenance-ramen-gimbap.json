@@ -1,0 +1,87 @@
+{
+  "id": "01-maintenance-ramen-gimbap",
+  "description": "유지기 점심. 라면 국물로 나트륨 초과, 채소가 없어 식이섬유 부족, 2시간 만에 허기",
+  "tags": [
+    "meal:LUNCH",
+    "stage:MAINTENANCE",
+    "gap:sodium_over",
+    "gap:fiber_short",
+    "satiety:hunger_return"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 48,
+      "satiety": 40
+    },
+    "mealId": "golden-meal-01",
+    "items": [
+      {
+        "displayName": "참치김밥",
+        "amount": 1,
+        "unit": "줄",
+        "nutrition": {
+          "kcal": 480,
+          "proteinG": 16,
+          "fiberG": 2.1,
+          "sodiumMg": 890
+        }
+      },
+      {
+        "displayName": "라면",
+        "amount": 1,
+        "unit": "개",
+        "nutrition": {
+          "kcal": 500,
+          "proteinG": 10,
+          "fiberG": 1.0,
+          "sodiumMg": 1790
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 80,
+      "checkins": [
+        {
+          "checkinOffsetHours": 2,
+          "satietyPct": 30
+        }
+      ],
+      "hungerReturnMinutes": 120,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {
+    "mustMentionAny": [
+      "라면",
+      "국물"
+    ]
+  },
+  "soft": [
+    "나트륨 초과의 원인을 라면(국물)으로 짚었는가",
+    "2시간 만에 배고파진 일을 사용자가 겪은 일로 썼는가",
+    "제안이 '라면 대신' 이나 '채소 더하기' 방향인가"
+  ],
+  "reference": {
+    "body": "라면에서 나트륨이 1790mg 나와 김밥까지 더하면 한 끼 한도의 세 배를 넘었어요. 채소가 거의 없어서 2시간 만에 다시 배고파졌죠.",
+    "reasoning": "유지기에는 먹는 양 자체가 적어서, 한 끼에 채소가 빠지면 금방 허기가 돌아오기 쉬워요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 달걀 2개",
+        "advice": "김밥에 라면 대신 곁들이면 국물 없이도 한 끼가 채워져요"
+      },
+      {
+        "foodName": "오이·당근 스틱 한 컵",
+        "advice": "편의점에서 바로 살 수 있고 이번 끼니에 빠진 채소를 더해 줘요"
+      }
+    ]
+  }
+}
