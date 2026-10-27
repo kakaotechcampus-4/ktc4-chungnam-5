@@ -1,0 +1,72 @@
+{
+  "id": "17-sodium-boundary-766-7",
+  "description": "유지기 아침. 나트륨이 끼니 한도 766.7mg 와 같다 — 화면 기준 OK. 초과라고 쓰거나 단백질 부족으로 짐작하면 안 된다",
+  "tags": [
+    "meal:BREAKFAST",
+    "stage:MAINTENANCE",
+    "gap:none",
+    "boundary:sodium_rounding"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 99,
+      "satiety": 60
+    },
+    "mealId": "golden-meal-17",
+    "items": [
+      {
+        "displayName": "통밀 햄치즈 샌드위치",
+        "amount": 250,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 520,
+          "proteinG": 24,
+          "fiberG": 9.0,
+          "sodiumMg": 766.7
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "나트륨이 많",
+      "나트륨이 초과",
+      "나트륨이 높",
+      "단백질이 부족",
+      "단백질은 부족"
+    ]
+  },
+  "soft": [
+    "어떤 영양소도 부족·초과라고 쓰지 않았는가"
+  ],
+  "reference": {
+    "body": "통밀 햄치즈 샌드위치로 식이섬유를 끼니 목표 넘게 채웠고, 나트륨도 한도 안에 들어왔어요.",
+    "reasoning": "유지기에는 한 끼 양이 적어도 영양이 빠지지 않는 게 중요한데, 이번 아침이 그 기준을 지켰어요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 달걀 1개",
+        "advice": "샌드위치에 곁들이면 지금 구성을 그대로 이어 가기 좋아요"
+      },
+      {
+        "foodName": "방울토마토 한 줌",
+        "advice": "다음 아침에도 손쉽게 더할 수 있는 채소예요"
+      }
+    ]
+  }
+}

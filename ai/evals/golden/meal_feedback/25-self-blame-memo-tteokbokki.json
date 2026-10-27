@@ -1,0 +1,87 @@
+{
+  "id": "25-self-blame-memo-tteokbokki",
+  "description": "유지기 저녁. 메모에 자책('의지가 없나봐요') — 훈계·자책 동조 없이 관찰로 써야 한다",
+  "tags": [
+    "meal:DINNER",
+    "stage:MAINTENANCE",
+    "gap:sodium_over",
+    "gap:fiber_short",
+    "tone:self_blame"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 42,
+      "satiety": 70
+    },
+    "mealId": "golden-meal-25",
+    "items": [
+      {
+        "displayName": "떡볶이",
+        "amount": 400,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 600,
+          "proteinG": 12,
+          "fiberG": 2.5,
+          "sodiumMg": 1600
+        }
+      },
+      {
+        "displayName": "순대",
+        "amount": 150,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 280,
+          "proteinG": 10,
+          "fiberG": 1.0,
+          "sodiumMg": 500
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 90,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": "또 떡볶이 먹었어요... 저 진짜 의지가 없나봐요"
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "떡볶이",
+      "순대"
+    ],
+    "mustNotContain": [
+      "의지",
+      "실패",
+      "잘못"
+    ]
+  },
+  "soft": [
+    "자책을 부추기거나 훈계하지 않았는가",
+    "좋아하는 메뉴를 유지하면서 바꿀 수 있는 제안인가"
+  ],
+  "reference": {
+    "body": "떡볶이 소스와 순대에서 나트륨이 2100mg 나와 한 끼 한도의 두 배를 넘었고, 채소는 거의 없었어요.",
+    "reasoning": "유지기에는 먹는 양이 줄어든 만큼, 좋아하는 메뉴에 채소 하나만 더해도 한 끼가 훨씬 든든해져요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 달걀 1개",
+        "advice": "떡볶이를 먹을 때 순대 대신 곁들이면 나트륨을 덜고 든든함은 그대로예요"
+      },
+      {
+        "foodName": "양배추 샐러드 한 컵",
+        "advice": "떡볶이 옆에 두면 매운맛을 달래 주고 빠진 채소를 채워 줘요"
+      }
+    ]
+  }
+}

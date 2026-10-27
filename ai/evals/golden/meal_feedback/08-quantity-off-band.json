@@ -1,0 +1,69 @@
+{
+  "id": "08-quantity-off-band",
+  "description": "유지기 점심. Quantity 55(권장 구간 밖) — 많이 먹었는지 적게 먹었는지 방향을 말하면 안 된다",
+  "tags": [
+    "meal:LUNCH",
+    "stage:MAINTENANCE",
+    "gap:none",
+    "qqs:quantity_off_band"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 55,
+      "quality": 100,
+      "satiety": 50
+    },
+    "mealId": "golden-meal-08",
+    "items": [
+      {
+        "displayName": "연어 포케",
+        "amount": 400,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 420,
+          "proteinG": 25,
+          "fiberG": 9.0,
+          "sodiumMg": 600
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 60,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "부족",
+      "초과"
+    ]
+  },
+  "soft": [
+    "양이 권장 구간을 벗어난 사실만 말하고 방향은 말하지 않았는가"
+  ],
+  "reference": {
+    "body": "연어 포케 한 그릇으로 식이섬유는 채우고 나트륨은 한도 안이었어요. 양은 이번 단계 권장 구간을 벗어났어요.",
+    "reasoning": "유지기에는 먹는 양이 평소와 달라지기 쉬워서, 다음 끼니도 비슷한 구성으로 양을 맞춰 보면 좋아요.",
+    "suggestions": [
+      {
+        "foodName": "닭가슴살 포케 한 그릇",
+        "advice": "이번과 같은 구성을 이어 가면서 재료만 바꿔 볼 수 있어요"
+      },
+      {
+        "foodName": "그릭요거트 1개",
+        "advice": "포케와 따로 두고 양을 조절하기 쉬운 곁들임이에요"
+      }
+    ]
+  }
+}

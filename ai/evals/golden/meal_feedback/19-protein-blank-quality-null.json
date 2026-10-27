@@ -1,0 +1,69 @@
+{
+  "id": "19-protein-blank-quality-null",
+  "description": "유지기 아침. 오트밀의 단백질이 DB 에 비어 Quality 가 null — 단백질을 언급하면 안 된다",
+  "tags": [
+    "meal:BREAKFAST",
+    "stage:MAINTENANCE",
+    "gap:none",
+    "data:nutrient_blank",
+    "qqs:quality_null"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": null,
+      "satiety": 70
+    },
+    "mealId": "golden-meal-19",
+    "items": [
+      {
+        "displayName": "오트밀",
+        "amount": 250,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": null,
+          "fiberG": 8.5,
+          "sodiumMg": 150
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 75,
+      "checkins": [],
+      "hungerReturnMinutes": 200,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "단백질"
+    ]
+  },
+  "soft": [
+    "제안이 오트밀 아침 구성을 이어 가는 음식인가"
+  ],
+  "reference": {
+    "body": "오트밀 한 그릇으로 식이섬유는 끼니 목표를 넘겼고, 나트륨도 한도 안이었어요.",
+    "reasoning": "유지기에는 양이 줄어도 영양이 빠지지 않는 게 중요한데, 이번 아침이 그 흐름을 지켰어요.",
+    "suggestions": [
+      {
+        "foodName": "바나나 반 개",
+        "advice": "오트밀에 얹기 쉬워 지금 아침 구성을 그대로 이어 가요"
+      },
+      {
+        "foodName": "플레인 요거트 1개",
+        "advice": "오트밀과 섞어 먹기 좋아 다음 아침에도 손이 가요"
+      }
+    ]
+  }
+}

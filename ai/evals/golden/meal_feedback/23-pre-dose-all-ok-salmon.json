@@ -1,0 +1,108 @@
+{
+  "id": "23-pre-dose-all-ok-salmon",
+  "description": "투약 전 저녁. 모두 OK — 투약 전 단계라 없는 위험을 지어내지 않고 지금 구성을 칭찬해야 한다",
+  "tags": [
+    "meal:DINNER",
+    "stage:PRE_DOSE",
+    "gap:none",
+    "satiety:checkins"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "PRE_DOSE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 100,
+      "satiety": 80
+    },
+    "mealId": "golden-meal-23",
+    "items": [
+      {
+        "displayName": "연어구이",
+        "amount": 120,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 250,
+          "proteinG": 25,
+          "fiberG": 0,
+          "sodiumMg": 150
+        }
+      },
+      {
+        "displayName": "현미밥",
+        "amount": 150,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 220,
+          "proteinG": 5,
+          "fiberG": 2.5,
+          "sodiumMg": 5
+        }
+      },
+      {
+        "displayName": "브로콜리",
+        "amount": 100,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 35,
+          "proteinG": 3,
+          "fiberG": 3.3,
+          "sodiumMg": 30
+        }
+      },
+      {
+        "displayName": "고구마",
+        "amount": 100,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 130,
+          "proteinG": 1.5,
+          "fiberG": 3.0,
+          "sodiumMg": 40
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 80,
+      "checkins": [
+        {
+          "checkinOffsetHours": 3,
+          "satietyPct": 60
+        }
+      ],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "부족",
+      "초과"
+    ]
+  },
+  "soft": [
+    "투약 전 단계에 맞게 특별한 위험을 지어내지 않았는가",
+    "잘한 점을 이번 음식과 연결해 썼는가"
+  ],
+  "reference": {
+    "body": "연어구이에 현미밥·브로콜리·고구마까지, 식이섬유는 끼니 목표를 넘기고 나트륨은 한도의 3분의 1도 안 됐어요.",
+    "reasoning": "투약 전이라 평소 식사가 기준인데, 지금 같은 구성이 앞으로의 기준이 되어 줄 거예요.",
+    "suggestions": [
+      {
+        "foodName": "두부구이 반 모",
+        "advice": "연어 대신 번갈아 올리면 지금 구성을 이어 가기 좋아요"
+      },
+      {
+        "foodName": "단호박찜 한 조각",
+        "advice": "고구마 대신 바꿔 가며 곁들이기 좋아요"
+      }
+    ]
+  }
+}

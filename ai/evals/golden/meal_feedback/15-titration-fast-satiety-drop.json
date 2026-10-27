@@ -1,0 +1,94 @@
+{
+  "id": "15-titration-fast-satiety-drop",
+  "description": "증량기 아침. 빵·커피 아침 뒤 체크인마다 포만감이 빠르게 떨어졌다 — 체크인 흐름을 구체적으로 짚어야 한다",
+  "tags": [
+    "meal:BREAKFAST",
+    "stage:TITRATION",
+    "gap:fiber_short",
+    "satiety:checkins"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 100,
+      "quality": 45,
+      "satiety": 25
+    },
+    "mealId": "golden-meal-15",
+    "items": [
+      {
+        "displayName": "크루아상",
+        "amount": 70,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 290,
+          "proteinG": 5,
+          "fiberG": 1.5,
+          "sodiumMg": 350
+        }
+      },
+      {
+        "displayName": "아메리카노",
+        "amount": 350,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 10,
+          "proteinG": 0.5,
+          "fiberG": 0,
+          "sodiumMg": 10
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 50,
+      "checkins": [
+        {
+          "checkinOffsetHours": 1,
+          "satietyPct": 30
+        },
+        {
+          "checkinOffsetHours": 2,
+          "satietyPct": 10
+        }
+      ],
+      "hungerReturnMinutes": 90,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "크루아상",
+      "빵"
+    ],
+    "mustNotContain": [
+      "단백질"
+    ]
+  },
+  "soft": [
+    "포만감이 금방 떨어진 흐름을 기록(1시간 반 만에 허기)으로 짚었는가",
+    "판정하지 않은 단백질을 평가하지 않았는가",
+    "제안이 오래 든든한 아침 쪽인가"
+  ],
+  "reference": {
+    "body": "크루아상과 커피로 가볍게 시작했는데, 1시간 반 만에 다시 배고파졌죠. 채소가 없어 금방 꺼진 아침이었어요.",
+    "reasoning": "용량을 맞춰 가는 시기에는 먹는 양이 줄기 쉬워서, 적은 양으로도 오래가는 아침이 중요해요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 달걀 2개",
+        "advice": "크루아상 대신 곁들이면 같은 양으로 더 오래 든든해요"
+      },
+      {
+        "foodName": "방울토마토 한 줌",
+        "advice": "커피 옆에 두기 쉽고 이번 아침에 빠진 채소를 채워 줘요"
+      }
+    ]
+  }
+}

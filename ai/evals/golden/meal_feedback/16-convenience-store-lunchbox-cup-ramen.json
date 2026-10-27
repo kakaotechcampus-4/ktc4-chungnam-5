@@ -1,0 +1,81 @@
+{
+  "id": "16-convenience-store-lunchbox-cup-ramen",
+  "description": "유지기 점심. 편의점 도시락 + 컵라면 — 두 음식의 나트륨 합계를 근거로 써야 한다",
+  "tags": [
+    "meal:LUNCH",
+    "stage:MAINTENANCE",
+    "gap:sodium_over",
+    "gap:fiber_short"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 40,
+      "satiety": 55
+    },
+    "mealId": "golden-meal-16",
+    "items": [
+      {
+        "displayName": "편의점 도시락",
+        "amount": 400,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 700,
+          "proteinG": 22,
+          "fiberG": 3.5,
+          "sodiumMg": 1650
+        }
+      },
+      {
+        "displayName": "컵라면",
+        "amount": 110,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 6,
+          "fiberG": 1.0,
+          "sodiumMg": 1100
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 85,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "컵라면",
+      "도시락"
+    ]
+  },
+  "soft": [
+    "나트륨 원인을 도시락·컵라면으로 짚었는가",
+    "제안이 편의점에서 바로 바꿀 수 있는 음식인가"
+  ],
+  "reference": {
+    "body": "도시락에 컵라면까지 더해 나트륨이 2750mg, 한 끼 한도의 세 배를 넘었어요. 채소 반찬은 거의 없었고요.",
+    "reasoning": "유지기에는 먹는 양이 줄어든 만큼, 한 끼 안에서 짠 음식이 차지하는 몫이 커지기 쉬워요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 달걀 2개",
+        "advice": "컵라면 대신 도시락에 곁들이면 국물 없이 든든해요"
+      },
+      {
+        "foodName": "샐러드 한 팩",
+        "advice": "편의점에서 같이 집기 쉬워 이번에 빠진 채소를 채워 줘요"
+      }
+    ]
+  }
+}

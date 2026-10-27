@@ -1,0 +1,92 @@
+{
+  "id": "21-reduced-off-band-tonkatsu",
+  "description": "감량 직후 저녁. Quantity 60 + 감량 직후 위험(많이 먹게 됨) — 이번 끼니를 과식이라고 단정하면 안 된다",
+  "tags": [
+    "meal:DINNER",
+    "stage:REDUCED",
+    "gap:sodium_over",
+    "gap:fiber_short",
+    "qqs:quantity_off_band"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "REDUCED",
+    "qqs": {
+      "quantity": 60,
+      "quality": 45,
+      "satiety": 90
+    },
+    "mealId": "golden-meal-21",
+    "items": [
+      {
+        "displayName": "돈까스",
+        "amount": 200,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 600,
+          "proteinG": 30,
+          "fiberG": 1.5,
+          "sodiumMg": 900
+        }
+      },
+      {
+        "displayName": "양배추샐러드",
+        "amount": 80,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 25,
+          "proteinG": 1,
+          "fiberG": 1.8,
+          "sodiumMg": 150
+        }
+      },
+      {
+        "displayName": "공깃밥",
+        "amount": 210,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 5,
+          "fiberG": 0.6,
+          "sodiumMg": 5
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 100,
+      "checkins": [],
+      "hungerReturnMinutes": 330,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "돈까스"
+    ]
+  },
+  "soft": [
+    "감량 직후 위험과 이어 쓰되 이번 끼니를 과식으로 단정하지 않았는가",
+    "곁들인 양배추 샐러드를 반영했는가"
+  ],
+  "reference": {
+    "body": "돈까스에서 나트륨이 900mg 나와 한 끼 한도를 넘었고, 양배추 샐러드가 있었지만 채소는 끼니 목표의 절반 정도였어요. 양은 이번 단계 권장 구간을 벗어났어요.",
+    "reasoning": "용량을 낮춘 직후에는 식욕이 돌아오기 쉬워서, 튀김 위주의 끼니가 이어지지 않게 살피면 좋아요.",
+    "suggestions": [
+      {
+        "foodName": "돼지고기 수육 한 접시",
+        "advice": "튀김옷 없이 같은 고기를 먹을 수 있어 나트륨과 기름이 덜해요"
+      },
+      {
+        "foodName": "브로콜리 무침 한 접시",
+        "advice": "돈까스 정식에 반찬으로 더하면 빠진 채소를 채워 줘요"
+      }
+    ]
+  }
+}

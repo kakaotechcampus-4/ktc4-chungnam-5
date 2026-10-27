@@ -1,0 +1,85 @@
+{
+  "id": "05-pre-dose-jjamppong-sodium",
+  "description": "투약 전 점심. 짬뽕 건더기로 식이섬유는 OK, 국물 나트륨만 크게 초과",
+  "tags": [
+    "meal:LUNCH",
+    "stage:PRE_DOSE",
+    "gap:sodium_over"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "PRE_DOSE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 67,
+      "satiety": 70
+    },
+    "mealId": "golden-meal-05",
+    "items": [
+      {
+        "displayName": "짬뽕",
+        "amount": 900,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 690,
+          "proteinG": 30,
+          "fiberG": 8.0,
+          "sodiumMg": 3200
+        }
+      },
+      {
+        "displayName": "단무지",
+        "amount": 30,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 10,
+          "proteinG": 0.1,
+          "fiberG": 0.5,
+          "sodiumMg": 230
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 90,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "OK",
+    "sodium": "OVER"
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "짬뽕",
+      "국물"
+    ],
+    "mustNotContain": [
+      "식이섬유가 부족",
+      "채소가 부족"
+    ]
+  },
+  "soft": [
+    "나트륨 원인을 짬뽕 국물로 짚었는가",
+    "투약 전 단계라 특별한 위험을 지어내지 않았는가",
+    "제안이 나트륨을 줄이는 방향인가"
+  ],
+  "reference": {
+    "body": "짬뽕 건더기로 채소는 넉넉했는데, 국물에서 나트륨이 3200mg 나와 한 끼 한도의 네 배를 넘었어요.",
+    "reasoning": "투약 전이라 평소 식사가 기준인 지금, 국물 습관을 잡아 두면 이후 단계에서도 그대로 이어져요.",
+    "suggestions": [
+      {
+        "foodName": "볶음짬뽕 한 그릇",
+        "advice": "같은 맛이면서 국물이 없어 이번처럼 나트륨이 쌓이지 않아요"
+      },
+      {
+        "foodName": "플레인 요거트 1개",
+        "advice": "짠 식사 뒤 단무지 대신 입가심으로 곁들이기 좋아요"
+      }
+    ]
+  }
+}

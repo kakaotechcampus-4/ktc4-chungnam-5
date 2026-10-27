@@ -1,0 +1,81 @@
+{
+  "id": "06-nutrients-blank-unjudged",
+  "description": "증량기 저녁. DB 에 열량만 있고 단백질·식이섬유·나트륨이 비어 있다 — 영양이 충분·부족하다 단정하면 안 된다",
+  "tags": [
+    "meal:DINNER",
+    "stage:TITRATION",
+    "gap:unjudged",
+    "data:nutrient_blank",
+    "qqs:quality_null"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 100,
+      "quality": null,
+      "satiety": 60
+    },
+    "mealId": "golden-meal-06",
+    "items": [
+      {
+        "displayName": "잡채",
+        "amount": 200,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 380,
+          "proteinG": null,
+          "fiberG": null,
+          "sodiumMg": null
+        }
+      },
+      {
+        "displayName": "동그랑땡",
+        "amount": 100,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 250,
+          "proteinG": null,
+          "fiberG": null,
+          "sodiumMg": null
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": null,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": 180,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {},
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "균형",
+      "충분",
+      "부족",
+      "초과"
+    ]
+  },
+  "soft": [
+    "영양 판정 없이 먹은 음식·포만감만으로 썼는가",
+    "제안이 단백질·채소를 곁들이기 쉬운 무난한 음식인가"
+  ],
+  "reference": {
+    "body": "잡채와 동그랑땡으로 차린 한 끼였고, 3시간 동안 배고픔 없이 지나갔어요.",
+    "reasoning": "용량을 맞춰 가는 시기에는 먹는 양이 줄기 쉬워서, 이렇게 오래가는 끼니가 반가워요.",
+    "suggestions": [
+      {
+        "foodName": "두부 반 모",
+        "advice": "잡채 같은 반찬 옆에 곁들이기 쉬워요"
+      },
+      {
+        "foodName": "방울토마토 한 줌",
+        "advice": "기름진 반찬 뒤에 산뜻하게 곁들이기 좋아요"
+      }
+    ]
+  }
+}

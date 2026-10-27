@@ -1,0 +1,72 @@
+{
+  "id": "09-fiber-boundary-8-3",
+  "description": "유지기 아침. 식이섬유 8.3g — 화면 기준 OK. Quality 99 의 1점은 식이섬유 몫이라 단백질 부족도 아니다",
+  "tags": [
+    "meal:BREAKFAST",
+    "stage:MAINTENANCE",
+    "gap:none",
+    "boundary:fiber_rounding"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 99,
+      "satiety": 50
+    },
+    "mealId": "golden-meal-09",
+    "items": [
+      {
+        "displayName": "닭가슴살 샐러드",
+        "amount": 250,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 350,
+          "proteinG": 40,
+          "fiberG": 8.3,
+          "sodiumMg": 500
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": null,
+      "afterPct": 60,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "식이섬유가 부족",
+      "섬유질이 부족",
+      "단백질이 부족",
+      "단백질은 부족",
+      "단백질이 모자"
+    ]
+  },
+  "soft": [
+    "어떤 영양소도 부족하다고 쓰지 않았는가"
+  ],
+  "reference": {
+    "body": "닭가슴살 샐러드로 식이섬유는 끼니 목표 8.3g을 딱 채웠고, 나트륨도 한도 안이었어요.",
+    "reasoning": "유지기에는 양이 줄어도 영양이 빠지지 않는 게 중요한데, 이번 끼니가 그 기준을 지켰어요.",
+    "suggestions": [
+      {
+        "foodName": "현미밥 반 공기",
+        "advice": "샐러드에 곁들이면 지금 구성을 지키면서 한 끼가 더 든든해져요"
+      },
+      {
+        "foodName": "삶은 브로콜리 한 컵",
+        "advice": "다음 샐러드에 더하기 쉬워 지금 흐름을 이어 가기 좋아요"
+      }
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "id": "02-initial-fiber-ok-lower-target",
+  "description": "시작기 아침. 시작기 식이섬유 목표(5.6g)는 채웠다 — 유지기 기준(8.3g)으로 부족하다고 쓰면 안 된다",
+  "tags": [
+    "meal:BREAKFAST",
+    "stage:INITIAL",
+    "gap:none",
+    "boundary:stage_target"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "INITIAL",
+    "qqs": {
+      "quantity": 100,
+      "quality": 100,
+      "satiety": 70
+    },
+    "mealId": "golden-meal-02",
+    "items": [
+      {
+        "displayName": "야채죽",
+        "amount": 350,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 320,
+          "proteinG": 9,
+          "fiberG": 4.2,
+          "sodiumMg": 450
+        }
+      },
+      {
+        "displayName": "바나나",
+        "amount": 120,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 90,
+          "proteinG": 1.1,
+          "fiberG": 2.6,
+          "sodiumMg": 1
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "식이섬유가 부족",
+      "섬유질이 부족",
+      "채소가 부족"
+    ]
+  },
+  "soft": [
+    "시작기의 위험(속 불편으로 적게 먹는 것)과 이어서 썼는가",
+    "제안이 속에 부담 없는 음식인가"
+  ],
+  "reference": {
+    "body": "야채죽에 바나나까지 곁들여서 속에 부담 없이 식이섬유를 이번 단계 목표만큼 채웠어요.",
+    "reasoning": "시작기에는 속이 불편해 끼니를 거르기 쉬운데, 부드러운 음식으로 한 끼를 다 채운 게 좋은 흐름이에요.",
+    "suggestions": [
+      {
+        "foodName": "달걀찜 한 그릇",
+        "advice": "죽처럼 부드러워 시작기에도 편하게 먹을 수 있어요"
+      },
+      {
+        "foodName": "연두부 반 모",
+        "advice": "야채죽 옆에 곁들이기 쉽고 식감이 순해요"
+      }
+    ]
+  }
+}
