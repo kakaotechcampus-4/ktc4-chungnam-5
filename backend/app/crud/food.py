@@ -47,38 +47,24 @@ def _normalized_name():
 def find_unique_by_name(db: Session, name: str) -> FoodRef | None:
     """이름이 **딱 하나로 좁혀질 때만** 그 행을 준다. 0건이거나 여러 건이면 None.
 
-    ## 왜 여러 건이면 포기하는가
+    ## 같은 이름은 이미 한 행이다
 
-    이름이 같아도 영양성분은 제각각이다 — 실측하면 `미역국` 14건의 열량이
-    7~450 kcal(64배), `김치찌개` 28건이 16~140 kcal 이다. 그중 하나를 골라 주면
-    그 값이 `meal_items.food_ref_id` 로 박제되고 Q/Q/S 채점까지 흘러간다.
-    사용자는 자기 점수가 왜 그런지 알 방법이 없다.
+    공공 DB 에는 이름이 같은 음식이 여러 건씩 있다 — `미역국` 14건의 열량이
+    7~450 kcal, `김치찌개` 28건이 16~140 kcal 였다. 적재할 때 `(category, 정규화한
+    이름)` 마다 한 행으로 합치고 성분은 100g 당 평균으로 둔다(`scripts/load_food_refs.py`,
+    마이그레이션 `8d3f6a1c5e27`). 그래서 **한 category 안에서 이름이 같은 행은 없다.**
 
-    **정렬로 하나를 집으면 "결정적으로 틀린" 답이 된다.** 결정성은 재현성을 줄 뿐
-    정확도를 주지 않는다. 영양정보가 비는 건 설계된 정상 경로지만(Rule Engine 이
-    NULL 을 처리한다 — `qqs_evaluations.quality_score` 가 NULL 허용인 이유),
-    틀린 영양정보는 조용한 오염이다.
-
-    못 좁힌 경우는 계약서의 폴백 흐름으로 넘어간다 — 응답의 `matched: false` 가
-    FE 에게 `GET /nutrition/candidates` 로 후보를 띄우라는 신호다. 퍼지 검색은
-    **사람이 고르는** 그 자리에서 하면 안전하다.
+    여러 건이 남는 건 category 가 다른 경우뿐이고, 그건 아래 GENERAL 우선 규칙이
+    정한다. 그래도 여러 건이면 포기한다 — 정렬로 하나를 집으면 그 값이
+    `meal_items.food_ref_id` 로 박제되고 Q/Q/S 채점까지 흘러간다. 못 좁힌 경우는 계약서의
+    폴백 흐름으로 넘어간다 — 응답의 `matched: false` 가 FE 에게
+    `GET /nutrition/candidates` 로 후보를 띄우라는 신호다.
 
     ## GENERAL 을 먼저 보는 이유
 
-    사용자가 "배추김치" 라 쓰면 브랜드 제품이 아니라 그 음식을 뜻한다. 동명 행은
-    대부분 `PROCESSED`(가공식품 31.6만건)라, GENERAL 에 딱 하나만 있으면 그게
-    사용자가 말한 것이다 — `배추김치` 는 전체 75건이지만 GENERAL 은 1건이다.
-
-    GENERAL 에 한 건도 없을 때만 전체에서 다시 찾는다. GENERAL 이 여러 건이면
-    거기서 포기한다 — PROCESSED 를 더 봐도 더 애매해질 뿐이다.
-
-    **기대는 낮게 잡을 것.** 이 분기가 실제로 구제하는 건 모호한 이름 31,101 개
-    중 149 개(0.5%)다. `미역국`(GENERAL 5건) · `김치찌개`(GENERAL 5건)처럼
-    GENERAL 안에서도 여러 건인 이름이 훨씬 많아 대부분은 그대로 포기한다.
-    좁히는 것만으로 매칭률이 오르지는 않는다 — 나머지는 폴백의 몫이다.
-
-    (측정: `dataset_version='20260828'` 기준. 정규화한 이름으로 묶어
-    `total > 1 AND general = 1` 인 그룹 수를 셌다.)
+    사용자가 "배추김치" 라 쓰면 브랜드 제품이 아니라 그 음식을 뜻한다. 일반음식
+    (`GENERAL`)과 가공식품(`PROCESSED`)에 같은 이름이 한 건씩 있으면 GENERAL 쪽이
+    사용자가 말한 것이다. GENERAL 에 없을 때만 전체에서 다시 찾는다.
     """
     matches_name = _normalized_name() == normalize_name(name)
 
@@ -149,7 +135,7 @@ def _candidate_order():
     가깝기 때문이다 — `계란` 에 `계란빵` 이 `부추넣은 계란말이` 보다 먼저 온다.
 
     마지막 `id` 는 동점일 때 순서를 고정한다. 없으면 같은 질의가 호출마다 다른
-    후보를 보여준다 — 공공 DB 에는 이름·성분이 같은 행이 실제로 여럿 있다.
+    후보를 보여준다 — GENERAL 과 PROCESSED 에 같은 이름이 하나씩 있을 수 있다.
     """
     return (
         (FoodRef.category == FoodCategory.GENERAL).desc(),
