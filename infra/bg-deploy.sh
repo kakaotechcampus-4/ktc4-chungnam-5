@@ -72,6 +72,12 @@ trap on_exit EXIT
 "${COMPOSE[@]}" run --rm migrate
 # healthy(/health/ready)가 아니면 여기서 실패로 끝난다
 "${COMPOSE[@]}" up -d --wait --no-deps "api-$NEXT"
+if [ -n "$FIRST" ] && [ "$ENV" = prod ] && ! caddy_exists; then
+  # 새 서버(로컬 확인 · 장애 복구) — 받던 쪽이 없으므로 끊길 것도 없다. Caddy 가 있어야
+  # 아래에서 Caddy 쪽 확인을 할 수 있으니 먼저 띄운다. 아래 첫 전환 블록은 같은 일을 다시 해도 바뀌는 게 없다.
+  write_upstream "$UPSTREAM" "glp1-prod-api-blue"
+  "${COMPOSE[@]}" up -d --wait --no-deps caddy
+fi
 caddy_can_reach "$NEXT"
 
 if [ -n "$FIRST" ] && [ "$ENV" = prod ]; then

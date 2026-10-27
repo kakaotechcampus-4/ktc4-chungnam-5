@@ -54,6 +54,9 @@ caddy_can_reach() { # color
   docker exec "$CADDY" wget -qO /dev/null "http://glp1-$ENV-api-$1:8000/health/ready"
 }
 
+# 운영 Caddy 컨테이너가 있는지 (정지 상태 포함). 없으면 새 서버다 — 받던 쪽도 없다.
+caddy_exists() { docker container inspect "$CADDY" >/dev/null 2>&1; }
+
 # 운영 Caddy 가 upstream 파일을 읽는 새 구성으로 떠 있는지 (첫 전환 전의 옛 Caddy 는 아니다)
 caddy_is_bg() { docker exec "$CADDY" test -d /etc/caddy-upstreams 2>/dev/null; }
 
