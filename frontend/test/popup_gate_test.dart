@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/popups/popup_gate.dart';
+import 'package:frontend/state/tab_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final _dailyTitle = find.text('오늘 컨디션 기록');
@@ -133,5 +134,58 @@ void main() {
     await _settle(tester);
     expect(_dailyTitle, findsNothing);
     expect(gate.isShowing, isFalse);
+  });
+
+  testWidgets('the feedback branch waits for an open popup, then returns', (
+    WidgetTester tester,
+  ) async {
+    final context = await _pumpHost(tester);
+    final gate = PopupGate();
+
+    gate.showDailyPopupsIfDue(context);
+    await _settle(tester);
+    final branch = gate.showFeedbackBranch(
+      context,
+      anchorCenterX: 400,
+      bottomOffset: 60,
+    );
+    await _settle(tester);
+    expect(_dailyTitle, findsOneWidget);
+    expect(find.text('장기 피드백'), findsNothing);
+
+    await tester.tap(find.text('나중에'));
+    await _settle(tester);
+    expect(find.text('장기 피드백'), findsOneWidget);
+
+    await tester.tap(find.text('장기 피드백'));
+    await _settle(tester);
+    expect(await branch, FeedbackKind.long);
+    expect(gate.isShowing, isFalse);
+  });
+
+  testWidgets('replacing a suggestion asks once and returns the choice', (
+    WidgetTester tester,
+  ) async {
+    final context = await _pumpHost(tester);
+    final gate = PopupGate();
+
+    final first = gate.confirmSuggestionReplace(
+      context,
+      foodCardId: 'card_1',
+      foodName: '두부 반 모',
+    );
+    // 같은 카드를 연달아 눌러도 확인창은 하나다.
+    final second = gate.confirmSuggestionReplace(
+      context,
+      foodCardId: 'card_1',
+      foodName: '두부 반 모',
+    );
+    await _settle(tester);
+    expect(find.text('다음 끼니 추천을 바꿀까요?'), findsOneWidget);
+
+    await tester.tap(find.text('바꾸기'));
+    await _settle(tester);
+    expect(await first, isTrue);
+    expect(await second, isTrue);
   });
 }

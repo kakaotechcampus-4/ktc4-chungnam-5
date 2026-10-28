@@ -318,9 +318,6 @@ def _sources_of(totals: NutrientTotals) -> list[NutritionSource]:
     return [NutritionSource.PUBLIC_DB] if totals.counted > 0 else []
 
 
-FEEDBACK_TASK_TYPE: Final = "feedback.meal"
-
-
 def _has_feedback_text(db: Session, meal_id: uuid.UUID) -> bool:
     """이 식사에 쓸 만한 끼니 피드백 문장이 이미 있는가.
 
@@ -409,7 +406,7 @@ def confirm(
     if stale or not _has_feedback_text(db, meal.id):
         # 채점과 **같은 트랜잭션**에 넣는다 — 점수는 저장됐는데 작업은 없는 상태가
         # 생기지 않는다. 제안 화면을 열 때가 아니라 여기서 넣는 이유는 모듈 독스트링 참고.
-        enqueue(db, FEEDBACK_TASK_TYPE, {"mealId": str(meal.id)})
+        enqueue(db, feedback_crud.FEEDBACK_TASK_TYPE, {"mealId": str(meal.id)})
     meal_crud.set_status(db, meal, MealStatus.EVALUATED)
     db.commit()
 

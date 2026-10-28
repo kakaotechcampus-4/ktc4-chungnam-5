@@ -7,15 +7,15 @@
 from __future__ import annotations
 
 import uuid
-from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
+from app.crud import chat as chat_crud
 from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import satiety as satiety_crud
-from app.models.enums import MealStatus
+from app.models.enums import MealStatus, TaskStatus
 from app.models.meal import Meal
 from app.schemas.feedback import (
     ExpectedSatiety,
@@ -31,50 +31,27 @@ class MealNotFoundError(LookupError):
     """없는 식사 · 남의 식사 · 삭제된 식사. 셋 다 404 로 같게 응답한다."""
 
 
+class MealNotConfirmedError(Exception):
+    """끼니가 확정(`EVALUATED`) 상태가 아니다. 409 `NOT_CONFIRMED`."""
+
+
+class FoodCardNotFoundError(LookupError):
+    """없는 카드 · 남의 카드 · 다른 끼니 대화의 카드. 셋 다 404 로 같게 응답한다."""
+
+
+class SuggestionConflictError(Exception):
+    """지금은 이 카드로 바꿀 수 없다. 409 `CONFLICT`.
+
+    둘 중 하나다 — 카드가 끼니의 마지막 확정보다 먼저 만들어졌다(고치기 전 끼니를 보고 만든
+    추천), 또는 끼니 피드백이 보여 줄 수 있는 상태(본문 있음 · SAFE)가 아니다.
+    """
+
+
 def _owned_meal(db: Session, user_id: uuid.UUID, meal_id: uuid.UUID) -> Meal:
     meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id)
     if meal is None:
         raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
     return meal
-
-
-class _StoredSuggestion(NamedTuple):
-    food_name: str
-    advice: str
-    ref_id: str | None
-
-
-def _coerce(item: object) -> _StoredSuggestion | None:
-    """저장된 제안 한 건을 쓸 수 있는 모양으로 바꾼다. 못 쓰면 `None`.
-
-    **이 값은 신뢰할 수 없는 입력이다.** 컬럼이 JSONB 라 DB 는 아무 JSON 이나 받고,
-    쓰는 쪽은 AI 응답을 담을 워커다. 계약이 바뀌거나 부분 응답이 오면 모양이 어긋난다.
-    검증 없이 `item.get(...)` 을 부르면 문자열 원소 하나에 `AttributeError` 가 나고,
-    **그 끼니 피드백 전체(요약·근거까지)를 못 읽는다.** 한 건이 깨졌다고 나머지를
-    버릴 이유는 없다.
-
-    `or ""` 를 쓰는 건 `{"foodName": null}` 때문이다 — 키가 있으면
-    `get(k, "")` 의 기본값이 안 먹어 `None` 이 그대로 나오고, `food_name: str` 에서
-    터진다.
-
-    문구가 하나라도 비면 버린다. `nutrients` 만 남은 카드는 FE 에 그릴 게 없다.
-    """
-    if not isinstance(item, dict):
-        return None
-
-    food_name = item.get("foodName") or ""
-    advice = item.get("advice") or ""
-    if not isinstance(food_name, str) or not isinstance(advice, str):
-        return None
-    # **하나라도 비면 버린다.** 명세의 카드는 음식 이름과 조언 문구가 짝이라
-    # (`{foodName, nutrients, advice}`), 한쪽이 없으면 FE 가 반쪽 카드를 그린다.
-    if not food_name or not advice:
-        return None
-
-    ref_id = item.get("candidateFoodRefId")
-    # str 이 아닌 건 조회에 넘기지 않는다 — int 는 `varchar = integer` 로 DB 가
-    # 거부하고, list 는 `set()` 에서 unhashable 로 터진다.
-    return _StoredSuggestion(food_name, advice, ref_id if isinstance(ref_id, str) else None)
 
 
 def _build_suggestions(db: Session, stored: object) -> list[FeedbackSuggestion]:
@@ -86,12 +63,9 @@ def _build_suggestions(db: Session, stored: object) -> list[FeedbackSuggestion]:
 
     **참조를 못 찾아도 항목을 버리지 않는다.** `nutrients` 만 비운다 — 제안 문구
     ("두부 반 모를 더해요")는 성분 숫자가 없어도 그대로 쓸모가 있다. 모양이 깨진
-    항목만 `_coerce` 가 걸러낸다.
+    항목만 `crud/feedback.py::parse_suggestion` 이 걸러낸다.
     """
-    if not isinstance(stored, list):
-        return []
-
-    items = [parsed for item in stored if (parsed := _coerce(item)) is not None]
+    items = feedback_crud.parse_suggestions(stored)
     if not items:
         return []
 
@@ -104,12 +78,12 @@ def _build_suggestions(db: Session, stored: object) -> list[FeedbackSuggestion]:
             food_name=item.food_name,
             advice=item.advice,
             nutrients=[
-                SuggestionNutrient(code=code, amount_g=float(amount))
-                for code, amount in (
-                    by_ref[item.ref_id].amounts
+                SuggestionNutrient(code=n.code, amount=float(n.amount), unit=n.unit)
+                for n in (
+                    by_ref[item.ref_id].nutrients
                     if item.ref_id is not None and item.ref_id in by_ref
-                    else {}
-                ).items()
+                    else []
+                )
             ],
         )
         for item in items
@@ -162,23 +136,29 @@ def get_feedback(
         BLOCKED         영영 못 보여 준다. FE 는 상담 안내로
                         바꾼다(`MEDICAL_QUESTION_DETECTED`)    → READY
         REVIEW_REQUIRED 검수를 통과하면 보일 수도 있다         → PENDING
-        내용 없음 · 확정 전                                    → PENDING
+        내용 없음 · 가장 최근 작업이 처리 중(PROCESSING)       → GENERATING
+        내용 없음 · 가장 최근 작업이 격리됨(FAILED)            → FAILED
+        내용 없음 · 가장 최근 작업이 끝남(DONE)                → FAILED
+        내용 없음 (그 밖) · 확정 전                            → PENDING
 
     명세가 주는 것은 값 목록(`:46`)과 예시 둘(`POST /confirm` → `PENDING`, 여기 →
     `READY`)뿐이고 **유도 규칙은 없다.** 그 둘은 이미 만족한다.
 
     **이 GET 은 쓰기를 하지 않는다.** `feedback.meal` 은 확인 API 가 채점과 같은
     트랜잭션에서 넣고(`services/evaluation/__init__.py::confirm`), 워커가 채우면 여기서
-    `READY` 가 된다. FE 는 `PENDING` 인 동안 폴링만 한다.
+    `READY` 가 된다. FE 는 `PENDING` · `GENERATING` 인 동안 폴링만 한다.
 
     제안 화면을 열 때(이 GET) 넣지 않는 이유: 하루 피드백이 끼니 피드백을 근거로 쓰므로
     (`crud/daily_feedback.py::list_day_evidence`), 화면을 안 연 끼니가 하루 요약에서
     조용히 빠진다.
 
-    🔗 TODO: 명세의 `GENERATING` · `FAILED` 는 아직 내지 않는다. 워커는
-    `QUEUE_MAX_ATTEMPTS` 까지 재시도한 뒤 DLQ 로 격리하는데(`worker/loop.py`), 그 상태를
-    여기서 `task_queue` 로 읽어 `FAILED` 를 낼지는 FE 와 합의 후 정한다. 그때까지
-    재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣는다.
+    `FAILED` 는 보여 줄 문장이 없는데 가장 최근 `feedback.meal` 작업이 격리됐거나
+    끝났을 때다 — 어느 쪽이든 기다려도 문장이 오지 않는다.
+    재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣고, 그러면
+    가장 최근 작업이 PENDING 이 되어 여기서도 PENDING 으로 돌아간다.
+    `GENERATING` 은 가장 최근 작업을 워커가 집어 처리 중(`TaskStatus.PROCESSING`)일
+    때다. 워커가 집는 순간 커밋하므로(`infra/queue.py::claim`) 다른 세션인 여기서도
+    보인다. 재시도 대기(backoff) 중인 작업은 PENDING 으로 돌아가 있어 PENDING 이다.
     """
     meal = _owned_meal(db, user_id, meal_id)
 
@@ -212,6 +192,15 @@ def get_feedback(
     # 흡수하는 것과 같은 이유다.
     row = feedback_crud.get_by_meal(db, meal.id)
     if row is None or not (row.body or "").strip():
+        # 보여 줄 문장이 없을 때만 작업 이력을 본다. 문장이 있으면 그게 답이다.
+        task_status = feedback_crud.latest_task_status(db, meal.id)
+        if task_status is TaskStatus.PROCESSING:
+            return MealFeedbackResponse.generating()
+        # DONE 인데 문장이 없으면 더 기다려도 오지 않는다 — AI 가 빈 본문을 줬거나 가드레일이
+        # 지웠다. 워커가 낡은 작업이라 건너뛰고 DONE 으로 끝낸 경우는 여기 오지 않는다:
+        # 건너뛰게 만든 재확정이 새 작업을 함께 넣으므로 가장 최근 작업은 그 새 작업이다.
+        if task_status in (TaskStatus.FAILED, TaskStatus.DONE):
+            return MealFeedbackResponse.failed()
         return MealFeedbackResponse.pending()
 
     # 마스킹은 스키마 팩토리가 한다 — `GET /meals/{mealId}` 도 같은 행을 읽으므로
@@ -263,4 +252,92 @@ def add_checkin(
         # 방금 보낸 값이 아니라 **저장된 값**을 돌려준다. 이번에 안 보냈으면 앞서
         # 적어 둔 값이 그대로 나간다 — 사용자가 화면에서 보는 것과 맞다.
         hunger_return_minutes=log.hunger_return_minutes if log else None,
+    )
+
+
+def replace_suggestion(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_id: uuid.UUID,
+    food_card_id: uuid.UUID,
+) -> MealFeedbackResponse:
+    """챗봇 카드 한 장으로 이 끼니의 다음 끼니 추천을 **전체 교체**한다 (A-5). 커밋까지 한다.
+
+    바꾸는 것은 `meal_feedbacks.suggestions` 뿐이다 — 본문 · 근거 · 판정 · 점수는 그대로고
+    AI 를 부르지 않는다. 응답은 `get_feedback` 의 READY 경로와 같은 모양이다.
+
+    확인 순서(스펙 4절):
+
+        ① 내 끼니가 아니면                    → MealNotFoundError
+        ② 확정 상태가 아니면                  → MealNotConfirmedError
+        ③ 이 끼니 대화의 내 카드가 아니면     → FoodCardNotFoundError
+        ④ 카드가 마지막 확정보다 먼저면       → SuggestionConflictError
+        ⑤ 피드백이 본문 있음 · SAFE 가 아니면 → SuggestionConflictError
+
+    ① 을 ③ 보다 먼저 둬 남의 끼니에는 카드 존재 여부를 흘리지 않고, ④ 를 ⑤ 보다 먼저 둬
+    재확정 직후(둘 다 참)에는 원인인 "카드가 낡음" 으로 판정한다.
+
+    **끼니 행을 `FOR UPDATE` 로 잠근다.** 확정(`services/evaluation::confirm`)과 워커
+    (`worker/jobs/feedback_meal.py`)도 같은 행을 먼저 잠그고 피드백 행을 쓴다. 잠그지 않으면
+    ⑤ 를 통과한 뒤 쓰기 전에 재확정이 피드백을 비우거나 워커가 덮어써, 확인한 상태와 쓴
+    상태가 달라진다.
+
+    **낡은 카드 판정(④)**: `qqs_evaluations.computed_at` 은 행을 처음 넣을 때만 정해지고
+    같은 값 재확정(upsert)에서는 그대로다. 음식을 고치면 `crud/meal.py::mark_recalculating`
+    이 점수 행을 지우므로 다음 확정에서 새 시각이 된다 — 즉 "끼니 내용이 마지막으로 바뀐
+    확정 시각" 이다. 카드는 메시지 `created_at`(`clock_timestamp()`)이 그보다 앞이면
+    고치기 전 끼니를 보고 만든 것이다. 확정된 끼니에는 점수 행이 항상 있지만, 없으면 비교할
+    기준이 없으므로 막는다.
+
+    점수 행 시각만으로는 **포만감만 고친 재확정**을 못 잡는다 — upsert 라 시각이 그대로인데,
+    `services/evaluation::_is_stale_feedback` 은 점수가 바뀌었다고 피드백을 비우고 추천을 다시
+    만든다. 그래서 가장 최근 `feedback.meal` 작업이 들어간 시각(`latest_task_created_at`)도
+    본다 — 추천을 새로 만들 때마다 확정이 같은 트랜잭션에서 넣는 작업이다.
+    """
+    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id, for_update=True)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+    if meal.status is not MealStatus.EVALUATED:
+        raise MealNotConfirmedError(f"meal {meal_id} 는 아직 확정되지 않았습니다.")
+
+    found = chat_crud.get_card_for_meal(
+        db, card_id=food_card_id, user_id=user_id, meal_id=meal.id
+    )
+    if found is None:
+        raise FoodCardNotFoundError(f"food card {food_card_id} 를 찾을 수 없습니다.")
+    card, card_created_at = found
+
+    evaluation = evaluation_crud.get_by_meal(db, meal.id)
+    regenerated_at = feedback_crud.latest_task_created_at(db, meal.id)
+    if (
+        evaluation is None
+        or card_created_at < evaluation.computed_at
+        or (regenerated_at is not None and card_created_at < regenerated_at)
+    ):
+        raise SuggestionConflictError("끼니가 바뀌어 이 추천은 쓸 수 없습니다.")
+
+    row = feedback_crud.get_by_meal(db, meal.id)
+    if row is None or not feedback_crud.is_showable(row):
+        raise SuggestionConflictError("끼니 피드백이 아직 준비되지 않았습니다.")
+
+    # AI 계약(`ai-stub/schemas.py::Suggestion`) 모양 그대로 담는다 — 읽는 쪽
+    # (`crud/feedback.py::parse_suggestions`)이 워커가 쓴 행과 같은 규칙으로 해석한다.
+    feedback_crud.replace_suggestions(
+        db,
+        row,
+        [
+            {
+                "foodName": card.food_name,
+                "advice": card.advice,
+                "candidateFoodRefId": card.food_ref_id,
+            }
+        ],
+    )
+    db.commit()
+
+    return MealFeedbackResponse.from_row(
+        row,
+        suggestions=_build_suggestions(db, row.suggestions),
+        expected=_expected_satiety(db, meal.id),
     )

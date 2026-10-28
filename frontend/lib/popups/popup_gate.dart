@@ -3,15 +3,24 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import 'daily_condition_popup.dart';
+import 'feedback_branch_popup.dart';
 import 'meal_delete_confirm_popup.dart';
 import 'satiety_checkin_popup.dart';
+import 'suggestion_replace_popup.dart';
 
 /// 앱의 팝업. [priority] 가 작을수록 먼저 띄운다.
 enum AppPopup {
   /// 식사 기록 삭제 확인. 사용자가 방금 한 동작에 대한 답이라 가장 먼저다.
   mealDeleteConfirm(0),
+
+  /// 피드백 탭의 단기·장기 분기. 삭제 확인처럼 방금 누른 탭에 대한 답이다.
+  feedbackBranch(0),
+
+  /// 챗봇 카드 "이걸로 바꾸기" 확인. 방금 누른 버튼에 대한 답이다.
+  suggestionReplace(0),
 
   /// 사후 포만감 체크인. 게이지 탭·알림처럼 사용자가 특정 끼니를 골라 연
   /// 요청이라 하루 한 번 팝업보다 먼저 띄운다.
@@ -86,6 +95,55 @@ class PopupGate {
       show: (c) =>
           _showDialog(c, MealDeleteConfirmPopup(description: description)),
     );
+  }
+
+  /// 챗봇 카드로 다음 끼니 추천을 바꿀지 확인한다. 바꾸기를 골랐으면 `true`.
+  /// 같은 카드([foodCardId])를 연달아 눌러도 확인창은 하나만 뜬다.
+  Future<bool> confirmSuggestionReplace(
+    BuildContext context, {
+    required String foodCardId,
+    required String foodName,
+  }) {
+    return _request(
+      context,
+      AppPopup.suggestionReplace,
+      id: foodCardId,
+      show: (c) => _showDialog(c, SuggestionReplacePopup(foodName: foodName)),
+    );
+  }
+
+  /// 피드백 탭의 단기·장기 분기 팝업. 고른 쪽을, 바깥을 누르면 null 을 돌려준다.
+  ///
+  /// 다른 팝업이 떠 있으면 그게 닫힌 뒤에 뜬다. 탭을 연달아 눌러도 하나만 뜨고,
+  /// 겹친 요청은 null 을 받는다(고른 값은 처음 요청한 쪽이 받는다).
+  Future<FeedbackKind?> showFeedbackBranch(
+    BuildContext context, {
+    required double anchorCenterX,
+    required double bottomOffset,
+  }) async {
+    FeedbackKind? picked;
+    await _request(
+      context,
+      AppPopup.feedbackBranch,
+      show: (c) async {
+        picked = await showGeneralDialog<FeedbackKind>(
+          context: c,
+          barrierDismissible: true,
+          barrierLabel: '닫기',
+          barrierColor: AppColors.overlay,
+          transitionDuration: const Duration(milliseconds: 320),
+          pageBuilder: (_, animation, _) => FeedbackBranchPopup(
+            animation: animation,
+            anchorCenterX: anchorCenterX,
+            bottomOffset: bottomOffset,
+          ),
+          // 딤 배경의 페이드는 route 가 맡고, 말풍선 애니메이션은 팝업 안에서 한다.
+          transitionBuilder: (_, _, _, child) => child,
+        );
+        return picked != null;
+      },
+    );
+    return picked;
   }
 
   /// 오늘 띄울 하루 한 번 팝업을 요청한다. `RootShell` 이 앱 시작(첫 프레임

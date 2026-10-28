@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/api/api_client.dart';
 import 'package:frontend/api/api_exception.dart';
+import 'package:frontend/api/chat_api.dart';
 import 'package:frontend/api/meal_api.dart';
 import 'package:frontend/api/medication_api.dart';
 import 'package:frontend/api/user_api.dart';
@@ -926,6 +927,88 @@ void main() {
         'nutrition': <String, dynamic>{},
       });
       expect(c.displayName, '달걀 삶은것');
+    });
+  });
+
+  group('chat', () {
+    test('suggestion nutrients read both {amount, unit} and old amountG', () {
+      final parsed = NutrientAmount.listFrom([
+        {'code': 'SODIUM', 'amount': 350, 'unit': 'mg'},
+        {'code': 'PROTEIN', 'amountG': 8},
+        {'code': 'FAT', 'amount': -1, 'unit': 'g'},
+        {'code': 'FIBER'},
+        'broken',
+      ]);
+      expect(parsed.map((n) => '${n.code} ${n.amount} ${n.unit}'), [
+        'SODIUM 350.0 mg',
+        'PROTEIN 8.0 g',
+      ]);
+    });
+
+    test('starting without a meal sends no mealId', () async {
+      final (client, adapter) = await _client(
+        (_) => (
+          201,
+          _ok({'conversationId': 'c1', 'mealId': null, 'messages': []}),
+        ),
+      );
+      final conversation = await ChatApiService(client).start();
+      expect(conversation.messages, isEmpty);
+      expect(adapter.requests.single.data, <String, Object?>{});
+    });
+
+    test('no open conversation reads as null', () async {
+      final (client, _) = await _client((_) => (200, _ok(null)));
+      expect(await ChatApiService(client).fetchLatest(), isNull);
+    });
+
+    test('a blocked reply is hidden, a sent message gives the poll plan', () async {
+      final (client, _) = await _client(
+        (o) => o.method == 'POST'
+            ? (
+                202,
+                _ok({
+                  'userMessage': {
+                    'messageId': 'u1',
+                    'role': 'USER',
+                    'status': 'READY',
+                    'text': '약 줄여도 돼?',
+                    'foodCards': [],
+                    'safetyStatus': null,
+                    'createdAt': '2026-10-18T12:00:00+09:00',
+                  },
+                  'assistantMessageId': 'a1',
+                  'pollIntervalMs': 1000,
+                  'timeoutMs': 30000,
+                }),
+              )
+            : (
+                200,
+                _ok({
+                  'conversationId': 'c1',
+                  'mealId': null,
+                  'messages': [
+                    {
+                      'messageId': 'a1',
+                      'role': 'ASSISTANT',
+                      'status': 'READY',
+                      'text': null,
+                      'foodCards': [],
+                      'safetyStatus': 'BLOCKED',
+                      'createdAt': '2026-10-18T12:00:01+09:00',
+                    },
+                  ],
+                }),
+              ),
+      );
+      final api = ChatApiService(client);
+      final sent = await api.send('c1', '약 줄여도 돼?');
+      expect(sent.assistantMessageId, 'a1');
+      expect(sent.pollInterval, const Duration(seconds: 1));
+      expect(sent.userMessage.fromUser, isTrue);
+      final reply = (await api.fetch('c1')).messageById('a1')!;
+      expect(reply.isHidden, isTrue);
+      expect(reply.isGenerating, isFalse);
     });
   });
 }

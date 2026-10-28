@@ -19,14 +19,23 @@ from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import satiety as satiety_crud
-from app.models.enums import MealStatus, MedicationStage, SafetyStatus
+from app.models.enums import MealStatus, MedicationStage, SafetyStatus, TaskStatus
 from app.models.feedback import MealFeedback
+from app.models.task import Task
 from app.tests.factories import make_food_ref, make_meal, make_meal_item, make_user
 
 _SPEC_FIELDS = {
     "feedbackStatus", "summary", "reasoning",
     "suggestions", "expectedSatietyPct", "safetyStatus",
 }
+
+
+_ONLY_PROTEIN_FIBER = {
+    "calories": None, "fat_g": None, "carbohydrate_g": None, "sodium_mg": None,
+}
+"""`make_food_ref` 기본값은 6개 성분이 다 차 있다. 성분 하나의 규칙(환산 · NaN 등)만 보는
+테스트는 나머지를 비워 단언을 그 성분에 묶는다 — 전 성분 노출은
+`test_suggestion_nutrients_cover_every_code_in_column_units` 가 본다."""
 
 
 def _h(user_id: uuid.UUID) -> dict[str, str]:
@@ -531,7 +540,7 @@ def test_suggestion_nutrients_come_from_food_refs(client: TestClient, db: Sessio
     user, meal = _meal(db)
     make_food_ref(
         db, food_ref_id="KFD_TOFU", name="두부",
-        protein_g=Decimal("10"), fiber_g=Decimal("2"),
+        protein_g=Decimal("10"), fiber_g=Decimal("2"), **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db, meal,
@@ -547,9 +556,41 @@ def test_suggestion_nutrients_come_from_food_refs(client: TestClient, db: Sessio
 
     assert set(suggestion) == {"foodName", "nutrients", "advice"}
     assert suggestion["foodName"] == "두부 반 모"
-    assert {n["code"]: n["amountG"] for n in suggestion["nutrients"]} == {
-        "PROTEIN": 10.0, "FIBER": 2.0,
-    }
+    assert suggestion["nutrients"] == [
+        {"code": "PROTEIN", "amount": 10.0, "unit": "g"},
+        {"code": "FIBER", "amount": 2.0, "unit": "g"},
+    ]
+
+
+def test_suggestion_nutrients_cover_every_code_in_column_units(
+    client: TestClient, db: Session
+) -> None:
+    """6개 성분을 모두 싣고, 값은 **컬럼 단위 그대로**다 — CALORIE 는 kcal, SODIUM 은
+    mg 숫자이고 `unit` 이 그 단위를 말한다. g 으로 바꾸지 않는다."""
+    user, meal = _meal(db)
+    make_food_ref(
+        db, food_ref_id="KFD_ALL", name="현미밥",
+        calories=Decimal("100"), protein_g=Decimal("10"), fat_g=Decimal("3"),
+        carbohydrate_g=Decimal("20"), fiber_g=Decimal("2"), sodium_mg=Decimal("100"),
+    )
+    _add_feedback(
+        db, meal,
+        suggestions=[{"foodName": "현미밥 반 공기", "advice": "식이섬유를 채워요",
+                      "candidateFoodRefId": "KFD_ALL"}],
+    )
+
+    (suggestion,) = client.get(
+        f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
+    ).json()["data"]["suggestions"]
+
+    assert suggestion["nutrients"] == [
+        {"code": "CALORIE", "amount": 100.0, "unit": "kcal"},
+        {"code": "PROTEIN", "amount": 10.0, "unit": "g"},
+        {"code": "FAT", "amount": 3.0, "unit": "g"},
+        {"code": "CARB", "amount": 20.0, "unit": "g"},
+        {"code": "FIBER", "amount": 2.0, "unit": "g"},
+        {"code": "SODIUM", "amount": 100.0, "unit": "mg"},
+    ]
 
 
 def test_dead_food_ref_keeps_the_advice(client: TestClient, db: Session) -> None:
@@ -588,6 +629,7 @@ def test_nutrients_are_scaled_to_100g(client: TestClient, db: Session) -> None:
         serving_size=Decimal("200.000"),
         protein_g=Decimal("3.000"),
         fiber_g=None,
+        **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db,
@@ -602,20 +644,22 @@ def test_nutrients_are_scaled_to_100g(client: TestClient, db: Session) -> None:
         f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)
     ).json()["data"]
 
-    assert data["suggestions"][0]["nutrients"] == [{"code": "PROTEIN", "amountG": 1.5}]
+    assert data["suggestions"][0]["nutrients"] == [
+        {"code": "PROTEIN", "amount": 1.5, "unit": "g"}
+    ]
 
 
 def test_nan_nutrient_is_omitted_not_null(client: TestClient, db: Session) -> None:
     """NaN 성분은 키째 뺀다 — NULL 과 같은 "모른다" 다.
 
     `'NaN'::numeric` 은 성분 컬럼에 그냥 저장되고 `is not None` 을 통과한다. 그대로
-    두면 `amountG: null` 이 나가는데, 스키마상 **required non-nullable** 이라 응답이
+    두면 `amount: null` 이 나가는데, 스키마상 **required non-nullable** 이라 응답이
     자기 OpenAPI 계약을 어긴다.
     """
     user, meal = _meal(db)
     make_food_ref(
         db, food_ref_id="KFD_NAN", name="정체불명",
-        protein_g=Decimal("NaN"), fiber_g=Decimal("2.000"),
+        protein_g=Decimal("NaN"), fiber_g=Decimal("2.000"), **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db,
@@ -631,7 +675,9 @@ def test_nan_nutrient_is_omitted_not_null(client: TestClient, db: Session) -> No
     ).json()["data"]
 
     # 멀쩡한 FIBER 만 남는다. PROTEIN 은 null 로도 0 으로도 나가지 않는다.
-    assert data["suggestions"][0]["nutrients"] == [{"code": "FIBER", "amountG": 2.0}]
+    assert data["suggestions"][0]["nutrients"] == [
+        {"code": "FIBER", "amount": 2.0, "unit": "g"}
+    ]
 
 
 def test_tiny_serving_size_does_not_overflow(client: TestClient, db: Session) -> None:
@@ -645,6 +691,7 @@ def test_tiny_serving_size_does_not_overflow(client: TestClient, db: Session) ->
     make_food_ref(
         db, food_ref_id="KFD_TINY", name="농축액",
         serving_size=Decimal("0.001"), protein_g=Decimal("9999999.999"), fiber_g=None,
+        **_ONLY_PROTEIN_FIBER,
     )
     _add_feedback(
         db, meal,
@@ -1003,3 +1050,164 @@ def test_typo_field_is_rejected(client: TestClient, db: Session) -> None:
     )
 
     assert res.status_code == 422
+
+
+def _add_task(db: Session, meal, status: TaskStatus) -> Task:
+    """`confirm` 이 넣는 `feedback.meal` 작업을 흉내 낸다."""
+    task = Task(type="feedback.meal", payload={"mealId": str(meal.id)}, status=status)
+    db.add(task)
+    db.flush()
+    return task
+
+
+def test_quarantined_task_without_text_is_failed(client: TestClient, db: Session) -> None:
+    """워커가 포기한 끼니는 PENDING 이 아니라 FAILED 다 — FE 가 폴링을 멈춘다."""
+    user, meal = _meal(db)
+    _add_task(db, meal, TaskStatus.FAILED)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "FAILED"
+    assert data["summary"] is None
+    assert data["suggestions"] == []
+    assert data["safetyStatus"] is None
+
+
+def test_requeued_after_failure_is_pending_again(client: TestClient, db: Session) -> None:
+    """재확정이 작업을 다시 넣으면 가장 최근 작업만 본다."""
+    user, meal = _meal(db)
+    old = _add_task(db, meal, TaskStatus.FAILED)
+    new = _add_task(db, meal, TaskStatus.PENDING)
+    # created_at 이 같은 트랜잭션에서 같아질 수 있어 순서를 못 박는다.
+    old.created_at = datetime(2026, 9, 1, tzinfo=UTC)
+    new.created_at = datetime(2026, 9, 2, tzinfo=UTC)
+    db.flush()
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+
+
+def test_ready_text_wins_over_a_failed_task(client: TestClient, db: Session) -> None:
+    """문장이 이미 있으면 작업 이력과 무관하게 READY 다."""
+    user, meal = _meal(db)
+    _add_feedback(db, meal)
+    _add_task(db, meal, TaskStatus.FAILED)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "READY"
+
+
+def test_failed_task_of_another_meal_is_ignored(client: TestClient, db: Session) -> None:
+    user, meal = _meal(db)
+    other = make_meal(db, user_id=user.id, status=MealStatus.EVALUATED)
+    _add_task(db, other, TaskStatus.FAILED)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+
+
+def test_processing_task_without_text_is_generating(client: TestClient, db: Session) -> None:
+    """워커가 작업을 집어 처리 중이면 GENERATING 이다. 내용은 PENDING 처럼 비어 있다."""
+    user, meal = _meal(db)
+    _add_task(db, meal, TaskStatus.PROCESSING)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "GENERATING"
+    assert data["summary"] is None
+    assert data["reasoning"] is None
+    assert data["suggestions"] == []
+    assert data["expectedSatietyPct"] is None
+    assert data["safetyStatus"] is None
+
+
+def test_requeued_task_being_processed_is_generating(client: TestClient, db: Session) -> None:
+    """실패 뒤 재확정한 작업을 워커가 집으면 옛 FAILED 가 아니라 GENERATING 이다."""
+    user, meal = _meal(db)
+    old = _add_task(db, meal, TaskStatus.FAILED)
+    new = _add_task(db, meal, TaskStatus.PROCESSING)
+    old.created_at = datetime(2026, 9, 1, tzinfo=UTC)
+    new.created_at = datetime(2026, 9, 2, tzinfo=UTC)
+    db.flush()
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "GENERATING"
+
+
+def test_ready_text_wins_over_a_processing_task(client: TestClient, db: Session) -> None:
+    """재확정으로 새 작업이 도는 중이어도 쓸 만한 문장이 남아 있으면 READY 다."""
+    user, meal = _meal(db)
+    _add_feedback(db, meal)
+    _add_task(db, meal, TaskStatus.PROCESSING)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "READY"
+
+
+def test_processing_task_of_unconfirmed_meal_is_pending(client: TestClient, db: Session) -> None:
+    """확정 상태가 아닌 식사는 작업이 돌아도 PENDING 이다 — 워커가 쓰지 않고 건너뛴다."""
+    user, meal = _meal(db)
+    meal.status = MealStatus.ANALYZING
+    meal.is_recalculation = True
+    _add_task(db, meal, TaskStatus.PROCESSING)
+    db.flush()
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+
+
+def test_done_task_without_text_is_failed(client: TestClient, db: Session) -> None:
+    """작업은 끝났는데 쓸 문장이 없으면 더 기다려도 오지 않는다 — FAILED 다.
+
+    AI 가 빈 본문을 주거나 가드레일이 본문을 지우면 이렇게 끝난다.
+    """
+    user, meal = _meal(db)
+    _add_task(db, meal, TaskStatus.DONE)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "FAILED"
+    assert data["summary"] is None
+    assert data["suggestions"] == []
+
+
+def test_done_task_with_blank_text_is_failed(client: TestClient, db: Session) -> None:
+    """본문이 공백뿐인 행도 문장이 없는 것이다."""
+    user, meal = _meal(db)
+    row = _add_feedback(db, meal)
+    row.body = "   "
+    _add_task(db, meal, TaskStatus.DONE)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "FAILED"
+
+
+def test_requeued_after_empty_done_is_pending_again(client: TestClient, db: Session) -> None:
+    """문장 없이 끝난 뒤 재확정이 새 작업을 넣으면 다시 기다린다."""
+    user, meal = _meal(db)
+    old = _add_task(db, meal, TaskStatus.DONE)
+    new = _add_task(db, meal, TaskStatus.PENDING)
+    old.created_at = datetime(2026, 9, 1, tzinfo=UTC)
+    new.created_at = datetime(2026, 9, 2, tzinfo=UTC)
+    db.flush()
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"
+
+
+def test_queued_task_without_text_is_pending(client: TestClient, db: Session) -> None:
+    """대기열에만 있는 작업은 PENDING 이다."""
+    user, meal = _meal(db)
+    _add_task(db, meal, TaskStatus.PENDING)
+
+    data = client.get(f"/api/v1/meals/{meal.id}/feedback", headers=_h(user.id)).json()["data"]
+
+    assert data["feedbackStatus"] == "PENDING"

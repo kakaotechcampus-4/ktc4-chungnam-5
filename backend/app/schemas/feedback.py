@@ -9,7 +9,7 @@ from typing import Final
 
 from pydantic import ConfigDict, Field
 
-from app.models.enums import FeedbackStatus, NutrientCode, SafetyStatus
+from app.models.enums import FeedbackStatus, NutrientCode, NutrientUnit, SafetyStatus
 from app.schemas.base import CamelModel
 
 if TYPE_CHECKING:  # ORM 모델만 피한다 — 열거형은 응답 값이라 런타임에 필요하다.
@@ -20,7 +20,9 @@ class SuggestionNutrient(CamelModel):
     """제안 음식이 채워 주는 성분 한 줄. 명세 `suggestions[].nutrients[]`."""
 
     code: NutrientCode
-    amount_g: float
+    amount: float
+    """100g 당 양. 단위는 `unit` 이다(`crud/feedback.py::_SUGGESTION_NUTRIENTS`)."""
+    unit: NutrientUnit
 
 
 class FeedbackSuggestion(CamelModel):
@@ -83,6 +85,19 @@ class MealFeedbackResponse(CamelModel):
         )
 
     @classmethod
+    def generating(cls) -> MealFeedbackResponse:
+        """워커가 작업을 집어 AI 를 부르는 중이다. 내용은 `pending()` 과 같이 비어 있다 —
+        다른 건 "대기열에 있다" 가 아니라 "만드는 중" 이라는 것뿐이다."""
+        return cls.pending().model_copy(update={"feedback_status": FeedbackStatus.GENERATING})
+
+    @classmethod
+    def failed(cls) -> MealFeedbackResponse:
+        """기다려도 문장이 오지 않는다 — 워커가 재시도를 다 쓰고 포기했거나, 작업은 끝났는데
+        쓸 문장이 없다. 내용은 `pending()` 과 같이 비어 있다 — 다른 건 FE 가 폴링을 멈출 수
+        있다는 것뿐이다."""
+        return cls.pending().model_copy(update={"feedback_status": FeedbackStatus.FAILED})
+
+    @classmethod
     def from_row(
         cls,
         row: MealFeedback,
@@ -128,6 +143,19 @@ class MealFeedbackResponse(CamelModel):
             expected_satiety_pct=expected if safe else None,
             safety_status=row.safety_status,
         )
+
+
+class ReplaceSuggestionRequest(CamelModel):
+    """`PUT /meals/{mealId}/feedback/suggestions` 요청 — 챗봇 카드 한 장.
+
+    extra="forbid": `foodCardID` 같은 오타를 조용히 무시하면 필수 필드 누락으로 바뀌어
+    원인을 찾기 어렵다 — 422 로 바로 알린다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    food_card_id: uuid.UUID
+    """챗봇 메시지의 `foodCards[].foodCardId`."""
 
 
 _MAX_HUNGER_MINUTES: Final = 2880

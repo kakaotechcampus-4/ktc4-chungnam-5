@@ -1,0 +1,60 @@
+# 운영 리버스 프록시. 값은 docker-compose.prod.yml 이 .env.prod 에서 넘겨준다.
+#
+# 데모 기간 접근 제어 — 앱이 모든 요청에 X-Demo-Key 를 붙이고 여기서 확인한다.
+# 팀원 IP(ALLOWED_IPS)는 키 없이 전체 API 를 통과한다(OR). Swagger 의 "Try it out" 요청에는
+# 키 헤더가 붙지 않아서 /docs 만 열면 쓸 수 없다. 키가 APK 에 들어 있어 IP 쪽이 오히려 좁다.
+# Authorization 헤더는 나중에 JWT 가 써야 해서 건드리지 않는다.
+#
+# DOMAIN=localhost 로 띄우면 Let's Encrypt 대신 내부 인증서를 쓴다 (curl 은 -k).
+
+# 운영(main)·스테이징(develop) 두 사이트가 같은 규칙을 쓴다. upstream({args[0]})과
+# 데모 키({args[1]})만 다르다.
+# upstream 은 서비스 이름(api)이 아니라 컨테이너 이름이다 — 서비스 이름으로 찾으면 blue·green
+# 중 아무 쪽이나 걸릴 수 있다.
+(gate) {
+	encode gzip
+
+	# BE 제한(10MB, meals.py 의 _MAX_IMAGE_BYTES)보다 약간 크게 둔다. 같거나 작으면
+	# Caddy 가 먼저 끊어서(본문 없는 413) BE 가 보내는 422 VALIDATION_ERROR(크기 안내 메시지)가
+	# 앱까지 가지 않는다.
+	request_body {
+		max_size 12MB
+	}
+
+	# route 안에서는 적힌 순서대로 적용된다. 먼저 응답한 줄에서 끝난다.
+	route {
+		# 1. AI → BE tool 역호출 경로. compose 내부 네트워크(api:8000)로만 닿는다.
+		@internal path /internal /internal/*
+		respond @internal 404
+
+		# 2. 상태 확인은 키 없이 통과
+		reverse_proxy /health {args[0]}
+
+		# 3. 데모 키가 맞거나 팀원 IP 이면 통과
+		@demo header X-Demo-Key {args[1]}
+		reverse_proxy @demo {args[0]}
+
+		# 팀원 IP — 경로 제한 없이 전체 통과 (위 머리 주석 참고)
+		@team remote_ip {$ALLOWED_IPS}
+		reverse_proxy @team {args[0]}
+
+		# 4. 나머지
+		respond 403
+	}
+}
+
+# Blue/Green — 지금 요청을 받는 쪽은 git 밖 upstream 파일 한 줄이 정한다 (J1).
+#   /opt/glp1-bg/upstreams/prod.caddy : import gate glp1-prod-api-green:8000 {args[0]}
+# bg-deploy.sh · bg-switch.sh 가 이 줄을 다시 쓰고 reload 한다. 키는 여기서 넘기므로 upstream
+# 파일은 키를 모른다 — phase 마다 키를 나눌 때(K2) 이 파일만 바꾸면 된다.
+# 두 파일 중 하나라도 없으면 Caddyfile 전체가 파싱에 실패한다. bg-deploy.sh 가 첫 배포 때 만든다.
+{$DOMAIN} {
+	import /etc/caddy-upstreams/prod.caddy {$DEMO_KEY}
+}
+
+# 스테이징 — 스택이 꺼져 있으면 이 도메인만 502 이고 운영에는 영향이 없다.
+# Caddy 는 요청 때 이름을 찾으므로 스테이징이 없어도 기동은 실패하지 않는다.
+# 지금은 운영과 같은 키다. 키를 나눌 때(K2) {$STAGING_DEMO_KEY} 로 바꾼다.
+{$STAGING_DOMAIN} {
+	import /etc/caddy-upstreams/staging.caddy {$DEMO_KEY}
+}

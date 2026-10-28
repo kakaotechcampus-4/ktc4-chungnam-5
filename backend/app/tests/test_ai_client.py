@@ -4,6 +4,7 @@
   - 4xx(계약 위반·인증 실패)까지 재시도하는 것. 같은 요청은 몇 번을 보내도 같은 4xx 다.
     실제 AI 에서는 시도마다 LLM 비용이 든다
   - 반대로 408·429 처럼 "잠시 뒤엔 될" 4xx 를 영구 실패로 격리하는 것
+  - 501 을 다른 5xx 처럼 재시도하는 것. "그 기능이 없다"는 응답이라 몇 번을 보내도 같다
 """
 
 from __future__ import annotations
@@ -29,6 +30,14 @@ def test_client_error_is_not_retryable(status_code):
 
     assert isinstance(exc_info.value, NonRetryableError)
     assert exc_info.value.status_code == status_code
+
+
+def test_not_implemented_is_not_retryable():
+    with pytest.raises(AiRequestRejected) as exc_info:
+        _client(501).analyze_meal({"mealId": "m1"})
+
+    assert isinstance(exc_info.value, NonRetryableError)
+    assert exc_info.value.status_code == 501
 
 
 @pytest.mark.parametrize("status_code", [408, 429, 500, 502, 503])
@@ -57,3 +66,16 @@ def test_success_returns_the_json_body():
     client = HttpAiClient("http://ai.test", transport=httpx.MockTransport(respond))
 
     assert client.analyze_meal({}) == {"ok": True}
+
+
+def test_chat_posts_to_chat_path():
+    seen: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        return httpx.Response(200, json={"ok": True})
+
+    client = HttpAiClient("http://ai.test", transport=httpx.MockTransport(respond))
+
+    assert client.chat({"text": "안녕"}) == {"ok": True}
+    assert seen == ["/chat"]

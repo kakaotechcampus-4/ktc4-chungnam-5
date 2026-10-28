@@ -71,6 +71,7 @@ class AppTypography {
     fontSize: 11,
     fontWeight: FontWeight.w400,
     height: _bodyHeight,
+    color: AppColors.textBody,
   );
 
   /// 보조 설명. 11 Regular.

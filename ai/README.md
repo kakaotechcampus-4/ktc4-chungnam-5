@@ -18,7 +18,8 @@
 3. **의료 조언 금지.** 입력·출력 양쪽에 가드레일을 건다. 위반 시 `safetyStatus=BLOCKED` →
    상담 안내로 대체. "이만큼 드세요" 같은 명령형 처방 톤도 금지 — 서술형("평소 대비 이만큼")으로만.
 4. **tool 호출 상한 3회.** 컨텍스트 선주입으로 호출 자체를 줄이고, 상한은 설정값으로 뺀다.
-5. **모델은 화이트리스트로 고정.** 팀 공용 크레딧이므로 임의 모델 호출을 구조로 막는다.
+5. **모델은 엔드포인트로 고정.** 팀 공용 크레딧이므로 임의 모델 호출을 구조로 막는다.
+   게이트웨이는 URL 이 곧 모델이라, 설정에 있는 URL 두 개 외에는 호출할 수 없다.
 
 ---
 
@@ -27,7 +28,7 @@
 ```
 ai/
 ├─ app/          FastAPI 앱 · 라우터 3개 · 설정
-├─ agents/       Agent별 프롬프트 + 모델 선택 + 출력 스키마
+├─ agents/       Agent별 프롬프트 + 엔드포인트 선택(vision/reasoning) + 출력 스키마
 ├─ tools/        BE /internal/v1 클라이언트 (호출 상한 · 타임아웃 · 로깅)
 ├─ guardrail/    의료 질문 감지 · 출력 검증 (safetyStatus 판정)
 └─ tests/        pytest (fixtures 포함)
@@ -65,9 +66,9 @@ ai/
 
 **모든 모델 호출은 단일 진입점을 거친다.** 에이전트가 클라이언트를 직접 만들지 않는다.
 
-- `ALLOWED_MODELS` 화이트리스트 — 목록 밖 모델은 기동 시 거부
-- API 키·base URL은 `repr`에서 제외 — 로그·스택트레이스 유출 방지
-- base URL이 https인지 **부팅 시점에 검증**
+- 엔드포인트 URL이 `https://mlapi.run/...`인지 **부팅 시점에 검증** — 다른 호스트면 기동 거부
+- API 키·엔드포인트 URL은 `repr`에서 제외 — 로그·스택트레이스 유출 방지 (URL 도 비밀로 다룬다)
+- LLM SDK 없이 `httpx`로 직접 POST 한다 — SDK는 base URL 뒤에 경로를 붙여 이 엔드포인트와 맞지 않는다
 - 타임아웃·재시도 횟수를 설정값으로 노출 (재시도는 비용 × 지연의 곱셈이다)
 
 ## 환경변수
@@ -76,9 +77,9 @@ ai/
 
 | 키                                         | 설명                      |
 | ------------------------------------------ | ------------------------- |
-| `LLM_API_KEY`                              | 모델 API 키               |
-| `LLM_BASE_URL`                             | https 필수                |
-| `LLM_MODEL_VISION` · `LLM_MODEL_REASONING` | 화이트리스트 내 값만      |
+| `LLM_API_KEY`                              | Serverless API 키  |
+| `LLM_VISION_URL`                           | 음식 인식 (Gemini Flash)  |
+| `LLM_REASONING_URL`                        | 피드백 (Claude Sonnet 5)  |
 | `LLM_TIMEOUT_SEC` · `LLM_MAX_RETRIES`      | 기본 45초 / 1회           |
 | `BE_INTERNAL_BASE_URL`                     | BE `/internal/v1` 주소    |
 | `INTERNAL_SERVICE_TOKEN`                   | BE와 공유하는 서비스 토큰 |

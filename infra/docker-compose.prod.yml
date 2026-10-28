@@ -1,0 +1,245 @@
+# 운영(EC2) 배포. 사람도 CI 도 직접 부르지 않고 deploy.sh 를 거친다.
+#
+#   ./deploy.sh            # 잠금 · checkout → bg-deploy.sh prod (Blue/Green)
+#
+# api 는 blue · green 두 벌이다 (J). 새 쪽을 띄워 확인한 뒤 Caddy 가 받는 쪽을 바꾸고, 옛 쪽은
+# 정지만 해 둔다 (롤백용, bg-switch.sh). 이미지 태그(BLUE_TAG · GREEN_TAG · BE_TAG)는
+# bg-deploy.sh 가 /opt/glp1-bg/<env>.env 에서 읽어 export 한다. compose 를 손으로 부를 때
+# 태그가 없으면 :none 이 되어 이미지를 못 찾는다 — 태그를 쓰지 않는 caddy 단독 작업은 괜찮다.
+#
+# 비밀값은 전부 .env.prod 한 곳에서 온다(B4). --env-file 로 읽어 아래 ${...} 에 끼워 넣고,
+# 서비스마다 **필요한 키만** environment 로 넘긴다 — env_file 로 통째로 넣으면 db·caddy
+# 컨테이너에도 LLM 키가 들어간다. ai/.env · backend/.env 는 쓰지 않는다.
+# ${VAR:?} 는 값이 비어 있으면 compose 가 기동 전에 멈춘다.
+#
+# 외부에 여는 포트는 caddy 의 80·443 뿐이다. api·ai·db 는 compose 내부 네트워크로만 닿는다.
+
+# 로컬 개발 compose(프로젝트 infra)와 볼륨·네트워크가 섞이지 않게 프로젝트를 분리한다.
+# 컨테이너 이름·이미지 태그도 glp1-prod- 를 붙여 개발용(glp1-db, glp1-be 등)과 겹치지 않게 한다 —
+# 로컬에서 둘을 함께 띄워도 이름이 충돌하지 않고, 운영 빌드가 개발 이미지를 덮어쓰지 않는다.
+name: glp1-prod
+
+x-be-env: &be-env
+  # local 이어야 /users/* 의 X-User-Id 이음새가 살아 있다. production 이면 기동이 막힌다
+  # (backend/README.md). JWT 병합 전까지 바깥 접근은 Caddy 의 데모 키가 막는다.
+  APP_ENV: local
+  DB_URL: db:5432/${DB_NAME:?}
+  DB_USER: ${DB_USER:?}
+  DB_PASSWORD: ${DB_PASSWORD:?}
+  # 음식 인식이 머지되기 전 데모는 .env.prod 에서 ai-stub 으로 바꾼다 (아래 ai-stub 참고).
+  AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai:8000}
+  # 워커가 AI 에 넘기는 imageUrl 의 앞부분. AI 컨테이너가 사진을 받아 가는 내부 주소다.
+  LOCAL_STORAGE_BASE_URL: http://api:8000/media
+  # 사진 저장소 (배포 계획서 I절). 기본은 로컬 디스크(media 볼륨). s3 로 바꾸면 S3_BUCKET 이
+  # 필수다 — 비어 있으면 api 가 기동하지 않는다. AWS 키는 넣지 않는다(인스턴스 역할로 받는다).
+  STORAGE_TYPE: ${STORAGE_TYPE:-local}
+  S3_BUCKET: ${S3_BUCKET:-}
+  INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?}
+
+# api · worker 는 같은 이미지다. 빌드 인자는 deploy.sh · deploy-staging.sh 가 git 에서 읽어
+# export 한다(H3) — 운영은 릴리스 태그와 전체 SHA, 스테이징은 SHA 만. 직접 compose 를 부르면
+# 둘 다 비어 /health 가 null 을 낸다.
+x-be-build: &be-build
+  context: ../backend
+  args:
+    GIT_SHA: ${GIT_SHA:-}
+    APP_VERSION: ${APP_VERSION:-}
+
+x-python-health: &python-health
+  test:
+    - CMD
+    - python
+    - -c
+    - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')
+  interval: 10s
+  timeout: 3s
+  retries: 3
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: glp1-prod-db
+    environment:
+      POSTGRES_USER: ${DB_USER:?}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+      POSTGRES_DB: ${DB_NAME:?}
+      # 한글 음식명 정렬·비교를 위해 UTF-8 로 초기화한다 (docker-compose.yml 과 같다)
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # blue · green 이 같은 설정을 쓴다. 이미지 태그와 컨테이너 이름만 다르다.
+  # 마이그레이션은 여기서 돌리지 않는다 — 두 쪽이 번갈아 뜨므로 아래 migrate 가 새 쪽을 띄우기
+  # 전에 한 번만 돌린다.
+  api-blue: &api
+    build: *be-build
+    image: glp1-prod-be:${BLUE_TAG:-none}
+    container_name: glp1-prod-api-blue
+    environment: *be-env
+    # 업로드한 사진. 두 쪽이 같은 볼륨을 쓴다. 볼륨이 없으면 컨테이너를 다시 만들 때마다 사라진다.
+    volumes:
+      - media:/srv/var/media
+    networks:
+      default:
+        # ai 의 BE_INTERNAL_BASE_URL, worker 의 LOCAL_STORAGE_BASE_URL 이 api:8000 을 부른다.
+        # 정지한 컨테이너는 이름 풀이에서 빠지므로 옛 쪽을 정지하면 새 쪽만 남는다.
+        # 두 쪽이 함께 떠 있는 동안에는 둘 다 가리키므로, 이 별칭을 부르는 worker · ai 는
+        # bg-deploy.sh 가 옛 쪽을 정지한 뒤에 띄운다.
+        aliases: [api]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # /health 가 아니라 DB 까지 보는 /health/ready — DB 에 못 붙는 api 로 전환하지 않게 한다
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')
+      # 줄이지 않는다. 검사마다 파이썬 프로세스가 떠서 CPU 를 잠깐 쓴다 (t3 는 CPU 크레딧제)
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  api-green:
+    <<: *api
+    image: glp1-prod-be:${GREEN_TAG:-none}
+    container_name: glp1-prod-api-green
+
+  # 일회성 마이그레이션 (bg-deploy.sh 가 `run --rm migrate`). profile 이라 up 으로는 뜨지 않는다.
+  # 새 이미지(BE_TAG)로 돌리지만 옛 api 가 계속 요청을 받는 중이다 — 옛 코드와 호환되는
+  # 마이그레이션만 넣는다 (Deployment.md J4, Expand / Contract).
+  migrate:
+    image: glp1-prod-be:${BE_TAG:-none}
+    profiles: ["tools"]
+    command: ["alembic", "upgrade", "head"]
+    environment: *be-env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    # 빌드는 api 쪽이 한다. 같은 이미지의 지금 받는 쪽 태그를 쓴다.
+    image: glp1-prod-be:${BE_TAG:-none}
+    container_name: glp1-prod-worker
+    command: ["python", "-m", "app.worker_main"]
+    environment: *be-env
+    depends_on:
+      db:
+        condition: service_healthy
+    # HTTP 를 듣지 않으므로 DB 에 붙는지로 본다. 큐가 DB 테이블이라 DB 가 곧 일감이다.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "from sqlalchemy import create_engine, text; from app.core.config import get_settings; create_engine(get_settings().sqlalchemy_dsn).connect().execute(text('select 1'))"
+      interval: 30s
+      # 앱 설정 · SQLAlchemy 를 import 하느라 부하가 있으면 3~4초 걸린다. Blue/Green 은 전환 뒤
+      # worker 를 --wait 로 기다리므로 5초면 정상 워커가 시간 초과로 배포를 실패시킨다.
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # SIGTERM 을 받으면 진행 중인 작업을 끝까지 처리하고 내려간다. compose 기본 10초는
+    # AI 타임아웃(45초)보다 짧다 (docker-compose.be.yml 참고).
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+  ai:
+    build:
+      context: ../ai
+    image: glp1-prod-ai
+    container_name: glp1-prod-ai
+    environment:
+      LLM_API_KEY: ${LLM_API_KEY:?}
+      LLM_VISION_URL: ${LLM_VISION_URL:?}
+      LLM_REASONING_URL: ${LLM_REASONING_URL:?}
+      LLM_TIMEOUT_SEC: ${LLM_TIMEOUT_SEC:-45}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      TOOL_CALL_LIMIT: ${TOOL_CALL_LIMIT:-3}
+      # tool 역호출. Caddy 는 /internal/* 을 404 로 막으므로 내부 네트워크로만 닿는다.
+      BE_INTERNAL_BASE_URL: http://api:8000/internal/v1
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?}
+    healthcheck:
+      <<: *python-health
+      start_period: 15s
+    restart: unless-stopped
+
+  # 실제 AI 의 엔드포인트가 아직 501 이라 데모에서 분석이 전부 실패한다. 그 기간에는
+  # 고정 더미 응답을 주는 스텁을 붙인다. profile 이라 평소에는 뜨지 않는다.
+  # 켜기: .env.prod 에 COMPOSE_PROFILES=stub, AI_SERVICE_BASE_URL=http://ai-stub:8000
+  ai-stub:
+    build:
+      context: ../ai-stub
+    image: glp1-prod-ai-stub
+    container_name: glp1-prod-ai-stub
+    profiles: ["stub"]
+    healthcheck:
+      <<: *python-health
+      start_period: 5s
+    restart: unless-stopped
+
+  caddy:
+    # 버전을 고정한다. 2-alpine 처럼 움직이는 태그면 배포 때 컨테이너가 다시 만들어져 80/443 이
+    # 끊긴다. Blue/Green 에서 Caddy 는 다시 만들지 않고 reload 만 한다.
+    image: caddy:2.11.7-alpine
+    container_name: glp1-prod-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?}
+      DEMO_KEY: ${DEMO_KEY:?}
+      # 비워 두면 Caddyfile 의 remote_ip 가 인자 없이 남아 파싱에 실패한다.
+      # 기본값은 컨테이너 자기 자신이라 사실상 아무도 허용하지 않는다.
+      ALLOWED_IPS: ${ALLOWED_IPS:-127.0.0.1/32}
+      # 스테이징 사이트 주소(Caddyfile 의 두 번째 사이트). 비면 Caddyfile 파싱이 실패하므로 필수다.
+      STAGING_DOMAIN: ${STAGING_DOMAIN:?}
+      # 스테이징 전용 데모 키(K2). 아직 Caddyfile 이 쓰지 않는다. 환경변수는 컨테이너를 다시 만들
+      # 때만 바뀌므로(reload 로는 안 됨) 어차피 끊기는 첫 Blue/Green 전환 때 미리 넣어 둔다 —
+      # 그러면 K2 는 Caddyfile 한 줄과 reload 로 끝난다.
+      STAGING_DEMO_KEY: ${STAGING_DEMO_KEY:-}
+    networks:
+      - default
+      # 스테이징 api(glp1-staging-api-*)에 닿는 통로. 운영 api 는 여기 붙지 않는다.
+      - edge
+    volumes:
+      # 파일 하나가 아니라 디렉터리째 마운트한다. git checkout 은 파일을 새로 만들어 바꾸므로
+      # 파일만 마운트하면 컨테이너가 옛 파일을 계속 본다 (reload 해도 반영되지 않는다).
+      - ./caddy:/etc/caddy:ro
+      # 지금 받는 쪽(blue/green) 한 줄. git 밖에 둬서 운영·스테이징 checkout 과 무관하다.
+      - ${GLP1_BG_DIR:-/opt/glp1-bg}/upstreams:/etc/caddy-upstreams:ro
+      # 발급받은 인증서. 없으면 컨테이너를 다시 만들 때마다 새로 받다가 Let's Encrypt
+      # 발급 한도에 걸린다.
+      - caddy_data:/data
+      - caddy_config:/config
+    # api 에 depends_on 을 걸지 않는다. Caddy 는 요청 때 이름을 찾으므로 api 가 없어도 뜨고,
+    # 걸어 두면 caddy 를 다시 만들 때 compose 가 api 까지 건드린다.
+    healthcheck:
+      # 관리 API(localhost:2019)가 응답하면 설정을 읽고 떠 있는 것이다
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  media:
+  caddy_data:
+  caddy_config:
+
+networks:
+  # 운영 caddy 와 스테이징 api 만 붙는 외부 네트워크. compose 가 만들지 않으므로
+  # deploy.sh · deploy-staging.sh 가 먼저 만든다 (docker network create glp1-edge).
+  edge:
+    external: true
+    name: glp1-edge

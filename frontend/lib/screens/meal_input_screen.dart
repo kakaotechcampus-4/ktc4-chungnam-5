@@ -1,7 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -11,12 +10,57 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'food_search_screen.dart';
 import 'meal_analysis_screen.dart';
 
 const List<String> _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
 
 String _formatDateShort(DateTime d) =>
     '${d.month}월 ${d.day}일 (${_weekdayNames[d.weekday - 1]})';
+
+String _two(int n) => n.toString().padLeft(2, '0');
+
+/// `2026년 08월 21일`.
+String _formatDay(DateTime d) => '${d.year}년 ${_two(d.month)}월 ${_two(d.day)}일';
+
+/// `18:10`.
+String _formatTime(DateTime d) => '${_two(d.hour)}:${_two(d.minute)}';
+
+/// 양을 화면에 적을 때 정수면 소수점을 뗀다(`1.0` → `1`).
+String _formatAmount(double v) =>
+    v == v.roundToDouble() ? '${v.toInt()}' : v.toString();
+
+/// "끼니" · "식사 시각" 같은 섹션 제목.
+final TextStyle _sectionLabel = AppTypography.sectionHead.copyWith(fontSize: 12.5);
+
+/// 검색 탭에서 고른 음식 하나와 먹은 양(g). 서버로 보내기 전까지 화면 안에서만 들고 있는다.
+class _PickedFood {
+  _PickedFood(this.candidate)
+    : amount = TextEditingController(
+        text: _formatAmount(candidate.servingSizeG ?? _defaultAmountG),
+      );
+
+  /// 기준량을 모르는 음식의 처음 양.
+  static const double _defaultAmountG = 100;
+
+  final FoodCandidate candidate;
+
+  /// 먹은 양(g). 카드의 숫자 칸이 고친다.
+  final TextEditingController amount;
+
+  double? get amountG {
+    final v = double.tryParse(amount.text.trim());
+    return v == null || v <= 0 ? null : v;
+  }
+
+  /// 영양 한 줄을 먹은 양으로 환산할 비율. 기준량을 모르면 기준량 값 그대로다.
+  double get scale {
+    final serving = candidate.servingSizeG;
+    final g = amountG;
+    if (serving == null || serving <= 0 || g == null) return 1;
+    return g / serving;
+  }
+}
 
 class MealInputScreen extends StatefulWidget {
   const MealInputScreen({super.key});
@@ -26,7 +70,7 @@ class MealInputScreen extends StatefulWidget {
 }
 
 class _MealInputScreenState extends State<MealInputScreen> {
-  int _selectedTab = 0; // 0: 사진으로, 1: 직접 입력
+  int _selectedTab = 0; // 0: 사진, 1: 검색
   int _selectedMealType = 2; // 0: 아침, 1: 점심, 2: 저녁
 
   /// [_selectedMealType] 순서의 서버 값.
@@ -38,7 +82,8 @@ class _MealInputScreenState extends State<MealInputScreen> {
   /// 분석 요청을 보내는 중. 버튼을 막는다.
   bool _submitting = false;
 
-  final TextEditingController _searchController = TextEditingController();
+  /// 검색 탭에서 고른 음식(고른 순서).
+  final List<_PickedFood> _foods = [];
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -107,12 +152,13 @@ class _MealInputScreenState extends State<MealInputScreen> {
     });
   }
 
-  Future<void> _changeDateTime() async {
+  /// 날짜 행 · 시간 행을 누르면 그 값만 바꾼다. 나머지는 지금 값을 그대로 둔다.
+  Future<void> _changeEatenAt(_PickerMode mode) async {
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheetRadius),
-      builder: (context) => _DateTimeDialPicker(initial: _eatenAt),
+      builder: (context) => _DateTimeDialPicker(initial: _eatenAt, mode: mode),
     );
     if (picked == null) return;
     setState(() => _eatenAt = picked);
@@ -120,8 +166,29 @@ class _MealInputScreenState extends State<MealInputScreen> {
 
   @override
   void dispose() {
-    _searchController.dispose();
+    for (final f in _foods) {
+      f.amount.dispose();
+    }
     super.dispose();
+  }
+
+  /// 검색 화면을 열어 고른 음식을 목록에 더한다. 이미 있는 음식은 건너뛴다.
+  Future<void> _openSearch() async {
+    final picked = await Navigator.of(context).push<List<FoodCandidate>>(
+      MaterialPageRoute(builder: (_) => FoodSearchScreen(api: _api)),
+    );
+    if (picked == null || picked.isEmpty || !mounted) return;
+    final have = {for (final f in _foods) f.candidate.foodRefId};
+    setState(() {
+      for (final c in picked) {
+        if (have.add(c.foodRefId)) _foods.add(_PickedFood(c));
+      }
+    });
+  }
+
+  void _removeFood(_PickedFood food) {
+    setState(() => _foods.remove(food));
+    food.amount.dispose();
   }
 
   /// 분석 시작(`POST /meals`) → AI 분석 진행 화면(4번)으로 교체 이동.
@@ -129,35 +196,39 @@ class _MealInputScreenState extends State<MealInputScreen> {
   /// 교체(`pushReplacement`)라서 분석 이후 화면에서 뒤로 가면 입력 화면이 아니라
   /// 이 화면을 연 탭으로 바로 돌아간다.
   Future<void> _startAnalysis() async {
-    final photo = _photoBytes;
-    final text = _searchController.text.trim();
-    final usePhoto = _selectedTab == 0;
-    if (usePhoto ? photo == null : text.isEmpty) {
-      _showError(usePhoto ? '사진을 골라 주세요' : '먹은 음식을 적어 주세요');
+    final manual = _selectedTab == 1;
+    final photo = manual ? null : _photoBytes;
+    if (manual && _foods.isEmpty) {
+      _showError('먹은 음식을 검색해 추가해 주세요');
+      return;
+    }
+    if (manual && _foods.any((f) => f.amountG == null)) {
+      _showError('양을 0보다 큰 숫자로 적어 주세요');
+      return;
+    }
+    if (!manual && photo == null) {
+      _showError('사진을 골라 주세요');
       return;
     }
     setState(() => _submitting = true);
     try {
       final mealType = _mealTypes[_selectedMealType];
-      final created = usePhoto
-          ? await _api.createWithPhoto(
+      final created = photo == null
+          ? await _api.createWithText(
               mealType: mealType,
               eatenAt: _eatenAt,
-              photo: photo!,
-              fileName: _photo?.name ?? 'meal.jpg',
+              text: _foodsAsText(),
             )
-          : await _api.createWithText(
+          : await _api.createWithPhoto(
               mealType: mealType,
               eatenAt: _eatenAt,
-              text: text,
+              photo: photo,
+              fileName: _photo?.name ?? 'meal.jpg',
             );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => MealAnalysisScreen(
-            meal: created,
-            photo: usePhoto ? photo : null,
-          ),
+          builder: (_) => MealAnalysisScreen(meal: created, photo: photo),
         ),
       );
     } catch (e) {
@@ -167,6 +238,16 @@ class _MealInputScreenState extends State<MealInputScreen> {
     }
   }
 
+  /// 고른 음식을 `rawText` 한 줄로 만든다(`참치김밥 250g, 달걀 삶은것 100g`).
+  ///
+  /// 임시 연결이다. `POST /meals` 는 아직 음식 목록(`items[]`)을 받지 않아 텍스트
+  /// 입력 경로로 보내고, AI 가 다시 음식을 나눈다. 이름을 DB 이름 그대로 보내
+  /// 서버의 이름 매칭이 같은 음식을 찾게 한다. BE 가 `items[]`(+`foodRefId`)를
+  /// 받게 되면 고른 음식을 그대로 보내 AI 를 건너뛴다(API 요청서 B-1).
+  String _foodsAsText() => _foods
+      .map((f) => '${f.candidate.displayName} ${_formatAmount(f.amountG!)}g')
+      .join(', ');
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
@@ -175,7 +256,16 @@ class _MealInputScreenState extends State<MealInputScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('식사 기록')),
+      appBar: AppBar(
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed: () => Navigator.of(context).maybePop(),
+          tooltip: '뒤로',
+        ),
+        title: const Text('식사 기록'),
+        titleTextStyle: AppTypography.sectionHead.copyWith(fontSize: 14),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
@@ -187,25 +277,26 @@ class _MealInputScreenState extends State<MealInputScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 탭
+              // 입력 방식 탭
               Container(
                 padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.surfaceMuted,
-                  borderRadius: AppRadius.pillRadius,
+                  borderRadius: BorderRadius.circular(13),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: _SegmentTab(
-                        label: '사진으로',
+                        label: '사진',
                         selected: _selectedTab == 0,
                         onTap: () => setState(() => _selectedTab = 0),
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: _SegmentTab(
-                        label: '직접 입력',
+                        label: '검색',
                         selected: _selectedTab == 1,
                         onTap: () => setState(() => _selectedTab = 1),
                       ),
@@ -215,16 +306,16 @@ class _MealInputScreenState extends State<MealInputScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // 사진으로 / 직접 입력 — 탭에 따라 내용을 바꾼다.
+              // 사진 / 직접 입력 — 탭에 따라 내용을 바꾼다.
               if (_selectedTab == 0)
                 _buildPhotoUpload()
               else
-                _buildSearchInput(),
-              const SizedBox(height: AppSpacing.xl),
+                _buildManualInput(),
+              const SizedBox(height: AppSpacing.lg),
 
               // 끼니 선택
-              Text('끼니', style: AppTypography.sectionHead),
-              const SizedBox(height: AppSpacing.md),
+              Text('끼니', style: _sectionLabel),
+              const SizedBox(height: AppSpacing.sm),
               Row(
                 children: [
                   _MealTypeButton(
@@ -232,13 +323,13 @@ class _MealInputScreenState extends State<MealInputScreen> {
                     selected: _selectedMealType == 0,
                     onTap: () => setState(() => _selectedMealType = 0),
                   ),
-                  const SizedBox(width: AppSpacing.md),
+                  const SizedBox(width: 6),
                   _MealTypeButton(
                     label: '점심',
                     selected: _selectedMealType == 1,
                     onTap: () => setState(() => _selectedMealType = 1),
                   ),
-                  const SizedBox(width: AppSpacing.md),
+                  const SizedBox(width: 6),
                   _MealTypeButton(
                     label: '저녁',
                     selected: _selectedMealType == 2,
@@ -248,40 +339,37 @@ class _MealInputScreenState extends State<MealInputScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // 식사 시각
-              Text('식사 시각', style: AppTypography.sectionHead),
-              const SizedBox(height: AppSpacing.md),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _formatDate(_eatenAt),
-                          style: AppTypography.cardTitle,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _changeDateTime,
-                        child: const Text('변경'),
-                      ),
-                    ],
-                  ),
-                ),
+              // 식사 시각 — 날짜와 시간을 따로 고친다.
+              Text('식사 시각', style: _sectionLabel),
+              const SizedBox(height: AppSpacing.sm),
+              _DateTimeRow(
+                icon: Icons.calendar_today_outlined,
+                iconSize: 14,
+                label: '날짜',
+                value: _formatDay(_eatenAt),
+                onTap: () => _changeEatenAt(_PickerMode.date),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _DateTimeRow(
+                icon: Icons.access_time,
+                iconSize: 16,
+                label: '시간',
+                value: _formatTime(_eatenAt),
+                onTap: () => _changeEatenAt(_PickerMode.time),
               ),
               const SizedBox(height: AppSpacing.lg),
 
               // 분석 버튼
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: _submitting ? null : _startAnalysis,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.lgRadius,
+                    elevation: 0,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppRadius.xlRadius,
                     ),
                   ),
                   child: _submitting
@@ -304,40 +392,47 @@ class _MealInputScreenState extends State<MealInputScreen> {
     );
   }
 
-  String _formatDate(DateTime dt) {
-    // YYYY. MM. DD hh:mm 형태(간단 구현)
-    return '${dt.year.toString().padLeft(4, '0')}. ${dt.month.toString().padLeft(2, '0')}. ${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-
   Widget _buildPhotoUpload() {
     final bytes = _photoBytes;
     if (_photo != null && bytes != null) return _buildPhotoPreview(bytes);
+    // 점선은 흰 면 위에 그려야 해서 foregroundPainter 로 얹는다.
     return CustomPaint(
-      painter: const _DashedBorderPainter(),
-      child: InkWell(
-        onTap: _pickPhoto,
-        borderRadius: AppRadius.lgRadius,
-        child: Container(
-          width: double.infinity,
-          height: 220,
-          alignment: Alignment.center,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
-                  shape: BoxShape.circle,
+      foregroundPainter: const _DashedBorderPainter(),
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: AppRadius.xlRadius,
+        child: InkWell(
+          onTap: _pickPhoto,
+          borderRadius: AppRadius.xlRadius,
+          child: Container(
+            width: double.infinity,
+            height: 180,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    size: 22,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-                child: const Icon(Icons.add, color: AppColors.primary),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text('사진 올리기', style: AppTypography.sectionHead),
-              const SizedBox(height: AppSpacing.xs),
-              Text('갤러리에서 선택하거나 텍스트로 입력', style: AppTypography.bodySecondary),
-            ],
+                const SizedBox(height: AppSpacing.sm),
+                Text('사진 올리기', style: AppTypography.cardTitle),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  '갤러리에서 선택하거나 텍스트로 입력',
+                  style: AppTypography.caption.copyWith(fontSize: 10.5),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -347,10 +442,10 @@ class _MealInputScreenState extends State<MealInputScreen> {
   /// 고른 사진 미리보기. 사진을 탭하면 다시 고르고, ✕ 로 지운다.
   Widget _buildPhotoPreview(Uint8List bytes) {
     return ClipRRect(
-      borderRadius: AppRadius.lgRadius,
+      borderRadius: AppRadius.xlRadius,
       child: SizedBox(
         width: double.infinity,
-        height: 220,
+        height: 180,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -377,58 +472,40 @@ class _MealInputScreenState extends State<MealInputScreen> {
     );
   }
 
-  Widget _buildSearchInput() {
+  /// "검색" 탭 — Figma `17:488`(비었을 때) · `17:527`(고른 뒤). 검색창을 누르면
+  /// 공공 DB 검색 화면이 열리고, 고른 음식마다 먹은 양(g)을 정한다.
+  Widget _buildManualInput() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: AppRadius.mdRadius,
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.edit_outlined,
-                size: AppLayout.tabIconSize,
-                color: AppColors.inactive,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  style: AppTypography.body,
-                  decoration: InputDecoration(
-                    hintText: '먹은 음식을 적어 주세요 (예: 현미밥, 된장국)',
-                    hintStyle: AppTypography.bodySecondary,
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.md,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        FoodSearchBar(onTap: _openSearch),
         const SizedBox(height: AppSpacing.sm),
-        Text(
-          'AI 가 음식과 양을 알아봐요. 다음 화면에서 고칠 수 있어요.',
-          style: AppTypography.bodySecondary,
-        ),
+        if (_foods.isEmpty)
+          _EmptySearch(onTap: _openSearch)
+        else
+          for (final food in _foods) ...[
+            _PickedFoodCard(
+              key: ObjectKey(food),
+              food: food,
+              onChanged: () => setState(() {}),
+              onRemove: () => _removeFood(food),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
       ],
     );
   }
 }
 
-/// "변경" 버튼이 여는 바텀시트. 달력/시계 대신 숫자 다이얼(휠)로 조정한다.
+enum _PickerMode { date, time }
+
+/// 날짜 행 · 시간 행이 여는 바텀시트. 달력/시계 대신 숫자 다이얼(휠)로 조정한다.
+/// [mode] 가 날짜면 날짜 휠 하나, 시간이면 시 · 분 휠 둘만 보이고, 안 보이는 쪽은 지금 값을 그대로 둔다.
 class _DateTimeDialPicker extends StatefulWidget {
-  const _DateTimeDialPicker({required this.initial});
+  const _DateTimeDialPicker({required this.initial, required this.mode});
 
   final DateTime initial;
+  final _PickerMode mode;
 
   @override
   State<_DateTimeDialPicker> createState() => _DateTimeDialPickerState();
@@ -469,8 +546,24 @@ class _DateTimeDialPickerState extends State<_DateTimeDialPicker> {
     return DateTime(d.year, d.month, d.day, _hour, _minute);
   }
 
+  Widget _wheel({
+    required int initialItem,
+    required ValueChanged<int> onChanged,
+    required List<String> labels,
+  }) {
+    return CupertinoPicker(
+      itemExtent: _itemExtent,
+      scrollController: FixedExtentScrollController(initialItem: initialItem),
+      onSelectedItemChanged: onChanged,
+      children: labels
+          .map((l) => Center(child: Text(l, style: AppTypography.body)))
+          .toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDate = widget.mode == _PickerMode.date;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
@@ -483,71 +576,34 @@ class _DateTimeDialPickerState extends State<_DateTimeDialPicker> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('식사 시각 변경', style: AppTypography.sectionHead),
+            Text(isDate ? '날짜 변경' : '시간 변경', style: AppTypography.sectionHead),
             const SizedBox(height: AppSpacing.md),
             SizedBox(
               height: 180,
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: CupertinoPicker(
-                      itemExtent: _itemExtent,
-                      scrollController: FixedExtentScrollController(
-                        initialItem: _dateIndex,
-                      ),
-                      onSelectedItemChanged: (i) =>
-                          setState(() => _dateIndex = i),
-                      children: _dates
-                          .map(
-                            (d) => Center(
-                              child: Text(
-                                _formatDateShort(d),
-                                style: AppTypography.body,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                  Expanded(
-                    child: CupertinoPicker(
-                      itemExtent: _itemExtent,
-                      scrollController: FixedExtentScrollController(
-                        initialItem: _hour,
-                      ),
-                      onSelectedItemChanged: (i) => setState(() => _hour = i),
-                      children: List.generate(
-                        24,
-                        (h) => Center(
-                          child: Text(
-                            h.toString().padLeft(2, '0'),
-                            style: AppTypography.body,
+              child: isDate
+                  ? _wheel(
+                      initialItem: _dateIndex,
+                      onChanged: (i) => setState(() => _dateIndex = i),
+                      labels: _dates.map(_formatDateShort).toList(),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: _wheel(
+                            initialItem: _hour,
+                            onChanged: (i) => setState(() => _hour = i),
+                            labels: List.generate(24, _two),
                           ),
                         ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: CupertinoPicker(
-                      itemExtent: _itemExtent,
-                      scrollController: FixedExtentScrollController(
-                        initialItem: _minute,
-                      ),
-                      onSelectedItemChanged: (i) => setState(() => _minute = i),
-                      children: List.generate(
-                        60,
-                        (m) => Center(
-                          child: Text(
-                            m.toString().padLeft(2, '0'),
-                            style: AppTypography.body,
+                        Expanded(
+                          child: _wheel(
+                            initialItem: _minute,
+                            onChanged: (i) => setState(() => _minute = i),
+                            labels: List.generate(60, _two),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             Row(
@@ -574,6 +630,247 @@ class _DateTimeDialPickerState extends State<_DateTimeDialPicker> {
   }
 }
 
+/// 식사 시각 한 줄(날짜 · 시간). 줄 전체가 눌리고, 오른쪽 화살표는 "눌러서 고친다"는 표시다.
+class _DateTimeRow extends StatelessWidget {
+  const _DateTimeRow({
+    required this.icon,
+    required this.iconSize,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final double iconSize;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTypography.body.copyWith(
+      fontSize: 13,
+      color: AppColors.textPrimary,
+    );
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(13));
+    return Material(
+      color: AppColors.surface,
+      shape: shape.copyWith(side: const BorderSide(color: AppColors.border)),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: shape,
+        child: SizedBox(
+          height: 48,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Icon(icon, size: iconSize, color: AppColors.primary),
+                const SizedBox(width: 5),
+                Text(label, style: style),
+                const Spacer(),
+                Text(value, style: style),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 18,
+                  color: AppColors.textTertiary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 아직 고른 음식이 없을 때 — Figma `17:488`.
+class _EmptySearch extends StatelessWidget {
+  const _EmptySearch({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+        child: Column(
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'assets/images/meal_input_food_add.png',
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text('음식명을 검색하여 추가해 보세요.', style: AppTypography.bodySecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 고른 음식 카드 — 이름 · 먹은 양 기준 영양 한 줄 · ✕, 아래에 `− 250 g ＋`.
+/// 숫자 칸은 직접 고칠 수도 있다.
+class _PickedFoodCard extends StatelessWidget {
+  const _PickedFoodCard({
+    super.key,
+    required this.food,
+    required this.onChanged,
+    required this.onRemove,
+  });
+
+  /// − · ＋ 한 번에 바뀌는 양(g).
+  static const double _step = 10;
+
+  final _PickedFood food;
+  final VoidCallback onChanged;
+  final VoidCallback onRemove;
+
+  void _bump(double delta) {
+    final next = (food.amountG ?? 0) + delta;
+    if (next <= 0) return;
+    food.amount.text = _formatAmount(next);
+    onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final line = formatNutritionLine(
+      food.candidate.nutrition,
+      scale: food.scale,
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: AppRadius.lgRadius,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      food.candidate.displayName,
+                      style: AppTypography.cardTitle.copyWith(fontSize: 15),
+                    ),
+                    if (line.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        line,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onRemove,
+                tooltip: '빼기',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.close,
+                  size: 18,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              _StepButton(
+                icon: Icons.remove,
+                tooltip: '양 줄이기',
+                onTap: () => _bump(-_step),
+              ),
+              SizedBox(
+                width: 56,
+                child: TextField(
+                  controller: food.amount,
+                  onChanged: (_) => onChanged(),
+                  textAlign: TextAlign.center,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  ],
+                  style: AppTypography.cardTitle.copyWith(fontSize: 16),
+                  decoration: const InputDecoration(
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              Text('g', style: AppTypography.caption),
+              const SizedBox(width: AppSpacing.sm),
+              _StepButton(
+                icon: Icons.add,
+                tooltip: '양 늘리기',
+                onTap: () => _bump(_step),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 양 조절 − · ＋ 동그라미 버튼.
+class _StepButton extends StatelessWidget {
+  const _StepButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: AppColors.surfaceMuted,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            width: 30,
+            height: 30,
+            child: Icon(icon, size: 16, color: AppColors.textPrimary),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SegmentTab extends StatelessWidget {
   const _SegmentTab({required this.label, required this.selected, this.onTap});
 
@@ -583,19 +880,34 @@ class _SegmentTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(10);
     return InkWell(
       onTap: onTap,
-      borderRadius: AppRadius.pillRadius,
+      borderRadius: radius,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        height: 34,
         decoration: BoxDecoration(
           color: selected ? AppColors.surface : Colors.transparent,
-          borderRadius: AppRadius.pillRadius,
+          borderRadius: radius,
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppColors.textPrimary.withValues(alpha: 0.12),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
         ),
         alignment: Alignment.center,
         child: Text(
           label,
-          style: selected ? AppTypography.emphasis : AppTypography.caption,
+          style: AppTypography.body.copyWith(
+            fontSize: 11.5,
+            height: 1.25,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+            color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+          ),
         ),
       ),
     );
@@ -615,22 +927,33 @@ class _MealTypeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(11);
     return Expanded(
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: selected
-              ? AppColors.primaryTint
-              : Colors.transparent,
-          foregroundColor: selected ? AppColors.primary : AppColors.textPrimary,
+      child: Material(
+        color: selected ? AppColors.primaryTint : AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
           side: BorderSide(
-            color: selected ? AppColors.primary : AppColors.borderStrong,
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 1.5 : 1,
           ),
-          shape: RoundedRectangleBorder(borderRadius: AppRadius.lgRadius),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Text(label, style: AppTypography.body),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: Container(
+            height: 38,
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: AppTypography.body.copyWith(
+                fontSize: 10,
+                height: 1.25,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -646,15 +969,15 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.borderStrong
+      ..color = AppColors.border
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
+      ..strokeWidth = 1.5;
 
     final path = Path()
       ..addRRect(
         RRect.fromRectAndRadius(
           Offset.zero & size,
-          const Radius.circular(AppRadius.lg),
+          const Radius.circular(AppRadius.xl),
         ),
       );
 
