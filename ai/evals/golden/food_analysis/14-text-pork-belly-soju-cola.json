@@ -1,0 +1,42 @@
+{
+  "id": "14-text-pork-belly-soju-cola",
+  "description": "고기 · 술 · 음료가 섞인 글 — 마신 것도 끼니 항목으로",
+  "tags": [
+    "meal:DINNER",
+    "gap:drinks",
+    "items:3",
+    "input:text"
+  ],
+  "imageUrl": null,
+  "rawText": "삼겹살 1인분이랑 소주 반 병, 콜라 한 캔",
+  "mealType": "DINNER",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "삼겹살",
+        "삼겹살구이",
+        "돼지고기삼겹살"
+      ],
+      "amountG": 200
+    },
+    {
+      "names": [
+        "소주"
+      ],
+      "amountG": 170
+    },
+    {
+      "names": [
+        "콜라"
+      ],
+      "amountG": 370
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "직접 작성",
+    "amountG": "글의 양을 일반 1회분 g 으로 옮긴 값"
+  }
+}

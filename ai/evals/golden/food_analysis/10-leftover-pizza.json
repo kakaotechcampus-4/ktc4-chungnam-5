@@ -1,0 +1,30 @@
+{
+  "id": "10-leftover-pizza",
+  "description": "8조각 중 5조각 남은 피자 + '3조각 먹었어' — 남은 양이 아니라 먹은 양",
+  "tags": [
+    "meal:DINNER",
+    "gap:leftover",
+    "items:1",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/10-leftover-pizza.jpg",
+  "rawText": "3조각 먹었어",
+  "mealType": "DINNER",
+  "stage": "REDUCED",
+  "expected": [
+    {
+      "names": [
+        "피자",
+        "페퍼로니피자",
+        "콤비네이션피자"
+      ],
+      "amountG": 300
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  }
+}

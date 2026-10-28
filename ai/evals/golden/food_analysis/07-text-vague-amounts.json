@@ -1,0 +1,48 @@
+{
+  "id": "07-text-vague-amounts",
+  "description": "'반 공기' · '조금' 같은 애매한 양 — 모르는 양은 확인 질문으로",
+  "tags": [
+    "meal:DINNER",
+    "gap:text-only",
+    "gap:clarify",
+    "items:3",
+    "input:text"
+  ],
+  "imageUrl": null,
+  "rawText": "밥 반 공기랑 된장찌개 조금, 계란말이 두 조각",
+  "mealType": "DINNER",
+  "stage": "TITRATION",
+  "expected": [
+    {
+      "names": [
+        "쌀밥",
+        "공깃밥",
+        "밥"
+      ],
+      "amountG": 105
+    },
+    {
+      "names": [
+        "된장찌개"
+      ],
+      "amountG": 150
+    },
+    {
+      "names": [
+        "계란말이",
+        "달걀말이"
+      ],
+      "amountG": 60
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "직접 작성",
+    "amountG": "글의 양을 일반 1회분 g 으로 옮긴 값"
+  },
+  "amountTolerance": 0.5,
+  "expectClarify": [
+    "된장찌개"
+  ]
+}

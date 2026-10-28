@@ -1,0 +1,35 @@
+{
+  "id": "06-text-banana-milk",
+  "description": "사진 없이 글만 — 자연 단위(개 · ml)를 g 으로 옮기는지",
+  "tags": [
+    "meal:BREAKFAST",
+    "gap:text-only",
+    "items:2",
+    "input:text"
+  ],
+  "imageUrl": null,
+  "rawText": "아침에 바나나 1개랑 우유 200ml 먹었어",
+  "mealType": "BREAKFAST",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "바나나"
+      ],
+      "amountG": 120
+    },
+    {
+      "names": [
+        "우유",
+        "흰우유"
+      ],
+      "amountG": 206
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "직접 작성",
+    "amountG": "글의 양을 일반 1회분 g 으로 옮긴 값"
+  }
+}

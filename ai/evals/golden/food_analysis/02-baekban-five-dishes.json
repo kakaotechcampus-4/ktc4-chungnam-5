@@ -1,0 +1,62 @@
+{
+  "id": "02-baekban-five-dishes",
+  "description": "제육볶음 백반 — 작은 반찬까지 빠뜨리지 않는지",
+  "tags": [
+    "meal:DINNER",
+    "cuisine:korean",
+    "items:5",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/02-baekban-five-dishes.jpg",
+  "rawText": null,
+  "mealType": "DINNER",
+  "stage": "TITRATION",
+  "expected": [
+    {
+      "names": [
+        "제육볶음",
+        "돼지고기볶음",
+        "돼지불고기"
+      ],
+      "amountG": 150
+    },
+    {
+      "names": [
+        "쌀밥",
+        "공깃밥",
+        "흰쌀밥"
+      ],
+      "amountG": 210
+    },
+    {
+      "names": [
+        "미역국",
+        "소고기미역국"
+      ],
+      "amountG": 300
+    },
+    {
+      "names": [
+        "배추김치",
+        "김치"
+      ],
+      "amountG": 50
+    },
+    {
+      "names": [
+        "콩나물무침",
+        "콩나물"
+      ],
+      "amountG": 60
+    }
+  ],
+  "mayAlsoContain": [
+    "상추",
+    "쌈장"
+  ],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  }
+}

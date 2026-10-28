@@ -1,0 +1,47 @@
+{
+  "id": "05-toast-fried-egg-milk",
+  "description": "토스트 · 계란프라이 · 우유 — 아침 간편식",
+  "tags": [
+    "meal:BREAKFAST",
+    "cuisine:western",
+    "items:3",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/05-toast-fried-egg-milk.jpg",
+  "rawText": null,
+  "mealType": "BREAKFAST",
+  "stage": "PRE_DOSE",
+  "expected": [
+    {
+      "names": [
+        "식빵",
+        "토스트"
+      ],
+      "amountG": 60
+    },
+    {
+      "names": [
+        "계란프라이",
+        "달걀프라이",
+        "계란후라이"
+      ],
+      "amountG": 50
+    },
+    {
+      "names": [
+        "우유",
+        "흰우유"
+      ],
+      "amountG": 206
+    }
+  ],
+  "mayAlsoContain": [
+    "버터",
+    "딸기잼"
+  ],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  }
+}

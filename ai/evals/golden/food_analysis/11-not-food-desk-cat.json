@@ -1,0 +1,24 @@
+{
+  "id": "11-not-food-desk-cat",
+  "description": "음식이 없는 사진(책상 위 노트북과 고양이) — 음식을 지어내지 않는지",
+  "tags": [
+    "meal:SNACK",
+    "gap:not-food",
+    "items:0",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/11-not-food-desk-cat.jpg",
+  "rawText": null,
+  "mealType": "SNACK",
+  "stage": "MAINTENANCE",
+  "expected": [],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  },
+  "expectedSafety": [
+    "SAFE"
+  ]
+}

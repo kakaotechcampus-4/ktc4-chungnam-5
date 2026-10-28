@@ -1,0 +1,36 @@
+{
+  "id": "08-blurry-bibimbap",
+  "description": "어둡고 흐린 비빔밥 사진 — 확신이 낮으면 확인 질문",
+  "tags": [
+    "meal:DINNER",
+    "gap:low-quality-photo",
+    "gap:clarify",
+    "items:1",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/08-blurry-bibimbap.jpg",
+  "rawText": null,
+  "mealType": "DINNER",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "비빔밥",
+        "돌솥비빔밥"
+      ],
+      "amountG": 450
+    }
+  ],
+  "mayAlsoContain": [
+    "계란프라이",
+    "고추장"
+  ],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  },
+  "expectClarify": [
+    "비빔밥"
+  ]
+}

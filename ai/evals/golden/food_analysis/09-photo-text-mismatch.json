@@ -1,0 +1,29 @@
+{
+  "id": "09-photo-text-mismatch",
+  "description": "사진은 짜장면, 글은 '실제로는 짬뽕' — 사용자 정정을 따르는지 (팀 합의 필요)",
+  "tags": [
+    "meal:LUNCH",
+    "gap:photo-text-mismatch",
+    "agreement:needed",
+    "items:1",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/09-photo-text-mismatch.jpg",
+  "rawText": "사진은 짜장면인데 실제로는 짬뽕 먹었어요",
+  "mealType": "LUNCH",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "짬뽕"
+      ],
+      "amountG": 650
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  }
+}

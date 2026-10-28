@@ -1,0 +1,46 @@
+{
+  "id": "01-doenjang-jjigae-multigrain-rice",
+  "description": "된장찌개 · 잡곡밥 · 깍두기 한 상 — 기본 한식 인식",
+  "tags": [
+    "meal:LUNCH",
+    "cuisine:korean",
+    "items:3",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/01-doenjang-jjigae-multigrain-rice.jpg",
+  "rawText": null,
+  "mealType": "LUNCH",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "된장찌개",
+        "차돌된장찌개"
+      ],
+      "amountG": 350
+    },
+    {
+      "names": [
+        "잡곡밥",
+        "혼합곡밥",
+        "현미잡곡밥"
+      ],
+      "amountG": 200
+    },
+    {
+      "names": [
+        "깍두기",
+        "무김치"
+      ],
+      "amountG": 50
+    }
+  ],
+  "mayAlsoContain": [
+    "청양고추"
+  ],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  }
+}

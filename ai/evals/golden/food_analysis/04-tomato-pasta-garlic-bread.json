@@ -1,0 +1,40 @@
+{
+  "id": "04-tomato-pasta-garlic-bread",
+  "description": "토마토 파스타 + 마늘빵 — 양식",
+  "tags": [
+    "meal:DINNER",
+    "cuisine:western",
+    "items:2",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/04-tomato-pasta-garlic-bread.jpg",
+  "rawText": null,
+  "mealType": "DINNER",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "토마토파스타",
+        "토마토스파게티",
+        "스파게티"
+      ],
+      "amountG": 350
+    },
+    {
+      "names": [
+        "마늘빵",
+        "갈릭브레드"
+      ],
+      "amountG": 40
+    }
+  ],
+  "mayAlsoContain": [
+    "파슬리",
+    "파마산치즈"
+  ],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  }
+}

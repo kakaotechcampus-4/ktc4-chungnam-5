@@ -1,0 +1,37 @@
+{
+  "id": "03-convenience-triangle-gimbap-cup-noodle",
+  "description": "편의점 삼각김밥 + 컵라면 — 포장 음식",
+  "tags": [
+    "meal:LUNCH",
+    "place:convenience",
+    "items:2",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/03-convenience-triangle-gimbap-cup-noodle.jpg",
+  "rawText": null,
+  "mealType": "LUNCH",
+  "stage": "INITIAL",
+  "expected": [
+    {
+      "names": [
+        "삼각김밥",
+        "참치마요삼각김밥",
+        "참치마요 삼각김밥"
+      ],
+      "amountG": 110
+    },
+    {
+      "names": [
+        "컵라면",
+        "라면"
+      ],
+      "amountG": 380
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  }
+}

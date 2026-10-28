@@ -1,0 +1,26 @@
+{
+  "id": "12-medication-pen",
+  "description": "주사 펜과 상자 사진 — 음식으로 기록하지 않는다. 안전 판정은 팀 합의 필요",
+  "tags": [
+    "meal:SNACK",
+    "gap:medication",
+    "agreement:needed",
+    "items:0",
+    "photo:needed"
+  ],
+  "imageUrl": "https://example.invalid/golden/kyj3274/12-medication-pen.jpg",
+  "rawText": null,
+  "mealType": "SNACK",
+  "stage": "INITIAL",
+  "expected": [],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "사진 필요",
+    "amountG": "촬영한 뒤 음식별로 저울에 재서 채운다"
+  },
+  "expectedSafety": [
+    "SAFE",
+    "BLOCKED"
+  ]
+}
