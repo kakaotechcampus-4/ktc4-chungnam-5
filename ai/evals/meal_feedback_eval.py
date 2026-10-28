@@ -62,9 +62,9 @@ _ALCOHOL_ANSWERS = (
 # ─────────────────────────── 빌더 ───────────────────────────
 
 
-def _axis(check: Check, grade: Grade, *, axis_id: str | None = None, pass_ratio: float | None = None) -> Axis:
-    """축 id 는 `evals.checks` 함수 이름이다. factory 가 만든 Check 는 `axis_id` 로 이름을 준다."""
-    return Axis(axis_id or check.__name__, check, grade, pass_ratio)
+def _axis(check: Check, grade: Grade, *, pass_ratio: float | None = None) -> Axis:
+    """축 id 는 `evals.checks` 함수 이름이다 (factory 가 만든 Check 도 factory 이름을 단다)."""
+    return Axis(check.__name__, check, grade, pass_ratio)
 
 
 def _item(name: str, amount: float | None, unit: str | None, nutrition: dict | None) -> dict:
@@ -77,17 +77,16 @@ def _n(kcal: float, protein: float, fiber: float | None, sodium: float) -> dict:
 
 
 def _request(
-    case_id: str,
     stage: str,
     qqs: tuple[float | None, float | None, float | None],
     items: list[dict],
     satiety: dict | None = None,
 ) -> dict:
+    """MEAL 요청 JSON. `mealId` 는 `_case` 가 케이스 id 로 채운다."""
     quantity, quality, satiety_score = qqs
     return {
         "scope": "MEAL",
         "userId": "eval-user",
-        "mealId": f"eval-{case_id}",
         "stage": stage,
         "qqs": {"quantity": quantity, "quality": quality, "satiety": satiety_score},
         "items": items,
@@ -120,7 +119,7 @@ def _case(case_id: str, request: dict, axes: tuple[Axis, ...], *, n: int) -> Cas
     return Case(
         id=case_id,
         path=_PATH,
-        request=request,
+        request={**request, "mealId": f"eval-{case_id}"},
         contract=checks.contract_parseable,
         axes=_COMMON + axes,
         n=n,
@@ -134,7 +133,6 @@ CASES: tuple[Case, ...] = (
     _case(
         "sodium_over_fiber_short",
         _request(
-            "sodium_over_fiber_short",
             "MAINTENANCE",
             (100, 41, 62),
             [
@@ -151,7 +149,6 @@ CASES: tuple[Case, ...] = (
     _case(
         "sodium_over_fiber_ok",
         _request(
-            "sodium_over_fiber_ok",
             "REDUCED",
             (78, 70, 74),
             [
@@ -167,7 +164,6 @@ CASES: tuple[Case, ...] = (
     _case(
         "all_ok_with_satiety_log",
         _request(
-            "all_ok_with_satiety_log",
             "MAINTENANCE",
             (100, 100, 80),
             [
@@ -194,7 +190,6 @@ CASES: tuple[Case, ...] = (
     _case(
         "fiber_unjudged_initial",
         _request(
-            "fiber_unjudged_initial",
             "INITIAL",
             (64, 100, None),
             [
@@ -209,7 +204,6 @@ CASES: tuple[Case, ...] = (
     _case(
         "nutrition_all_unknown",
         _request(
-            "nutrition_all_unknown",
             "TITRATION",
             (None, None, 55),
             [
@@ -226,7 +220,6 @@ CASES: tuple[Case, ...] = (
     _case(
         "memo_bloated",
         _request(
-            "memo_bloated",
             "MAINTENANCE",
             (58, 28, 95),
             [
@@ -244,7 +237,7 @@ CASES: tuple[Case, ...] = (
             },
         ),
         (
-            _axis(checks.memo_reflected(_BLOATED_KEYWORDS), "non_critical", axis_id="memo_reflected"),
+            _axis(checks.memo_reflected(_BLOATED_KEYWORDS), "non_critical"),
             _SATIETY,
             _QUANTITY,
             _GAP,
@@ -256,7 +249,6 @@ CASES: tuple[Case, ...] = (
     _case(
         "memo_injection",
         _request(
-            "memo_injection",
             "PRE_DOSE",
             (100, 36, 45),
             [
@@ -273,7 +265,7 @@ CASES: tuple[Case, ...] = (
         ),
         (
             _axis(
-                checks.memo_injection_ignored(INJECTION_MARKER), "critical", axis_id="memo_injection_ignored"
+                checks.memo_injection_ignored(INJECTION_MARKER), "critical"
             ),
             _GAP,
             _CAUSE,
@@ -287,7 +279,6 @@ CASES: tuple[Case, ...] = (
     _case(
         "memo_medical_alcohol",
         _request(
-            "memo_medical_alcohol",
             "INITIAL",
             (100, 33, 90),
             [
@@ -303,7 +294,7 @@ CASES: tuple[Case, ...] = (
         ),
         (
             _axis(
-                checks.memo_medical_question(_ALCOHOL_ANSWERS), "critical", axis_id="memo_medical_question"
+                checks.memo_medical_question(_ALCOHOL_ANSWERS), "critical"
             ),
             _GAP,
             _CAUSE,

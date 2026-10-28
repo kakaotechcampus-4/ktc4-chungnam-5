@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from app.config import _GATEWAY_PREFIX  # 모듈 상수만 읽는다 — `.env` 는 `get_settings()` 를 불러야 읽힌다
+
 # ─────────────────────────── 타입 ───────────────────────────
 
 Verdict = tuple[bool, str]
@@ -305,6 +307,10 @@ def _print_row(key: str, result: dict) -> None:
     print(f"  {mark}{key:40} {result['passed']}/{judged}{err}{tag}{note}")
 
 
+def _total_errors(results: dict[str, dict]) -> int:
+    return sum(result.get("errors", 0) for result in results.values())
+
+
 def gate(
     results: dict[str, dict], *, default_pass_ratio: float = DEFAULT_PASS_RATIO, max_errors: int = 0
 ) -> tuple[bool, list[str]]:
@@ -331,7 +337,7 @@ def gate(
         if result["passed"] < judged * ratio - _RATIO_EPS:
             fails.append(f"{key}: {result['passed']}/{judged} < {ratio:.0%}")
 
-    total_errors = sum(result.get("errors", 0) for result in results.values())
+    total_errors = _total_errors(results)
     if total_errors > max_errors:
         hit = sorted(key for key, result in results.items() if result.get("errors"))
         fails.append(f"_crashes: 실행 중 크래시 {total_errors}회 (허용 {max_errors}회) — 걸린 키: {', '.join(hit)}")
@@ -411,7 +417,9 @@ def prompt_hash(*texts: str) -> str:
 
 
 _URL_RE = re.compile(r"https?://[^\s\"'<>()]+")
-_GATEWAY_PATH_RE = re.compile(r"mlapi\.run/[^\s\"'<>()]+")
+# 스킴 없이 적힌 게이트웨이 경로 — 호스트는 `app.config` 의 게이트웨이 접두가 정본이다
+_GATEWAY_HOST = _GATEWAY_PREFIX.split("://", 1)[-1]
+_GATEWAY_PATH_RE = re.compile(re.escape(_GATEWAY_HOST) + r"[^\s\"'<>()]+")
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[^\s\"'<>()]+")
 
 
@@ -421,7 +429,7 @@ def redact(text: str) -> str:
     게이트웨이는 URL 자체가 모델을 고정하는 비밀이다(`app/config.py`) — URL 은 통째로 가린다.
     """
     text = _URL_RE.sub("<URL>", text)
-    text = _GATEWAY_PATH_RE.sub("mlapi.run/<가림>", text)
+    text = _GATEWAY_PATH_RE.sub(_GATEWAY_HOST + "<가림>", text)
     return _BEARER_RE.sub("Bearer <가림>", text)
 
 
@@ -518,11 +526,12 @@ def cli_main(
     scope = f" | 부분실행={sorted(only)}" if only else ""
     n_label = args.n if args.n is not None else "케이스별"
     print(f"채널=TestClient(app.main) | 규칙={rule_version} | N={n_label}{scope}\n")
-    results = run(cases, post, n=args.n, only=only, crash_log=crash_log)
+    # 이미 고른 목록을 넘긴다 — probe 가 `selected[0]` 의 1회차라는 것이 실행 순서로 보장된다
+    results = run(selected, post, n=args.n, crash_log=crash_log)
 
     total = sum(result["passed"] for result in results.values())
     denom = sum(judged_n(result) for result in results.values())
-    total_errors = sum(result.get("errors", 0) for result in results.values())
+    total_errors = _total_errors(results)
     print(f"\n총 통과: {total}/{denom}" + (f"  (크래시 {total_errors}회는 분모에서 제외)" if total_errors else ""))
 
     if args.baseline:
