@@ -1,0 +1,31 @@
+{
+  "id": "01-kimchi-jjigae-pot",
+  "description": "여러 인분짜리 냄비에 담긴 삼채 김치찌개. 소품(삼채 뿌리 · 항아리)을 음식으로 내지 않는지",
+  "tags": [
+    "meal:DINNER",
+    "cuisine:korean",
+    "shape:pot",
+    "distractor:props"
+  ],
+  "imageUrl": "https://www.nongsaro.go.kr/cms_contents/mgnNew/978-89-480-5631-0/978-89-480-5631-0_A_50.jpg",
+  "mealType": "DINNER",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "김치찌개",
+        "삼채김치찌개",
+        "돼지고기김치찌개"
+      ],
+      "amountG": 847.0
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "농촌진흥청 메뉴젠(농사로)",
+    "foodCode": "D065019",
+    "foodName": "삼채 김치찌개",
+    "amountG": "fd_Wgh 후보값 — 사진 속 양인지 확인 안 됨"
+  }
+}

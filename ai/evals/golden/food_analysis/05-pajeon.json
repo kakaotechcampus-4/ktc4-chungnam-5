@@ -1,0 +1,29 @@
+{
+  "id": "05-pajeon",
+  "description": "접시의 파전 한 장. 뒤의 찻잔 · 주전자를 음식으로 내지 않는지",
+  "tags": [
+    "meal:DINNER",
+    "cuisine:korean",
+    "distractor:props"
+  ],
+  "imageUrl": "https://www.nongsaro.go.kr/cms_contents/mgnNew/978-89-480-1254-5/978-89-480-1254-5_A_079.jpg",
+  "mealType": "DINNER",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "파전",
+        "쪽파전"
+      ],
+      "amountG": 385.0
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "농촌진흥청 메뉴젠(농사로)",
+    "foodCode": "D093035",
+    "foodName": "파전",
+    "amountG": "fd_Wgh 후보값 — 사진 속 양인지 확인 안 됨"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "06-grilled-mackerel",
+  "description": "고등어구이 두 쪽과 곁들인 파채 종지 — 파채는 내도 되고 안 내도 된다",
+  "tags": [
+    "meal:DINNER",
+    "cuisine:korean",
+    "side:garnish"
+  ],
+  "imageUrl": "https://www.nongsaro.go.kr/cms_contents/mgnNew/978-89-480-1254-5/978-89-480-1254-5_A_135.jpg",
+  "mealType": "DINNER",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "고등어구이",
+        "간고등어구이",
+        "고등어자반구이"
+      ],
+      "amountG": 316.0
+    }
+  ],
+  "mayAlsoContain": [
+    "파채",
+    "파무침",
+    "대파채"
+  ],
+  "amountVerified": false,
+  "source": {
+    "provider": "농촌진흥청 메뉴젠(농사로)",
+    "foodCode": "D081042",
+    "foodName": "고등어구이(간고등어구이)",
+    "amountG": "fd_Wgh 후보값 — 사진 속 양인지 확인 안 됨"
+  }
+}

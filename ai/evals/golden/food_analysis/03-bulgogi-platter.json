@@ -1,0 +1,31 @@
+{
+  "id": "03-bulgogi-platter",
+  "description": "큰 접시의 언양불고기(다진 소고기를 납작하게 구운 것)",
+  "tags": [
+    "meal:DINNER",
+    "cuisine:korean",
+    "shape:platter"
+  ],
+  "imageUrl": "https://www.nongsaro.go.kr/cms_contents/mgnNew/978-89-480-0772-5/978-89-480-0772-5_A_082.jpg",
+  "mealType": "DINNER",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "불고기",
+        "언양불고기",
+        "소불고기",
+        "바싹불고기"
+      ],
+      "amountG": 693.0
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "농촌진흥청 메뉴젠(농사로)",
+    "foodCode": "D102035",
+    "foodName": "언양불고기",
+    "amountG": "fd_Wgh 후보값 — 사진 속 양인지 확인 안 됨"
+  }
+}

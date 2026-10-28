@@ -1,0 +1,30 @@
+{
+  "id": "02-sundubu-jjigae",
+  "description": "1인분 그릇의 바지락 순두부찌개",
+  "tags": [
+    "meal:LUNCH",
+    "cuisine:korean",
+    "shape:bowl"
+  ],
+  "imageUrl": "https://www.nongsaro.go.kr/cms_contents/mgnNew/978-89-480-1254-5/978-89-480-1254-5_A_017.jpg",
+  "mealType": "LUNCH",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "순두부찌개",
+        "해물순두부찌개",
+        "바지락순두부찌개"
+      ],
+      "amountG": 363.1
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "농촌진흥청 메뉴젠(농사로)",
+    "foodCode": "D065021",
+    "foodName": "순두부찌개",
+    "amountG": "fd_Wgh 후보값 — 사진 속 양인지 확인 안 됨"
+  }
+}

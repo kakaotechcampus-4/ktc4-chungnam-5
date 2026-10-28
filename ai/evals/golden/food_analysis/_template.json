@@ -1,0 +1,43 @@
+{
+  "id": "01-kimchi-jjigae-rice",
+  "description": "한식 한 상. 김치찌개 · 공깃밥 · 계란말이 — 반찬까지 빠짐없이 찾는지",
+  "tags": [
+    "meal:LUNCH",
+    "cuisine:korean",
+    "items:3"
+  ],
+  "imageUrl": "https://example.invalid/golden/01-kimchi-jjigae-rice.jpg",
+  "mealType": "LUNCH",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "김치찌개",
+        "돼지고기김치찌개"
+      ],
+      "amountG": 400
+    },
+    {
+      "names": [
+        "공깃밥",
+        "쌀밥",
+        "흰쌀밥"
+      ],
+      "amountG": 210
+    },
+    {
+      "names": [
+        "계란말이",
+        "달걀말이"
+      ],
+      "amountG": 80
+    }
+  ],
+  "amountTolerance": 0.3,
+  "mayAlsoContain": [],
+  "amountVerified": true,
+  "source": {
+    "provider": "직접 촬영",
+    "amountG": "음식별로 저울에 잰 값"
+  }
+}

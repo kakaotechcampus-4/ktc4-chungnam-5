@@ -1,0 +1,29 @@
+{
+  "id": "04-gungjung-tteokbokki",
+  "description": "간장 양념의 궁중떡볶이 — 고추장 떡볶이와 성분이 달라 '떡볶이' 는 허용하지 않는다",
+  "tags": [
+    "meal:LUNCH",
+    "cuisine:korean",
+    "fine_grained"
+  ],
+  "imageUrl": "https://www.nongsaro.go.kr/cms_contents/mgnNew/978-89-480-3061-7/978-89-480-3061-7_A_053.jpg",
+  "mealType": "LUNCH",
+  "stage": "MAINTENANCE",
+  "expected": [
+    {
+      "names": [
+        "궁중떡볶이",
+        "간장떡볶이"
+      ],
+      "amountG": 409.0
+    }
+  ],
+  "mayAlsoContain": [],
+  "amountVerified": false,
+  "source": {
+    "provider": "농촌진흥청 메뉴젠(농사로)",
+    "foodCode": "D104013",
+    "foodName": "궁중떡볶이",
+    "amountG": "fd_Wgh 후보값 — 사진 속 양인지 확인 안 됨"
+  }
+}
