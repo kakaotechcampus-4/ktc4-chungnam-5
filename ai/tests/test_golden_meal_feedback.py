@@ -37,7 +37,7 @@ def _failed(case, response) -> set[str]:
     return {
         r.check
         for r in mf.check_response(case, response, COMMON)
-        if not r.passed and r.check not in mf.SIGNAL_CHECKS
+        if not r.passed and r.check not in mf.OBSERVE_CHECKS and r.check != "signal_must_not_contain"
     }
 
 
@@ -58,7 +58,8 @@ def test_case_format(path):
 def test_common_checks_match_code():
     """`_common.json` 에 적은 검사와 코드의 검사가 같아야 문서가 거짓말을 안 한다."""
     assert set(COMMON["checks"]) == set(mf.COMMON_CHECKS)
-    assert {spec["grade"] for spec in COMMON["checks"].values()} <= set(golden.GRADES) - {"observe"}
+    assert {spec["grade"] for spec in COMMON["checks"].values()} <= set(golden.GRADES)
+    assert {n for n, spec in COMMON["checks"].items() if spec["grade"] == "observe"} == set(mf.OBSERVE_CHECKS)
 
 
 def test_every_grade_appears():
@@ -89,6 +90,13 @@ def test_reference_passes(case):
     assert _failed(case, case["reference"]) == set()
 
 
+@pytest.mark.parametrize("case", CASES, ids=IDS)
+def test_reference_has_no_observed_flags(case):
+    """관측 축도 모범 답에서는 걸리지 않아야 키워드 목록이 맞는지 알 수 있다."""
+    flagged = [r.check for r in mf.check_response(case, case["reference"], COMMON) if not r.passed]
+    assert flagged == []
+
+
 @pytest.mark.parametrize(("case", "index"), COUNTEREXAMPLES, ids=COUNTEREXAMPLE_IDS)
 def test_counterexample_fails_only_where_declared(case, index):
     """적은 검사에서만 실패해야 한다. 더 많이 실패하면 검사가 너무 넓어 맞는 답도 떨어뜨린다."""
@@ -99,7 +107,7 @@ def test_counterexample_fails_only_where_declared(case, index):
 def test_every_common_check_has_counterexample():
     """반례가 없는 검사는 실패를 잡는지 확인한 적이 없는 검사다."""
     covered = {check for case in CASES for bad in case["counterexamples"] for check in bad["failsOn"]}
-    assert set(mf.COMMON_CHECKS) - covered == set()
+    assert set(mf.COMMON_CHECKS) - set(mf.OBSERVE_CHECKS) - covered == set()
 
 
 # ─────────────────────────── 규칙 동기화 ───────────────────────────

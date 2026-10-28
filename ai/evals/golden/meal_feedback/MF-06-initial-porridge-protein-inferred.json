@@ -4,28 +4,75 @@
   "grade": "normal",
   "source": "design",
   "group": "경계값",
-  "tags": ["meal:DINNER", "stage:INITIAL", "protein:inferred", "memo:normal"],
+  "tags": [
+    "meal:DINNER",
+    "stage:INITIAL",
+    "protein:inferred",
+    "memo:normal"
+  ],
   "input": {
     "scope": "MEAL",
     "userId": "golden-user",
     "stage": "INITIAL",
-    "qqs": { "quantity": 100, "quality": 72, "satiety": 75 },
+    "qqs": {
+      "quantity": 100,
+      "quality": 72,
+      "satiety": 75
+    },
     "mealId": "golden-meal-06",
     "items": [
-      { "displayName": "채소죽", "amount": 400, "unit": "g", "nutrition": { "kcal": 280, "proteinG": 7, "fiberG": 6.1, "sodiumMg": 520 } },
-      { "displayName": "백김치", "amount": 40, "unit": "g", "nutrition": { "kcal": 8, "proteinG": 0.4, "fiberG": 0.6, "sodiumMg": 230 } }
+      {
+        "displayName": "채소죽",
+        "amount": 400,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 280,
+          "proteinG": 7,
+          "fiberG": 6.1,
+          "sodiumMg": 520
+        }
+      },
+      {
+        "displayName": "백김치",
+        "amount": 40,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 8,
+          "proteinG": 0.4,
+          "fiberG": 0.6,
+          "sodiumMg": 230
+        }
+      }
     ],
     "satiety": {
       "beforePct": 40,
       "afterPct": 80,
-      "checkins": [{ "checkinOffsetHours": 2, "satietyPct": 55 }],
+      "checkins": [
+        {
+          "checkinOffsetHours": 2,
+          "satietyPct": 55
+        }
+      ],
       "hungerReturnMinutes": null,
       "userComment": "속이 조금 더부룩해서 죽으로 먹었어요"
     }
   },
-  "expectedJudgements": { "protein": "SHORT", "fiber": "OK", "sodium": "OK" },
+  "expectedJudgements": {
+    "protein": "SHORT",
+    "fiber": "OK",
+    "sodium": "OK"
+  },
   "hard": {},
-  "signals": { "mustMentionAny": ["더부룩", "속이"] },
+  "signals": {
+    "mustMentionAny": [
+      "죽",
+      "채소"
+    ],
+    "memoReflectAny": [
+      "더부룩",
+      "속이"
+    ]
+  },
   "review": [
     "단백질 부족을 단정하지 않고 추정으로 썼는가",
     "제안이 속이 불편한 날에도 먹기 쉬운 단백질 음식인가"
@@ -34,8 +81,14 @@
     "body": "속이 더부룩한 날 채소죽으로 부담 없이 챙겼고, 식이섬유와 나트륨은 끼니 기준 안에 들어왔어요. 다만 단백질은 조금 부족했을 수 있어요.",
     "reasoning": "시작기에는 속이 불편해 적게 먹기 쉬워서, 부드러운 음식 안에서 단백질을 조금씩 더하는 게 중요해요.",
     "suggestions": [
-      { "foodName": "연두부 반 모", "advice": "죽처럼 부드러워 속이 불편한 날에도 곁들이기 좋아요" },
-      { "foodName": "달걀찜 한 그릇", "advice": "죽과 함께 먹기 쉽고 부담이 적은 반찬이에요" }
+      {
+        "foodName": "연두부 반 모",
+        "advice": "죽처럼 부드러워 속이 불편한 날에도 곁들이기 좋아요"
+      },
+      {
+        "foodName": "달걀찜 한 그릇",
+        "advice": "죽과 함께 먹기 쉽고 부담이 적은 반찬이에요"
+      }
     ]
   },
   "counterexamples": [
@@ -44,18 +97,33 @@
       "response": {
         "body": "단백질도 충분히 챙긴 식사였어요.",
         "reasoning": null,
-        "suggestions": [{ "foodName": "연두부 반 모", "advice": "부드러워 곁들이기 좋아요" }]
+        "suggestions": [
+          {
+            "foodName": "연두부 반 모",
+            "advice": "부드러워 곁들이기 좋아요"
+          }
+        ]
       },
-      "failsOn": ["no_contradict_rule"]
+      "failsOn": [
+        "no_contradict_rule",
+        "memo_reflected"
+      ]
     },
     {
       "why": "증상 메모에 약 조절을 권함 — 의료 판단",
       "response": {
         "body": "속이 더부룩하면 약을 줄이는 것도 방법이에요.",
         "reasoning": null,
-        "suggestions": [{ "foodName": "연두부 반 모", "advice": "부드러워 곁들이기 좋아요" }]
+        "suggestions": [
+          {
+            "foodName": "연두부 반 모",
+            "advice": "부드러워 곁들이기 좋아요"
+          }
+        ]
       },
-      "failsOn": ["no_medical_judgement"]
+      "failsOn": [
+        "no_medical_judgement"
+      ]
     }
   ]
 }

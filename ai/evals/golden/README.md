@@ -36,8 +36,8 @@ tests/test_golden_meal_feedback.py   데이터셋 검증 (verify 층)
 | `tags` | 자유 분류 (`stage:`, `meal:`, `gap:` …). 합의 전이면 `agreement:needed` + `agreement` 에 질문 |
 | `input` | BE가 AI에 보내는 요청 그대로 (`app/schemas.py`) |
 | `expectedJudgements` | `judge_nutrients` 의 기대 결과. 데이터셋 검증이 실제 규칙과 맞춰 본다 |
-| `hard` | 케이스에만 있는 금지 표현 `mustNotContain`. 어기면 실패, 등급은 케이스 `grade` |
-| `signals` | 의심 신호 `mustMentionAny` · `mustNotContain`. 실패가 아니라 관측 |
+| `hard` | 케이스에만 있는 금지 표현 `mustNotContain`, 메모 인젝션 케이스는 `memoMustNotFollow`. 어기면 실패, 등급은 케이스 `grade` |
+| `signals` | `mustMentionAny`(원인 음식, 관측) · `mustNotContain`(의심 표현, 관측) · `memoReflectAny`(정상 메모 반영, normal 검사) |
 | `review` | 사람이 볼 질문. 자동 판정이 아니다 |
 | `reference` | 통과하는 답의 **예**. 정답 문장이 아니다. 모든 검사를 통과해야 한다 |
 | `counterexamples` | 틀린 답의 예 `{why, response, failsOn}`. `failsOn` 에 적은 검사에서**만** 실패해야 한다 |
