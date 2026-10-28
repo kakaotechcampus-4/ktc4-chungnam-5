@@ -9,6 +9,7 @@ import 'daily_condition_popup.dart';
 import 'feedback_branch_popup.dart';
 import 'meal_delete_confirm_popup.dart';
 import 'satiety_checkin_popup.dart';
+import 'suggestion_replace_popup.dart';
 
 /// 앱의 팝업. [priority] 가 작을수록 먼저 띄운다.
 enum AppPopup {
@@ -17,6 +18,9 @@ enum AppPopup {
 
   /// 피드백 탭의 단기·장기 분기. 삭제 확인처럼 방금 누른 탭에 대한 답이다.
   feedbackBranch(0),
+
+  /// 챗봇 카드 "이걸로 바꾸기" 확인. 방금 누른 버튼에 대한 답이다.
+  suggestionReplace(0),
 
   /// 사후 포만감 체크인. 게이지 탭·알림처럼 사용자가 특정 끼니를 골라 연
   /// 요청이라 하루 한 번 팝업보다 먼저 띄운다.
@@ -90,6 +94,21 @@ class PopupGate {
       id: mealId,
       show: (c) =>
           _showDialog(c, MealDeleteConfirmPopup(description: description)),
+    );
+  }
+
+  /// 챗봇 카드로 다음 끼니 추천을 바꿀지 확인한다. 바꾸기를 골랐으면 `true`.
+  /// 같은 카드([foodCardId])를 연달아 눌러도 확인창은 하나만 뜬다.
+  Future<bool> confirmSuggestionReplace(
+    BuildContext context, {
+    required String foodCardId,
+    required String foodName,
+  }) {
+    return _request(
+      context,
+      AppPopup.suggestionReplace,
+      id: foodCardId,
+      show: (c) => _showDialog(c, SuggestionReplacePopup(foodName: foodName)),
     );
   }
 

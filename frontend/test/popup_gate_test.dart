@@ -162,4 +162,30 @@ void main() {
     expect(await branch, FeedbackKind.long);
     expect(gate.isShowing, isFalse);
   });
+
+  testWidgets('replacing a suggestion asks once and returns the choice', (
+    WidgetTester tester,
+  ) async {
+    final context = await _pumpHost(tester);
+    final gate = PopupGate();
+
+    final first = gate.confirmSuggestionReplace(
+      context,
+      foodCardId: 'card_1',
+      foodName: '두부 반 모',
+    );
+    // 같은 카드를 연달아 눌러도 확인창은 하나다.
+    final second = gate.confirmSuggestionReplace(
+      context,
+      foodCardId: 'card_1',
+      foodName: '두부 반 모',
+    );
+    await _settle(tester);
+    expect(find.text('다음 끼니 추천을 바꿀까요?'), findsOneWidget);
+
+    await tester.tap(find.text('바꾸기'));
+    await _settle(tester);
+    expect(await first, isTrue);
+    expect(await second, isTrue);
+  });
 }

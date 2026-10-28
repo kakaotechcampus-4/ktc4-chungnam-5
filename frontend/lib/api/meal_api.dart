@@ -599,6 +599,23 @@ class MealApiService {
     return MealFeedback.fromJson(result.dataMap);
   }
 
+  /// `PUT /meals/{mealId}/feedback/suggestions` — 챗봇 카드 한 장으로 이 끼니의
+  /// 다음 끼니 추천을 **통째로** 바꾼다(본문·점수는 그대로).
+  ///
+  /// - 404 `NOT_FOUND`: 끼니나 카드가 없다(다른 끼니 대화의 카드 포함).
+  /// - 409 `NOT_CONFIRMED`: 끼니가 확정 상태가 아니다.
+  /// - 409 `CONFLICT`: 카드가 끼니를 고치기 전에 만들어졌거나 피드백이 아직 준비 전이다.
+  Future<MealFeedback> replaceSuggestion(
+    String mealId, {
+    required String foodCardId,
+  }) async {
+    final result = await _client.put(
+      '/meals/$mealId/feedback/suggestions',
+      body: {'foodCardId': foodCardId},
+    );
+    return MealFeedback.fromJson(result.dataMap);
+  }
+
   /// `GET /insights/daily?date=` — [date] 는 KST 날짜.
   Future<DailyFeedback> fetchDailyFeedback(DateTime date) async {
     final result = await _client.get(

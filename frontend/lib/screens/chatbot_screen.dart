@@ -9,6 +9,7 @@ import '../api/chat_api.dart';
 import '../api/meal_api.dart';
 import '../common/api_format.dart';
 import '../common/polling.dart';
+import '../popups/popup_gate.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -72,6 +73,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   /// 대화의 기준 끼니(맥락 줄). 못 받아도 대화는 그대로 쓴다.
   MealDetail? _meal;
 
+  /// "이걸로 바꾸기" 로 다음 끼니 추천이 된 카드. 바꿀 때마다 추천 전체가 그 카드
+  /// 하나로 바뀌므로 하나만 기억한다.
+  String? _chosenCard;
+
+  /// 바꾸는 중인 카드(`PUT .../feedback/suggestions`).
+  String? _replacingCard;
+
   bool get _busy => _sending || _waitingFor != null || _conversation == null;
 
   @override
@@ -113,6 +121,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       _conversation = null;
       _waitingFor = null;
       _lateReply = null;
+      _chosenCard = null;
     });
     _input.clear();
     try {
@@ -230,6 +239,40 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       _waitingFor = null;
       if (done == null) _lateReply = messageId;
     });
+  }
+
+  /// "이걸로 바꾸기" — 확인을 받고 대화의 기준 끼니 추천을 [card] 로 바꾼다.
+  /// 끼니 피드백(7번)을 다시 열면 바뀐 추천이 보인다.
+  Future<void> _replace(ChatFoodCard card) async {
+    final mealId = _conversation?.mealId;
+    if (mealId == null || _replacingCard != null) return;
+    final api = MealApiService(context.read<ApiClient>());
+    final ok = await context.read<PopupGate>().confirmSuggestionReplace(
+      context,
+      foodCardId: card.foodCardId,
+      foodName: card.foodName,
+    );
+    if (!ok || !mounted || _conversation?.mealId != mealId) return;
+    setState(() => _replacingCard = card.foodCardId);
+    String message;
+    try {
+      await api.replaceSuggestion(mealId, foodCardId: card.foodCardId);
+      message = '다음 끼니 추천을 ${card.foodName}(으)로 바꿨어요.';
+      if (mounted) setState(() => _chosenCard = card.foodCardId);
+    } catch (e) {
+      message = switch (e) {
+        ApiException(code: 'CONFLICT') =>
+          '끼니 기록이 바뀌어 이 추천은 쓸 수 없어요. 새 대화를 열어 주세요.',
+        ApiException(code: 'NOT_CONFIRMED') => '확정한 끼니만 추천을 바꿀 수 있어요.',
+        ApiException(code: 'NOT_FOUND') => '끼니 기록을 찾을 수 없어요.',
+        _ => '바꾸지 못했어요. 잠시 후 다시 시도해 주세요.',
+      };
+    }
+    if (!mounted) return;
+    setState(() => _replacingCard = null);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _newChat() {
@@ -396,6 +439,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bubbleMax = math.min(262.0, (constraints.maxWidth - 24) * 0.75);
+        final firstQuestion = messages.indexWhere((m) => m.fromUser);
         return ListView.separated(
           controller: _scroll,
           padding: const EdgeInsets.fromLTRB(
@@ -410,7 +454,15 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             final m = messages[i];
             return m.fromUser
                 ? _UserBubble(text: m.text ?? '', maxWidth: bubbleMax)
-                : _buildReply(m, bubbleMax);
+                : _buildReply(
+                    m,
+                    bubbleMax,
+                    // 첫 질문 전의 카드는 지금 추천을 그대로 옮긴 것이라 바꿀 게 없다.
+                    replaceable:
+                        _conversation?.mealId != null &&
+                        firstQuestion >= 0 &&
+                        i > firstQuestion,
+                  );
           },
         );
       },
@@ -418,7 +470,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 
   /// AI 말 하나. 만드는 중 · 늦어짐 · 실패 · 숨김은 안내 문구로 바꿔 보인다.
-  Widget _buildReply(ChatMessage m, double maxWidth) {
+  /// [replaceable] 이면 카드에 "이걸로 바꾸기" 를 둔다.
+  Widget _buildReply(
+    ChatMessage m,
+    double maxWidth, {
+    bool replaceable = false,
+  }) {
     if (m.isGenerating) {
       final late = m.messageId == _lateReply;
       return _AiBubble(
@@ -445,7 +502,17 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     }
     return _AiBubble(
       text: m.text ?? '',
-      cards: m.foodCards,
+      cards: [
+        for (final c in m.foodCards)
+          _FoodCard(
+            card: c,
+            chosen: c.foodCardId == _chosenCard,
+            onReplace: replaceable && _replacingCard == null
+                ? () => _replace(c)
+                : null,
+            showReplace: replaceable,
+          ),
+      ],
       maxWidth: maxWidth,
     );
   }
@@ -668,7 +735,7 @@ class _AiBubble extends StatelessWidget {
 
   final String text;
   final double maxWidth;
-  final List<ChatFoodCard> cards;
+  final List<Widget> cards;
   final bool muted;
   final String? actionLabel;
   final VoidCallback? onAction;
@@ -718,10 +785,7 @@ class _AiBubble extends StatelessWidget {
                   ),
                   child: Text(label),
                 ),
-              for (final c in cards) ...[
-                const SizedBox(height: 6),
-                _FoodCard(card: c),
-              ],
+              for (final c in cards) ...[const SizedBox(height: 6), c],
             ],
           ),
         ),
@@ -731,10 +795,21 @@ class _AiBubble extends StatelessWidget {
 }
 
 /// 추천 음식 카드 — 음식 이름과 그 음식 100g 에 든 영양소 칩.
+///
+/// [showReplace] 면 아래에 "이걸로 바꾸기" 를 둔다. [onReplace] 가 null 이면(다른 카드를
+/// 바꾸는 중) 누를 수 없다. [chosen] 이면 다음 끼니 추천이 된 카드다.
 class _FoodCard extends StatelessWidget {
-  const _FoodCard({required this.card});
+  const _FoodCard({
+    required this.card,
+    this.showReplace = false,
+    this.onReplace,
+    this.chosen = false,
+  });
 
   final ChatFoodCard card;
+  final bool showReplace;
+  final VoidCallback? onReplace;
+  final bool chosen;
 
   @override
   Widget build(BuildContext context) {
@@ -757,6 +832,30 @@ class _FoodCard extends StatelessWidget {
             const SizedBox(height: 8),
             NutrientAmountChips(nutrients: card.effects),
           ],
+          if (chosen)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '✓ 다음 끼니 추천으로 정했어요',
+                style: AppTypography.emphasis.copyWith(
+                  fontSize: 10,
+                  color: AppColors.quality,
+                ),
+              ),
+            )
+          else if (showReplace)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: onReplace,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  minimumSize: const Size(0, 30),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('이걸로 바꾸기'),
+              ),
+            ),
         ],
       ),
     );

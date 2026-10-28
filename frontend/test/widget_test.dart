@@ -269,6 +269,122 @@ void main() {
     expect(polls, 2);
   });
 
+  testWidgets('a chat card replaces the next meal suggestion', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    const mealId = '00000000-0000-0000-0000-000000000456';
+    Map<String, Object?> card(String id, String name) => {
+      'foodCardId': id,
+      'foodName': name,
+      'effects': <Object?>[],
+    };
+    final api = FakeApi()
+      ..on(
+        'GET /chat/conversations/latest',
+        (_) => (
+          200,
+          fakeOk({
+            'conversationId': 'c1',
+            'mealId': mealId,
+            'messages': [
+              _chatMessage(
+                'intro',
+                text: '다음 끼니로 이 음식은 어떤가요?',
+                foodCards: [card('f1', '두부 반 모')],
+              ),
+              _chatMessage('u1', role: 'USER', text: '다른 거 없어?'),
+              _chatMessage(
+                'a1',
+                text: '이건 어때요?',
+                foodCards: [card('f2', '닭가슴살 샐러드')],
+              ),
+            ],
+          }),
+        ),
+      )
+      ..on(
+        'PUT /meals/{meal_id}/feedback/suggestions',
+        (_) => (
+          200,
+          fakeOk({
+            'feedbackStatus': 'READY',
+            'summary': null,
+            'suggestions': <Object?>[],
+            'safetyStatus': 'SAFE',
+          }),
+        ),
+      );
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AI'));
+    await _settle(tester);
+
+    // 첫 말의 카드는 지금 추천 그대로라 버튼이 없고, 질문 뒤 카드에만 있다.
+    expect(find.text('이걸로 바꾸기'), findsOneWidget);
+    await tester.tap(find.text('이걸로 바꾸기'));
+    await _settle(tester);
+    expect(find.text('다음 끼니 추천을 바꿀까요?'), findsOneWidget);
+    await tester.tap(find.text('바꾸기'));
+    await _settle(tester);
+
+    final put = api.requests.singleWhere((r) => r.method == 'PUT');
+    expect(put.path, '/meals/$mealId/feedback/suggestions');
+    expect(put.data, {'foodCardId': 'f2'});
+    expect(find.text('✓ 다음 끼니 추천으로 정했어요'), findsOneWidget);
+    expect(find.text('이걸로 바꾸기'), findsNothing);
+  });
+
+  testWidgets('an outdated chat card explains why it cannot replace', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final api = FakeApi()
+      ..on(
+        'GET /chat/conversations/latest',
+        (_) => (
+          200,
+          fakeOk({
+            'conversationId': 'c1',
+            'mealId': '00000000-0000-0000-0000-000000000456',
+            'messages': [
+              _chatMessage('u1', role: 'USER', text: '다른 거 없어?'),
+              _chatMessage(
+                'a1',
+                text: '이건 어때요?',
+                foodCards: [
+                  {
+                    'foodCardId': 'f2',
+                    'foodName': '닭가슴살 샐러드',
+                    'effects': <Object?>[],
+                  },
+                ],
+              ),
+            ],
+          }),
+        ),
+      )
+      ..on(
+        'PUT /meals/{meal_id}/feedback/suggestions',
+        (_) => (409, fakeError('CONFLICT')),
+      );
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AI'));
+    await _settle(tester);
+
+    await tester.tap(find.text('이걸로 바꾸기'));
+    await _settle(tester);
+    await tester.tap(find.text('바꾸기'));
+    await _settle(tester);
+
+    expect(find.textContaining('새 대화를 열어 주세요'), findsOneWidget);
+    expect(find.text('✓ 다음 끼니 추천으로 정했어요'), findsNothing);
+    expect(find.text('이걸로 바꾸기'), findsOneWidget);
+  });
+
   testWidgets('a medical question gets the counselling notice', (
     WidgetTester tester,
   ) async {
