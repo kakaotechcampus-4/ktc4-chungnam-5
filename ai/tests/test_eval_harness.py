@@ -244,6 +244,17 @@ def test_r73_compare_marks_key_missing_from_baseline_as_new():
     assert any("c1/new_axis" in line and "신규" in line for line in lines)
 
 
+def test_r73a_compare_marks_key_only_in_baseline_as_removed():
+    """행 73a — baseline 에만 있고 이번 결과에 없는 키는 '제거됨' 줄로 나온다 (게이트 5-2).
+
+    케이스 · 축을 지우면 그 키의 하락이 비교에서 조용히 사라진다. 삭제를 드러내야 회귀가 가려지지 않는다.
+    """
+    base = _baseline({"c1/a1": _r(passed=3, n=3), "c1/a2": _r(passed=3, n=3)})
+    current = {"c1/a1": _r(passed=3, n=3)}
+    lines = compare(current, base, rule_version="v2", prompt_hash="hash-abc")
+    assert any("c1/a2" in line and "제거됨" in line for line in lines)
+
+
 @pytest.mark.parametrize(
     "changed",
     [{"rule_version": "v3", "prompt_hash": "hash-abc"}, {"rule_version": "v2", "prompt_hash": "hash-xyz"}],
@@ -411,6 +422,19 @@ def test_r86_unknown_only_id_is_misuse(tmp_path):
     """행 86 — 알 수 없는 `--only` id 는 오용(2)이고 post 를 만들지도 않는다."""
     post = FakePost(_ok())
     code, factory = _cli(["--only", "nope"], cases=[_case("c1")], post=post, tmp_path=tmp_path)
+    assert code == 2
+    assert factory.calls == 0
+    assert post.calls == []
+
+
+@pytest.mark.parametrize("n", ["0", "-1"], ids=["zero", "negative"])
+def test_r86a_n_below_one_is_misuse(n, tmp_path):
+    """행 86a — `--n` 이 1 미만이면 오용(2)이고 post 를 만들지도 않는다 (게이트 5-3).
+
+    n=0 이면 판정할 회차가 없는데도 미연결 probe 1회가 실제 모델을 불러 크레딧만 쓴다.
+    """
+    post = FakePost(_ok())
+    code, factory = _cli(["--n", n], cases=[_case("c1")], post=post, tmp_path=tmp_path)
     assert code == 2
     assert factory.calls == 0
     assert post.calls == []
