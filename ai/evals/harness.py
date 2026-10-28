@@ -353,6 +353,7 @@ def compare(
     전부 "↑ 3 -> 5" 로 찍혀 개선으로 오독됐다. n 은 케이스별이라 키마다 다를 수 있으므로,
     n 이 다른 키에는 그 키에 경고를 붙이고 통과율로 비교한다.
     규칙 버전 · 프롬프트 해시가 다르면 다른 조건으로 잰 baseline 이라 맨 앞에 경고한다.
+    baseline 에만 있는 키는 "제거됨" 으로 끝에 적는다.
     """
     lines: list[str] = []
     base_rule = baseline_doc.get("rule_version")
@@ -388,6 +389,10 @@ def compare(
             f"{arrow} {key}: {previous['passed']}/{base_judged} ({base_ratio:.0%}) "
             f"-> {result['passed']}/{cur_judged} ({cur_ratio:.0%})"
         )
+    # baseline 에만 있는 키 — 케이스 · 축을 지우면 그 키의 하락이 비교에서 조용히 사라진다
+    for key, previous in base.items():
+        if key not in current:
+            lines.append(f"- {key}: (제거됨) baseline {previous['passed']}/{judged_n(previous)} — 이번 결과에 없다")
     return lines
 
 
@@ -438,7 +443,7 @@ def redact(text: str) -> str:
 
 def _parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="eval — 실제 모델 N회 실행 → 통과율 → baseline 비교 → 게이트")
-    ap.add_argument("--n", type=int, default=None, help="케이스당 반복 횟수. 주면 케이스별 n 을 덮어쓴다")
+    ap.add_argument("--n", type=int, default=None, help="케이스당 반복 횟수(1 이상). 주면 케이스별 n 을 덮어쓴다")
     ap.add_argument(
         "--pass-ratio", type=float, default=DEFAULT_PASS_RATIO, help="자기 임계가 없는 non-critical 축의 합격 통과율"
     )
@@ -490,6 +495,9 @@ def cli_main(
     순서: 오용 검사 → 키 확인 → 미연결 probe → 실행 → 비교 → 게이트 → 저장.
     """
     args = _parser().parse_args(argv)
+    if args.n is not None and args.n < 1:
+        print(f"--n 은 1 이상이어야 한다 (받은 값 {args.n}).")
+        return 2
 
     only = {case_id.strip() for case_id in args.only.split(",") if case_id.strip()} if args.only else None
     if only:
