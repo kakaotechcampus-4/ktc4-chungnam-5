@@ -1,10 +1,19 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
+import '../api/api_exception.dart';
+import '../api/chat_api.dart';
+import '../api/meal_api.dart';
+import '../common/api_format.dart';
+import '../common/polling.dart';
+import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'shared_meal_widgets.dart';
 
 /// 빠른 질문 — 입력창 위에 놓는 고정 문구(Figma 화면 12 · AI 코치).
 const List<String> _quickQuestions = [
@@ -13,37 +22,18 @@ const List<String> _quickQuestions = [
   '장기 피드백 보고싶어',
 ];
 
-/// 추천 카드 아래 칩의 종류. 채우는 영양은 초록, 줄이는 양은 빨강2 계열이다.
-enum _TagKind { more, less }
-
-/// AI 답변 안의 추천 카드 한 장.
-class _Suggestion {
-  const _Suggestion({
-    required this.title,
-    required this.tag,
-    required this.kind,
-  });
-
-  final String title;
-  final String tag;
-  final _TagKind kind;
-}
-
-class _ChatMessage {
-  const _ChatMessage.user(this.text) : fromUser = true, suggestions = const [];
-
-  const _ChatMessage.ai(this.text, {this.suggestions = const []})
-    : fromUser = false;
-
-  final bool fromUser;
-  final String text;
-  final List<_Suggestion> suggestions;
-}
-
 /// AI 탭 — AI 코치(챗봇) 화면. Figma 화면 12 · AI 코치(챗봇) 11 · 12.
 ///
-/// 아직 화면만 만든 단계라 서버와 연결하지 않는다. 보낸 말은 화면 안에서만 쌓이고,
-/// "＋ 새 대화" 는 쌓인 말을 비운다. 답변은 [_tempReply] 의 임시 문구다.
+/// 대화는 서버에 있고 사용자당 하나만 열려 있다(챗봇 API A-1 ~ A-4).
+/// - AI 탭을 처음 열면 진행 중인 대화를 이어 본다. 없으면 새로 연다.
+/// - 끼니 피드백(7번)에서 오면([TabState.chatRequest]) 그 끼니로 새 대화를 연다.
+///   서버가 그 끼니의 추천 카드를 첫 말로 넣어 준다. 이미 그 끼니 대화면 이어 본다.
+/// - "＋ 새 대화" 는 끼니를 정하지 않고 연다 — 서버가 최근 확정 끼니로 정한다.
+/// - 보낸 말의 답은 비동기다(202). 답이 `READY`·`FAILED` 가 될 때까지 대화를 다시
+///   조회하고, 그동안은 새 말을 보내지 않는다(서버도 409 로 막는다).
+///
+/// 화면은 탭 묶음([IndexedStack]) 안에서 앱 시작 때 만들어지므로, 서버는 AI 탭이
+/// 처음 보일 때 부른다.
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
 
@@ -54,25 +44,200 @@ class ChatbotScreen extends StatefulWidget {
 class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
-  final List<_ChatMessage> _messages = [];
+
+  late final TabState _tabs = context.read<TabState>();
+  late final ChatApiService _api = ChatApiService(context.read<ApiClient>());
+
+  /// 지금 보이는 대화. 처음 열기 전이나 열다 실패했으면 null.
+  ChatConversation? _conversation;
+
+  /// 대화 열기 상태. null 이면 아직 AI 탭을 연 적이 없다.
+  LoadState? _load;
+
+  /// 마지막 대화 열기. 실패하면 이걸 다시 시도하고, 늦게 온 앞 요청은 버린다.
+  Future<ChatConversation> Function()? _lastOpen;
+
+  /// 처리한 마지막 [TabState.chatRequest].
+  ChatRequest? _handledRequest;
+
+  /// 말을 보내는 중(`POST .../messages`).
+  bool _sending = false;
+
+  /// 답을 기다리는 AI 말 id.
+  String? _waitingFor;
+
+  /// 기다리다 한도를 넘긴 AI 말 id. 그 말풍선에 "다시 확인" 을 둔다.
+  String? _lateReply;
+
+  /// 대화의 기준 끼니(맥락 줄). 못 받아도 대화는 그대로 쓴다.
+  MealDetail? _meal;
+
+  bool get _busy => _sending || _waitingFor != null || _conversation == null;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs.addListener(_onTabsChanged);
+    _onTabsChanged();
+  }
 
   @override
   void dispose() {
+    _tabs.removeListener(_onTabsChanged);
     _input.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  /// 말을 보낸다. 빈 말은 무시한다.
-  void _send(String raw) {
-    final text = raw.trim();
-    if (text.isEmpty) return;
+  void _onTabsChanged() {
+    if (_tabs.currentIndex != TabState.ai) return;
+    final request = _tabs.chatRequest;
+    if (request != null && !identical(request, _handledRequest)) {
+      _handledRequest = request;
+      if (_conversation?.mealId != request.mealId) {
+        _open(() => _api.start(mealId: request.mealId));
+        return;
+      }
+    }
+    if (_load == null) _open(_resumeOrStart);
+  }
+
+  Future<ChatConversation> _resumeOrStart() async =>
+      await _api.fetchLatest() ?? await _api.start();
+
+  /// 대화를 연다.
+  Future<void> _open(Future<ChatConversation> Function() open) async {
+    _lastOpen = open;
     setState(() {
-      _messages
-        ..add(_ChatMessage.user(text))
-        ..add(_tempReply(text));
+      _load = LoadState.loading;
+      _conversation = null;
+      _waitingFor = null;
+      _lateReply = null;
     });
     _input.clear();
+    try {
+      final conversation = await open();
+      if (!mounted || !identical(open, _lastOpen)) return;
+      setState(() {
+        _conversation = conversation;
+        _load = LoadState.ready;
+      });
+      _scrollToEnd();
+      _loadMeal(conversation.mealId);
+      // 이어 본 대화의 마지막 답이 아직 만들어지는 중이면 마저 기다린다.
+      final last = conversation.messages.lastOrNull;
+      if (last != null && !last.fromUser && last.isGenerating) {
+        _waitReply(last.messageId);
+      }
+    } catch (_) {
+      if (mounted && identical(open, _lastOpen)) {
+        setState(() => _load = LoadState.failed);
+      }
+    }
+  }
+
+  Future<void> _loadMeal(String? mealId) async {
+    if (_meal?.mealId == mealId) return;
+    setState(() => _meal = null);
+    if (mealId == null) return;
+    try {
+      final meal = await MealApiService(
+        context.read<ApiClient>(),
+      ).fetchMeal(mealId);
+      if (mounted && _conversation?.mealId == mealId) {
+        setState(() => _meal = meal);
+      }
+    } catch (_) {
+      // 맥락 줄 하나일 뿐이다.
+    }
+  }
+
+  /// 말을 보낸다. 빈 말이나 답을 기다리는 중이면 무시한다.
+  Future<void> _send(String raw) async {
+    final text = raw.trim();
+    final conversation = _conversation;
+    if (text.isEmpty || conversation == null || _busy) return;
+    setState(() => _sending = true);
+    try {
+      final sent = await _api.send(conversation.conversationId, text);
+      if (!mounted || !identical(conversation, _conversation)) return;
+      _input.clear();
+      setState(() {
+        _sending = false;
+        // 다시 조회하기 전까지 보낸 말과 "만들고 있어요" 자리를 먼저 보인다.
+        _conversation = ChatConversation(
+          conversationId: conversation.conversationId,
+          mealId: conversation.mealId,
+          messages: [
+            ...conversation.messages,
+            sent.userMessage,
+            ChatMessage(
+              messageId: sent.assistantMessageId,
+              fromUser: false,
+              status: 'GENERATING',
+              foodCards: const [],
+            ),
+          ],
+        );
+      });
+      _scrollToEnd();
+      _waitReply(
+        sent.assistantMessageId,
+        interval: sent.pollInterval,
+        timeout: sent.timeout,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      final message = e is ApiException && e.code == 'CONFLICT'
+          ? '앞 질문의 답을 아직 만들고 있어요.'
+          : '보내지 못했어요. 잠시 후 다시 시도해 주세요.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  /// [messageId] 답이 다 만들어질 때까지 대화를 다시 조회한다. 기본값은 BE 의
+  /// `CHAT_REPLY_POLL_INTERVAL_MS` · `CHAT_REPLY_TIMEOUT_MS` 다.
+  Future<void> _waitReply(
+    String messageId, {
+    Duration interval = const Duration(seconds: 1),
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final id = _conversation?.conversationId;
+    if (id == null) return;
+    bool active() => mounted && _conversation?.conversationId == id;
+    setState(() {
+      _waitingFor = messageId;
+      _lateReply = null;
+    });
+    final done = await pollUntil<ChatConversation>(
+      fetch: () => _api.fetch(id),
+      isDone: (c) => !(c.messageById(messageId)?.isGenerating ?? false),
+      isActive: active,
+      onResult: (c) {
+        setState(() => _conversation = c);
+        _scrollToEnd();
+      },
+      first: interval,
+      maxInterval: interval,
+      growth: 1,
+      budget: timeout,
+    );
+    if (!active()) return;
+    setState(() {
+      _waitingFor = null;
+      if (done == null) _lateReply = messageId;
+    });
+  }
+
+  void _newChat() {
+    if (_sending) return;
+    _open(() => _api.start());
+  }
+
+  void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
       _scroll.animateTo(
@@ -83,44 +248,29 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     });
   }
 
-  void _newChat() {
-    _input.clear();
-    setState(_messages.clear);
-  }
-
-  /// TODO(API): 서버 연결 전 임시 답변. 연결하면 이 함수를 서버 응답으로 바꾼다.
-  /// 첫 번째 빠른 질문에만 Figma 의 추천 카드 예시를 보여 준다.
-  _ChatMessage _tempReply(String question) {
-    if (question == _quickQuestions.first) {
-      return const _ChatMessage.ai(
-        '저녁엔 이런 음식 어때요?',
-        suggestions: [
-          _Suggestion(
-            title: '쌈채소 한 접시',
-            tag: '식이섬유 +5g',
-            kind: _TagKind.more,
-          ),
-          _Suggestion(
-            title: '밥 반 공기',
-            tag: '양 −120kcal',
-            kind: _TagKind.less,
-          ),
-        ],
-      );
-    }
-    return const _ChatMessage.ai('답변 기능은 아직 연결되지 않았어요.');
-  }
-
   @override
   Widget build(BuildContext context) {
-    final empty = _messages.isEmpty;
+    final messages = _conversation?.messages ?? const <ChatMessage>[];
+    final empty = messages.isEmpty;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(),
-            Expanded(child: empty ? _buildGreeting() : _buildConversation()),
+            ?_buildMealContext(),
+            Expanded(
+              child: switch (_load) {
+                LoadState.failed => _buildOpenFailed(),
+                LoadState.loading => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+                // 아직 AI 탭을 열지 않았다. 숨은 탭에서 스피너를 돌리지 않는다.
+                null => const SizedBox.shrink(),
+                LoadState.ready =>
+                  empty ? _buildGreeting() : _buildConversation(messages),
+              },
+            ),
             _buildQuickQuestions(empty),
             _buildInput(),
             _buildDisclaimer(),
@@ -166,6 +316,53 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     );
   }
 
+  /// 어느 끼니 이야기인지(`10월 14일 점심 · 참치김밥, 삶은 계란`). 끼니 없이 연
+  /// 대화거나 아직 못 받았으면 없다.
+  Widget? _buildMealContext() {
+    final meal = _meal;
+    if (meal == null) return null;
+    final when =
+        '${meal.eatenAt.month}월 ${meal.eatenAt.day}일 '
+        '${mealTypeLabel(meal.mealType)}';
+    final foods = meal.displayName;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        AppSpacing.sm,
+        AppSpacing.screenHorizontal,
+        0,
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          foods.isEmpty ? '$when 기록으로 이야기해요' : '$when 기록으로 이야기해요 · $foods',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOpenFailed() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.screenHorizontal,
+        ),
+        child: RetryBlock(
+          message: '대화를 불러오지 못했어요',
+          onRetry: () => _open(_lastOpen ?? _resumeOrStart),
+        ),
+      ),
+    );
+  }
+
   /// 아직 말이 없을 때: 로고와 첫인사(Figma 11).
   Widget _buildGreeting() {
     return Center(
@@ -195,23 +392,61 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 
   /// 말이 쌓였을 때: 보낸 말은 오른쪽, 답변은 왼쪽(Figma 12).
-  Widget _buildConversation() {
+  Widget _buildConversation(List<ChatMessage> messages) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bubbleMax = math.min(262.0, (constraints.maxWidth - 24) * 0.75);
         return ListView.separated(
           controller: _scroll,
-          padding: const EdgeInsets.fromLTRB(12, AppSpacing.lg, 12, AppSpacing.md),
-          itemCount: _messages.length,
+          padding: const EdgeInsets.fromLTRB(
+            12,
+            AppSpacing.lg,
+            12,
+            AppSpacing.md,
+          ),
+          itemCount: messages.length,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, i) {
-            final m = _messages[i];
+            final m = messages[i];
             return m.fromUser
-                ? _UserBubble(text: m.text, maxWidth: bubbleMax)
-                : _AiBubble(message: m, maxWidth: bubbleMax);
+                ? _UserBubble(text: m.text ?? '', maxWidth: bubbleMax)
+                : _buildReply(m, bubbleMax);
           },
         );
       },
+    );
+  }
+
+  /// AI 말 하나. 만드는 중 · 늦어짐 · 실패 · 숨김은 안내 문구로 바꿔 보인다.
+  Widget _buildReply(ChatMessage m, double maxWidth) {
+    if (m.isGenerating) {
+      final late = m.messageId == _lateReply;
+      return _AiBubble(
+        text: late ? '답이 늦어지고 있어요. 잠시 뒤 다시 확인해 주세요.' : '답을 만들고 있어요…',
+        muted: true,
+        maxWidth: maxWidth,
+        actionLabel: late ? '다시 확인' : null,
+        onAction: late ? () => _waitReply(m.messageId) : null,
+      );
+    }
+    if (m.isFailed) {
+      return _AiBubble(
+        text: '답을 만들지 못했어요. 다시 보내 주세요.',
+        muted: true,
+        maxWidth: maxWidth,
+      );
+    }
+    if (m.isHidden) {
+      return _AiBubble(
+        text: '의료 판단이 필요한 질문이라 답하기 어려워요. 담당 의사와 상담해 주세요.',
+        muted: true,
+        maxWidth: maxWidth,
+      );
+    }
+    return _AiBubble(
+      text: m.text ?? '',
+      cards: m.foodCards,
+      maxWidth: maxWidth,
     );
   }
 
@@ -219,7 +454,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Widget _buildQuickQuestions(bool vertical) {
     final chips = [
       for (final q in _quickQuestions)
-        _QuickChip(label: q, onTap: () => _send(q)),
+        _QuickChip(label: q, onTap: _busy ? null : () => _send(q)),
     ];
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.lg),
@@ -302,10 +537,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             ),
             const SizedBox(width: AppSpacing.sm),
             Material(
-              color: AppColors.primary,
+              // 답을 기다리는 동안은 보낼 수 없다.
+              color: _busy ? AppColors.inactive : AppColors.primary,
               shape: const CircleBorder(),
               child: InkWell(
-                onTap: () => _send(_input.text),
+                onTap: _busy ? null : () => _send(_input.text),
                 customBorder: const CircleBorder(),
                 child: const SizedBox.square(
                   dimension: 40,
@@ -345,12 +581,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 }
 
-/// 빠른 질문 칩.
+/// 빠른 질문 칩. [onTap] 이 null 이면(답을 기다리는 중) 누를 수 없다.
 class _QuickChip extends StatelessWidget {
   const _QuickChip({required this.label, required this.onTap});
 
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -419,15 +655,27 @@ class _UserBubble extends StatelessWidget {
 }
 
 /// AI 답변(왼쪽, 흰 바탕). 왼쪽 아래 모서리만 각지게 하고, 추천 카드가 있으면 아래에 붙인다.
+/// [muted] 는 답 대신 보이는 안내(만드는 중 · 실패 등)다.
 class _AiBubble extends StatelessWidget {
-  const _AiBubble({required this.message, required this.maxWidth});
+  const _AiBubble({
+    required this.text,
+    required this.maxWidth,
+    this.cards = const [],
+    this.muted = false,
+    this.actionLabel,
+    this.onAction,
+  });
 
-  final _ChatMessage message;
+  final String text;
   final double maxWidth;
+  final List<ChatFoodCard> cards;
+  final bool muted;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
-    final cards = message.suggestions;
+    final label = actionLabel;
     return Align(
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
@@ -451,16 +699,28 @@ class _AiBubble extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                message.text,
+                text,
                 style: AppTypography.body.copyWith(
                   fontSize: 11.5,
                   height: 17 / 11.5,
-                  color: AppColors.textPrimary,
+                  color: muted
+                      ? AppColors.textSecondary
+                      : AppColors.textPrimary,
                 ),
               ),
-              for (final s in cards) ...[
+              if (label != null && onAction != null)
+                TextButton(
+                  onPressed: onAction,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(label),
+                ),
+              for (final c in cards) ...[
                 const SizedBox(height: 6),
-                _SuggestionCard(suggestion: s),
+                _FoodCard(card: c),
               ],
             ],
           ),
@@ -470,15 +730,14 @@ class _AiBubble extends StatelessWidget {
   }
 }
 
-/// 추천 카드 — 음식 이름과, 그 음식이 채우거나 줄이는 값을 칩으로 보여 준다.
-class _SuggestionCard extends StatelessWidget {
-  const _SuggestionCard({required this.suggestion});
+/// 추천 음식 카드 — 음식 이름과 그 음식 100g 에 든 영양소 칩.
+class _FoodCard extends StatelessWidget {
+  const _FoodCard({required this.card});
 
-  final _Suggestion suggestion;
+  final ChatFoodCard card;
 
   @override
   Widget build(BuildContext context) {
-    final more = suggestion.kind == _TagKind.more;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
@@ -491,24 +750,13 @@ class _SuggestionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            suggestion.title,
+            card.foodName,
             style: AppTypography.cardTitle.copyWith(fontSize: 11),
           ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color: more ? AppColors.qualityBg : AppColors.primaryStrongBg,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Text(
-              suggestion.tag,
-              style: AppTypography.emphasis.copyWith(
-                fontSize: 9,
-                color: more ? AppColors.quality : AppColors.primaryStrong,
-              ),
-            ),
-          ),
+          if (card.effects.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            NutrientAmountChips(nutrients: card.effects),
+          ],
         ],
       ),
     );
