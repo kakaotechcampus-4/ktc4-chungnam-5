@@ -1,0 +1,67 @@
+{
+  "id": "DF-05",
+  "agent": "daily_feedback",
+  "title": "점수가 소수(평균)일 때 그대로 노출하지 않기",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "DAILY",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 66.6666,
+      "quality": 71.3333,
+      "satiety": 80
+    },
+    "date": "2026-10-27",
+    "meals": [
+      {
+        "mealType": "BREAKFAST",
+        "summary": "토스트",
+        "qqs": {
+          "quantity": 60,
+          "quality": 70,
+          "satiety": 80
+        }
+      },
+      {
+        "mealType": "LUNCH",
+        "summary": "백반",
+        "qqs": {
+          "quantity": 70,
+          "quality": 72,
+          "satiety": 80
+        }
+      },
+      {
+        "mealType": "DINNER",
+        "summary": "국수",
+        "qqs": {
+          "quantity": 70,
+          "quality": 72,
+          "satiety": 80
+        }
+      }
+    ]
+  },
+  "expected": {
+    "suggestions": null,
+    "reasoning": null,
+    "mentionAny": [],
+    "mustNot": [
+      "66.666",
+      "71.333"
+    ],
+    "warnIfContains": []
+  },
+  "judge": [
+    "점수를 쓴다면 정수로(67점) 썼는가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py DAILY_SYSTEM_PROMPT / build_daily_prompt",
+  "note": "_fmt_score 가 소수점 없이 프롬프트에 싣는다.",
+  "reference": {
+    "body": "아침 토스트에서 점심 백반, 저녁 국수까지 점수가 비슷하게 이어졌어요. 하루 평균은 양 67점, 질 71점, 포만감 80점이에요."
+  }
+}

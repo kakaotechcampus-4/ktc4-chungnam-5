@@ -1,0 +1,99 @@
+{
+  "id": "MF-16",
+  "agent": "meal_feedback",
+  "title": "조정기: 체크인마다 포만감이 빠르게 떨어짐",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 90,
+      "quality": 55,
+      "satiety": 40
+    },
+    "mealId": "golden-mf-17",
+    "items": [
+      {
+        "displayName": "식빵",
+        "amount": 120,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 330,
+          "proteinG": 9,
+          "fiberG": 2,
+          "sodiumMg": 620
+        }
+      },
+      {
+        "displayName": "아메리카노",
+        "amount": 355,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 10,
+          "proteinG": 0,
+          "fiberG": 0,
+          "sodiumMg": 10
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 70,
+      "checkins": [
+        {
+          "checkinOffsetHours": 1,
+          "satietyPct": 55
+        },
+        {
+          "checkinOffsetHours": 2,
+          "satietyPct": 40
+        },
+        {
+          "checkinOffsetHours": 3,
+          "satietyPct": 30
+        }
+      ],
+      "hungerReturnMinutes": 100
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "fiber": "SHORT",
+      "sodium": "OK"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [
+      "포만감",
+      "배고",
+      "시간"
+    ],
+    "mustNot": [],
+    "warnIfContains": []
+  },
+  "judge": [
+    "체크인 흐름(시간 경과에 따른 하락)을 구체적으로 짚었는가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py _satiety_lines",
+  "reference": {
+    "body": "식빵과 커피로 마친 아침은 식후 1시간에 55%, 2시간에 40%, 3시간에 30%로 포만감이 빠르게 내려갔어요. 100분 만에 다시 배고파졌어요.",
+    "reasoning": "먹는 양이 줄기 쉬운 시기에는 빵만으로는 든든함이 오래가지 않아서 단백질과 식이섬유가 곁들여지면 차이가 커요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 달걀 2개",
+        "advice": "빵 옆에 곁들이면 포만감이 더 오래가요"
+      },
+      {
+        "foodName": "바나나 한 개",
+        "advice": "커피와 함께 먹기 쉬운 곁들임이에요"
+      }
+    ]
+  }
+}

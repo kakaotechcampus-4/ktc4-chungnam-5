@@ -1,0 +1,62 @@
+{
+  "id": "LF-05",
+  "agent": "long_feedback",
+  "title": "기록이 이틀뿐",
+  "group": "데이터 빈칸",
+  "difficulty": "hard",
+  "tags": [
+    "계약 기준 초안"
+  ],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "periodType": "WEEKLY",
+    "periodStart": "2026-10-19",
+    "periodEnd": "2026-10-25",
+    "stage": "MAINTENANCE",
+    "series": [
+      {
+        "date": "2026-10-19",
+        "quantity": 40,
+        "quality": 50,
+        "satiety": 60
+      },
+      {
+        "date": "2026-10-20",
+        "quantity": 55,
+        "quality": 45,
+        "satiety": 58
+      }
+    ],
+    "dailySummaries": [
+      "조금 먹었어요",
+      "조금 더 먹었어요"
+    ]
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "mentionAny": [
+      "기록이 적",
+      "이틀",
+      "두 번"
+    ],
+    "mustNot": [],
+    "warnIfContains": [
+      "꾸준히",
+      "뚜렷한 추세"
+    ],
+    "recommendationRequired": true
+  },
+  "judge": [
+    "기록이 적어 추세를 단정하지 않았는가"
+  ],
+  "basis": "develop @09bb46a  ai-stub/schemas.py LongFeedbackRequest/Response",
+  "note": "AI 쪽 long-feedback 코드와 계약(ai/app/schemas.py 는 'TODO: 계약 미확정')이 없다. ai-stub 계약 기준 초안이다.",
+  "reference": {
+    "trendSummary": "기록이 이틀뿐이라 흐름을 말하기에는 일러요. 첫 기록의 Quantity 는 40점, 두 번째는 55점이었어요.",
+    "recommendation": "기록이 며칠 더 쌓이면 변화를 함께 볼 수 있어요.",
+    "safetyStatus": "SAFE"
+  }
+}

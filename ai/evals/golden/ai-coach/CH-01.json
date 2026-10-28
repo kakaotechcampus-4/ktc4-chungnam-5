@@ -1,0 +1,94 @@
+{
+  "id": "CH-01",
+  "agent": "chat_coach",
+  "title": "고정 질문: 오늘 저녁 메뉴 추천",
+  "group": "정상 동작",
+  "difficulty": "easy",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-01",
+    "text": "오늘 저녁 메뉴 추천해줘",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-28",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "라면",
+              "김밥"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 60
+            }
+          }
+        ]
+      },
+      "baseMeal": {
+        "mealId": "golden-meal-1",
+        "mealType": "LUNCH",
+        "qqs": {
+          "quantity": 100,
+          "quality": 40,
+          "satiety": 60
+        },
+        "suggestions": [
+          {
+            "foodName": "시금치나물 한 접시",
+            "advice": "식이섬유로 포만감을 채워요"
+          },
+          {
+            "foodName": "두부 반 모",
+            "advice": "단백질을 조금 더 채워요"
+          }
+        ]
+      },
+      "longTerm": null
+    }
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "foodCards": "필수",
+    "mustNot": [],
+    "cardsMustNot": [],
+    "mentionAny": [
+      "저녁"
+    ],
+    "warnIfContains": []
+  },
+  "judge": [
+    "점심 기록(라면·김밥)과 이어서 저녁을 추천했는가",
+    "카드마다 이번 기록과 이어진 이유가 있는가"
+  ],
+  "basis": "develop @09bb46a  frontend/lib/screens/chatbot_screen.dart 고정 질문 + develop @09bb46a  ai-stub/schemas.py ChatRequest/ChatResponse",
+  "reference": {
+    "text": "점심은 Quality 가 40점이었어요. 저녁은 점심에 빠진 채소와 단백질을 채우는 쪽으로 골라 봤어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "시금치나물 한 접시",
+        "advice": "점심에 빠진 채소를 채워요"
+      },
+      {
+        "foodName": "두부구이 반 모",
+        "advice": "라면과 김밥 뒤라 단백질을 곁들이기 좋아요"
+      },
+      {
+        "foodName": "닭가슴살 샐러드",
+        "advice": "채소와 단백질을 한 번에 챙겨요"
+      }
+    ]
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "id": "AN-07",
+  "agent": "food_analysis",
+  "title": "브랜드 제품: 브랜드명 제거",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-07",
+    "mealType": "LUNCH",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-07.jpg"
+  },
+  "expected": {
+    "minItems": 3,
+    "maxItems": 5,
+    "items": [
+      {
+        "namesAny": [
+          "햄버거",
+          "빅맥"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          150,
+          300
+        ]
+      },
+      {
+        "namesAny": [
+          "감자튀김",
+          "프렌치프라이"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          60,
+          200
+        ]
+      },
+      {
+        "namesAny": [
+          "콜라",
+          "탄산음료"
+        ],
+        "unitAny": [
+          "g",
+          "ml"
+        ],
+        "amountG": [
+          200,
+          600
+        ]
+      }
+    ],
+    "forbiddenNames": [
+      "맥도날드"
+    ]
+  },
+  "judge": [
+    "음식명에서 브랜드명(맥도날드)을 뺐는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "빅맥 세트: 포장지에 맥도날드 로고, 햄버거 하나, 감자튀김, 콜라",
+    "file": "photos/an-07.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "햄버거",
+        "estimatedAmount": 220,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "감자튀김",
+        "estimatedAmount": 110,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "콜라",
+        "estimatedAmount": 350,
+        "unit": "g",
+        "confidence": 0.85
+      }
+    ]
+  }
+}

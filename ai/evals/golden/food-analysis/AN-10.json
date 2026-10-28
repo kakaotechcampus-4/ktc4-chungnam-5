@@ -1,0 +1,41 @@
+{
+  "id": "AN-10",
+  "agent": "food_analysis",
+  "title": "어둡고 흐린 사진: 확신도",
+  "group": "정상 동작",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-10",
+    "mealType": "DINNER",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-10.jpg"
+  },
+  "expected": {
+    "minItems": 0,
+    "maxItems": 2,
+    "items": [],
+    "maxConfidence": 0.5
+  },
+  "judge": [
+    "확신이 없는데 confidence 를 높게 주지 않았는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "초점이 나가고 어두운 사진. 그릇 안에 국물 요리처럼 보이는 것이 있음",
+    "file": "photos/an-10.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "찌개",
+        "estimatedAmount": 400,
+        "unit": "g",
+        "confidence": 0.3
+      }
+    ]
+  }
+}

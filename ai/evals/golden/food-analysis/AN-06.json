@@ -1,0 +1,51 @@
+{
+  "id": "AN-06",
+  "agent": "food_analysis",
+  "title": "수박 한 통: 자연 단위 예외",
+  "group": "경계값",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-06",
+    "mealType": "SNACK",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-06.jpg"
+  },
+  "expected": {
+    "minItems": 1,
+    "maxItems": 1,
+    "items": [
+      {
+        "namesAny": [
+          "수박"
+        ],
+        "unitAny": [
+          "통",
+          "개"
+        ]
+      }
+    ],
+    "unitIsWarningOnly": true
+  },
+  "judge": [
+    "g 을 억지로 지어내지 않았는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "자르지 않은 수박 한 통이 도마 위에 놓여 있음",
+    "file": "photos/an-06.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "수박",
+        "estimatedAmount": 1,
+        "unit": "통",
+        "confidence": 0.9
+      }
+    ]
+  }
+}

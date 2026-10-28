@@ -1,0 +1,133 @@
+{
+  "id": "AN-15",
+  "agent": "food_analysis",
+  "title": "뷔페 접시: 항목이 많아도 빠뜨리지 않기",
+  "group": "정상 동작",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-15",
+    "mealType": "DINNER",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-15.jpg"
+  },
+  "expected": {
+    "minItems": 7,
+    "maxItems": 10,
+    "items": [
+      {
+        "namesAny": [
+          "볶음밥"
+        ],
+        "unitAny": [
+          "g"
+        ]
+      },
+      {
+        "namesAny": [
+          "탕수육"
+        ],
+        "unitAny": [
+          "g"
+        ]
+      },
+      {
+        "namesAny": [
+          "잡채"
+        ],
+        "unitAny": [
+          "g"
+        ]
+      },
+      {
+        "namesAny": [
+          "샐러드"
+        ],
+        "unitAny": [
+          "g"
+        ]
+      },
+      {
+        "namesAny": [
+          "새우튀김"
+        ],
+        "unitAny": [
+          "g"
+        ]
+      },
+      {
+        "namesAny": [
+          "미역국"
+        ],
+        "unitAny": [
+          "g"
+        ]
+      },
+      {
+        "namesAny": [
+          "과일"
+        ],
+        "unitAny": [
+          "g"
+        ]
+      }
+    ]
+  },
+  "judge": [
+    "주요 항목을 빠뜨리지 않았는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "볶음밥, 탕수육 3점, 잡채, 샐러드, 새우튀김 2개, 미역국 한 그릇, 과일 몇 조각",
+    "file": "photos/an-15.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "볶음밥",
+        "estimatedAmount": 200,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "탕수육",
+        "estimatedAmount": 120,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "잡채",
+        "estimatedAmount": 100,
+        "unit": "g",
+        "confidence": 0.85
+      },
+      {
+        "originalFoodName": "샐러드",
+        "estimatedAmount": 80,
+        "unit": "g",
+        "confidence": 0.85
+      },
+      {
+        "originalFoodName": "새우튀김",
+        "estimatedAmount": 60,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "미역국",
+        "estimatedAmount": 250,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "과일",
+        "estimatedAmount": 100,
+        "unit": "g",
+        "confidence": 0.7
+      }
+    ]
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "id": "CH-07",
+  "agent": "chat_coach",
+  "title": "싫은 음식 제외(이전 대화 이어가기)",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-07",
+    "text": "두부는 질렸어. 단백질 되는 다른 걸로",
+    "history": [
+      {
+        "role": "USER",
+        "text": "저녁에 단백질 되는 거 추천해줘"
+      },
+      {
+        "role": "ASSISTANT",
+        "text": "두부 반 모를 곁들이면 단백질을 채우기 쉬워요."
+      }
+    ],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-28",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "라면",
+              "김밥"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 60
+            }
+          }
+        ]
+      },
+      "baseMeal": {
+        "mealId": "golden-meal-1",
+        "mealType": "LUNCH",
+        "qqs": {
+          "quantity": 100,
+          "quality": 40,
+          "satiety": 60
+        },
+        "suggestions": [
+          {
+            "foodName": "시금치나물 한 접시",
+            "advice": "식이섬유로 포만감을 채워요"
+          },
+          {
+            "foodName": "두부 반 모",
+            "advice": "단백질을 조금 더 채워요"
+          }
+        ]
+      },
+      "longTerm": null
+    }
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "foodCards": "필수",
+    "mustNot": [],
+    "cardsMustNot": [
+      "두부"
+    ],
+    "mentionAny": [],
+    "warnIfContains": []
+  },
+  "judge": [
+    "단백질이라는 조건은 이어 가고 두부는 뺐는가"
+  ],
+  "basis": "develop @09bb46a  ai-stub/schemas.py ChatRequest/ChatResponse history",
+  "reference": {
+    "text": "두부는 빼고 단백질을 채울 수 있는 걸로 골라 봤어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "삶은 달걀 2개",
+        "advice": "단백질을 채우기 쉽고 손이 덜 가요"
+      },
+      {
+        "foodName": "구운 고등어 한 토막",
+        "advice": "저녁에 든든하게 단백질을 채워요"
+      }
+    ]
+  }
+}

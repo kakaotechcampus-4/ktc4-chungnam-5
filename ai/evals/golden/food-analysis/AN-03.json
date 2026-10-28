@@ -1,0 +1,62 @@
+{
+  "id": "AN-03",
+  "agent": "food_analysis",
+  "title": "토스트: 조각으로 세는 음식도 g 이 기본",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-03",
+    "mealType": "BREAKFAST",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-03.jpg"
+  },
+  "expected": {
+    "minItems": 1,
+    "maxItems": 3,
+    "items": [
+      {
+        "namesAny": [
+          "토스트",
+          "식빵",
+          "빵"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          60,
+          160
+        ]
+      }
+    ]
+  },
+  "judge": [
+    "'2장' 같은 낱개 단위가 아니라 g 으로 추정했는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "note": "프롬프트가 2026-10-22 에 바뀐 부분: 토스트처럼 1개 크기가 일정한 음식은 g 이 기본이다.",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "접시에 토스트 2장과 딸기잼",
+    "file": "photos/an-03.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "토스트",
+        "estimatedAmount": 100,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "딸기잼",
+        "estimatedAmount": 15,
+        "unit": "g",
+        "confidence": 0.7
+      }
+    ]
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "id": "MF-07",
+  "agent": "meal_feedback",
+  "title": "조정기 단백질: Quality 로만 짐작할 수 있다(단정 금지)",
+  "group": "경계값",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 100,
+      "quality": 81,
+      "satiety": 70
+    },
+    "mealId": "golden-mf-07",
+    "items": [
+      {
+        "displayName": "비빔밥",
+        "amount": 400,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 560,
+          "proteinG": 12,
+          "fiberG": 9.5,
+          "sodiumMg": 500
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 75,
+      "checkins": [],
+      "hungerReturnMinutes": 240
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "protein": "SHORT",
+      "fiber": "OK",
+      "sodium": "OK"
+    },
+    "inferredNutrients": [
+      "protein"
+    ],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [],
+    "mustNot": [],
+    "warnIfContains": [
+      "단백질이 부족합니다",
+      "단백질 부족입니다",
+      "단백질이 확실히"
+    ]
+  },
+  "judge": [
+    "단백질 부족을 '짐작/가능성'으로 썼는가(목표량을 모르므로 단정하면 안 됨)"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py judge_nutrients (inferred)",
+  "reference": {
+    "body": "비빔밥으로 식이섬유는 채웠고 나트륨도 한도 안이었어요. 점수로 보면 단백질이 조금 모자랐을 가능성이 있어요.",
+    "reasoning": "조정기에는 먹는 양이 줄기 쉬워서 한 끼 안에 단백질이 들어가는 게 더 중요해져요.",
+    "suggestions": [
+      {
+        "foodName": "두부 반 모",
+        "advice": "비빔밥 옆에 곁들이면 단백질을 더하기 쉬워요"
+      },
+      {
+        "foodName": "삶은 달걀 2개",
+        "advice": "비빔밥 위에 올려도 잘 어울려요"
+      }
+    ]
+  }
+}

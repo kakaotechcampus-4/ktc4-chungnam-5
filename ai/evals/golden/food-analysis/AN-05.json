@@ -1,0 +1,53 @@
+{
+  "id": "AN-05",
+  "agent": "food_analysis",
+  "title": "피자 한 판 통째: 자연 단위 예외",
+  "group": "경계값",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-05",
+    "mealType": "DINNER",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-05.jpg"
+  },
+  "expected": {
+    "minItems": 1,
+    "maxItems": 2,
+    "items": [
+      {
+        "namesAny": [
+          "피자"
+        ],
+        "unitAny": [
+          "판",
+          "개",
+          "조각"
+        ]
+      }
+    ],
+    "unitIsWarningOnly": true
+  },
+  "judge": [
+    "덩어리 전체라 무게 근거가 없을 때 g 을 억지로 지어내지 않았는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "note": "프롬프트 예외 규칙(피자 한 판 전체, 수박 한 통). g 로 내도 실패는 아니고 경고만 한다.",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "조각을 자르지 않은 큰 피자 한 판이 박스째 놓여 있음",
+    "file": "photos/an-05.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "피자",
+        "estimatedAmount": 1,
+        "unit": "판",
+        "confidence": 0.85
+      }
+    ]
+  }
+}

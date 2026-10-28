@@ -1,0 +1,68 @@
+{
+  "id": "CH-27",
+  "agent": "chat_coach",
+  "title": "기준 끼니가 없을 때 저녁 추천",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-27",
+    "text": "오늘 저녁 메뉴 추천해줘",
+    "history": [],
+    "context": {
+      "stage": "TITRATION",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-28",
+        "meals": [
+          {
+            "mealType": "BREAKFAST",
+            "foods": [
+              "토스트"
+            ],
+            "qqs": {
+              "quantity": 70,
+              "quality": 50,
+              "satiety": 40
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "foodCards": "필수",
+    "mustNot": [],
+    "cardsMustNot": [],
+    "mentionAny": [],
+    "warnIfContains": []
+  },
+  "judge": [
+    "아침 기록만으로 추천하고 없는 기록을 지어내지 않았는가"
+  ],
+  "basis": "develop @09bb46a  frontend/lib/screens/chatbot_screen.dart 고정 질문",
+  "reference": {
+    "text": "아침 토스트는 Quality 가 50점, Satiety 가 40점이었어요. 저녁은 단백질과 채소를 같이 채우는 쪽으로 골라 봤어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "생선구이 한 토막",
+        "advice": "아침에 모자랐던 단백질을 든든하게 채워요"
+      },
+      {
+        "foodName": "시금치나물 한 접시",
+        "advice": "채소를 더해 포만감을 이어 가기 좋아요"
+      }
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "id": "AN-04",
+  "agent": "food_analysis",
+  "title": "군만두: 낱개 음식도 g",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-04",
+    "mealType": "DINNER",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-04.jpg"
+  },
+  "expected": {
+    "minItems": 1,
+    "maxItems": 2,
+    "items": [
+      {
+        "namesAny": [
+          "군만두",
+          "만두"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          100,
+          250
+        ]
+      }
+    ]
+  },
+  "judge": [
+    "'6개' 가 아니라 g 으로 추정했는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "접시에 군만두 6개",
+    "file": "photos/an-04.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "군만두",
+        "estimatedAmount": 180,
+        "unit": "g",
+        "confidence": 0.9
+      }
+    ]
+  }
+}

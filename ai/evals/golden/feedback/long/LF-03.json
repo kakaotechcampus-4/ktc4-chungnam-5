@@ -1,0 +1,75 @@
+{
+  "id": "LF-03",
+  "agent": "long_feedback",
+  "title": "세 축이 서로 다르게 움직임",
+  "group": "정상 동작",
+  "difficulty": "hard",
+  "tags": [
+    "계약 기준 초안"
+  ],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "periodType": "WEEKLY",
+    "periodStart": "2026-10-19",
+    "periodEnd": "2026-10-25",
+    "stage": "MAINTENANCE",
+    "series": [
+      {
+        "date": "2026-10-19",
+        "quantity": 70,
+        "quality": 50,
+        "satiety": 55
+      },
+      {
+        "date": "2026-10-20",
+        "quantity": 72,
+        "quality": 60,
+        "satiety": 58
+      },
+      {
+        "date": "2026-10-21",
+        "quantity": 68,
+        "quality": 66,
+        "satiety": 50
+      },
+      {
+        "date": "2026-10-22",
+        "quantity": 74,
+        "quality": 72,
+        "satiety": 48
+      }
+    ],
+    "dailySummaries": [
+      "단백질 부족",
+      "채소가 늘었어요",
+      "저녁 포만감이 짧아요",
+      "단백질은 늘었지만 포만감이 낮아요"
+    ]
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "mentionAny": [
+      "Quality",
+      "Satiety",
+      "포만감"
+    ],
+    "mustNot": [
+      "모든 점수가 올",
+      "모든 점수가 내"
+    ],
+    "recommendationRequired": true
+  },
+  "judge": [
+    "축마다 다른 방향(Quality 상승, Satiety 하락)을 구분해 썼는가"
+  ],
+  "basis": "develop @09bb46a  ai-stub/schemas.py LongFeedbackRequest/Response",
+  "note": "AI 쪽 long-feedback 코드와 계약(ai/app/schemas.py 는 'TODO: 계약 미확정')이 없다. ai-stub 계약 기준 초안이다.",
+  "reference": {
+    "trendSummary": "Quality 는 50점에서 72점으로 올랐지만 Satiety 는 55점에서 48점으로 내려갔어요. 단백질은 늘었는데 포만감이 낮았다는 기록이 있어요.",
+    "recommendation": "저녁 포만감이 짧은 날에는 식이섬유가 있는 반찬을 하나 더하면 흐름을 잡기 좋아요.",
+    "safetyStatus": "SAFE"
+  }
+}

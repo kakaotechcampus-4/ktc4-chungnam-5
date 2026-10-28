@@ -1,0 +1,74 @@
+{
+  "id": "MF-13",
+  "agent": "meal_feedback",
+  "title": "포만감 기록이 없음: 포만감을 평가하면 안 됨",
+  "group": "데이터 빈칸",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 60,
+      "satiety": null
+    },
+    "mealId": "golden-mf-14",
+    "items": [
+      {
+        "displayName": "라면",
+        "amount": 550,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 500,
+          "proteinG": 10,
+          "fiberG": 3,
+          "sodiumMg": 1800
+        }
+      }
+    ],
+    "satiety": null
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "fiber": "SHORT",
+      "sodium": "OVER"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [
+      "나트륨"
+    ],
+    "mustNot": [],
+    "warnIfContains": [
+      "포만감이 높",
+      "포만감이 낮",
+      "든든",
+      "배불",
+      "배고"
+    ]
+  },
+  "judge": [
+    "측정 못 한 포만감 축을 언급하지 않았는가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py _score_line (측정 못 함)",
+  "reference": {
+    "body": "라면은 국물에서 나트륨이 한 끼 한도의 두 배를 넘었고, 식이섬유도 모자랐어요.",
+    "reasoning": "유지기에는 양이 줄어도 한 끼 안에 채소가 들어가야 영양이 채워져요.",
+    "suggestions": [
+      {
+        "foodName": "컵 샐러드 하나",
+        "advice": "라면 옆에 곁들이면 모자란 식이섬유를 채워요"
+      },
+      {
+        "foodName": "삶은 달걀 2개",
+        "advice": "국물 없이 단백질을 더하기 좋아요"
+      }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "AN-09",
+  "agent": "food_analysis",
+  "title": "음식이 없는 사진",
+  "group": "환각·범위 밖",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-09",
+    "mealType": "SNACK",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-09.jpg"
+  },
+  "expected": {
+    "minItems": 0,
+    "maxItems": 0,
+    "items": []
+  },
+  "judge": [
+    "없는 음식을 지어내지 않았는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "note": "프롬프트에는 '음식이 없으면' 규칙이 없다. 빈 items 를 기대하는 건 이 데이터셋의 제안이다.",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "소파 위의 고양이. 음식 없음",
+    "file": "photos/an-09.jpg"
+  },
+  "reference": {
+    "items": []
+  }
+}

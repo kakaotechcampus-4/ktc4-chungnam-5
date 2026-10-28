@@ -1,0 +1,118 @@
+{
+  "id": "MF-18",
+  "agent": "meal_feedback",
+  "title": "삼겹살 한 상: 나트륨 원인이 고기가 아니라 된장찌개·쌈장",
+  "group": "정상 동작",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 55,
+      "satiety": 70
+    },
+    "mealId": "golden-mf-20",
+    "items": [
+      {
+        "displayName": "삼겹살",
+        "amount": 200,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 660,
+          "proteinG": 30,
+          "fiberG": 0,
+          "sodiumMg": 160
+        }
+      },
+      {
+        "displayName": "된장찌개",
+        "amount": 250,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 110,
+          "proteinG": 9,
+          "fiberG": 3,
+          "sodiumMg": 1300
+        }
+      },
+      {
+        "displayName": "쌈장",
+        "amount": 30,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 55,
+          "proteinG": 2,
+          "fiberG": 1,
+          "sodiumMg": 520
+        }
+      },
+      {
+        "displayName": "상추",
+        "amount": 80,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 15,
+          "proteinG": 1,
+          "fiberG": 2,
+          "sodiumMg": 5
+        }
+      },
+      {
+        "displayName": "공기밥",
+        "amount": 210,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 5.5,
+          "fiberG": 1.2,
+          "sodiumMg": 3
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 80,
+      "checkins": [],
+      "hungerReturnMinutes": 240
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "fiber": "SHORT",
+      "sodium": "OVER"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [
+      "된장찌개",
+      "쌈장"
+    ],
+    "mustNot": [],
+    "warnIfContains": []
+  },
+  "judge": [
+    "나트륨 초과의 원인 음식(된장찌개·쌈장)을 짚었는가(삼겹살 탓으로 돌리지 않았는가)"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py _item_line (focus 성분은 음식별로 보여 줌)",
+  "reference": {
+    "body": "나트륨은 한 끼 한도의 두 배 넘게 나왔는데, 고기보다 된장찌개와 쌈장에서 대부분 왔어요. 식이섬유도 목표에 조금 못 미쳤어요.",
+    "reasoning": "유지기에는 든든하게 먹는 만큼 국물과 장류에서 나트륨이 쉽게 늘어요.",
+    "suggestions": [
+      {
+        "foodName": "쌈채소 한 접시",
+        "advice": "쌈장을 덜 찍고 채소를 늘리면 식이섬유는 채우고 나트륨은 줄여요"
+      },
+      {
+        "foodName": "구운 버섯 한 접시",
+        "advice": "된장찌개 대신 곁들이면 국물 없이 든든해요"
+      }
+    ]
+  }
+}

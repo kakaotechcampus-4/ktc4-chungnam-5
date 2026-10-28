@@ -1,0 +1,76 @@
+{
+  "id": "MF-04",
+  "agent": "meal_feedback",
+  "title": "유지기 식이섬유 8.3g: 화면 기준 OK, 채점 기준(8.33)은 못 채워 Quality 가 99",
+  "group": "경계값",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 99,
+      "satiety": 65
+    },
+    "mealId": "golden-mf-04",
+    "items": [
+      {
+        "displayName": "오트밀과 바나나",
+        "amount": 300,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 420,
+          "proteinG": 14,
+          "fiberG": 8.3,
+          "sodiumMg": 600
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 35,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": 240
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "fiber": "OK",
+      "sodium": "OK"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [],
+    "mustNot": [],
+    "warnIfContains": [
+      "식이섬유가 부족",
+      "단백질이 부족",
+      "단백질은 부족"
+    ]
+  },
+  "judge": [
+    "식이섬유를 부족하다고 쓰지도, 단백질 부족으로 짐작하지도 않았는가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py judge_nutrients 주석(8.3g 사례)",
+  "note": "Quality 99 의 1점은 식이섬유 몫이다. 화면 state(OK)로 단백질을 추정하면 오판한다.",
+  "reference": {
+    "body": "오트밀과 바나나로 식이섬유는 끼니 목표를 채웠고, 나트륨도 한도 안이었어요. 4시간 가까이 속이 든든했어요.",
+    "reasoning": "유지기에는 양이 줄어도 영양이 빠지지 않는 게 중요한데, 이번 아침이 그 흐름을 지켰어요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 달걀 1개",
+        "advice": "아침 구성에 곁들이기 쉬워요"
+      },
+      {
+        "foodName": "그릭요거트 한 컵",
+        "advice": "오트밀 위에 올려 먹기 편해요"
+      }
+    ]
+  }
+}

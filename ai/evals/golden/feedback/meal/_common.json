@@ -1,0 +1,70 @@
+{
+  "dataset": "meal_feedback",
+  "name": "끼니 피드백",
+  "endpoint": "POST /short-feedback (scope=MEAL)",
+  "what": "한 끼 점수·영양 판정 → 코멘트와 다음 끼니 제안",
+  "remark": "영양 판정(식이섬유·나트륨·단백질)은 모델이 아니라 Python 규칙이 먼저 계산해 프롬프트에 넣는다.",
+  "basis": [
+    "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py",
+    "docs/be-qqs-scoring-rule.md (규칙 v2)",
+    "develop @09bb46a  ai-stub/schemas.py"
+  ],
+  "commonChecks": [
+    {
+      "type": "code",
+      "rule": "응답이 JSON 이고 body 가 비어 있지 않다. 제안은 1~3개, 제안마다 foodName·advice 가 있다",
+      "basis": "parse_response / MAX_SUGGESTIONS"
+    },
+    {
+      "type": "code",
+      "rule": "제안 음식이 서로 겹치지 않는다",
+      "basis": "MEAL_SYSTEM_PROMPT"
+    },
+    {
+      "type": "code",
+      "rule": "candidateFoodRefId 와 성분 숫자를 내지 않는다",
+      "basis": "README 절대 규칙 2 / parse_response"
+    },
+    {
+      "type": "code",
+      "rule": "뻔한 표현을 쓰지 않는다: 균형 잡힌 식사, 건강한 식습관, 골고루, 적당히, ~에 도움이 됩니다",
+      "basis": "_FORBIDDEN"
+    },
+    {
+      "type": "code",
+      "rule": "명령형 처방을 쓰지 않는다: ~드세요, ~하세요, ~를 피하세요 (인사 '안녕하세요' 는 제외)",
+      "basis": "_FORBIDDEN / README 규칙 3"
+    },
+    {
+      "type": "code",
+      "rule": "입력에 없는 kcal·g·mg 숫자를 쓰지 않는다 (입력값, 끼니 목표·한도, 합계는 허용)",
+      "basis": "_FORBIDDEN"
+    },
+    {
+      "type": "warn",
+      "rule": "의료 표현(약, 용량, 증상, 질병)이 있으면 경고",
+      "basis": "_FORBIDDEN / README 규칙 3"
+    },
+    {
+      "type": "warn",
+      "rule": "점수가 null 인 축을 평가하는 문장이 있으면 경고",
+      "basis": "QQS 주석(null = 못 쟀다)"
+    },
+    {
+      "type": "judge",
+      "rule": "body 가 한두 문장이고 reasoning 이 투약 단계와 이어진 한 문장인가",
+      "basis": "MEAL_SYSTEM_PROMPT"
+    },
+    {
+      "type": "judge",
+      "rule": "제안이 '바꾸기/더하기' 형태이고 편의점·배달·집밥에서 구할 수 있는 음식인가",
+      "basis": "MEAL_SYSTEM_PROMPT"
+    },
+    {
+      "type": "code",
+      "rule": "nutrientJudgement 는 실제 judge_nutrients 결과와 같다 (BE 기준이 바뀌었는데 사본을 안 맞추면 여기서 깨진다)",
+      "basis": "short_feedback.py BE_RULE_VERSION"
+    }
+  ],
+  "count": 20
+}

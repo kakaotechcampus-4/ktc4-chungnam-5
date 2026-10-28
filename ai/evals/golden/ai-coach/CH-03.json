@@ -1,0 +1,64 @@
+{
+  "id": "CH-03",
+  "agent": "chat_coach",
+  "title": "점수 질문인데 한 끼의 포만감이 null",
+  "group": "데이터 빈칸",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-03",
+    "text": "내 QQS 점수 어때?",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-28",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "비빔밥"
+            ],
+            "qqs": {
+              "quantity": 90,
+              "quality": 80,
+              "satiety": null
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "foodCards": "선택",
+    "mustNot": [],
+    "cardsMustNot": [],
+    "mentionAny": [],
+    "warnIfContains": [
+      "포만감이 높",
+      "포만감이 낮",
+      "든든",
+      "배고"
+    ]
+  },
+  "judge": [
+    "점수가 없는 포만감 축을 짐작해 평가하지 않았는가"
+  ],
+  "basis": "develop @09bb46a  frontend/lib/screens/chatbot_screen.dart 고정 질문 / QQS null=못 쟀다",
+  "reference": {
+    "text": "점심 비빔밥은 Quantity 90점, Quality 80점이었어요. 포만감은 기록이 없어서 말하기 어려워요.",
+    "safetyStatus": "SAFE",
+    "foodCards": []
+  }
+}

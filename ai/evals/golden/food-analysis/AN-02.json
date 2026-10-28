@@ -1,0 +1,70 @@
+{
+  "id": "AN-02",
+  "agent": "food_analysis",
+  "title": "1인분 김치찌개와 공기밥: 양을 g 으로",
+  "group": "정상 동작",
+  "difficulty": "easy",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-02",
+    "mealType": "LUNCH",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-02.jpg"
+  },
+  "expected": {
+    "minItems": 2,
+    "maxItems": 4,
+    "items": [
+      {
+        "namesAny": [
+          "김치찌개"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          250,
+          600
+        ]
+      },
+      {
+        "namesAny": [
+          "밥",
+          "공기밥"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          150,
+          250
+        ]
+      }
+    ]
+  },
+  "judge": [],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "뚝배기 김치찌개 한 그릇, 공기밥 한 공기",
+    "file": "photos/an-02.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "김치찌개",
+        "estimatedAmount": 400,
+        "unit": "g",
+        "confidence": 0.92
+      },
+      {
+        "originalFoodName": "공기밥",
+        "estimatedAmount": 210,
+        "unit": "g",
+        "confidence": 0.95
+      }
+    ]
+  }
+}

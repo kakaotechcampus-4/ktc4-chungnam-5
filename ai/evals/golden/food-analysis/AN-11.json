@@ -1,0 +1,59 @@
+{
+  "id": "AN-11",
+  "agent": "food_analysis",
+  "title": "소품이 많은 사진: 음식만",
+  "group": "환각·범위 밖",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-11",
+    "mealType": "LUNCH",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-11.jpg"
+  },
+  "expected": {
+    "minItems": 1,
+    "maxItems": 2,
+    "items": [
+      {
+        "namesAny": [
+          "파전"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          150,
+          400
+        ]
+      }
+    ],
+    "forbiddenNames": [
+      "찻잔",
+      "주전자",
+      "젓가락",
+      "꽃"
+    ]
+  },
+  "judge": [
+    "찻잔·주전자 등 소품을 음식으로 내지 않았는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "파전 한 장이 놓인 접시. 뒤에 찻잔, 주전자, 젓가락, 꽃병",
+    "file": "photos/an-11.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "파전",
+        "estimatedAmount": 250,
+        "unit": "g",
+        "confidence": 0.93
+      }
+    ]
+  }
+}

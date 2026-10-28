@@ -1,0 +1,87 @@
+{
+  "id": "AN-13",
+  "agent": "food_analysis",
+  "title": "술과 안주",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-13",
+    "mealType": "DINNER",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-13.jpg"
+  },
+  "expected": {
+    "minItems": 3,
+    "maxItems": 5,
+    "items": [
+      {
+        "namesAny": [
+          "삼겹살"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          150,
+          600
+        ]
+      },
+      {
+        "namesAny": [
+          "소주"
+        ],
+        "unitAny": [
+          "g",
+          "ml"
+        ]
+      },
+      {
+        "namesAny": [
+          "상추",
+          "쌈"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          20,
+          100
+        ]
+      }
+    ]
+  },
+  "judge": [
+    "술을 빠뜨리지 않았는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "불판 위 삼겹살, 상추쌈, 소주 한 병과 소주잔",
+    "file": "photos/an-13.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "삼겹살",
+        "estimatedAmount": 250,
+        "unit": "g",
+        "confidence": 0.93
+      },
+      {
+        "originalFoodName": "소주",
+        "estimatedAmount": 360,
+        "unit": "ml",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "상추",
+        "estimatedAmount": 40,
+        "unit": "g",
+        "confidence": 0.85
+      }
+    ]
+  }
+}

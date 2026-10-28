@@ -1,0 +1,47 @@
+{
+  "id": "LF-04",
+  "agent": "long_feedback",
+  "title": "기록이 하나도 없음",
+  "group": "데이터 빈칸",
+  "difficulty": "hard",
+  "tags": [
+    "계약 기준 초안"
+  ],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "periodType": "WEEKLY",
+    "periodStart": "2026-10-19",
+    "periodEnd": "2026-10-25",
+    "stage": "MAINTENANCE",
+    "series": [],
+    "dailySummaries": []
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "mentionAny": [
+      "기록"
+    ],
+    "mustNot": [],
+    "warnIfContains": [
+      "올랐",
+      "내려",
+      "추세",
+      "좋아지",
+      "나빠"
+    ],
+    "recommendationRequired": true
+  },
+  "judge": [
+    "없는 추이를 지어내지 않았는가"
+  ],
+  "basis": "develop @09bb46a  ai-stub/schemas.py LongFeedbackRequest/Response",
+  "note": "AI 쪽 long-feedback 코드와 계약(ai/app/schemas.py 는 'TODO: 계약 미확정')이 없다. ai-stub 계약 기준 초안이다.",
+  "reference": {
+    "trendSummary": "이번 주는 기록된 끼니가 없어서 흐름을 말하기 어려워요.",
+    "recommendation": "끼니를 기록해 주시면 다음 주에는 변화를 함께 볼 수 있어요.",
+    "safetyStatus": "SAFE"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "AN-12",
+  "agent": "food_analysis",
+  "title": "다 먹고 난 빈 그릇",
+  "group": "환각·범위 밖",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-12",
+    "mealType": "LUNCH",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-12.jpg"
+  },
+  "expected": {
+    "minItems": 0,
+    "maxItems": 0,
+    "items": []
+  },
+  "judge": [
+    "빈 그릇에서 음식을 지어내지 않았는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "note": "프롬프트에 규칙 없음. 빈 items 기대는 제안이다.",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "빈 그릇과 수저만 남은 사진",
+    "file": "photos/an-12.jpg"
+  },
+  "reference": {
+    "items": []
+  }
+}

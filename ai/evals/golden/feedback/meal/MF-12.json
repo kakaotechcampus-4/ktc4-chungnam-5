@@ -1,0 +1,87 @@
+{
+  "id": "MF-12",
+  "agent": "meal_feedback",
+  "title": "한 음식의 식이섬유만 비어 있음: 식이섬유는 판정 불가",
+  "group": "데이터 빈칸",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": null,
+      "satiety": 55
+    },
+    "mealId": "golden-mf-12",
+    "items": [
+      {
+        "displayName": "김치찌개",
+        "amount": 350,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 160,
+          "proteinG": 11,
+          "fiberG": null,
+          "sodiumMg": 1400
+        }
+      },
+      {
+        "displayName": "공기밥",
+        "amount": 210,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 5.5,
+          "fiberG": 1.2,
+          "sodiumMg": 3
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 55,
+      "checkins": [],
+      "hungerReturnMinutes": 150
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "sodium": "OVER"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [
+      "나트륨"
+    ],
+    "mustNot": [],
+    "warnIfContains": [
+      "식이섬유가 부족",
+      "식이섬유가 충분",
+      "식이섬유는"
+    ]
+  },
+  "judge": [
+    "식이섬유를 평가하지 않고 판정된 나트륨만 말했는가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py _sum_nutrient (하나라도 비면 None)",
+  "reference": {
+    "body": "김치찌개 국물에서 나트륨이 한 끼 한도를 크게 넘었어요. 식후 포만감은 2시간 반쯤 이어졌어요.",
+    "reasoning": "유지기에는 한 끼를 든든하게 먹는 만큼 국물 양을 조절하는 것이 눈에 띄는 차이를 만들어요.",
+    "suggestions": [
+      {
+        "foodName": "계란찜 한 그릇",
+        "advice": "국물 없이 단백질을 채우기 좋아요"
+      },
+      {
+        "foodName": "오이무침 한 접시",
+        "advice": "싱겁게 곁들이면 짠맛이 덜해요"
+      }
+    ]
+  }
+}

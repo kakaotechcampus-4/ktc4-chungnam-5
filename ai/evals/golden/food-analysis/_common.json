@@ -1,0 +1,44 @@
+{
+  "dataset": "food_analysis",
+  "name": "음식 분석",
+  "endpoint": "POST /analyze-meal",
+  "what": "사진 → 음식 후보(이름·양 g·확신도)",
+  "remark": "사진 전용. 텍스트 입력은 BE 가 DB 로 직접 매칭하고 AI 를 거치지 않는다(food_analyzer.py 모듈 주석).",
+  "basis": [
+    "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py",
+    "develop @09bb46a  ai-stub/schemas.py"
+  ],
+  "commonChecks": [
+    {
+      "type": "code",
+      "rule": "응답이 JSON 이고 items 배열이다 (마크다운 코드펜스로 와도 벗겨서 읽는다)",
+      "basis": "_parse_response / _strip_code_fence"
+    },
+    {
+      "type": "code",
+      "rule": "estimatedAmount 는 0 이상 999999.99 이하, unit 은 1~32자, confidence 는 0~1, 음식명은 1~255자",
+      "basis": "RecognizedItem 의 Field 제약"
+    },
+    {
+      "type": "code",
+      "rule": "candidateFoodRefId 는 null (search_foods 가 생기기 전까지)",
+      "basis": "food_analyzer.py 모듈 주석"
+    },
+    {
+      "type": "code",
+      "rule": "unit 은 g 이 기본이다. 낱개·조각 음식도 g 으로 낸다",
+      "basis": "_build_prompt"
+    },
+    {
+      "type": "code",
+      "rule": "단위가 g/ml 이 아니면 BE 가 성분을 못 구해 QQS 채점에 못 들어간다",
+      "basis": "to_grams (BE)"
+    },
+    {
+      "type": "code",
+      "rule": "성분(kcal·단백질 등) 필드를 내지 않는다",
+      "basis": "README 절대 규칙 2"
+    }
+  ],
+  "count": 15
+}

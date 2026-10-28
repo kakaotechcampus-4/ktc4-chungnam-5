@@ -1,0 +1,89 @@
+{
+  "id": "MF-09",
+  "agent": "meal_feedback",
+  "title": "감량 직후: Quantity 60은 방향을 모른다(과식 단정 금지)",
+  "group": "경계값",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "REDUCED",
+    "qqs": {
+      "quantity": 60,
+      "quality": 55,
+      "satiety": 60
+    },
+    "mealId": "golden-mf-09",
+    "items": [
+      {
+        "displayName": "돈까스",
+        "amount": 250,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 650,
+          "proteinG": 25,
+          "fiberG": 3,
+          "sodiumMg": 1100
+        }
+      },
+      {
+        "displayName": "공기밥",
+        "amount": 210,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 5.5,
+          "fiberG": 1.2,
+          "sodiumMg": 3
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 65,
+      "checkins": [],
+      "hungerReturnMinutes": 200
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "fiber": "SHORT",
+      "sodium": "OVER"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [],
+    "mustNot": [],
+    "warnIfContains": [
+      "과식",
+      "많이 먹",
+      "적게 먹",
+      "많이 드",
+      "적게 드"
+    ]
+  },
+  "judge": [
+    "양이 많았는지 적었는지 방향을 말하지 않았는가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py _quantity_note / STAGE_RISK[REDUCED]",
+  "note": "BE 는 평소 열량 비율을 안 줘서 Quantity 점수만으로는 방향을 모른다.",
+  "reference": {
+    "body": "돈까스와 공기밥은 식이섬유가 모자랐고, 튀김과 소스에서 나트륨이 한 끼 한도를 넘었어요. 그래도 3시간 넘게 배고픔 없이 지나갔어요.",
+    "reasoning": "감량 직후라 식욕이 돌아오기 쉬운 시기라서, 한 끼에 채소가 들어가면 다음 끼니까지 흐름을 이어 가기 좋아요.",
+    "suggestions": [
+      {
+        "foodName": "양배추샐러드 한 접시",
+        "advice": "돈까스 옆에 곁들이면 모자란 식이섬유를 채워요"
+      },
+      {
+        "foodName": "데친 브로콜리 한 줌",
+        "advice": "기름진 한 끼 뒤에 입이 개운해져요"
+      }
+    ]
+  }
+}

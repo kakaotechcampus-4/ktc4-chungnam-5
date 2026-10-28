@@ -1,0 +1,80 @@
+{
+  "id": "MF-15",
+  "agent": "meal_feedback",
+  "title": "먹은 양을 모르는 음식: 양을 지어내지 않기",
+  "group": "데이터 빈칸",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 70,
+      "quality": 55,
+      "satiety": 50
+    },
+    "mealId": "golden-mf-16",
+    "items": [
+      {
+        "displayName": "된장찌개",
+        "amount": null,
+        "unit": null,
+        "nutrition": null
+      },
+      {
+        "displayName": "밥",
+        "amount": 210,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 5.5,
+          "fiberG": 1.2,
+          "sodiumMg": 3
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 40,
+      "afterPct": 60,
+      "checkins": [],
+      "hungerReturnMinutes": null
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "fiber": "SHORT",
+      "sodium": "OK"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [],
+    "mustNot": [],
+    "warnIfContains": [
+      "된장찌개 300",
+      "된장찌개는 약"
+    ]
+  },
+  "judge": [
+    "양을 모르는 된장찌개의 양이나 성분을 지어내지 않았는가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py _item_line (양 모름)",
+  "reference": {
+    "body": "된장찌개와 밥으로 차린 한 끼였어요. 된장찌개의 양은 기록이 없어서, 알 수 있는 밥 기준으로 보면 식이섬유가 목표에 못 미쳤어요.",
+    "reasoning": "먹는 양이 줄기 쉬운 시기에는 한 끼에 채소 반찬 하나가 큰 차이를 만들어요.",
+    "suggestions": [
+      {
+        "foodName": "시금치나물 한 접시",
+        "advice": "된장찌개 옆에 곁들이기 쉬운 채소 반찬이에요"
+      },
+      {
+        "foodName": "구운 두부 반 모",
+        "advice": "가볍게 단백질을 더하기 좋아요"
+      }
+    ]
+  }
+}

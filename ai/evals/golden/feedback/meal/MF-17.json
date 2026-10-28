@@ -1,0 +1,73 @@
+{
+  "id": "MF-17",
+  "agent": "meal_feedback",
+  "title": "시작기: 식이섬유가 모자라도 생채소·잡곡을 무리하게 권하지 않기",
+  "group": "정상 동작",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "INITIAL",
+    "qqs": {
+      "quantity": 85,
+      "quality": 90,
+      "satiety": 70
+    },
+    "mealId": "golden-mf-18",
+    "items": [
+      {
+        "displayName": "흰죽과 계란찜",
+        "amount": 350,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 280,
+          "proteinG": 14,
+          "fiberG": 1.0,
+          "sodiumMg": 450
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 25,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": 150
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "fiber": "SHORT",
+      "sodium": "OK"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [
+      "식이섬유"
+    ],
+    "mustNot": [],
+    "warnIfContains": []
+  },
+  "judge": [
+    "제안이 시작기에 부담스러운 고섬유 음식(생채소 한 접시, 잡곡밥 등)이 아닌가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py STAGE_RISK[INITIAL] / BE 문서 6장(시작 초기 고섬유 음식 회피)",
+  "reference": {
+    "body": "흰죽과 계란찜은 속이 편한 한 끼였고, 식이섬유는 시작기 목표 5.6g 에 못 미쳤어요.",
+    "reasoning": "시작기에는 부담이 적은 음식부터 조금씩 늘려 가는 게 속 편해요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 고구마 반 개",
+        "advice": "부드럽고 식이섬유를 조금 더하기 좋아요"
+      },
+      {
+        "foodName": "바나나 반 개",
+        "advice": "으깨서 곁들이기 쉬워 부담이 적어요"
+      }
+    ]
+  }
+}

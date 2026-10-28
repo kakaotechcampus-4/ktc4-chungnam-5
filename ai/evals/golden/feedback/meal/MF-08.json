@@ -1,0 +1,93 @@
+{
+  "id": "MF-08",
+  "agent": "meal_feedback",
+  "title": "모두 충분: 칭찬하되 뻔한 표현 없이",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 100,
+      "satiety": 85
+    },
+    "mealId": "golden-mf-08",
+    "items": [
+      {
+        "displayName": "구운 두부와 나물",
+        "amount": 250,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 22,
+          "fiberG": 9.5,
+          "sodiumMg": 500
+        }
+      },
+      {
+        "displayName": "잡곡밥",
+        "amount": 150,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 210,
+          "proteinG": 5,
+          "fiberG": 3,
+          "sodiumMg": 2
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 85,
+      "checkins": [
+        {
+          "checkinOffsetHours": 3,
+          "satietyPct": 70
+        }
+      ],
+      "hungerReturnMinutes": 270
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "fiber": "OK",
+      "sodium": "OK"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [],
+    "mustNot": [],
+    "warnIfContains": [
+      "문제",
+      "개선",
+      "아쉬운",
+      "부족"
+    ]
+  },
+  "judge": [
+    "지금 구성을 구체적으로(어떤 음식이) 칭찬했는가",
+    "억지로 개선점을 만들지 않았는가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py 판정 OK 분기",
+  "reference": {
+    "body": "구운 두부와 나물에 잡곡밥까지, 식이섬유와 나트륨을 모두 기준 안에서 맞췄고 4시간 넘게 든든했어요.",
+    "reasoning": "유지기에는 양이 줄어도 영양이 빠지지 않아야 하는데, 이번 끼니가 그걸 해냈어요.",
+    "suggestions": [
+      {
+        "foodName": "계란찜 한 그릇",
+        "advice": "부드러워서 두부와 번갈아 올리기 좋아요"
+      },
+      {
+        "foodName": "구운 연어 한 토막",
+        "advice": "지금 같은 상차림에 단백질 반찬을 바꿔 올릴 수 있어요"
+      }
+    ]
+  }
+}

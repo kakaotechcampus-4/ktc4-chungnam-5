@@ -1,0 +1,54 @@
+{
+  "id": "CH-05",
+  "agent": "chat_coach",
+  "title": "고정 질문: 장기 피드백 — 있는 요약을 바꾸지 않고 전달",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-05",
+    "text": "장기 피드백 보고싶어",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-28",
+        "meals": []
+      },
+      "baseMeal": null,
+      "longTerm": {
+        "periodType": "WEEKLY",
+        "trendSummary": "최근 일주일 동안 Quality 가 점점 올랐고, 저녁 나트륨이 자주 한도를 넘었어요.",
+        "recommendation": "저녁 국물 요리를 줄여 보세요."
+      }
+    }
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "foodCards": "없음",
+    "mustNot": [],
+    "cardsMustNot": [],
+    "mentionAny": [
+      "나트륨",
+      "국물"
+    ],
+    "warnIfContains": []
+  },
+  "judge": [
+    "장기 피드백 내용을 바꾸거나 부풀리지 않고 전했는가"
+  ],
+  "basis": "develop @09bb46a  frontend/lib/screens/chatbot_screen.dart 고정 질문",
+  "reference": {
+    "text": "일주일 흐름은 Quality 가 점점 오르는 쪽이에요. 저녁에는 나트륨이 한도를 자주 넘었다고 정리돼 있고, 국물 요리를 줄이는 걸 제안하고 있어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": []
+  }
+}

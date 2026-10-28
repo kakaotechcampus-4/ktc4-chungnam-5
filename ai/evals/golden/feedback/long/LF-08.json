@@ -1,0 +1,93 @@
+{
+  "id": "LF-08",
+  "agent": "long_feedback",
+  "title": "월간: 기간이 길어도 추이만 전하기",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [
+    "계약 기준 초안"
+  ],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "periodType": "MONTHLY",
+    "periodStart": "2026-10-19",
+    "periodEnd": "2026-10-25",
+    "stage": "MAINTENANCE",
+    "series": [
+      {
+        "date": "2026-10-19",
+        "quantity": 70,
+        "quality": 50,
+        "satiety": 55
+      },
+      {
+        "date": "2026-10-20",
+        "quantity": 72,
+        "quality": 60,
+        "satiety": 58
+      },
+      {
+        "date": "2026-10-21",
+        "quantity": 68,
+        "quality": 66,
+        "satiety": 50
+      },
+      {
+        "date": "2026-10-22",
+        "quantity": 74,
+        "quality": 72,
+        "satiety": 48
+      },
+      {
+        "date": "2026-10-23",
+        "quantity": 75,
+        "quality": 74,
+        "satiety": 50
+      },
+      {
+        "date": "2026-10-24",
+        "quantity": 74,
+        "quality": 75,
+        "satiety": 52
+      },
+      {
+        "date": "2026-10-25",
+        "quantity": 76,
+        "quality": 78,
+        "satiety": 55
+      }
+    ],
+    "dailySummaries": [
+      "한 달 요약",
+      "한 달 요약",
+      "한 달 요약"
+    ]
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "mentionAny": [
+      "Quality"
+    ],
+    "mustNot": [
+      "완치",
+      "평생"
+    ],
+    "warnIfContains": [
+      "보장"
+    ],
+    "recommendationRequired": true
+  },
+  "judge": [
+    "앞날의 결과를 약속하지 않았는가"
+  ],
+  "basis": "develop @09bb46a  ai-stub/schemas.py LongFeedbackRequest/Response",
+  "note": "AI 쪽 long-feedback 코드와 계약(ai/app/schemas.py 는 'TODO: 계약 미확정')이 없다. ai-stub 계약 기준 초안이다.",
+  "reference": {
+    "trendSummary": "이번 달은 Quality 가 50점에서 78점으로 꾸준히 올랐고, Satiety 는 중간에 48점까지 내려갔다가 55점으로 돌아왔어요.",
+    "recommendation": "Quality 를 올린 식사 구성을 저녁에도 가져가 보는 방법이 있어요.",
+    "safetyStatus": "SAFE"
+  }
+}

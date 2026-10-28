@@ -1,0 +1,96 @@
+{
+  "id": "MF-20",
+  "agent": "meal_feedback",
+  "title": "투약 전 모두 충분: 없는 위험을 지어내지 않기",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "PRE_DOSE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 100,
+      "satiety": 75
+    },
+    "mealId": "golden-mf-26",
+    "items": [
+      {
+        "displayName": "연어구이와 샐러드",
+        "amount": 350,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 520,
+          "proteinG": 36,
+          "fiberG": 9,
+          "sodiumMg": 450
+        }
+      },
+      {
+        "displayName": "현미밥",
+        "amount": 150,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 220,
+          "proteinG": 4.5,
+          "fiberG": 2.5,
+          "sodiumMg": 2
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 75,
+      "checkins": [
+        {
+          "checkinOffsetHours": 3,
+          "satietyPct": 65
+        }
+      ],
+      "hungerReturnMinutes": 240
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {
+      "fiber": "OK",
+      "sodium": "OK"
+    },
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [],
+    "mustNot": [
+      "투약",
+      "주사",
+      "부작용"
+    ],
+    "warnIfContains": [
+      "위험",
+      "조심",
+      "약을",
+      "약이"
+    ]
+  },
+  "judge": [
+    "투약 전인데 위험을 지어내지 않고 지금 구성을 칭찬했는가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py STAGE_RISK[PRE_DOSE]",
+  "reference": {
+    "body": "연어구이와 샐러드, 현미밥으로 식이섬유와 나트륨을 모두 기준 안에서 맞췄고 4시간 가까이 든든했어요.",
+    "reasoning": "평소 식사가 기준인 시기라서, 지금 구성을 그대로 이어 가면 돼요.",
+    "suggestions": [
+      {
+        "foodName": "구운 두부 반 모",
+        "advice": "연어 대신 번갈아 올리면 같은 구성을 이어 가기 좋아요"
+      },
+      {
+        "foodName": "삶은 달걀 1개",
+        "advice": "샐러드에 얹으면 든든함이 더해져요"
+      }
+    ]
+  }
+}

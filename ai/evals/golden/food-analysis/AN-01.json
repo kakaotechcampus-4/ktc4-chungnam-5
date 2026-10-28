@@ -1,0 +1,147 @@
+{
+  "id": "AN-01",
+  "agent": "food_analysis",
+  "title": "한식 백반: 반찬을 하나로 뭉치지 않고 항목별로",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-01",
+    "mealType": "DINNER",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-01.jpg"
+  },
+  "expected": {
+    "minItems": 6,
+    "maxItems": 8,
+    "items": [
+      {
+        "namesAny": [
+          "밥",
+          "공기밥"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          150,
+          250
+        ]
+      },
+      {
+        "namesAny": [
+          "된장찌개"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          200,
+          450
+        ]
+      },
+      {
+        "namesAny": [
+          "고등어",
+          "고등어구이"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          60,
+          150
+        ]
+      },
+      {
+        "namesAny": [
+          "시금치나물",
+          "나물"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          30,
+          100
+        ]
+      },
+      {
+        "namesAny": [
+          "김치"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          20,
+          80
+        ]
+      },
+      {
+        "namesAny": [
+          "계란말이",
+          "달걀말이"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          50,
+          150
+        ]
+      }
+    ]
+  },
+  "judge": [
+    "사진에 보이는 음식을 빠짐없이 개별 항목으로 나눴는가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "공기밥, 된장찌개, 구운 고등어 한 토막, 시금치나물, 김치, 계란말이가 차려진 상",
+    "file": "photos/an-01.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "공기밥",
+        "estimatedAmount": 210,
+        "unit": "g",
+        "confidence": 0.95
+      },
+      {
+        "originalFoodName": "된장찌개",
+        "estimatedAmount": 300,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "고등어구이",
+        "estimatedAmount": 90,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "시금치나물",
+        "estimatedAmount": 60,
+        "unit": "g",
+        "confidence": 0.85
+      },
+      {
+        "originalFoodName": "김치",
+        "estimatedAmount": 40,
+        "unit": "g",
+        "confidence": 0.9
+      },
+      {
+        "originalFoodName": "계란말이",
+        "estimatedAmount": 90,
+        "unit": "g",
+        "confidence": 0.9
+      }
+    ]
+  }
+}

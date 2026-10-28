@@ -1,0 +1,33 @@
+{
+  "dataset": "long_feedback",
+  "name": "장기 피드백",
+  "endpoint": "POST /long-feedback",
+  "what": "기간별 점수 추이 → 추이 요약과 제안",
+  "remark": "AI 쪽 코드와 계약이 아직 없다. ai-stub 계약 기준 초안이다.",
+  "basis": [
+    "develop @09bb46a  ai-stub/schemas.py"
+  ],
+  "commonChecks": [
+    {
+      "type": "code",
+      "rule": "trendSummary 가 비어 있지 않다. recommendation 은 문자열(BLOCKED 면 빈 문자열)",
+      "basis": "LongFeedbackResponse"
+    },
+    {
+      "type": "code",
+      "rule": "series·요약에 없는 체중·kg·점수를 쓰지 않는다 (체중은 입력에 없다)",
+      "basis": "LongFeedbackRequest"
+    },
+    {
+      "type": "code",
+      "rule": "뻔한 표현·명령형·의료 판단을 쓰지 않는다",
+      "basis": "README 규칙 3 / short_feedback _FORBIDDEN"
+    },
+    {
+      "type": "judge",
+      "rule": "series 의 실제 방향과 문장이 일치하는가",
+      "basis": "LongFeedbackRequest.series"
+    }
+  ],
+  "count": 8
+}

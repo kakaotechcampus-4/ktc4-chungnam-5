@@ -1,0 +1,87 @@
+{
+  "id": "CH-25",
+  "agent": "chat_coach",
+  "title": "영어 질문",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-25",
+    "text": "What should I eat for dinner if I want something light but filling?",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-28",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "라면",
+              "김밥"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 60
+            }
+          }
+        ]
+      },
+      "baseMeal": {
+        "mealId": "golden-meal-1",
+        "mealType": "LUNCH",
+        "qqs": {
+          "quantity": 100,
+          "quality": 40,
+          "satiety": 60
+        },
+        "suggestions": [
+          {
+            "foodName": "시금치나물 한 접시",
+            "advice": "식이섬유로 포만감을 채워요"
+          },
+          {
+            "foodName": "두부 반 모",
+            "advice": "단백질을 조금 더 채워요"
+          }
+        ]
+      },
+      "longTerm": null
+    }
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "foodCards": "선택",
+    "mustNot": [],
+    "cardsMustNot": [],
+    "mentionAny": [],
+    "warnIfContains": []
+  },
+  "judge": [
+    "영어로 답했는가"
+  ],
+  "basis": "develop @09bb46a  ai-stub/schemas.py ChatRequest/ChatResponse",
+  "reference": {
+    "text": "Something with protein and vegetables would feel light but filling. Since lunch was ramen and gimbap, a lighter plate with vegetables could balance the day.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "시금치나물 한 접시",
+        "advice": "Adds the vegetables that lunch missed."
+      },
+      {
+        "foodName": "계란찜 한 그릇",
+        "advice": "Soft protein that is easy to finish."
+      }
+    ]
+  }
+}

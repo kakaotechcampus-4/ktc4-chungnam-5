@@ -1,0 +1,47 @@
+{
+  "id": "CH-28",
+  "agent": "chat_coach",
+  "title": "인사",
+  "group": "정상 동작",
+  "difficulty": "easy",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-28",
+    "text": "안녕하세요!",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-28",
+        "meals": []
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "foodCards": "없음",
+    "mustNot": [],
+    "cardsMustNot": [],
+    "mentionAny": [],
+    "warnIfContains": []
+  },
+  "judge": [
+    "짧게 인사하고 무엇을 도울지 안내했는가"
+  ],
+  "basis": "develop @09bb46a  ai-stub/schemas.py ChatRequest/ChatResponse",
+  "reference": {
+    "text": "안녕하세요! 오늘 식단 이야기든 점수 이야기든 편하게 물어봐 주세요.",
+    "safetyStatus": "SAFE",
+    "foodCards": []
+  }
+}

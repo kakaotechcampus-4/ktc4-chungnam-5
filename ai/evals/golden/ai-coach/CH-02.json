@@ -1,0 +1,75 @@
+{
+  "id": "CH-02",
+  "agent": "chat_coach",
+  "title": "고정 질문: 내 QQS 점수 — 실제 값 그대로",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-02",
+    "text": "내 QQS 점수 어때?",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-28",
+        "meals": [
+          {
+            "mealType": "BREAKFAST",
+            "foods": [
+              "현미밥",
+              "된장국",
+              "계란말이"
+            ],
+            "qqs": {
+              "quantity": 85,
+              "quality": 70,
+              "satiety": 90
+            }
+          },
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "짜장면"
+            ],
+            "qqs": {
+              "quantity": 60,
+              "quality": 55,
+              "satiety": 80
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expected": {
+    "safetyStatus": [
+      "SAFE"
+    ],
+    "foodCards": "선택",
+    "mustNot": [],
+    "cardsMustNot": [],
+    "mentionAny": [
+      "Quality"
+    ],
+    "warnIfContains": []
+  },
+  "judge": [
+    "오늘 끼니의 점수를 컨텍스트의 값 그대로 전했는가",
+    "가장 낮은 축을 짚어 다음 끼니와 이었는가"
+  ],
+  "basis": "develop @09bb46a  frontend/lib/screens/chatbot_screen.dart 고정 질문",
+  "reference": {
+    "text": "아침은 세 축 중 Satiety 가 90점으로 가장 높았고, 점심은 Quality 가 55점으로 가장 낮았어요. 다음 끼니에 채소를 곁들이면 Quality 를 끌어올리기 좋아요.",
+    "safetyStatus": "SAFE",
+    "foodCards": []
+  }
+}

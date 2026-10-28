@@ -1,0 +1,86 @@
+{
+  "id": "MF-11",
+  "agent": "meal_feedback",
+  "title": "성분이 전부 비어 있음: 영양이 충분·부족하다 단정 금지",
+  "group": "데이터 빈칸",
+  "difficulty": "hard",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 100,
+      "quality": null,
+      "satiety": 60
+    },
+    "mealId": "golden-mf-11",
+    "items": [
+      {
+        "displayName": "잡채",
+        "amount": 200,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 380,
+          "proteinG": null,
+          "fiberG": null,
+          "sodiumMg": null
+        }
+      },
+      {
+        "displayName": "동그랑땡",
+        "amount": 100,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 250,
+          "proteinG": null,
+          "fiberG": null,
+          "sodiumMg": null
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": null,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": 180
+    }
+  },
+  "expected": {
+    "nutrientJudgement": {},
+    "inferredNutrients": [],
+    "suggestionsCount": [
+      1,
+      3
+    ],
+    "mentionAny": [],
+    "mustNot": [],
+    "warnIfContains": [
+      "균형",
+      "충분",
+      "부족",
+      "초과",
+      "영양이"
+    ]
+  },
+  "judge": [
+    "영양 판정 없이 먹은 음식·포만감만으로 썼는가",
+    "제안이 단백질·채소를 곁들이기 쉬운 무난한 음식인가"
+  ],
+  "basis": "ai/3-feat-short-feedback @e3cd088  ai/app/short_feedback.py 판정 없음 분기",
+  "reference": {
+    "body": "잡채와 동그랑땡으로 차린 한 끼였고, 3시간 동안 배고픔 없이 지나갔어요.",
+    "reasoning": "먹는 양이 줄기 쉬운 시기에는 이렇게 오래가는 끼니가 반가워요.",
+    "suggestions": [
+      {
+        "foodName": "데친 브로콜리 한 줌",
+        "advice": "잡채 옆에 곁들이기 쉬운 무난한 채소예요"
+      },
+      {
+        "foodName": "삶은 달걀 1개",
+        "advice": "동그랑땡 대신 번갈아 올리기 좋아요"
+      }
+    ]
+  }
+}

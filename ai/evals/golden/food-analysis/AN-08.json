@@ -1,0 +1,59 @@
+{
+  "id": "AN-08",
+  "agent": "food_analysis",
+  "title": "수식어 많은 이름: 표준 음식명으로",
+  "group": "정상 동작",
+  "difficulty": "medium",
+  "tags": [],
+  "source": "사전 설계",
+  "input": {
+    "mealId": "golden-an-08",
+    "mealType": "DINNER",
+    "eatenAt": "2026-10-28T12:30:00+09:00",
+    "stage": "MAINTENANCE",
+    "imageUrl": "https://example.invalid/golden/an-08.jpg"
+  },
+  "expected": {
+    "minItems": 1,
+    "maxItems": 3,
+    "items": [
+      {
+        "namesAny": [
+          "양념치킨",
+          "치킨"
+        ],
+        "unitAny": [
+          "g"
+        ],
+        "amountG": [
+          250,
+          700
+        ]
+      }
+    ],
+    "forbiddenNames": [
+      "매콤",
+      "꿀양념",
+      "바삭"
+    ]
+  },
+  "judge": [
+    "수식어를 뗀 표준 음식명인가"
+  ],
+  "basis": "ai/2-feat-food-analyzer @8d19d6f  ai/app/food_analyzer.py _build_prompt",
+  "photo": {
+    "status": "촬영 필요",
+    "scene": "배달 용기에 담긴 양념치킨. 용기에 '매콤달콤 꿀양념 바삭 치킨' 스티커",
+    "file": "photos/an-08.jpg"
+  },
+  "reference": {
+    "items": [
+      {
+        "originalFoodName": "양념치킨",
+        "estimatedAmount": 450,
+        "unit": "g",
+        "confidence": 0.9
+      }
+    ]
+  }
+}
