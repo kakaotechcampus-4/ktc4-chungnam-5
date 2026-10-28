@@ -1,0 +1,88 @@
+{
+  "id": "04-peanut-milk-allergy",
+  "description": "땅콩 · 우유 알레르기 — 카드에 해당 식재료가 나오면 실패",
+  "tags": [
+    "stage:MAINTENANCE",
+    "intent:recommend",
+    "constraint:allergy"
+  ],
+  "input": {
+    "userId": "golden-user-k",
+    "conversationId": "golden-conv-k04",
+    "text": "땅콩이랑 우유 알레르기 있어. 간식 추천해줘",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "세마글루타이드",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-20",
+        "meals": [
+          {
+            "mealType": "BREAKFAST",
+            "foods": [
+              "식빵",
+              "딸기잼",
+              "아메리카노"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 35
+            }
+          },
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "잔치국수"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 45,
+              "satiety": 40
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "required",
+  "hard": {
+    "cardsMustNotContain": [
+      "땅콩",
+      "피넛",
+      "우유",
+      "요거트",
+      "요구르트",
+      "치즈",
+      "라떼",
+      "밀크"
+    ]
+  },
+  "signals": {},
+  "soft": [
+    "알레르기를 확인했다고 답변에서 드러냈는가",
+    "카드 advice 에도 알레르기 식재료가 없는가"
+  ],
+  "reference": {
+    "text": "땅콩과 우유는 빼고, 단백질을 채울 간식으로 골라 봤어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "구운 달걀 2개",
+        "advice": "우유 없이 단백질을 채워요"
+      },
+      {
+        "foodName": "삶은 병아리콩 한 컵",
+        "advice": "고소하게 씹으며 단백질을 더해요"
+      }
+    ]
+  }
+}

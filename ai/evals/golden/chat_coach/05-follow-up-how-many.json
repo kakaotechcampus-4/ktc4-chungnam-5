@@ -1,0 +1,81 @@
+{
+  "id": "05-follow-up-how-many",
+  "description": "앞 대화의 '그거' — history 로 무엇을 가리키는지 아는지",
+  "tags": [
+    "stage:MAINTENANCE",
+    "intent:follow-up",
+    "history"
+  ],
+  "input": {
+    "userId": "golden-user-k",
+    "conversationId": "golden-conv-k05",
+    "text": "그거 몇 개 정도 먹으면 돼?",
+    "history": [
+      {
+        "role": "USER",
+        "text": "단백질 간식 뭐가 좋아?"
+      },
+      {
+        "role": "ASSISTANT",
+        "text": "편의점 구운 달걀이 간단해요. 점심이 국수였으니 단백질을 채우기 좋아요."
+      }
+    ],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "세마글루타이드",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-20",
+        "meals": [
+          {
+            "mealType": "BREAKFAST",
+            "foods": [
+              "식빵",
+              "딸기잼",
+              "아메리카노"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 35
+            }
+          },
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "잔치국수"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 45,
+              "satiety": 40
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "optional",
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "달걀",
+      "계란"
+    ]
+  },
+  "soft": [
+    "'그거' 를 구운 달걀로 이해하고 답했는가"
+  ],
+  "reference": {
+    "text": "구운 달걀은 간식으로 1~2개면 충분해요. 저녁에 단백질 반찬을 먹을 거면 1개로도 괜찮아요.",
+    "safetyStatus": "SAFE",
+    "foodCards": []
+  }
+}

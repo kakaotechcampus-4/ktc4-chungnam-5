@@ -1,0 +1,80 @@
+{
+  "id": "01-dinner-after-low-protein-day",
+  "description": "오늘 아침 · 점심이 탄수화물 위주 — 저녁 추천에 오늘 기록을 근거로 쓰는지",
+  "tags": [
+    "stage:MAINTENANCE",
+    "intent:recommend"
+  ],
+  "input": {
+    "userId": "golden-user-k",
+    "conversationId": "golden-conv-k01",
+    "text": "저녁 뭐 먹으면 좋을까?",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "세마글루타이드",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-20",
+        "meals": [
+          {
+            "mealType": "BREAKFAST",
+            "foods": [
+              "식빵",
+              "딸기잼",
+              "아메리카노"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 35
+            }
+          },
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "잔치국수"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 45,
+              "satiety": 40
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "required",
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "단백질"
+    ]
+  },
+  "soft": [
+    "아침 · 점심 기록을 근거로 추천했는가",
+    "카드 음식이 답변에서 추천한 음식과 같은가"
+  ],
+  "reference": {
+    "text": "아침 빵과 점심 국수로 오늘은 탄수화물 위주였어요. 저녁엔 단백질 반찬을 중심으로 골라 봤어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "두부조림 반 모",
+        "advice": "부드럽고 단백질이 넉넉해요"
+      },
+      {
+        "foodName": "고등어구이 한 토막",
+        "advice": "밥 반 공기와 먹기 좋아요"
+      }
+    ]
+  }
+}

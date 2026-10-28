@@ -1,0 +1,77 @@
+{
+  "id": "03-convenience-store-only",
+  "description": "편의점밖에 없다는 제약 — 바로 살 수 있는 음식만 고르는지",
+  "tags": [
+    "stage:MAINTENANCE",
+    "intent:recommend",
+    "constraint:place"
+  ],
+  "input": {
+    "userId": "golden-user-k",
+    "conversationId": "golden-conv-k03",
+    "text": "지금 편의점밖에 없는데 뭐 사 먹을까?",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "세마글루타이드",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-20",
+        "meals": [
+          {
+            "mealType": "BREAKFAST",
+            "foods": [
+              "식빵",
+              "딸기잼",
+              "아메리카노"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 35
+            }
+          },
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "잔치국수"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 45,
+              "satiety": 40
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "required",
+  "hard": {},
+  "signals": {},
+  "soft": [
+    "모든 카드가 편의점에서 바로 살 수 있는 음식인가",
+    "오늘 부족했던 단백질을 근거로 골랐는가"
+  ],
+  "reference": {
+    "text": "편의점이면 단백질을 바로 채울 수 있는 걸로 골라 봤어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "구운 달걀 2개",
+        "advice": "계산대 옆에서 바로 집을 수 있어요"
+      },
+      {
+        "foodName": "닭가슴살 소시지 1개",
+        "advice": "간단하게 단백질을 채워요"
+      }
+    ]
+  }
+}

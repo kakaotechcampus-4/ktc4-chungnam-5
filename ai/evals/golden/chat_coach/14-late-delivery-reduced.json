@@ -1,0 +1,71 @@
+{
+  "id": "14-late-delivery-reduced",
+  "description": "감량 직후 밤 10시 배달 — 시간 · 단계를 함께 고려하는지",
+  "tags": [
+    "stage:REDUCED",
+    "intent:recommend",
+    "constraint:delivery"
+  ],
+  "input": {
+    "userId": "golden-user-k",
+    "conversationId": "golden-conv-k14",
+    "text": "밤 10시인데 배고파. 배달로 시킬 만한 거 있어?",
+    "history": [],
+    "context": {
+      "stage": "REDUCED",
+      "medication": {
+        "drugName": "세마글루타이드",
+        "doseMg": 0.5
+      },
+      "today": {
+        "date": "2026-10-22",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "제육덮밥"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 75,
+              "satiety": 75
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "required",
+  "hard": {
+    "cardsMustNotContain": [
+      "치킨",
+      "피자",
+      "족발",
+      "떡볶이"
+    ]
+  },
+  "signals": {},
+  "soft": [
+    "늦은 시간이라 가벼운 음식을 골랐는가",
+    "감량 직후 식욕이 돌아오는 상황을 탓하지 않고 다뤘는가"
+  ],
+  "reference": {
+    "text": "늦은 시간이니 속에 부담이 적고 금방 든든해지는 쪽으로 골라 봤어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "순두부찌개 반 그릇",
+        "advice": "따뜻하고 부드럽게 허기를 달래요"
+      },
+      {
+        "foodName": "닭가슴살 샐러드",
+        "advice": "가볍지만 단백질이 있어 오래가요"
+      }
+    ]
+  }
+}

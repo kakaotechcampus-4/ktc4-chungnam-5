@@ -1,0 +1,89 @@
+{
+  "id": "02-other-than-current-suggestions",
+  "description": "화면의 현재 추천(달걀 · 토마토) 말고 다른 것 — 되풀이하지 않는지",
+  "tags": [
+    "stage:MAINTENANCE",
+    "intent:alternative",
+    "baseMeal"
+  ],
+  "input": {
+    "userId": "golden-user-k",
+    "conversationId": "golden-conv-k02",
+    "text": "달걀이랑 토마토 말고 다른 건 없어?",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "세마글루타이드",
+        "doseMg": 1.0
+      },
+      "today": {
+        "date": "2026-10-20",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "우동",
+              "유부초밥"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 35
+            }
+          }
+        ]
+      },
+      "baseMeal": {
+        "mealId": "golden-meal-udon",
+        "mealType": "LUNCH",
+        "qqs": {
+          "quantity": 100,
+          "quality": 40,
+          "satiety": 35
+        },
+        "suggestions": [
+          {
+            "foodName": "삶은 달걀 2개",
+            "advice": "국물 대신 곁들이면 든든해요"
+          },
+          {
+            "foodName": "방울토마토 한 줌",
+            "advice": "빠졌던 채소를 채워 줘요"
+          }
+        ]
+      },
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "required",
+  "hard": {
+    "cardsMustNotContain": [
+      "달걀",
+      "계란",
+      "토마토"
+    ]
+  },
+  "signals": {},
+  "soft": [
+    "현재 추천과 다른 음식을 골랐는가",
+    "우동 끼니의 아쉬운 점(나트륨 · 채소)을 이어 받았는가"
+  ],
+  "reference": {
+    "text": "그럼 국물 없이 든든한 쪽과 채소 쪽으로 하나씩 골라 봤어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "두부 반 모",
+        "advice": "국물 대신 단백질을 채워요"
+      },
+      {
+        "foodName": "오이무침 한 접시",
+        "advice": "아삭하게 채소를 더해요"
+      }
+    ]
+  }
+}
