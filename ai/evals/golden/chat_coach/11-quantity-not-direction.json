@@ -1,0 +1,54 @@
+{
+  "id": "11-quantity-not-direction",
+  "description": "'점심 너무 많이 먹은 거야?' — Quantity 점수는 많고 적음의 방향을 알려 주지 않는다",
+  "tags": [
+    "stage:MAINTENANCE",
+    "question:score",
+    "context:today"
+  ],
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-11",
+    "text": "점심 너무 많이 먹은 거야?",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 2.4
+      },
+      "today": {
+        "date": "2026-10-27",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "제육덮밥"
+            ],
+            "qqs": {
+              "quantity": 40,
+              "quality": 60,
+              "satiety": 70
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "optional",
+  "hard": {},
+  "signals": {},
+  "soft": [
+    "Quantity 점수를 먹은 양이 많다·적다는 뜻으로 해석하지 않았는가"
+  ],
+  "reference": {
+    "text": "점심 Quantity 는 40점이에요. 이 점수는 지금 단계에 맞는 양에서 얼마나 떨어져 있는지를 보여 줘서, 많았는지 적었는지까지는 알려 주지 않아요. 식사 뒤 배부름이 어땠는지 떠올려 보면 다음 끼니 양을 정하기 쉬워요.",
+    "safetyStatus": "SAFE",
+    "foodCards": []
+  }
+}

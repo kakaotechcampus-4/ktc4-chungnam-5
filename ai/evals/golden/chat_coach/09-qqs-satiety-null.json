@@ -1,0 +1,52 @@
+{
+  "id": "09-qqs-satiety-null",
+  "description": "점심 Satiety 가 null(체크인 없음). 포만감을 짐작해 말하면 안 된다",
+  "tags": [
+    "stage:MAINTENANCE",
+    "question:score",
+    "context:unscored_axis"
+  ],
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-09",
+    "text": "점심 점수 어땠어?",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 2.4
+      },
+      "today": {
+        "date": "2026-10-27",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "비빔밥"
+            ],
+            "qqs": {
+              "quantity": 80,
+              "quality": 60,
+              "satiety": null
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "none",
+  "hard": {},
+  "signals": {},
+  "soft": [],
+  "reference": {
+    "text": "점심은 Quantity 80점, Quality 60점이에요. 포만감 점수는 식후 기록이 없어서 매기지 못했어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": []
+  }
+}

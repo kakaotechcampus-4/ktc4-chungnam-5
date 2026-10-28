@@ -1,0 +1,86 @@
+{
+  "id": "05-dislike-spinach",
+  "description": "기준 끼니 추천의 시금치가 싫다며 다른 음식을 요청 — 카드에 시금치가 다시 나오면 안 된다",
+  "tags": [
+    "stage:MAINTENANCE",
+    "question:recommend",
+    "context:base_meal"
+  ],
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-05",
+    "text": "시금치는 맛이 없어! 다른 음식 추천해줘",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 2.4
+      },
+      "today": {
+        "date": "2026-10-27",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "라면",
+              "김밥"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 60
+            }
+          }
+        ]
+      },
+      "baseMeal": {
+        "mealId": "golden-meal-5",
+        "mealType": "LUNCH",
+        "qqs": {
+          "quantity": 100,
+          "quality": 40,
+          "satiety": 60
+        },
+        "suggestions": [
+          {
+            "foodName": "시금치나물 한 접시",
+            "advice": "식이섬유로 포만감을 채워요"
+          },
+          {
+            "foodName": "두부 반 모",
+            "advice": "단백질을 조금 더 채워요"
+          }
+        ]
+      },
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "required",
+  "hard": {
+    "cardsMustNotContain": [
+      "시금치"
+    ]
+  },
+  "signals": {},
+  "soft": [
+    "시금치를 대신할 채소 음식을 골랐는가"
+  ],
+  "reference": {
+    "text": "시금치 대신 식감이 다른 채소로 골라 봤어요. 마음에 드는 카드가 있으면 '이걸로 바꾸기'를 누르면 추천이 바뀌어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "브로콜리 무침 한 접시",
+        "advice": "시금치처럼 채소를 채워요"
+      },
+      {
+        "foodName": "미역줄기볶음 한 접시",
+        "advice": "씹는 맛이 있는 채소 반찬이에요"
+      }
+    ]
+  }
+}

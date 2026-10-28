@@ -1,0 +1,72 @@
+{
+  "id": "02-fixed-qqs-score",
+  "description": "고정 질문 '내 QQS 점수 어때?'. 오늘 두 끼의 점수를 실제 값 그대로 전한다",
+  "tags": [
+    "stage:MAINTENANCE",
+    "question:fixed",
+    "context:today"
+  ],
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-02",
+    "text": "내 QQS 점수 어때?",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 2.4
+      },
+      "today": {
+        "date": "2026-10-27",
+        "meals": [
+          {
+            "mealType": "BREAKFAST",
+            "foods": [
+              "현미밥",
+              "된장국",
+              "계란말이"
+            ],
+            "qqs": {
+              "quantity": 85,
+              "quality": 70,
+              "satiety": 90
+            }
+          },
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "짜장면"
+            ],
+            "qqs": {
+              "quantity": 60,
+              "quality": 55,
+              "satiety": 80
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "optional",
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "Quality"
+    ]
+  },
+  "soft": [
+    "오늘 끼니의 점수를 실제 값 그대로 전했는가",
+    "가장 낮은 축을 짚어 다음 끼니와 이었는가"
+  ],
+  "reference": {
+    "text": "오늘 아침은 Quantity 85점, Quality 70점, Satiety 90점이고, 점심은 Quantity 60점, Quality 55점, Satiety 80점이에요. 두 끼 모두 Quality 가 가장 낮아서, 다음 끼니에 채소나 단백질을 하나 더하면 점수가 오르기 쉬워요.",
+    "safetyStatus": "SAFE",
+    "foodCards": []
+  }
+}

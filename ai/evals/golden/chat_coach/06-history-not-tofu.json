@@ -1,0 +1,77 @@
+{
+  "id": "06-history-not-tofu",
+  "description": "앞선 대화에서 두부를 추천받았고 '두부는 질렸어' — 조건(단백질 저녁)을 이어 가고 두부는 빼야 한다",
+  "tags": [
+    "stage:MAINTENANCE",
+    "question:recommend",
+    "context:history"
+  ],
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-06",
+    "text": "두부는 질렸어. 다른 거",
+    "history": [
+      {
+        "role": "USER",
+        "text": "단백질 많은 저녁 추천해줘"
+      },
+      {
+        "role": "ASSISTANT",
+        "text": "두부구이 한 모는 어때요? 저녁에 부담 없이 단백질을 채울 수 있어요."
+      }
+    ],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 1.7
+      },
+      "today": {
+        "date": "2026-10-27",
+        "meals": [
+          {
+            "mealType": "BREAKFAST",
+            "foods": [
+              "그릭요거트",
+              "바나나"
+            ],
+            "qqs": {
+              "quantity": 90,
+              "quality": 80,
+              "satiety": 70
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "required",
+  "hard": {
+    "cardsMustNotContain": [
+      "두부"
+    ]
+  },
+  "signals": {},
+  "soft": [
+    "앞선 대화의 '단백질 많은 저녁' 조건을 이어서 반영했는가"
+  ],
+  "reference": {
+    "text": "그럼 두부 말고 다른 단백질 반찬으로 골라 볼게요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "닭가슴살 샐러드 한 접시",
+        "advice": "저녁에 가볍게 단백질을 채워요"
+      },
+      {
+        "foodName": "달걀찜 한 그릇",
+        "advice": "부드럽게 단백질을 더해요"
+      }
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "id": "07-no-base-meal-next-meal",
+  "description": "기준 끼니가 없다. 오늘 아침 기록만 보고 다음 끼니를 추천한다",
+  "tags": [
+    "stage:TITRATION",
+    "question:recommend",
+    "context:base_meal_null"
+  ],
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-07",
+    "text": "다음 끼니 뭐 먹지?",
+    "history": [],
+    "context": {
+      "stage": "TITRATION",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 0.5
+      },
+      "today": {
+        "date": "2026-10-27",
+        "meals": [
+          {
+            "mealType": "BREAKFAST",
+            "foods": [
+              "토스트",
+              "아메리카노"
+            ],
+            "qqs": {
+              "quantity": 70,
+              "quality": 45,
+              "satiety": 60
+            }
+          }
+        ]
+      },
+      "baseMeal": null,
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "required",
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "토스트",
+      "아침"
+    ]
+  },
+  "soft": [
+    "아침 기록을 보고 다음 끼니를 골랐는가"
+  ],
+  "reference": {
+    "text": "아침이 토스트와 커피라 단백질과 채소가 거의 없었어요. 점심에는 둘을 같이 채우는 메뉴가 잘 맞아요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "닭가슴살 샐러드 한 접시",
+        "advice": "아침에 빠진 단백질과 채소를 함께 채워요"
+      },
+      {
+        "foodName": "고등어구이 정식",
+        "advice": "생선으로 단백질을 채워요"
+      }
+    ]
+  }
+}

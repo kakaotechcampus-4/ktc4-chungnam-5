@@ -1,0 +1,82 @@
+{
+  "id": "08-apply-request",
+  "description": "'달걀찜으로 바꿔줘' — AI 는 추천을 직접 바꿀 수 없다. 카드를 내고 버튼을 안내한다",
+  "tags": [
+    "stage:MAINTENANCE",
+    "question:recommend",
+    "context:base_meal"
+  ],
+  "input": {
+    "userId": "golden-user",
+    "conversationId": "golden-conv-08",
+    "text": "두부 반 모 말고 달걀찜으로 바꿔줘",
+    "history": [],
+    "context": {
+      "stage": "MAINTENANCE",
+      "medication": {
+        "drugName": "위고비",
+        "doseMg": 2.4
+      },
+      "today": {
+        "date": "2026-10-27",
+        "meals": [
+          {
+            "mealType": "LUNCH",
+            "foods": [
+              "라면",
+              "김밥"
+            ],
+            "qqs": {
+              "quantity": 100,
+              "quality": 40,
+              "satiety": 60
+            }
+          }
+        ]
+      },
+      "baseMeal": {
+        "mealId": "golden-meal-8",
+        "mealType": "LUNCH",
+        "qqs": {
+          "quantity": 100,
+          "quality": 40,
+          "satiety": 60
+        },
+        "suggestions": [
+          {
+            "foodName": "시금치나물 한 접시",
+            "advice": "식이섬유로 포만감을 채워요"
+          },
+          {
+            "foodName": "두부 반 모",
+            "advice": "단백질을 조금 더 채워요"
+          }
+        ]
+      },
+      "longTerm": null
+    }
+  },
+  "expectedSafety": [
+    "SAFE"
+  ],
+  "expectedCards": "required",
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "바꾸기"
+    ]
+  },
+  "soft": [
+    "직접 바꿨다고 하지 않고, 카드의 '이걸로 바꾸기'로 교체할 수 있다고 안내했는가"
+  ],
+  "reference": {
+    "text": "달걀찜으로 골라 봤어요. 카드의 '이걸로 바꾸기'를 누르면 추천이 달걀찜으로 바뀌어요.",
+    "safetyStatus": "SAFE",
+    "foodCards": [
+      {
+        "foodName": "달걀찜 한 그릇",
+        "advice": "두부처럼 부드럽게 단백질을 채워요"
+      }
+    ]
+  }
+}
