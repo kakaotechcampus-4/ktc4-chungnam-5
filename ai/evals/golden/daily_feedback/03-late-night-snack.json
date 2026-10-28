@@ -1,0 +1,64 @@
+{
+  "id": "03-late-night-snack",
+  "description": "점심 · 저녁은 괜찮다가 밤 간식에서 무너짐 — 시간대 흐름을 읽는지",
+  "tags": [
+    "stage:REDUCED",
+    "meals:3",
+    "meal:SNACK"
+  ],
+  "input": {
+    "scope": "DAILY",
+    "userId": "golden-user-k",
+    "stage": "REDUCED",
+    "qqs": {
+      "quantity": 90,
+      "quality": 65,
+      "satiety": 55
+    },
+    "date": "2026-10-22",
+    "meals": [
+      {
+        "mealType": "LUNCH",
+        "summary": "제육덮밥으로 든든하게 먹었어요.",
+        "qqs": {
+          "quantity": 100,
+          "quality": 75,
+          "satiety": 75
+        }
+      },
+      {
+        "mealType": "DINNER",
+        "summary": "두부조림과 나물로 가볍게 먹었어요.",
+        "qqs": {
+          "quantity": 100,
+          "quality": 85,
+          "satiety": 60
+        }
+      },
+      {
+        "mealType": "SNACK",
+        "summary": "밤 11시에 과자 한 봉지를 먹었어요.",
+        "qqs": {
+          "quantity": 80,
+          "quality": 30,
+          "satiety": 30
+        }
+      }
+    ]
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "밤",
+      "간식",
+      "과자"
+    ]
+  },
+  "soft": [
+    "감량 직후 식욕이 돌아오는 위험을 밤 간식과 이어 썼는가",
+    "간식을 탓하는 말투가 아닌가"
+  ],
+  "reference": {
+    "body": "점심 · 저녁은 잘 챙겼는데, 저녁이 가벼웠던 만큼 밤늦게 과자로 허기를 달랬어요."
+  }
+}

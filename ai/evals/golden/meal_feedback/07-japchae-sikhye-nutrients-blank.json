@@ -1,0 +1,78 @@
+{
+  "id": "07-japchae-sikhye-nutrients-blank",
+  "description": "잡채 + 식혜, 성분은 kcal 만 — 판정 못 한 영양소를 짐작하지 않는지 (Quality null)",
+  "tags": [
+    "stage:MAINTENANCE",
+    "nutrients:blank"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user-k",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": null,
+      "satiety": 55
+    },
+    "mealId": "golden-meal-k07",
+    "items": [
+      {
+        "displayName": "잡채",
+        "amount": 200,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": null,
+          "fiberG": null,
+          "sodiumMg": null
+        }
+      },
+      {
+        "displayName": "식혜",
+        "amount": 250,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 200,
+          "proteinG": null,
+          "fiberG": null,
+          "sodiumMg": null
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 70,
+      "checkins": [
+        {
+          "checkinOffsetHours": 2,
+          "satietyPct": 40
+        }
+      ],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {},
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "단백질이 부족",
+      "나트륨이 많",
+      "식이섬유가 부족"
+    ]
+  },
+  "soft": [
+    "단백질 · 식이섬유 · 나트륨을 충분하다 · 부족하다고 평가하지 않았는가",
+    "기록에 없는 숫자를 쓰지 않았는가"
+  ],
+  "reference": {
+    "body": "잡채와 식혜로 드신 끼니예요. 두 시간 뒤 포만감이 절반 아래로 내려갔어요.",
+    "reasoning": "유지기에는 한 끼가 오래 든든해야 간식이 줄어요.",
+    "suggestions": [
+      {
+        "foodName": "삶은 달걀 1개",
+        "advice": "잡채 옆에 곁들이면 든든함이 오래가요"
+      }
+    ]
+  }
+}

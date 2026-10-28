@@ -1,0 +1,61 @@
+{
+  "id": "01-dinner-dropped",
+  "description": "세 끼 중 저녁만 무너진 하루 — 끼니 요약을 되풀이하지 않고 흐름 하나를",
+  "tags": [
+    "stage:MAINTENANCE",
+    "meals:3"
+  ],
+  "input": {
+    "scope": "DAILY",
+    "userId": "golden-user-k",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 70,
+      "satiety": 62
+    },
+    "date": "2026-10-20",
+    "meals": [
+      {
+        "mealType": "BREAKFAST",
+        "summary": "그릭요거트와 견과류로 단백질을 챙겼어요.",
+        "qqs": {
+          "quantity": 100,
+          "quality": 95,
+          "satiety": 85
+        }
+      },
+      {
+        "mealType": "LUNCH",
+        "summary": "비빔밥으로 채소는 충분했고 단백질은 조금 아쉬웠어요.",
+        "qqs": {
+          "quantity": 100,
+          "quality": 80,
+          "satiety": 65
+        }
+      },
+      {
+        "mealType": "DINNER",
+        "summary": "라면 국물에서 나트륨이 많이 나왔고 금방 배고파졌어요.",
+        "qqs": {
+          "quantity": 100,
+          "quality": 35,
+          "satiety": 35
+        }
+      }
+    ]
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "저녁"
+    ]
+  },
+  "soft": [
+    "끼니별 요약을 그대로 옮기지 않고 하루 흐름 하나를 짚었는가",
+    "어느 끼니 이야기인지 드러나게 썼는가"
+  ],
+  "reference": {
+    "body": "아침 · 점심은 든든하게 이어 갔는데, 저녁 라면에서 흐름이 끊기면서 밤에 금방 배가 고파졌어요."
+  }
+}

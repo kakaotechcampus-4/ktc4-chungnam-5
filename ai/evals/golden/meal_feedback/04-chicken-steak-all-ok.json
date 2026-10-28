@@ -1,0 +1,92 @@
+{
+  "id": "04-chicken-steak-all-ok",
+  "description": "닭가슴살 스테이크 · 구운 채소 · 고구마 — 다 채운 끼니. 칭찬을 먼저, 억지 지적 없이",
+  "tags": [
+    "stage:MAINTENANCE",
+    "all:OK"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user-k",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 100,
+      "satiety": 90
+    },
+    "mealId": "golden-meal-k04",
+    "items": [
+      {
+        "displayName": "닭가슴살 스테이크",
+        "amount": 150,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 250,
+          "proteinG": 35,
+          "fiberG": 0.0,
+          "sodiumMg": 400
+        }
+      },
+      {
+        "displayName": "구운 채소",
+        "amount": 200,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 120,
+          "proteinG": 4,
+          "fiberG": 7.0,
+          "sodiumMg": 200
+        }
+      },
+      {
+        "displayName": "군고구마",
+        "amount": 150,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 190,
+          "proteinG": 2,
+          "fiberG": 4.5,
+          "sodiumMg": 30
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 25,
+      "afterPct": 80,
+      "checkins": [
+        {
+          "checkinOffsetHours": 3,
+          "satietyPct": 70
+        }
+      ],
+      "hungerReturnMinutes": 260,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "부족",
+      "초과",
+      "아쉬"
+    ]
+  },
+  "soft": [
+    "잘한 점을 이번 음식과 연결해 구체적으로 썼는가",
+    "없는 문제를 만들어 지적하지 않았는가"
+  ],
+  "reference": {
+    "body": "닭가슴살에 구운 채소와 고구마까지, 단백질과 채소를 한 접시에 고르게 담았어요. 네 시간 넘게 든든했죠.",
+    "reasoning": "유지기에는 이렇게 오래 든든한 끼니가 간식 생각을 줄여 줘요.",
+    "suggestions": [
+      {
+        "foodName": "연두부 한 모",
+        "advice": "닭가슴살이 질릴 때 바꿔 넣기 좋은 단백질이에요"
+      }
+    ]
+  }
+}

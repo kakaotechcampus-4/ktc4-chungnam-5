@@ -1,0 +1,78 @@
+{
+  "id": "08-sundae-amount-unknown",
+  "description": "순대(양 모름) + 삶은 달걀 — 모르는 양을 단정하지 않는지",
+  "tags": [
+    "stage:MAINTENANCE",
+    "amount:null"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user-k",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 70,
+      "satiety": 60
+    },
+    "mealId": "golden-meal-k08",
+    "items": [
+      {
+        "displayName": "순대",
+        "amount": null,
+        "unit": null,
+        "nutrition": {
+          "kcal": 380,
+          "proteinG": 14,
+          "fiberG": 2.0,
+          "sodiumMg": 690
+        }
+      },
+      {
+        "displayName": "삶은 달걀",
+        "amount": 50,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 75,
+          "proteinG": 6.5,
+          "fiberG": 0.0,
+          "sodiumMg": 65
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OK"
+  },
+  "hard": {
+    "mustNotContain": [
+      "순대 1인분",
+      "순대 한 접시"
+    ]
+  },
+  "signals": {
+    "mustMentionAny": [
+      "순대"
+    ]
+  },
+  "soft": [
+    "순대를 얼마나 먹었는지 단정하지 않았는가"
+  ],
+  "reference": {
+    "body": "순대에 삶은 달걀을 곁들여 단백질은 챙겼는데, 채소가 빠졌어요.",
+    "reasoning": "유지기에는 양이 줄어든 만큼 한 끼에 채소가 함께 들어가야 영양이 고르게 채워져요.",
+    "suggestions": [
+      {
+        "foodName": "부추무침 한 접시",
+        "advice": "순대와 잘 어울리고 채소를 바로 채워 줘요"
+      }
+    ]
+  }
+}

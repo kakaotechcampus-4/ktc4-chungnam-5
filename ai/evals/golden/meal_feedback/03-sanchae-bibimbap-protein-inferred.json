@@ -1,0 +1,71 @@
+{
+  "id": "03-sanchae-bibimbap-protein-inferred",
+  "description": "산채비빔밥 — 섬유 · 나트륨은 충족, Quality 85 라 단백질만 '부족했을 수 있음'",
+  "tags": [
+    "stage:MAINTENANCE",
+    "protein:inferred"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user-k",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 85,
+      "satiety": 70
+    },
+    "mealId": "golden-meal-k03",
+    "items": [
+      {
+        "displayName": "산채비빔밥",
+        "amount": 450,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 550,
+          "proteinG": 12,
+          "fiberG": 9.5,
+          "sodiumMg": 700
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 75,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "protein": "SHORT",
+    "fiber": "OK",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "단백질"
+    ],
+    "mustNotContain": [
+      "나트륨이 많"
+    ]
+  },
+  "soft": [
+    "단백질 부족을 단정하지 않고 '조금 아쉬웠을 수 있다' 수준으로 썼는가",
+    "나물로 채소를 잘 챙긴 점을 먼저 짚었는가"
+  ],
+  "reference": {
+    "body": "나물이 넉넉해서 채소는 충분히 챙겼어요. 다만 고기나 달걀이 거의 없어 단백질은 조금 아쉬웠을 수 있어요.",
+    "reasoning": "유지기에는 양이 줄어든 만큼 한 끼에 단백질을 하나씩 얹어야 근육을 지키기 쉬워요.",
+    "suggestions": [
+      {
+        "foodName": "달걀프라이 1개",
+        "advice": "비빔밥 위에 올리기만 하면 단백질이 채워져요"
+      },
+      {
+        "foodName": "두부부침 3조각",
+        "advice": "나물 반찬과 잘 어울리는 단백질 반찬이에요"
+      }
+    ]
+  }
+}

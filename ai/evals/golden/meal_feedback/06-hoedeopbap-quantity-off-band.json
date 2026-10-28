@@ -1,0 +1,58 @@
+{
+  "id": "06-hoedeopbap-quantity-off-band",
+  "description": "회덮밥, Quantity 55 — 많이/적게 먹었다는 방향을 말하지 않는지",
+  "tags": [
+    "stage:TITRATION",
+    "quantity:off-band"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user-k",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 55,
+      "quality": 80,
+      "satiety": 70
+    },
+    "mealId": "golden-meal-k06",
+    "items": [
+      {
+        "displayName": "회덮밥",
+        "amount": 400,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 520,
+          "proteinG": 28,
+          "fiberG": 5.0,
+          "sodiumMg": 650
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 15,
+      "afterPct": 80,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {},
+  "soft": [
+    "양이 권장 구간을 벗어났다는 사실만 다루고 방향(과식 · 소식)은 말하지 않았는가"
+  ],
+  "reference": {
+    "body": "회덮밥으로 단백질과 채소를 한 그릇에 담았는데, 이번 끼니 양은 지금 단계의 권장 구간에서 벗어났어요.",
+    "reasoning": "용량을 조정하는 동안에는 끼니마다 양이 들쭉날쭉하기 쉬워서 비슷한 양을 유지하는 게 도움이 돼요.",
+    "suggestions": [
+      {
+        "foodName": "미역줄기볶음 한 접시",
+        "advice": "회덮밥에 곁들이면 채소를 조금 더 채울 수 있어요"
+      }
+    ]
+  }
+}

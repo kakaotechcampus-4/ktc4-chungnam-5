@@ -1,0 +1,79 @@
+{
+  "id": "02-initial-beef-porridge",
+  "description": "시작기 소고기죽 + 백김치 — 시작기 목표(5.6g)로 식이섬유 부족만",
+  "tags": [
+    "stage:INITIAL",
+    "fiber:SHORT"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user-k",
+    "stage": "INITIAL",
+    "qqs": {
+      "quantity": 100,
+      "quality": 70,
+      "satiety": 75
+    },
+    "mealId": "golden-meal-k02",
+    "items": [
+      {
+        "displayName": "소고기죽",
+        "amount": 400,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 15,
+          "fiberG": 1.2,
+          "sodiumMg": 600
+        }
+      },
+      {
+        "displayName": "백김치",
+        "amount": 40,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 8,
+          "proteinG": 0.4,
+          "fiberG": 0.8,
+          "sodiumMg": 120
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 75,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OK"
+  },
+  "hard": {},
+  "signals": {
+    "mustNotContain": [
+      "나트륨이 많",
+      "나트륨 초과"
+    ]
+  },
+  "soft": [
+    "시작기에 맞게 부담이 적은 채소 음식을 제안했는가",
+    "죽을 먹은 이유(시작기 속 불편)를 짐작해 의료적으로 해석하지 않았는가"
+  ],
+  "reference": {
+    "body": "소고기죽으로 단백질은 챙겼는데, 백김치 조금 말고는 채소가 거의 없었어요.",
+    "reasoning": "시작기에는 속이 편한 음식 위주가 되기 쉬워서, 부드러운 채소를 조금씩 더하는 게 좋아요.",
+    "suggestions": [
+      {
+        "foodName": "애호박나물 반 접시",
+        "advice": "부드럽게 익혀서 죽과 같이 먹기 편해요"
+      },
+      {
+        "foodName": "바나나 반 개",
+        "advice": "식후 간식으로 부담 없이 식이섬유를 채울 수 있어요"
+      }
+    ]
+  }
+}

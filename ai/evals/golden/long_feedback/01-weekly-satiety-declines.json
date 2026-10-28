@@ -1,0 +1,85 @@
+{
+  "id": "01-weekly-satiety-declines",
+  "description": "주 후반으로 갈수록 포만감 하락 — 추세 하나와 바로 할 수 있는 권고 하나",
+  "tags": [
+    "stage:MAINTENANCE",
+    "period:WEEKLY",
+    "trend:down"
+  ],
+  "input": {
+    "userId": "golden-user-k",
+    "periodType": "WEEKLY",
+    "periodStart": "2026-10-13",
+    "periodEnd": "2026-10-19",
+    "stage": "MAINTENANCE",
+    "series": [
+      {
+        "date": "2026-10-13",
+        "quantity": 100,
+        "quality": 80,
+        "satiety": 80
+      },
+      {
+        "date": "2026-10-14",
+        "quantity": 100,
+        "quality": 78,
+        "satiety": 76
+      },
+      {
+        "date": "2026-10-15",
+        "quantity": 100,
+        "quality": 75,
+        "satiety": 70
+      },
+      {
+        "date": "2026-10-16",
+        "quantity": 90,
+        "quality": 70,
+        "satiety": 62
+      },
+      {
+        "date": "2026-10-17",
+        "quantity": 80,
+        "quality": 60,
+        "satiety": 50
+      },
+      {
+        "date": "2026-10-18",
+        "quantity": 80,
+        "quality": 55,
+        "satiety": 45
+      },
+      {
+        "date": "2026-10-19",
+        "quantity": 90,
+        "quality": 60,
+        "satiety": 48
+      }
+    ],
+    "dailySummaries": [
+      "주 초반에는 아침 단백질을 잘 챙겼어요.",
+      "금요일부터 배달 음식이 늘고 채소가 줄었어요.",
+      "주말 저녁 끼니가 늦어지면서 금방 배고파졌어요."
+    ]
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "포만",
+      "배고",
+      "든든"
+    ],
+    "mustNotContain": [
+      "과식",
+      "소식"
+    ]
+  },
+  "soft": [
+    "주 후반 하락을 배달 · 늦은 저녁과 연결했는가",
+    "권고가 다음 주에 바로 할 수 있는 한 가지인가"
+  ],
+  "reference": {
+    "trendSummary": "주 초반엔 아침 단백질 덕에 든든했는데, 금요일부터 배달과 늦은 저녁이 늘면서 포만감이 눈에 띄게 짧아졌어요.",
+    "recommendation": "다음 주에는 금요일 저녁 한 끼만 미리 정해 두면 주말 흐름을 지키기 쉬워요."
+  }
+}

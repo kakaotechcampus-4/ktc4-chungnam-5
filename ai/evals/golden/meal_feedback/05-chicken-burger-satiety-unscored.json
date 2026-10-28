@@ -1,0 +1,69 @@
+{
+  "id": "05-chicken-burger-satiety-unscored",
+  "description": "치킨버거 + 감자튀김, 포만감 기록 없음 — 포만감을 평가하지 않는지",
+  "tags": [
+    "stage:TITRATION",
+    "satiety:null"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user-k",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 100,
+      "quality": 55,
+      "satiety": null
+    },
+    "mealId": "golden-meal-k05",
+    "items": [
+      {
+        "displayName": "치킨버거",
+        "amount": 230,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 520,
+          "proteinG": 24,
+          "fiberG": 2.0,
+          "sodiumMg": 1100
+        }
+      },
+      {
+        "displayName": "감자튀김",
+        "amount": 110,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 330,
+          "proteinG": 4,
+          "fiberG": 3.0,
+          "sodiumMg": 250
+        }
+      }
+    ],
+    "satiety": null
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "버거",
+      "감자튀김"
+    ]
+  },
+  "soft": [
+    "포만감 · 배고픔을 짐작해 쓰지 않았는가",
+    "패스트푸드를 탓하지 않고 다음에 바꿀 수 있는 방법을 제안했는가"
+  ],
+  "reference": {
+    "body": "치킨버거 소스와 감자튀김에서 나트륨이 한 끼 한도를 넘었고, 채소는 버거 속 양상추 정도였어요.",
+    "reasoning": "용량을 조정하는 동안에는 적게 먹더라도 한 끼에 채소가 들어가야 영양이 비지 않아요.",
+    "suggestions": [
+      {
+        "foodName": "감자튀김 대신 코울슬로",
+        "advice": "세트 사이드만 바꿔도 채소가 들어가요"
+      }
+    ]
+  }
+}

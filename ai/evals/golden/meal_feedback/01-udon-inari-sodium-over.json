@@ -1,0 +1,86 @@
+{
+  "id": "01-udon-inari-sodium-over",
+  "description": "우동 + 유부초밥 — 국물 나트륨 초과 · 식이섬유 부족, 금방 배고파짐. 원인 음식을 짚는지",
+  "tags": [
+    "stage:MAINTENANCE",
+    "sodium:OVER",
+    "fiber:SHORT"
+  ],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user-k",
+    "stage": "MAINTENANCE",
+    "qqs": {
+      "quantity": 100,
+      "quality": 40,
+      "satiety": 35
+    },
+    "mealId": "golden-meal-k01",
+    "items": [
+      {
+        "displayName": "우동",
+        "amount": 600,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 450,
+          "proteinG": 12,
+          "fiberG": 2.0,
+          "sodiumMg": 2100
+        }
+      },
+      {
+        "displayName": "유부초밥",
+        "amount": 150,
+        "unit": "g",
+        "nutrition": {
+          "kcal": 300,
+          "proteinG": 7,
+          "fiberG": 1.0,
+          "sodiumMg": 500
+        }
+      }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 80,
+      "checkins": [
+        {
+          "checkinOffsetHours": 2,
+          "satietyPct": 25
+        }
+      ],
+      "hungerReturnMinutes": 110,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {
+    "fiber": "SHORT",
+    "sodium": "OVER"
+  },
+  "hard": {},
+  "signals": {
+    "mustMentionAny": [
+      "우동",
+      "국물"
+    ]
+  },
+  "soft": [
+    "나트륨을 우동 국물과 연결해 썼는가",
+    "다시 배고파진 경험을 사용자가 겪은 일로 썼는가",
+    "제안이 이번 끼니를 바꾸거나 더하는 구체적인 음식인가"
+  ],
+  "reference": {
+    "body": "유부초밥까지는 괜찮았는데, 우동 국물에서 나트륨이 한 끼 한도를 훌쩍 넘었어요. 채소가 거의 없어서 두 시간도 안 돼 다시 출출해졌죠.",
+    "reasoning": "유지기에는 먹는 양이 줄어든 만큼 한 끼 안에 채소가 들어가야 다음 끼니까지 버티기 쉬워요.",
+    "suggestions": [
+      {
+        "foodName": "우동 국물 절반 남기기",
+        "advice": "면은 그대로 즐기고 국물만 덜어도 나트륨이 크게 줄어요"
+      },
+      {
+        "foodName": "오이무침 한 접시",
+        "advice": "유부초밥 옆에 곁들이면 아삭한 채소로 포만감이 오래가요"
+      }
+    ]
+  }
+}

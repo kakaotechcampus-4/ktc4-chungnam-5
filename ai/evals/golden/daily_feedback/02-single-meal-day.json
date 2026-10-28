@@ -1,0 +1,48 @@
+{
+  "id": "02-single-meal-day",
+  "description": "기록이 점심 한 끼뿐인 하루 — '하루 종일' 처럼 과장하지 않는지",
+  "tags": [
+    "stage:TITRATION",
+    "meals:1"
+  ],
+  "input": {
+    "scope": "DAILY",
+    "userId": "golden-user-k",
+    "stage": "TITRATION",
+    "qqs": {
+      "quantity": 100,
+      "quality": 85,
+      "satiety": 70
+    },
+    "date": "2026-10-21",
+    "meals": [
+      {
+        "mealType": "LUNCH",
+        "summary": "닭가슴살 샐러드로 단백질과 채소를 함께 챙겼어요.",
+        "qqs": {
+          "quantity": 100,
+          "quality": 85,
+          "satiety": 70
+        }
+      }
+    ]
+  },
+  "hard": {
+    "mustNotContain": [
+      "세 끼",
+      "하루 종일"
+    ]
+  },
+  "signals": {
+    "mustNotContain": [
+      "아침",
+      "저녁"
+    ]
+  },
+  "soft": [
+    "기록된 끼니가 하나라는 점을 넘겨짚지 않았는가"
+  ],
+  "reference": {
+    "body": "오늘 기록된 점심 한 끼는 닭가슴살 샐러드로 단백질과 채소를 함께 챙겼어요."
+  }
+}

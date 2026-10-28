@@ -1,0 +1,61 @@
+{
+  "id": "02-monthly-sparse-data",
+  "description": "한 달 중 기록이 4일뿐 — 적은 기록으로 추세를 단정하지 않는지",
+  "tags": [
+    "stage:TITRATION",
+    "period:MONTHLY",
+    "data:sparse"
+  ],
+  "input": {
+    "userId": "golden-user-k",
+    "periodType": "MONTHLY",
+    "periodStart": "2026-09-01",
+    "periodEnd": "2026-09-30",
+    "stage": "TITRATION",
+    "series": [
+      {
+        "date": "2026-09-03",
+        "quantity": 100,
+        "quality": 60,
+        "satiety": 55
+      },
+      {
+        "date": "2026-09-11",
+        "quantity": 100,
+        "quality": 70,
+        "satiety": 60
+      },
+      {
+        "date": "2026-09-19",
+        "quantity": 90,
+        "quality": 72,
+        "satiety": 65
+      },
+      {
+        "date": "2026-09-28",
+        "quantity": 100,
+        "quality": 75,
+        "satiety": 70
+      }
+    ],
+    "dailySummaries": [
+      "9월 초에는 점심을 편의점으로 때웠어요.",
+      "중순부터 집밥이 조금 늘었어요."
+    ]
+  },
+  "hard": {
+    "mustNotContain": [
+      "매일",
+      "꾸준히 기록"
+    ]
+  },
+  "signals": {},
+  "soft": [
+    "기록이 적다는 점을 드러내고 추세를 단정하지 않았는가",
+    "기록을 늘리자는 권고가 부담스럽지 않은가"
+  ],
+  "reference": {
+    "trendSummary": "이번 달은 기록이 나흘뿐이라 조심스럽지만, 기록된 날만 보면 중순 이후 집밥이 늘면서 점수가 조금씩 올랐어요.",
+    "recommendation": "다음 달에는 점심 한 끼만이라도 꾸준히 남겨 보면 흐름을 더 정확히 볼 수 있어요."
+  }
+}
