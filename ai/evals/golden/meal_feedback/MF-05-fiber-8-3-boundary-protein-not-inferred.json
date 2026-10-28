@@ -1,0 +1,57 @@
+{
+  "id": "MF-05-fiber-8-3-boundary-protein-not-inferred",
+  "description": "식이섬유 8.3g — 화면 기준(8.3)으로는 OK, 채점 기준(8.33…)으로는 미달. Quality 96 이어도 깎인 원인을 단백질로 짐작하면 안 된다",
+  "grade": "critical",
+  "source": "design",
+  "group": "경계값",
+  "tags": ["meal:BREAKFAST", "stage:MAINTENANCE", "boundary:fiber_rounding", "protein:not_inferred"],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": { "quantity": 100, "quality": 96, "satiety": 70 },
+    "mealId": "golden-meal-05",
+    "items": [
+      { "displayName": "그릭요거트 귀리볼", "amount": 280, "unit": "g", "nutrition": { "kcal": 360, "proteinG": 15, "fiberG": 8.3, "sodiumMg": 120 } }
+    ],
+    "satiety": {
+      "beforePct": 25,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": { "fiber": "OK", "sodium": "OK" },
+  "hard": { "mustNotContain": ["단백질이 부족", "단백질은 부족", "단백질이 모자"] },
+  "signals": {},
+  "review": ["식이섬유를 '목표에 살짝 못 미쳤다' 처럼 화면과 다르게 쓰지 않았는가"],
+  "reference": {
+    "body": "그릭요거트 귀리볼 하나로 식이섬유를 끼니 목표인 8.3g만큼 채웠고, 나트륨은 120mg으로 한도 안이었어요.",
+    "reasoning": "유지기에는 한 끼 양이 줄어도 영양이 빠지지 않는 게 중요한데, 이번 아침이 그 기준을 지켰어요.",
+    "suggestions": [
+      { "foodName": "바나나 한 개", "advice": "귀리볼에 얹으면 같은 구성으로 아침을 이어 가기 좋아요" },
+      { "foodName": "견과류 한 줌", "advice": "요거트에 곁들이기 쉬운 고소한 토핑이에요" }
+    ]
+  },
+  "counterexamples": [
+    {
+      "why": "화면은 OK 인데 식이섬유가 모자랐다고 씀",
+      "response": {
+        "body": "식이섬유가 살짝 모자랐어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "바나나 한 개", "advice": "귀리볼에 얹기 좋아요" }]
+      },
+      "failsOn": ["no_contradict_rule"]
+    },
+    {
+      "why": "Quality 감점을 단백질 탓으로 짐작",
+      "response": {
+        "body": "식이섬유와 나트륨은 괜찮았지만 단백질이 부족했어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "바나나 한 개", "advice": "귀리볼에 얹기 좋아요" }]
+      },
+      "failsOn": ["unjudged_nutrient_silent", "case_must_not_contain"]
+    }
+  ]
+}

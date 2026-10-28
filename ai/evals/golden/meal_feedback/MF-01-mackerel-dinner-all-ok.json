@@ -1,0 +1,68 @@
+{
+  "id": "MF-01-mackerel-dinner-all-ok",
+  "description": "유지기 저녁. 식이섬유 · 나트륨 모두 기준 안 — 잘한 점을 이번 음식과 이어 쓰고, 부족 · 초과를 지어내지 않는다",
+  "grade": "normal",
+  "source": "design",
+  "group": "정상",
+  "tags": ["meal:DINNER", "stage:MAINTENANCE", "gap:none"],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": { "quantity": 100, "quality": 100, "satiety": 80 },
+    "mealId": "golden-meal-01",
+    "items": [
+      { "displayName": "현미밥", "amount": 210, "unit": "g", "nutrition": { "kcal": 310, "proteinG": 6.5, "fiberG": 3.6, "sodiumMg": 5 } },
+      { "displayName": "고등어구이", "amount": 120, "unit": "g", "nutrition": { "kcal": 280, "proteinG": 22, "fiberG": 0, "sodiumMg": 420 } },
+      { "displayName": "시금치나물", "amount": 70, "unit": "g", "nutrition": { "kcal": 35, "proteinG": 2.1, "fiberG": 2.6, "sodiumMg": 180 } },
+      { "displayName": "쌈채소", "amount": 100, "unit": "g", "nutrition": { "kcal": 18, "proteinG": 1.5, "fiberG": 2.3, "sodiumMg": 15 } }
+    ],
+    "satiety": {
+      "beforePct": 20,
+      "afterPct": 75,
+      "checkins": [{ "checkinOffsetHours": 3, "satietyPct": 60 }],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": { "fiber": "OK", "sodium": "OK" },
+  "hard": {},
+  "signals": { "mustMentionAny": ["현미밥", "고등어", "시금치", "쌈채소"] },
+  "review": [
+    "잘한 점을 이번에 먹은 음식과 이어서 썼는가",
+    "다음 끼니 제안이 지금 구성을 이어 가는 방향인가"
+  ],
+  "reference": {
+    "body": "현미밥에 시금치나물과 쌈채소까지 곁들여 식이섬유를 끼니 목표 8.3g 넘게 채웠고, 고등어구이가 있어도 나트륨은 620mg으로 한도 안이었어요. 식후 3시간에도 포만감이 60%로 남아 있었죠.",
+    "reasoning": "유지기에는 먹는 양이 줄어드는 만큼, 이렇게 한 끼 안에 채소와 생선이 같이 들어가면 영양이 빠지지 않아요.",
+    "suggestions": [
+      { "foodName": "두부구이 반 모", "advice": "다음 저녁에 생선 대신 곁들여도 지금 구성을 그대로 이어 갈 수 있어요" },
+      { "foodName": "브로콜리 한 줌", "advice": "쌈채소가 없을 때 같은 역할을 해 줘요" }
+    ]
+  },
+  "counterexamples": [
+    {
+      "why": "뻔한 표현 + 명령형",
+      "response": {
+        "body": "균형 잡힌 식사였어요. 다음에도 채소를 골고루 드세요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "두부구이 반 모", "advice": "생선 대신 곁들이기 좋아요" }]
+      },
+      "failsOn": ["no_cliche", "no_imperative"]
+    },
+    {
+      "why": "규칙은 나트륨 OK 인데 높았다고 씀 — 화면 칩과 모순",
+      "response": {
+        "body": "고등어구이 때문에 나트륨이 높았어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "두부구이 반 모", "advice": "생선 대신 곁들이기 좋아요" }]
+      },
+      "failsOn": ["no_contradict_rule"]
+    },
+    {
+      "why": "body 가 비면 BE 가 저장하지 못한다",
+      "response": { "body": "", "reasoning": "유지기에는 채소가 중요해요.", "suggestions": [] },
+      "failsOn": ["contract_parseable"]
+    }
+  ]
+}

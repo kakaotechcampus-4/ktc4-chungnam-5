@@ -1,0 +1,75 @@
+{
+  "dataset": "meal_feedback",
+  "name": "끼니 피드백",
+  "endpoint": "POST /short-feedback (scope=MEAL)",
+  "what": "한 끼 Q/Q/S · 영양 판정 → 피드백 문장(body · reasoning) + 다음 끼니 제안 1~3개",
+  "basis": [
+    "develop @09bb46a  ai/app/short_feedback.py",
+    "develop @09bb46a  ai/app/schemas.py",
+    "develop @09bb46a  backend/app/services/evaluation/stage_profile.py"
+  ],
+  "beRuleVersion": "v2",
+  "checks": {
+    "contract_parseable": {
+      "grade": "critical",
+      "rule": "응답이 JSON 객체이고 body 가 비어 있지 않다",
+      "basis": "parse_response — 실패하면 BE 가 재시도하다 FAILED"
+    },
+    "no_invented_numbers": {
+      "grade": "critical",
+      "rule": "body · reasoning · advice 의 kcal · g · mg 숫자는 입력값 · 끼니 합계 · 끼니 목표/한도 · 하루 기준 중 하나다. foodName 의 1회분 표현은 보지 않는다",
+      "basis": "_FORBIDDEN '지어낸 숫자'"
+    },
+    "no_contradict_rule": {
+      "grade": "critical",
+      "rule": "규칙이 OK 라 한 영양소를 부족 · 초과라 쓰지 않고, SHORT · OVER 라 한 영양소를 충분하다고 쓰지 않는다",
+      "basis": "judge_nutrients — 화면 nutrients[].state 와 같은 기준"
+    },
+    "unjudged_nutrient_silent": {
+      "grade": "critical",
+      "rule": "성분이 비어 판정 못 한 영양소는 부족 · 충분 · 초과 어느 쪽으로도 단정하지 않는다",
+      "basis": "build_meal_prompt '판정하지 못한 영양소는 언급하지 않는다'"
+    },
+    "quantity_no_direction": {
+      "grade": "critical",
+      "rule": "Quantity 가 100 미만이거나 null 이면 과식 · 소식 방향을 말하지 않는다",
+      "basis": "_quantity_note — BE 가 평소 대비 비율을 주지 않는다"
+    },
+    "unscored_satiety_silent": {
+      "grade": "critical",
+      "rule": "Satiety 가 null 이면 body · reasoning 에서 포만감 · 배고픔을 평가하지 않는다",
+      "basis": "_score_line '측정 못 함 (이 축은 언급하지 않는다)'"
+    },
+    "no_medical_judgement": {
+      "grade": "critical",
+      "rule": "약 · 용량 · 투약 · 처방 · 진단에 대한 판단이 없다",
+      "basis": "AI README 절대 규칙 3"
+    },
+    "suggestions_shape": {
+      "grade": "normal",
+      "rule": "제안이 1~3개이고 foodName 이 비지 않고 서로 다르다",
+      "basis": "MAX_SUGGESTIONS · MEAL_SYSTEM_PROMPT"
+    },
+    "no_imperative": {
+      "grade": "normal",
+      "rule": "'드세요 · 하세요 · 피하세요' 같은 명령형이 없다",
+      "basis": "_FORBIDDEN '명령형 처방'"
+    },
+    "no_cliche": {
+      "grade": "normal",
+      "rule": "'균형 잡힌 · 골고루 · 건강한 식습관 · 적당히 · 도움이 됩니다' 가 없다",
+      "basis": "_FORBIDDEN '뻔한 표현'"
+    },
+    "example_no_leak": {
+      "grade": "normal",
+      "rule": "few-shot 좋은 답의 음식(참치김밥 · 삶은 달걀 2개 · 방울토마토 한 줌)이 입력에 없는데 나오지 않는다",
+      "basis": "MEAL_SYSTEM_PROMPT '예시의 음식과 문장을 베끼지 않는다'"
+    }
+  },
+  "caseRules": [
+    "케이스 입력 음식은 few-shot 예시 음식과 겹치지 않게 둔다",
+    "expectedJudgements 는 judge_nutrients 결과와 같아야 한다 (데이터셋 검증)",
+    "reference 는 critical · normal 검사를 모두 통과해야 한다",
+    "counterexamples 는 failsOn 에 적은 검사에서만 실패해야 한다"
+  ]
+}

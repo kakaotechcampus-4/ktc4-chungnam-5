@@ -1,0 +1,71 @@
+{
+  "id": "MF-03-homemade-japchae-no-nutrition",
+  "description": "직접 입력한 음식이 음식 DB 와 매칭되지 않아 성분이 전부 비고 Quality 가 null — 영양을 칭찬하거나 단정하지 않는다",
+  "grade": "critical",
+  "source": "incident",
+  "incident": "음식이 DB 와 매칭되지 않으면(NUTRITION_NOT_MATCHED) 성분이 비고 Quality 가 null 이 된다. 이때 모델이 '균형 잡힌 식사' 로 칭찬하거나 영양을 단정할 위험이 있다",
+  "group": "결측",
+  "tags": ["meal:LUNCH", "stage:MAINTENANCE", "nutrition:none", "qqs:quality_null"],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": { "quantity": 100, "quality": null, "satiety": 70 },
+    "mealId": "golden-meal-03",
+    "items": [
+      { "displayName": "엄마표 잡채", "amount": 200, "unit": "g", "nutrition": null },
+      { "displayName": "보리차", "amount": 300, "unit": "ml", "nutrition": null }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 70,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": {},
+  "hard": { "mustNotContain": ["영양이 충분", "영양이 부족", "영양 균형", "영양가가 높"] },
+  "signals": { "mustMentionAny": ["잡채"] },
+  "review": [
+    "성분을 몰라 영양을 판단하지 못했다는 점을 자연스럽게 드러냈는가 (드러내지 않아도 실패는 아님)",
+    "제안이 무난한 단백질 · 채소 곁들이기 방향인가"
+  ],
+  "reference": {
+    "body": "잡채 200g으로 점심을 챙겼고, 식후 포만감도 무난하게 이어졌어요. 이번에는 음식 성분을 찾지 못해 영양은 따로 살펴보지 못했어요.",
+    "reasoning": "유지기에는 한 끼 양이 줄어든 만큼 무엇을 먹었는지가 중요해서, 성분이 잡히는 기록이 쌓이면 더 구체적으로 짚어 드릴 수 있어요.",
+    "suggestions": [
+      { "foodName": "달걀찜 한 그릇", "advice": "잡채와 함께 곁들이기 쉬운 단백질 반찬이에요" },
+      { "foodName": "애호박볶음", "advice": "잡채에 채소를 한 가지 더하고 싶을 때 잘 어울려요" }
+    ]
+  },
+  "counterexamples": [
+    {
+      "why": "성분을 모르는데 식이섬유가 충분하다고 단정 + 뻔한 칭찬",
+      "response": {
+        "body": "잡채에 채소가 들어가 식이섬유도 충분하고 균형 잡힌 식사였어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "달걀찜 한 그릇", "advice": "잡채와 곁들이기 쉬워요" }]
+      },
+      "failsOn": ["unjudged_nutrient_silent", "no_cliche"]
+    },
+    {
+      "why": "성분을 모르는데 나트륨이 높다고 단정",
+      "response": {
+        "body": "잡채는 나트륨이 높은 편이라 다음에는 간을 가볍게 하면 좋아요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "달걀찜 한 그릇", "advice": "잡채와 곁들이기 쉬워요" }]
+      },
+      "failsOn": ["unjudged_nutrient_silent"]
+    },
+    {
+      "why": "케이스 금지 표현 — 영양을 뭉뚱그려 단정",
+      "response": {
+        "body": "잡채 한 접시로 영양이 충분한 점심이었어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "달걀찜 한 그릇", "advice": "잡채와 곁들이기 쉬워요" }]
+      },
+      "failsOn": ["case_must_not_contain"]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "id": "MF-08-reduced-quantity-off-band-no-satiety",
+  "description": "감량기 저녁. Quantity 40(권장 구간 이탈, 방향 모름) · 포만감 기록 없음 — 과식 · 소식 방향을 말하지 않고, 포만감을 평가하지 않는다",
+  "grade": "critical",
+  "source": "design",
+  "group": "결측",
+  "tags": ["meal:DINNER", "stage:REDUCED", "quantity:off_band", "qqs:satiety_null"],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "REDUCED",
+    "qqs": { "quantity": 40, "quality": 35, "satiety": null },
+    "mealId": "golden-meal-08",
+    "items": [
+      { "displayName": "제육덮밥", "amount": 450, "unit": "g", "nutrition": { "kcal": 820, "proteinG": 32, "fiberG": 2.8, "sodiumMg": 1350 } },
+      { "displayName": "계란국", "amount": 250, "unit": "g", "nutrition": { "kcal": 60, "proteinG": 4, "fiberG": 0.3, "sodiumMg": 650 } }
+    ],
+    "satiety": null
+  },
+  "expectedJudgements": { "fiber": "SHORT", "sodium": "OVER" },
+  "hard": { "mustNotContain": ["과식", "많이 드셨", "적게 드셨"] },
+  "signals": {},
+  "review": ["양이 권장 구간을 벗어났다는 사실만 방향 없이 전했는가"],
+  "reference": {
+    "body": "제육덮밥과 계란국 국물에서 나트륨이 한 끼 한도의 두 배 넘게 나왔고, 채소가 적어 식이섬유는 3.1g에 머물렀어요. 이번 양은 이 단계의 권장 구간을 벗어났어요.",
+    "reasoning": "감량 단계 직후에는 식욕이 돌아오기 쉬워서, 양이 흔들릴 때일수록 덮밥 한 그릇에 채소 반찬을 곁들이면 좋아요.",
+    "suggestions": [
+      { "foodName": "쌈채소 한 접시", "advice": "제육을 쌈으로 싸 먹으면 채소를 자연스럽게 더할 수 있어요" },
+      { "foodName": "맑은 콩나물국", "advice": "계란국보다 간이 가벼운 국물로 바꿔 볼 수 있어요" }
+    ]
+  },
+  "counterexamples": [
+    {
+      "why": "방향을 모르는데 많이 먹었다고 단정 + 기록 없는 포만감을 평가",
+      "response": {
+        "body": "오늘은 평소보다 많이 드셨어요. 포만감도 오래가지 않았을 거예요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "쌈채소 한 접시", "advice": "채소를 더할 수 있어요" }]
+      },
+      "failsOn": ["quantity_no_direction", "unscored_satiety_silent", "case_must_not_contain"]
+    },
+    {
+      "why": "반대 방향(적게)도 똑같이 근거가 없다",
+      "response": {
+        "body": "양이 적었지만 나트륨이 많았어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "쌈채소 한 접시", "advice": "채소를 더할 수 있어요" }]
+      },
+      "failsOn": ["quantity_no_direction"]
+    }
+  ]
+}

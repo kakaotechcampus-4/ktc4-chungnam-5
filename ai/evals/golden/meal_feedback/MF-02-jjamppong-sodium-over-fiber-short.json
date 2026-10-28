@@ -1,0 +1,71 @@
+{
+  "id": "MF-02-jjamppong-sodium-over-fiber-short",
+  "description": "조정기 점심. 나트륨 초과 · 식이섬유 부족 — 원인 음식(짬뽕 국물)을 짚고, 열량 같은 숫자를 지어내지 않는다",
+  "grade": "normal",
+  "source": "design",
+  "group": "정상",
+  "tags": ["meal:LUNCH", "stage:TITRATION", "gap:sodium_over", "gap:fiber_short"],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "TITRATION",
+    "qqs": { "quantity": 100, "quality": 38, "satiety": 55 },
+    "mealId": "golden-meal-02",
+    "items": [
+      { "displayName": "짬뽕", "amount": 900, "unit": "g", "nutrition": { "kcal": 690, "proteinG": 30, "fiberG": 3.2, "sodiumMg": 2650 } },
+      { "displayName": "군만두", "amount": 120, "unit": "g", "nutrition": { "kcal": 320, "proteinG": 9, "fiberG": 1.0, "sodiumMg": 410 } }
+    ],
+    "satiety": {
+      "beforePct": 30,
+      "afterPct": 85,
+      "checkins": [{ "checkinOffsetHours": 2, "satietyPct": 30 }],
+      "hungerReturnMinutes": 150,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": { "fiber": "SHORT", "sodium": "OVER" },
+  "hard": {},
+  "signals": { "mustMentionAny": ["짬뽕", "국물"] },
+  "review": [
+    "나트륨의 원인 음식을 짚었는가",
+    "제안이 나트륨 줄이기 · 채소 채우기 방향인가",
+    "포만감을 사용자가 겪은 일(다시 배고파짐)로 썼는가"
+  ],
+  "reference": {
+    "body": "짬뽕 국물에서 나트륨이 한 끼 한도의 네 배 가까이 나왔고, 채소가 적어 식이섬유는 4.2g에 그쳤어요. 식후 2시간 반쯤 지나 다시 배고파졌죠.",
+    "reasoning": "조정기에는 먹는 양이 줄기 쉬워서, 같은 양이라도 국물보다 건더기와 채소로 채우면 영양과 포만감을 함께 지킬 수 있어요.",
+    "suggestions": [
+      { "foodName": "콩나물국밥", "advice": "국물 요리가 당길 때 짬뽕보다 간이 가벼운 편이에요" },
+      { "foodName": "오이무침 한 접시", "advice": "빠졌던 채소를 채우고 국물 없이도 입맛을 살려 줘요" }
+    ]
+  },
+  "counterexamples": [
+    {
+      "why": "규칙은 나트륨 OVER 인데 괜찮았다고 씀",
+      "response": {
+        "body": "나트륨은 괜찮았지만 채소가 아쉬웠어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "오이무침 한 접시", "advice": "채소를 채워 줘요" }]
+      },
+      "failsOn": ["no_contradict_rule"]
+    },
+    {
+      "why": "입력에 없는 열량을 지어냄",
+      "response": {
+        "body": "짬뽕 한 그릇이 1200kcal 정도라 열량이 높았어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "오이무침 한 접시", "advice": "채소를 채워 줘요" }]
+      },
+      "failsOn": ["no_invented_numbers"]
+    },
+    {
+      "why": "few-shot 예시 음식을 그대로 베낌",
+      "response": {
+        "body": "짬뽕 국물에서 나트륨이 많이 나왔어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "삶은 달걀 2개", "advice": "국물 대신 곁들이면 든든해요" }]
+      },
+      "failsOn": ["example_no_leak"]
+    }
+  ]
+}

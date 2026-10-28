@@ -1,0 +1,64 @@
+{
+  "id": "MF-04-kimchi-rice-egg-unit-unmatched",
+  "description": "개 단위로 고른 계란후라이만 성분이 비었다 — 남은 음식 기준 판정(나트륨 초과 · 식이섬유 부족)은 지키고, 빠진 음식으로 단백질을 짐작하지 않는다",
+  "grade": "normal",
+  "source": "incident",
+  "incident": "개 · 인분 단위로 고른 음식은 g 으로 환산되지 않아 성분이 빠졌다(FE-32 에서 g 전용으로 정리). 일부만 빠진 끼니는 남은 음식으로 판정한다(BE sum_nutrients 의 unmatched)",
+  "group": "결측",
+  "tags": ["meal:LUNCH", "stage:MAINTENANCE", "nutrition:partial", "unit:non_gram"],
+  "input": {
+    "scope": "MEAL",
+    "userId": "golden-user",
+    "stage": "MAINTENANCE",
+    "qqs": { "quantity": 100, "quality": 30, "satiety": 65 },
+    "mealId": "golden-meal-04",
+    "items": [
+      { "displayName": "김치볶음밥", "amount": 350, "unit": "g", "nutrition": { "kcal": 610, "proteinG": 14, "fiberG": 3.0, "sodiumMg": 1180 } },
+      { "displayName": "계란후라이", "amount": 1, "unit": "개", "nutrition": null }
+    ],
+    "satiety": {
+      "beforePct": 25,
+      "afterPct": 80,
+      "checkins": [],
+      "hungerReturnMinutes": null,
+      "userComment": null
+    }
+  },
+  "expectedJudgements": { "fiber": "SHORT", "sodium": "OVER" },
+  "hard": {},
+  "signals": { "mustMentionAny": ["김치볶음밥"] },
+  "review": ["성분이 빠진 계란후라이를 근거로 영양을 말하지 않았는가"],
+  "reference": {
+    "body": "김치볶음밥에서 나트륨이 한 끼 한도를 훌쩍 넘었고, 채소가 김치뿐이라 식이섬유도 3g으로 모자랐어요.",
+    "reasoning": "유지기에는 한 끼 양이 적은 만큼, 볶음밥처럼 한 그릇 음식일수록 채소 반찬을 곁들여야 영양이 빠지지 않아요.",
+    "suggestions": [
+      { "foodName": "오이무침 한 접시", "advice": "김치 대신 곁들이면 짠맛을 덜고 채소를 더할 수 있어요" },
+      { "foodName": "양배추샐러드 한 그릇", "advice": "볶음밥 옆에 두기 쉽고 이번에 모자랐던 채소를 채워 줘요" }
+    ]
+  },
+  "counterexamples": [
+    {
+      "why": "성분이 빠진 계란후라이로 단백질을 단정",
+      "response": {
+        "body": "계란후라이 덕분에 단백질이 충분했어요.",
+        "reasoning": null,
+        "suggestions": [{ "foodName": "오이무침 한 접시", "advice": "채소를 더할 수 있어요" }]
+      },
+      "failsOn": ["unjudged_nutrient_silent"]
+    },
+    {
+      "why": "제안이 4개 — 화면 카드 수 계약(1~3) 위반",
+      "response": {
+        "body": "김치볶음밥에서 나트륨이 한 끼 한도를 넘었어요.",
+        "reasoning": null,
+        "suggestions": [
+          { "foodName": "오이무침 한 접시", "advice": "채소를 더할 수 있어요" },
+          { "foodName": "양배추샐러드 한 그릇", "advice": "곁들이기 쉬워요" },
+          { "foodName": "두부조림", "advice": "단백질 반찬으로 좋아요" },
+          { "foodName": "미역줄기볶음", "advice": "채소 반찬으로 좋아요" }
+        ]
+      },
+      "failsOn": ["suggestions_shape"]
+    }
+  ]
+}
