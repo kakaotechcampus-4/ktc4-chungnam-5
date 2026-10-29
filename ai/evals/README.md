@@ -245,7 +245,8 @@ python -X utf8 -m evals.analyze_meal_eval --only hotdog --n 1                   
 
 | 항목 | analyze-meal |
 | --- | --- |
-| 호출 수 | **사진 수 × n** (기본 n=3 — 사진 7장이면 21회). 공용 크레딧이라 메인 세션이 승인(N · 호출 수) 후에만 실행한다 |
+| 호출 수 | 라우트 호출은 **사진 수 × n** (기본 n=3 — 사진 7장이면 21회). 모델 POST 는 게이트웨이 오류 · 타임아웃 때 `food_analyzer` 가 재시도하므로 **최대 사진 수 × n × (`LLM_MAX_RETRIES` + 1)** (기본 1 → 최대 42회). 공용 크레딧이라 메인 세션이 승인(N · 최대 호출 수) 후에만 실행한다 |
+| 프록시 | httpx 는 127.0.0.1 이라고 프록시를 건너뛰지 않는다 — `HTTP_PROXY` · 시스템 프록시가 있는 PC 에서는 이미지 GET 이 실패해 모든 회차가 500(계약 FAIL)으로 보인다. 실행 셸에 `NO_PROXY=127.0.0.1` 을 둔다 |
 | exit `2` | CLI 오용에 더해 **fixture 문제**(없는 파일 · EXIF · 크기 · 확장자 · 시그니처) — 키 확인 · 서버 기동 전에 모든 사진을 검사하고, 문제를 파일 이름과 함께 출력한 뒤 끝난다. `--only` 부분 실행이어도 전체를 검사한다 |
 | 라벨 오류 | 잘못된 라벨은 **import 시점**에 `ValueError`(파일 이름 포함) — 실행 전에 드러난다 |
 | baseline | `rule_version` = `RULE_VERSION`(`"analyze-meal-labels-v1"`) — BE 규칙 버전이 없으므로 **라벨 · 판정을 바꾸면 올린다**. `prompt_hash` = 케이스가 쓰는 mealType 마다의 `_build_prompt` 해시 |
@@ -280,7 +281,7 @@ python -X utf8 -m evals.analyze_meal_eval --only hotdog --n 1                   
 | `meal_type` (필수) | `"BREAKFAST"` · `"LUNCH"` · `"DINNER"` · `"SNACK"` (대문자) | — 요청 mealType · 프롬프트 |
 | `unit` | `"gram"` / `"natural"` | `gram_unit_default` / `natural_unit_allowed` |
 | `required` | 동의어 묶음 목록 — 묶음마다 하나는 나와야 한다 | `no_missing_food` |
-| `non_foods` | 사진에 보이는 음식 아닌 것 | `no_phantom_food` |
+| `non_foods` | 사진에 보이는 음식 아닌 것 — **원소마다 한 낱말**(공백 없음. `"나무 젓가락"` 대신 `"젓가락"`) | `no_phantom_food` |
 | `forbidden` | 이름에 남으면 안 되는 브랜드 · 수식어 | `standard_name` |
 | `empty` | `True` 만 — 음식 없는 사진. 다른 음식 키와 함께 쓸 수 없다 | `non_food_empty` |
 
@@ -301,7 +302,8 @@ LABELS: dict[str, dict] = {
 }
 ```
 
-라벨 값의 빈 목록 · 빈 문자열 · 목록 자리의 문자열 하나(`"그릇"` 은 글자 단위로 쪼개진다)는 `ValueError` 다.
+라벨 값의 빈 목록 · 빈 문자열 · 공백만인 원소 · 목록 자리의 문자열 하나(`"그릇"` 은 글자 단위로 쪼개진다) · 공백이 든 `non_foods` 원소는 `ValueError` 다
+(비음식은 낱말 단위로 판정해서 공백이 든 라벨은 어떤 이름과도 같아질 수 없다). `forbidden` · `required` 의 띄어 쓴 이름은 받는다.
 요청의 `eatenAt` · `stage` 는 고정값이다(analyze-meal 프롬프트는 stage 를 쓰지 않는다).
 
 ### 판정 축 (9개)
@@ -324,7 +326,8 @@ LABELS: dict[str, dict] = {
 
 - **자연 단위 축은 g · ml 밖이면 어떤 단위든 통과한다** — "피자 1.8 kg" · "수박 3000 cc" 처럼 지어낸 무게 · 부피도 통과다(BE 가 환산하지 않는 단위라 채점에는 들어가지 않는다).
 - 단위 축은 대소문자 · 전각 · 내부 공백 정규화를 하지 않는다 — "Ml" · "ｇ" · "m l" 은 g 가 아니다(BE `to_grams` 가 strip 만 하므로 일부러 같게 둔다).
-- `no_phantom_food` 는 낱말 단위라 붙여 쓴 비음식("나무젓가락" · "빈그릇")을 놓친다.
+- `no_phantom_food` 는 낱말 단위라 붙여 쓴 비음식("나무젓가락" · "빈그릇")을 놓친다. 반대로 음식명을 띄어 쓰면("쟁반 짜장") 비음식 라벨 "쟁반" 에 걸려 실패한다.
+- 단위 축은 사진의 모든 항목을 보므로, 한 음식만 찍어도 모델이 곁들이를 따로 내면("핫도그" + "케첩 1 개") 그 항목 단위로 실패한다 — 첫 실측 note 로 빈도를 본다.
 - `standard_name` 은 부분 문자열이라 금지어가 표준명의 일부가 되는 낱말(예: "수제" → "수제비")을 라벨에 넣으면 오판한다 — 라벨 작성자가 피한다.
 - `no_missing_food` 는 완전 일치라 라벨에 없는 동의어("흰밥")는 누락으로 센다 — 동의어 묶음을 넉넉히 적는다. 라벨 밖 음식이 더 나오는 것은 벌하지 않는다.
 - 팩토리 축은 라벨 **마지막 원소**만 어긴 응답으로 검증했다 — 라벨 일부만 묶는 구현을 테스트가 다 잡지는 못한다.
