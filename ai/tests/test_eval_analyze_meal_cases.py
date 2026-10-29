@@ -465,6 +465,15 @@ _R49_BAD = [
     ("r49-ext-none", "meal", _VALID_LABEL),
     ("r49-test-prefix", "test_meal.jpg", _VALID_LABEL),
     ("r49-observation-only", "meal.jpg", {"meal_type": "LUNCH"}),
+    # 비음식은 낱말 단위 판정 — 공백이 든 원소는 어떤 낱말과도 같아질 수 없어 공허 통과한다
+    ("r49-non-food-with-space", "meal.jpg", {"meal_type": "LUNCH", "unit": "gram", "non_foods": ["나무 젓가락"]}),
+    ("r49-non-food-with-space-2nd", "meal.jpg", {"meal_type": "LUNCH", "unit": "gram", "non_foods": ["그릇", "빈 그릇"]}),
+    # 공백만인 원소 — 빈 문자열과 같은 공허 · 과잉 판정
+    ("r49-space-only-non-food", "meal.jpg", {"meal_type": "LUNCH", "unit": "gram", "non_foods": [" "]}),
+    ("r49-space-only-forbidden", "meal.jpg", {"meal_type": "LUNCH", "unit": "gram", "forbidden": [" "]}),
+    ("r49-tab-only-forbidden", "meal.jpg", {"meal_type": "LUNCH", "unit": "gram", "forbidden": ["\t"]}),
+    ("r49-space-only-synonym", "meal.jpg", {"meal_type": "LUNCH", "required": [[" "]]}),
+    ("r49-space-only-synonym-2nd", "meal.jpg", {"meal_type": "LUNCH", "required": [["밥", " "]]}),
 ]
 
 
@@ -478,6 +487,8 @@ def test_r49_invalid_label_raises_value_error_with_file_name(name, label):
     - 파일 이름은 `[a-z0-9_.-]` 만 — `with_image_base` 는 quote 하지 않고 서버는 unquote 해 `#` · `?` · `%` 가 깨진다(§13-1).
     - 확장자는 소문자 jpg · jpeg · png 만(서버 content-type 표), `test_` 이름은 `ai/evals` 안 `test_*` 금지 규칙.
     - 관측 축만 남는 음식 케이스는 게이트에 아무것도 기여하지 않는다.
+    - `non_foods` 원소에 공백이 있으면 거른다 — 비음식은 낱말 단위 판정이라 `"나무 젓가락"` 은 어떤 낱말과도 같아질 수 없다(§15 ①).
+    - 공백만인 원소(`" "` · `"\\t"`)는 빈 문자열과 같다 — 금지어 `" "` 는 공백 든 모든 이름에 걸리고, 동의어 `" "` 는 늘 누락이다(§15 ①).
     """
     labels = {"ok_meal.jpg": _VALID_LABEL, name: label}
 
@@ -523,6 +534,29 @@ def test_r49b_allowed_file_names_build_a_case_with_stem_id(name, stem):
     assert case.id == stem
     assert case.request["imageUrl"] == name
     assert case.request["mealId"] == f"eval-{stem}"
+
+
+_R49C_WORDS = [
+    ("r49c-non-foods-no-space", "non_foods", ["그릇", "젓가락"], "no_phantom_food"),
+    ("r49c-forbidden-with-space", "forbidden", ["빙그레 우유"], "standard_name"),
+    ("r49c-synonym-with-space", "required", [["흰 쌀밥", "쌀밥"]], "no_missing_food"),
+]
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "axis_id"), [(k, v, a) for _, k, v, a in _R49C_WORDS], ids=[i for i, _, _, _ in _R49C_WORDS]
+)
+def test_r49c_valid_words_build_a_case_with_their_factory_axis(key, value, axis_id):
+    """행 49 남김 짝 — 공백 없는 비음식(`"그릇"`)과 공백이 든 금지어(`"빙그레 우유"`) · 동의어(`"흰 쌀밥"`)는 거르지 않는다.
+    ValueError 없이 Case 하나가 나오고 그 키의 팩토리 축이 붙는다.
+
+    행 49 의 공백 규칙(§15 ①)의 짝이다 — 공백 금지는 낱말 단위로 보는 `non_foods` 만이다.
+    금지어는 부분 문자열, 누락은 공백을 지운 뒤 완전 일치로 판정하므로(§12) 띄어 쓴 이름도 유효하다.
+    과하게 거르면 브랜드명 · 띄어 쓴 음식명을 라벨에 못 쓴다.
+    """
+    case = _only_case({"meal.jpg": {"meal_type": "LUNCH", "unit": "gram", key: value}})
+
+    assert _axis(case, axis_id).grade == "non_critical"
 
 
 # ─────────────────────────── 실데이터 (LABELS · CASES · FIXTURE_DIR) ───────────────────────────
