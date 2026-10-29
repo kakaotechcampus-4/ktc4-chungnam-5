@@ -14,13 +14,12 @@ harness.py 는 chat · DAILY 와 공유하는 파일이라 이 helper 를 따로
 
 from __future__ import annotations
 
-import struct
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from pathlib import Path, PurePath
 from urllib.parse import unquote
 
 from evals.harness import Observation, Post
@@ -41,9 +40,9 @@ _POLL_INTERVAL = 0.05
 _JPEG_SIGNATURE = b"\xff\xd8"
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
-_JPEG_APP1 = 0xE1
-_JPEG_SOS = 0xDA
-_JPEG_EOI = 0xD9
+_SIGNATURES: dict[str, bytes] = {"image/jpeg": _JPEG_SIGNATURE, "image/png": _PNG_SIGNATURE}
+"""content-type → 파일 첫 바이트. `fixture_problems` 가 확장자와 실제 형식이 같은지 본다."""
+
 _JPEG_STANDALONE = frozenset({0x01, *range(0xD0, 0xD8)})
 """길이 필드가 없는 JPEG 마커 — TEM · RST0~7."""
 _EXIF_HEADER = b"Exif\x00\x00"
@@ -82,11 +81,13 @@ class _FixtureHandler(BaseHTTPRequestHandler):
         """요청 경로를 `root` 안의 내줄 파일로 해석한다. 내주면 안 되면 None.
 
         퍼센트 디코드 뒤 `resolve()` 한 결과가 `root` 안에 있는지 `is_relative_to` 로 본다 — 문자열 접두어
-        비교는 형제 폴더(`fixtures_x`)를 통과시킨다. `..` · 백슬래시 · 절대경로 · 드라이브 문자는 결합 · 해석
-        단계에서 `root` 밖으로 나가므로 같은 검사에 걸린다.
+        비교는 형제 폴더(`fixtures_x`)를 통과시킨다. `..` · 백슬래시는 해석 단계에서 `root` 밖으로 나가므로
+        같은 검사에 걸린다. 절대경로 · 드라이브 문자 · UNC(`\\\\host\\share`)는 디스크를 건드리기 전에 거른다.
         """
         raw = request_path.split("?", 1)[0].split("#", 1)[0]
         relative = unquote(raw).lstrip("/")
+        if PurePath(relative).anchor:  # 결합하면 `root` 를 무시하는 경로 — resolve() 가 원격 공유에 닿지 않게
+            return None
         try:
             target = (self._root / relative).resolve()
             if not target.is_relative_to(self._root) or target.suffix not in _CONTENT_TYPES:
@@ -105,10 +106,10 @@ def serve_fixtures(directory: Path) -> Iterator[str]:
 
     base URL 은 `http://127.0.0.1:<port>` 이고 끝에 슬래시가 없다. 닫을 때 `shutdown()`(요청 루프 종료)과
     `server_close()`(소켓 해제)를 둘 다 부른다 — 하나만 부르면 루프가 돌거나 포트가 남는다.
+    `ThreadingHTTPServer` 의 요청 스레드는 daemon 이라 처리 중인 요청이 종료를 붙잡지 않는다.
     """
     root = Path(directory).resolve()
     server = ThreadingHTTPServer((_HOST, 0), partial(_FixtureHandler, root=root))
-    server.daemon_threads = True  # 기본값과 같지만 명시한다 — 처리 중인 요청이 종료를 붙잡지 않는다
     thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": _POLL_INTERVAL}, daemon=True)
     thread.start()
     try:
@@ -134,49 +135,39 @@ def with_image_base(post: Post, base_url: str) -> Post:
 # ─────────────────────────── fixture 검사 ───────────────────────────
 
 
-def _signature_type(data: bytes) -> str | None:
-    """시그니처로 본 실제 content-type — `image/jpeg` · `image/png` · 모름이면 None."""
-    if data.startswith(_JPEG_SIGNATURE):
-        return "image/jpeg"
-    if data.startswith(_PNG_SIGNATURE):
-        return "image/png"
-    return None
-
-
 def _jpeg_has_exif(data: bytes) -> bool:
-    """JPEG 세그먼트를 순회해 내용이 `Exif\\0\\0` 로 시작하는 APP1 이 있는지 본다. SOS · EOI 에서 멈춘다.
+    """JPEG 이고, 내용이 `Exif\\0\\0` 로 시작하는 APP1 세그먼트가 있는가. SOS · EOI 에서 멈춘다.
 
     SOS 뒤는 압축된 영상 데이터라 세그먼트 구조가 아니다. 구조가 깨져 있으면 거기서 멈춘다.
     """
+    if not data.startswith(_JPEG_SIGNATURE):
+        return False
     i = len(_JPEG_SIGNATURE)
-    while i + 1 < len(data):
-        if data[i] != 0xFF:
-            return False
+    while i + 1 < len(data) and data[i] == 0xFF:
         marker = data[i + 1]
         if marker == 0xFF:  # 채움 바이트 — 다음 바이트가 마커다
             i += 1
-            continue
-        if marker in (_JPEG_SOS, _JPEG_EOI):
-            return False
-        if marker in _JPEG_STANDALONE:
+        elif marker in _JPEG_STANDALONE:
             i += 2
-            continue
-        if i + 4 > len(data):
+        elif marker in (0xDA, 0xD9) or i + 4 > len(data):  # SOS · EOI, 또는 길이 필드가 잘렸다
             return False
-        (length,) = struct.unpack(">H", data[i + 2 : i + 4])  # 길이 필드 2바이트 포함
-        if length < 2:
-            return False
-        if marker == _JPEG_APP1 and data[i + 4 : i + 2 + length].startswith(_EXIF_HEADER):
-            return True
-        i += 2 + length
+        else:
+            length = int.from_bytes(data[i + 2 : i + 4], "big")  # 길이 필드 2바이트 포함
+            if length < 2:
+                return False
+            if marker == 0xE1 and data.startswith(_EXIF_HEADER, i + 4, i + 2 + length):  # APP1
+                return True
+            i += 2 + length
     return False
 
 
 def _png_has_exif(data: bytes) -> bool:
-    """PNG 청크를 순회해 `eXIf` 청크가 있는지 본다. IEND 에서 멈춘다."""
+    """PNG 이고, `eXIf` 청크가 있는가. IEND 에서 멈춘다."""
+    if not data.startswith(_PNG_SIGNATURE):
+        return False
     i = len(_PNG_SIGNATURE)
     while i + 8 <= len(data):
-        (length,) = struct.unpack(">I", data[i : i + 4])
+        length = int.from_bytes(data[i : i + 4], "big")
         kind = data[i + 4 : i + 8]
         if kind == b"eXIf":
             return True
@@ -201,16 +192,14 @@ def fixture_problems(path: Path, *, max_bytes: int = MAX_FIXTURE_BYTES) -> list[
     problems: list[str] = []
     if name.startswith("test_"):
         problems.append(f"{name}: 이름이 test_ 로 시작한다 — ai/evals 안에는 test_* 를 두지 않는다")
-    if path.suffix not in _CONTENT_TYPES:
+    expected = _CONTENT_TYPES.get(path.suffix)
+    if expected is None:
         problems.append(f"{name}: 확장자가 소문자 .jpg · .jpeg · .png 가 아니다")
     if len(data) > max_bytes:
         problems.append(f"{name}: 크기 {len(data)} 바이트가 상한 {max_bytes} 바이트를 넘는다")
-
-    actual = _signature_type(data)
-    expected = _CONTENT_TYPES.get(path.suffix)
-    if expected is not None and actual != expected:
+    if expected is not None and not data.startswith(_SIGNATURES[expected]):
         problems.append(f"{name}: 시그니처가 확장자({path.suffix})와 다르다")
     # EXIF 는 확장자가 아니라 실제 형식으로 본다 — 확장자가 틀린 사진의 EXIF 도 함께 알린다
-    if (actual == "image/jpeg" and _jpeg_has_exif(data)) or (actual == "image/png" and _png_has_exif(data)):
+    if _jpeg_has_exif(data) or _png_has_exif(data):
         problems.append(f"{name}: EXIF 블록이 있다 — 촬영 위치 · 기기 정보가 저장소에 커밋된다")
     return problems
