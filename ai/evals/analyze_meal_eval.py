@@ -40,26 +40,24 @@ _STAGE = "MAINTENANCE"
 
 _MEAL_TYPES = frozenset(meal_type.value for meal_type in MealType)
 _UNITS = ("gram", "natural")
-_FOOD_KEYS = frozenset({"unit", "required", "non_foods", "forbidden"})  # 음식 케이스에 판정 축을 붙이는 키
+_FOOD_KEYS = frozenset({"unit", "required", "non_foods", "forbidden"})  # 음식이 있다고 보는 키 — empty 와 함께 쓸 수 없다
 _KEYS = frozenset({"meal_type", "empty", *_FOOD_KEYS})
 
-# 파일 이름 규칙 — `with_image_base` 는 이름을 quote 하지 않고 서버는 unquote 하므로 `#` · `?` · `%` 가 깨진다.
-# 확장자는 서버 content-type 표와 같은 규칙으로 소문자만 받는다
+# 파일 이름 문자 집합 — `with_image_base` 는 이름을 quote 하지 않고 서버는 unquote 하므로 `#` · `?` · `%` 가 깨진다.
+# 확장자 · `test_` 규칙은 `fixture_server.name_problems` 가 정본이다
 _NAME = re.compile(r"[a-z0-9_.-]+")
-_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png"})
 
 
 # ─────────────────────────── 라벨 검사 ───────────────────────────
 
 
 def _check_name(name: str) -> None:
-    """fixture 파일 이름 규칙 — 문자 집합 · 소문자 jpg/jpeg/png · `test_` 시작 금지."""
+    """fixture 파일 이름 규칙 — 문자 집합 + `fixture_server.name_problems`(소문자 jpg/jpeg/png · `test_` 시작 금지)."""
     if not _NAME.fullmatch(name):
         raise ValueError(f"{name}: 파일 이름은 [a-z0-9_.-] 만 쓴다")
-    if PurePosixPath(name).suffix not in _EXTENSIONS:
-        raise ValueError(f"{name}: 확장자가 소문자 .jpg · .jpeg · .png 가 아니다")
-    if name.startswith("test_"):
-        raise ValueError(f"{name}: 이름이 test_ 로 시작한다 — ai/evals 안에는 test_* 를 두지 않는다")
+    problems = fixture_server.name_problems(name)
+    if problems:
+        raise ValueError(problems[0])
 
 
 def _check_words(name: str, key: str, value: object) -> None:
@@ -76,10 +74,12 @@ def _check_label(name: str, label: Mapping) -> None:
     """라벨 하나를 검사한다. 잘못되면 파일 이름을 담은 ValueError — 오타 · 빈 값을 넘기면 그 축이 빠진 채 측정된다."""
     _check_name(name)
     keys = set(label)
-    if keys - _KEYS:
-        raise ValueError(f"{name}: 모르는 라벨 키 {sorted(keys - _KEYS)}")
-    if label.get("meal_type") not in _MEAL_TYPES:
-        raise ValueError(f"{name}: meal_type 은 {sorted(_MEAL_TYPES)} 중 하나다 — {label.get('meal_type')!r}")
+    unknown = keys - _KEYS
+    if unknown:
+        raise ValueError(f"{name}: 모르는 라벨 키 {sorted(unknown)}")
+    meal_type = label.get("meal_type")
+    if meal_type not in _MEAL_TYPES:
+        raise ValueError(f"{name}: meal_type 은 {sorted(_MEAL_TYPES)} 중 하나다 — {meal_type!r}")
 
     if "empty" in label:
         if label["empty"] is not True:
@@ -88,8 +88,6 @@ def _check_label(name: str, label: Mapping) -> None:
             raise ValueError(f"{name}: empty 는 다른 축({sorted(keys & _FOOD_KEYS)})과 함께 쓸 수 없다")
         return
 
-    if not keys & _FOOD_KEYS:
-        raise ValueError(f"{name}: 음식 축(unit · required · non_foods · forbidden)이 하나도 없다 — 관측 축만 남는다")
     if "unit" in label and label["unit"] not in _UNITS:
         raise ValueError(f"{name}: unit 은 {list(_UNITS)} 중 하나다 — {label['unit']!r}")
     if "required" in label:
@@ -123,21 +121,22 @@ _OBSERVATIONS: tuple[Axis, ...] = (
 
 def _axes(label: Mapping) -> tuple[Axis, ...]:
     """검사를 통과한 라벨에 붙일 축. 사진별 기대값(required · non_foods · forbidden)은 팩토리가 묶는다."""
-    if label.get("empty"):
+    if "empty" in label:
         return (_EMPTY,)
     axes: list[Axis] = []
     if "unit" in label:
         axes.append(_GRAM if label["unit"] == "gram" else _NATURAL)
+    # 팩토리가 라벨 값을 복사해 묶는다 — 여기서 다시 복사하지 않는다
     if "required" in label:
-        axes.append(_axis(amc.no_missing_food([list(group) for group in label["required"]]), "non_critical"))
+        axes.append(_axis(amc.no_missing_food(label["required"]), "non_critical"))
     if "non_foods" in label:
-        axes.append(_axis(amc.no_phantom_food(list(label["non_foods"])), "non_critical"))
+        axes.append(_axis(amc.no_phantom_food(label["non_foods"]), "non_critical"))
     if "forbidden" in label:
-        axes.append(_axis(amc.standard_name(list(label["forbidden"])), "non_critical"))
+        axes.append(_axis(amc.standard_name(label["forbidden"]), "non_critical"))
     return (*axes, *_OBSERVATIONS)
 
 
-def _case(name: str, label: Mapping, *, n: int) -> Case:
+def _case(name: str, label: Mapping, axes: tuple[Axis, ...], *, n: int) -> Case:
     """id 는 파일 이름의 stem 이고, imageUrl 에는 파일 이름만 둔다(실행 시 `with_image_base` 가 주소를 붙인다)."""
     case_id = PurePosixPath(name).stem
     return Case(
@@ -151,7 +150,7 @@ def _case(name: str, label: Mapping, *, n: int) -> Case:
             "imageUrl": name,
         },
         contract=amc.contract_parseable,
-        axes=_axes(label),
+        axes=axes,
         n=n,
     )
 
@@ -159,16 +158,22 @@ def _case(name: str, label: Mapping, *, n: int) -> Case:
 def build_cases(labels: Mapping[str, Mapping], *, n: int = 3) -> tuple[Case, ...]:
     """라벨 하나를 Case 하나로 바꾼다. 잘못된 라벨은 파일 이름을 담은 ValueError.
 
+    게이트에 기여하는 축(관측이 아닌 축)이 하나도 없는 라벨은 거부한다 — 측정하는 척만 하는 케이스가 된다.
     stem 이 같은 두 파일(`meal.jpg` · `meal.png`)도 거부한다 — case id 가 겹쳐 결과 · baseline 이 덮어써진다.
     """
     stems: dict[str, str] = {}
+    cases: list[Case] = []
     for name, label in labels.items():
         _check_label(name, label)
+        axes = _axes(label)
+        if all(axis.grade == "ambiguous" for axis in axes):
+            raise ValueError(f"{name}: 판정 축(unit · required · non_foods · forbidden · empty)이 하나도 없다 — 관측 축만 남는다")
         stem = PurePosixPath(name).stem
         if stem in stems:
             raise ValueError(f"{name}: case id {stem!r} 가 {stems[stem]} 와 겹친다")
         stems[stem] = name
-    return tuple(_case(name, label, n=n) for name, label in labels.items())
+        cases.append(_case(name, label, axes, n=n))
+    return tuple(cases)
 
 
 CASES: tuple[Case, ...] = build_cases(LABELS)
@@ -186,37 +191,33 @@ def cases_prompt_hash(cases: Sequence[Case]) -> str:
     return harness.prompt_hash(*(food_analyzer._build_prompt(meal_type) for meal_type in meal_types))
 
 
-def _fixture_problems(cases: Sequence[Case], fixture_dir: Path) -> list[str]:
-    return [
-        problem
-        for case in cases
-        for problem in fixture_server.fixture_problems(fixture_dir / case.request["imageUrl"])
-    ]
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     """`serve_fixtures` 로 서버를 띄운 채 `harness.cli_main` 에 위임한다.
 
     먼저 모든 fixture 를 검사해 문제가 있으면 출력하고 2(오용)로 끝낸다 — 서버가 요청 로그를 꺼서
     fixture 누락과 모델 실패가 둘 다 `status 500` 으로 보이므로 키 확인 · 서버 기동 전에 막는다.
-    채널 · 키 확인 · 서버는 호출 시점에 만든다 — import 만으로 `.env` 를 읽거나 서버를 띄우지 않는다.
+    `--only` 부분 실행이어도 전체를 검사한다(인자 해석은 `cli_main` 이 한다).
+    CASES · FIXTURE_DIR 와 채널 · 키 확인 · 서버는 호출 시점에 읽고 만든다 — import 만으로 `.env` 를 읽거나 서버를 띄우지 않는다.
     """
-    cases, fixture_dir = CASES, FIXTURE_DIR
-    problems = _fixture_problems(cases, fixture_dir)
+    problems = [
+        problem
+        for case in CASES
+        for problem in fixture_server.fixture_problems(FIXTURE_DIR / case.request["imageUrl"])
+    ]
     if problems:
         print("fixture 문제 — 실행하지 않는다:")
         for problem in problems:
             print(f"  {problem}")
         return 2
 
-    with fixture_server.serve_fixtures(fixture_dir) as base:
+    with fixture_server.serve_fixtures(FIXTURE_DIR) as base:
         return harness.cli_main(
             argv,
-            cases=cases,
+            cases=CASES,
             post_factory=lambda: fixture_server.with_image_base(harness.default_post(), base),
             has_key=harness.has_api_key,
             rule_version=RULE_VERSION,
-            prompt_hash=cases_prompt_hash(cases),
+            prompt_hash=cases_prompt_hash(CASES),
             crash_log=CRASH_LOG,
         )
 

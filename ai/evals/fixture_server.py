@@ -177,11 +177,25 @@ def _png_has_exif(data: bytes) -> bool:
     return False
 
 
+def name_problems(name: str) -> list[str]:
+    """fixture 파일 이름의 문제 — `test_` 시작 · 소문자 jpg/jpeg/png 아닌 확장자. 파일을 읽지 않는다.
+
+    이름 규칙의 정본이다 — `fixture_problems` 와 라벨 검사(`analyze_meal_eval.build_cases`)가 함께 쓴다.
+    확장자는 서버 content-type 표(`_CONTENT_TYPES`)를 따르므로 소문자만 받는다.
+    """
+    problems: list[str] = []
+    if name.startswith("test_"):
+        problems.append(f"{name}: 이름이 test_ 로 시작한다 — ai/evals 안에는 test_* 를 두지 않는다")
+    if PurePath(name).suffix not in _CONTENT_TYPES:
+        problems.append(f"{name}: 확장자가 소문자 .jpg · .jpeg · .png 가 아니다")
+    return problems
+
+
 def fixture_problems(path: Path, *, max_bytes: int = MAX_FIXTURE_BYTES) -> list[str]:
     """fixture 한 장의 문제 목록 — 없음 · 확장자 · 시그니처 · 크기 · EXIF · `test_` 이름. 문제가 없으면 `[]`.
 
     문구마다 파일 이름을 넣는다 — 라벨 전체를 검사해 한 번에 모아 보여 주기 위해서다. 파일이 없으면 예외 대신
-    그 한 줄만 돌려준다. 확장자는 서버 content-type 표(`_CONTENT_TYPES`)와 같은 규칙으로 소문자만 받는다.
+    그 한 줄만 돌려준다. 이름 규칙은 `name_problems` 를 따른다.
     """
     path = Path(path)
     name = path.name
@@ -189,12 +203,8 @@ def fixture_problems(path: Path, *, max_bytes: int = MAX_FIXTURE_BYTES) -> list[
         return [f"{name}: 파일이 없다"]
 
     data = path.read_bytes()
-    problems: list[str] = []
-    if name.startswith("test_"):
-        problems.append(f"{name}: 이름이 test_ 로 시작한다 — ai/evals 안에는 test_* 를 두지 않는다")
+    problems = name_problems(name)
     expected = _CONTENT_TYPES.get(path.suffix)
-    if expected is None:
-        problems.append(f"{name}: 확장자가 소문자 .jpg · .jpeg · .png 가 아니다")
     if len(data) > max_bytes:
         problems.append(f"{name}: 크기 {len(data)} 바이트가 상한 {max_bytes} 바이트를 넘는다")
     if expected is not None and not data.startswith(_SIGNATURES[expected]):
