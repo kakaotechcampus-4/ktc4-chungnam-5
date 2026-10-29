@@ -14,14 +14,12 @@ chat · DAILY 사이클이 `checks.py` 를 고치므로 공유 파일 충돌을 
 
 from __future__ import annotations
 
-import re
 import unicodedata
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 
 from pydantic import ValidationError
 
 from app.schemas import AnalyzeMealResponse
-from evals.checks import _verdict
 from evals.harness import Check, Verdict
 
 GRAM_UNITS: frozenset[str] = frozenset({"g", "G", "그램", "ml", "mL", "ML", "밀리리터"})
@@ -34,6 +32,15 @@ BE 는 strip 말고는 정규화하지 않으므로 판정도 `unit.strip()` 이
 
 _MALFORMED: Verdict = (False, "응답 모양이 틀렸다 — items 가 항목 객체 목록이 아니다")
 _EMPTY_LABEL: Verdict = (False, "라벨이 비어 있다 — 판정 불가")
+
+
+def _verdict(label: str, found: Iterable[str]) -> Verdict:
+    """찾은 위반이 있으면 `(False, "<label>: …")`(순서 유지 중복 제거), 없으면 통과.
+
+    `checks._verdict` 와 같은 모양이다 — 공유 파일(`checks.py`)에 묶이지 않으려고 import 하지 않고 둔다.
+    """
+    unique = list(dict.fromkeys(found))
+    return (False, f"{label}: {', '.join(unique)}") if unique else (True, "")
 
 # ─────────────────────────── 응답 읽기 ───────────────────────────
 
@@ -87,24 +94,24 @@ def contract_parseable(status_code: int, payload: object) -> Verdict:
 # ─────────────────────────── 단위 ───────────────────────────
 
 
-def gram_unit_default(resp: dict, req: dict) -> Verdict:
-    """낱개 음식도 모든 항목을 BE 가 환산하는 g · ml 단위로 냈는가."""
+def _all_units(resp: object, *, gram: bool, label: str) -> Verdict:
+    """모든 항목의 단위가 g · ml 인가(`gram=True`) / 아닌가(`gram=False`). 단위가 문자열이 아니면 양쪽 모두 위반."""
     items = _items(resp)
     if items is None:
         return _MALFORMED
     if not items:
         return False, "항목이 없다"
-    return _verdict("g · ml 이 아닌 단위", [_name_of(item) for item in items if _in_gram_units(item) is not True])
+    return _verdict(label, [_name_of(item) for item in items if _in_gram_units(item) is not gram])
+
+
+def gram_unit_default(resp: dict, req: dict) -> Verdict:
+    """낱개 음식도 모든 항목을 BE 가 환산하는 g · ml 단위로 냈는가."""
+    return _all_units(resp, gram=True, label="g · ml 이 아닌 단위")
 
 
 def natural_unit_allowed(resp: dict, req: dict) -> Verdict:
     """통째 덩어리 음식을 g · ml 로 지어내지 않고 자연 단위로 냈는가 — `gram_unit_default` 의 짝."""
-    items = _items(resp)
-    if items is None:
-        return _MALFORMED
-    if not items:
-        return False, "항목이 없다"
-    return _verdict("덩어리 음식을 g · ml 로 냈다", [_name_of(item) for item in items if _in_gram_units(item) is not False])
+    return _all_units(resp, gram=False, label="덩어리 음식을 g · ml 로 냈다")
 
 
 # ─────────────────────────── 항목 ───────────────────────────
@@ -131,13 +138,13 @@ def no_phantom_food(non_foods: Sequence[str]) -> Check:
         names = _names(resp)
         if names is None:
             return _MALFORMED
-        return _verdict("비음식을 음식으로 냈다", [name for name in names if words & set(name.split())])
+        return _verdict("비음식을 음식으로 냈다", [name for name in names if not words.isdisjoint(name.split())])
 
     return no_phantom_food
 
 
 def _no_space(text: str) -> str:
-    return re.sub(r"\s+", "", text)
+    return "".join(text.split())
 
 
 def no_missing_food(required: Sequence[Sequence[str]]) -> Check:
@@ -155,7 +162,7 @@ def no_missing_food(required: Sequence[Sequence[str]]) -> Check:
         if names is None:
             return _MALFORMED
         given = {_no_space(name) for name in names}
-        missing = [group[0] for group in groups if not any(_no_space(word) in given for word in group)]
+        missing = [group[0] for group in groups if given.isdisjoint(map(_no_space, group))]
         return _verdict("빠진 주요 음식", missing)
 
     return no_missing_food
