@@ -61,13 +61,14 @@ def _check_name(name: str) -> None:
 
 
 def _check_words(name: str, key: str, value: object) -> None:
-    """비어 있지 않은 문자열들의 비어 있지 않은 목록인가. str 하나는 팩토리가 글자 단위로 쪼개므로 거부한다."""
+    """비어 있지 않은 문자열들의 비어 있지 않은 목록인가. str 하나는 팩토리가 글자 단위로 쪼개므로 거부한다.
+    공백만인 원소도 빈 문자열로 본다 — 금지어 `" "` 는 공백 든 모든 이름에 걸리고, 동의어 `" "` 는 늘 누락이다."""
     if not isinstance(value, (list, tuple)):
         raise ValueError(f"{name}: {key} 는 목록이어야 한다 — {value!r}")
     if not value:
         raise ValueError(f"{name}: {key} 가 비어 있다")
-    if not all(isinstance(word, str) and word for word in value):
-        raise ValueError(f"{name}: {key} 에 빈 문자열이나 문자열 아닌 값이 있다 — {value!r}")
+    if not all(isinstance(word, str) and word.strip() for word in value):
+        raise ValueError(f"{name}: {key} 에 빈 문자열(공백만인 것 포함)이나 문자열 아닌 값이 있다 — {value!r}")
 
 
 def _check_label(name: str, label: Mapping) -> None:
@@ -99,6 +100,10 @@ def _check_label(name: str, label: Mapping) -> None:
     for key in ("non_foods", "forbidden"):
         if key in label:
             _check_words(name, key, label[key])
+    # 비음식은 낱말 단위로 판정한다 — 공백이 든 원소(앞뒤 공백 포함)는 어떤 낱말과도 같아질 수 없어 축이 공허 통과한다.
+    # 금지어(부분 문자열) · 동의어(공백 제거 후 완전 일치)는 띄어 쓴 이름도 유효하다
+    if "non_foods" in label and any(char.isspace() for word in label["non_foods"] for char in word):
+        raise ValueError(f"{name}: non_foods 는 한 낱말이어야 한다(낱말 단위로 판정한다) — {label['non_foods']!r}")
 
 
 # ─────────────────────────── 빌더 ───────────────────────────
