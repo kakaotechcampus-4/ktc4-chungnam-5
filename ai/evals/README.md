@@ -1,4 +1,6 @@
-# eval — `/short-feedback` MEAL 골든셋
+# eval — 모델 출력 골든셋 (`/short-feedback` MEAL · `/analyze-meal`)
+
+`/analyze-meal` 은 맨 아래 [`/analyze-meal` 골든셋](#analyze-meal-골든셋) 절에 따로 정리했다. 그 위는 MEAL 이 기준이고, 하네스 동작(실행 옵션 · SKIP · 등급 · 채널)은 둘이 같다.
 
 모델 출력이 규칙을 **지켰는가**를 N회 통과율로 잰다.
 LLM 출력은 확률적이라 정답 문자열을 얼릴 수 없다. 그래서 정답 대신 **금지 조건 판정 + 통과율**을 계약으로 고정하고,
@@ -18,9 +20,13 @@ LLM 출력은 확률적이라 정답 문자열을 얼릴 수 없다. 그래서 �
 
 | 파일 | 내용 |
 | --- | --- |
-| `checks.py` | 공통 판정 함수 19개 — 이후 analyze-meal · chat · DAILY 사이클이 재사용한다 |
+| `checks.py` | `/short-feedback` 텍스트 판정 함수 19개 — chat · DAILY 사이클이 재사용한다 |
 | `harness.py` | 반복 · 집계 · baseline 저장/비교 · 게이트 · 크래시 로그 · CLI · SKIP |
 | `meal_feedback_eval.py` | MEAL 케이스(`CASES`) + `main()` |
+| `analyze_meal_checks.py` | `/analyze-meal` 구조 판정 함수 9개(단위 · 음식명 · 항목 수 · 관측). `checks.py` 와 공유하지 않는다 |
+| `fixture_server.py` | 사진 fixture 를 127.0.0.1 로컬 서버로 내주기 · imageUrl 치환 · fixture 파일 검사 |
+| `analyze_meal_eval.py` | 사진 라벨(`LABELS`) → 케이스(`CASES`) + `main()` |
+| `fixtures/analyze_meal/` | 사진 fixture (직접 촬영 · EXIF 제거 · 장당 200KB 이하) |
 
 `ai/evals/` 안에는 `test_*.py` · `tests/` 를 두지 않는다 (테스트 파일로 분류돼 단계 잠금이 꼬인다).
 
@@ -196,3 +202,140 @@ exit code:
    규칙 · 프롬프트가 바뀐 뒤의 비교에는 경고가 붙는다
 
 앱에서 발견한 결함은 케이스로 승격한다.
+
+---
+
+## `/analyze-meal` 골든셋
+
+비전 모델이 낸 인식 항목(`items`)이 `food_analyzer._build_prompt` 의 규칙을 지켰는가를 잰다 —
+g 기본 · 통째 덩어리만 자연 단위 · 브랜드명 · 수식어 제거 · 음식 아닌 것을 음식으로 내지 않음.
+`/analyze-meal` 은 실제 모델에 **연결돼 있다** — `/short-feedback` 과 달리 키가 있으면 바로 실측된다.
+
+케이스는 **사진 한 장**이다. 사진마다 라벨(`analyze_meal_eval.LABELS`)을 두면 `build_cases` 가 라벨 키로 붙일 축과
+기대값을 정한다 — 사진을 더할 때 코드를 고치지 않고 라벨만 더한다.
+
+### 이미지 전달 — GET 만 로컬, 모델 POST 는 실제
+
+`food_analyzer._call_vision_model` 은 `imageUrl` 을 httpx 로 직접 GET 해 data URI 로 바꾼 뒤 모델에 POST 한다.
+eval 은 `ai/app` 을 고치거나 monkeypatch 하지 않고 GET 대상만 로컬로 바꾼다:
+
+```
+CASES imageUrl = "hotdog.jpg"                         (파일 이름만 — seed 에 포트가 남지 않는다)
+  → main() 이 fixtures/analyze_meal/ 을 http://127.0.0.1:<임의 포트> 로 띄운다 (끝나면 닫는다)
+  → with_image_base 가 요청 복사본의 imageUrl 을 http://127.0.0.1:<포트>/hotdog.jpg 로 바꾼다
+  → 앱(/analyze-meal)이 운영과 같은 코드로 GET → content-type 으로 data URI
+  → 실제 비전 모델로 POST
+```
+
+- 서버는 127.0.0.1 에만 바인드하고, 디렉터리 안의 소문자 `.jpg` · `.jpeg` · `.png` 파일만 내준다. 디렉터리 밖 경로 · 디렉터리 목록 · 그 밖의 확장자는 404 다.
+- content-type 은 확장자 표로 정한다(OS mimetypes 레지스트리를 쓰지 않는다 — PC 마다 값이 다르다).
+- 사진이 저장소 밖으로 나가는 곳은 모델 게이트웨이 하나다. Dockerfile 은 `fixtures/` 를 복사하지 않는다.
+
+### 실행
+
+```bash
+cd ai
+python -X utf8 -m evals.analyze_meal_eval                                                     # 실행 (케이스별 n=3)
+python -X utf8 -m evals.analyze_meal_eval --save evals/baselines/analyze_meal_baseline.json      # 기준선 저장
+python -X utf8 -m evals.analyze_meal_eval --baseline evals/baselines/analyze_meal_baseline.json  # 기준선과 비교
+python -X utf8 -m evals.analyze_meal_eval --only hotdog --n 1                                 # 사진 하나만 빠르게
+```
+
+옵션 · SKIP 은 위 MEAL 과 같다. 다른 점:
+
+| 항목 | analyze-meal |
+| --- | --- |
+| 호출 수 | **사진 수 × n** (기본 n=3 — 사진 7장이면 21회). 공용 크레딧이라 메인 세션이 승인(N · 호출 수) 후에만 실행한다 |
+| exit `2` | CLI 오용에 더해 **fixture 문제**(없는 파일 · EXIF · 크기 · 확장자 · 시그니처) — 키 확인 · 서버 기동 전에 모든 사진을 검사하고, 문제를 파일 이름과 함께 출력한 뒤 끝난다. `--only` 부분 실행이어도 전체를 검사한다 |
+| 라벨 오류 | 잘못된 라벨은 **import 시점**에 `ValueError`(파일 이름 포함) — 실행 전에 드러난다 |
+| baseline | `rule_version` = `RULE_VERSION`(`"analyze-meal-labels-v1"`) — BE 규칙 버전이 없으므로 **라벨 · 판정을 바꾸면 올린다**. `prompt_hash` = 케이스가 쓰는 mealType 마다의 `_build_prompt` 해시 |
+| 크래시 로그 | `evals/analyze_meal_crashes.log` (커밋하지 않는다) |
+| 케이스 0개 | `LABELS` 가 비어 있으면 측정할 것이 없다 — 키가 있으면 0/0 으로 게이트 PASS 가 찍힌다. 사진을 넣기 전에는 의미 없는 실행이다 |
+
+### 사진 fixture 규칙
+
+위치는 `ai/evals/fixtures/analyze_meal/`. `fixture_server.fixture_problems` 가 검사하고, verify(`test_eval_analyze_meal_cases.py` 행 51)와 `main()` 이 모든 라벨 사진에 돌린다.
+
+| 규칙 | 이유 |
+| --- | --- |
+| 직접 촬영, 얼굴 없음 | 웹 이미지는 커밋 시 저작권 문제 |
+| **EXIF 블록 전체 제거** (JPEG APP1 `Exif` · PNG `eXIf`) — 위치 정보만 지우는 것으로는 부족 | 공개 저장소에 촬영 위치 · 기기 정보가 남는다 |
+| 장당 **200KB 이하** (긴 변 1024px 정도) | 저장소에 커밋한다 |
+| 확장자는 **소문자** `.jpg` · `.jpeg` · `.png`, 시그니처가 확장자와 같아야 함. 휴대폰 기본 HEIC · `.JPG` 는 변환 · 이름 변경 | 서버 content-type 표와 같은 규칙 |
+| 파일 이름은 `[a-z0-9_.-]` 만, `test_` 로 시작 금지, stem(확장자 뺀 이름)이 겹치지 않게 | `with_image_base` 는 이름을 퍼센트 인코딩하지 않는다 · `ai/evals` 안 `test_*` 금지 · stem 이 case id 다 |
+
+촬영할 때 판정 축의 전제를 지킨다:
+
+- **단위 축**(`unit`)은 사진의 **모든 항목**을 본다 — 그 사진은 **음식 한 가지만** 찍는다(반찬이 같이 나오면 반찬 단위로 실패한다).
+- g 단위 사진은 낱개 · 일정한 크기의 음식(핫도그 · 동그랑땡 등), 자연 단위 사진은 통째 덩어리(홀케이크 · 통닭 등).
+  **프롬프트가 예시로 든 음식(빵 조각 · 고기 한 점 · 만두 · 피자 한 판 · 수박 한 통)은 피한다** — 예시를 되풀이했는지를 재게 된다.
+- MEAL few-shot 음식(참치김밥 · 김밥 · 라면 · 삶은 달걀 · 방울토마토)은 `required` 에 쓰지 않는다(행 52 가 막는다). 브랜드 포장 사진도 라면 · 김밥류는 피한다.
+
+### 라벨 형식
+
+`analyze_meal_eval.LABELS` 에 파일 이름을 키로 둔다. `meal_type` 은 필수이고, 나머지 키가 붙일 축을 정한다:
+
+| 키 | 값 | 붙는 축 |
+| --- | --- | --- |
+| `meal_type` (필수) | `"BREAKFAST"` · `"LUNCH"` · `"DINNER"` · `"SNACK"` (대문자) | — 요청 mealType · 프롬프트 |
+| `unit` | `"gram"` / `"natural"` | `gram_unit_default` / `natural_unit_allowed` |
+| `required` | 동의어 묶음 목록 — 묶음마다 하나는 나와야 한다 | `no_missing_food` |
+| `non_foods` | 사진에 보이는 음식 아닌 것 | `no_phantom_food` |
+| `forbidden` | 이름에 남으면 안 되는 브랜드 · 수식어 | `standard_name` |
+| `empty` | `True` 만 — 음식 없는 사진. 다른 음식 키와 함께 쓸 수 없다 | `non_food_empty` |
+
+음식 사진(`empty` 아님)에는 관측 2축(`amount_accuracy` · `confidence_calibration`)이 늘 붙는다.
+판정 축이 하나도 없는 라벨(관측만 남는 라벨)은 거부한다 — 측정하는 척만 하는 케이스가 된다.
+
+```python
+LABELS: dict[str, dict] = {
+    "hotdog.jpg": {"meal_type": "SNACK", "unit": "gram"},
+    "whole_cake.jpg": {"meal_type": "SNACK", "unit": "natural"},
+    "banchan_table.jpg": {
+        "meal_type": "DINNER",
+        "required": [["밥", "쌀밥", "흰쌀밥"], ["된장국"], ["배추김치", "김치"], ["시금치나물"]],
+    },
+    "tableware.jpg": {"meal_type": "LUNCH", "non_foods": ["그릇", "젓가락", "숟가락", "쟁반"]},
+    "empty_desk.jpg": {"meal_type": "LUNCH", "empty": True},
+    "banana_milk.jpg": {"meal_type": "SNACK", "forbidden": ["빙그레"]},
+}
+```
+
+라벨 값의 빈 목록 · 빈 문자열 · 목록 자리의 문자열 하나(`"그릇"` 은 글자 단위로 쪼개진다)는 `ValueError` 다.
+요청의 `eatenAt` · `stage` 는 고정값이다(analyze-meal 프롬프트는 stage 를 쓰지 않는다).
+
+### 판정 축 (9개)
+
+| 축 | 검사 | 등급 |
+| --- | --- | --- |
+| `contract_parseable` | 200 + `AnalyzeMealResponse` 스키마(이름 ≤255 · 단위 ≤32 · confidence 0~1). note 에 모델 출력값을 싣지 않는다 | critical (모든 케이스) |
+| `gram_unit_default` | 모든 항목의 `unit.strip()` 이 BE `to_grams` 단위(`g · G · 그램 · ml · mL · ML · 밀리리터`) 그대로 | non-critical |
+| `natural_unit_allowed` | 덩어리 음식을 g · ml 로 지어내지 않음 — 모든 항목이 위 단위 **밖** | non-critical |
+| `no_phantom_food` | 이름을 공백으로 나눈 **낱말**이 비음식 라벨과 같으면 실패("쟁반짜장" · "해물뚝배기" 는 통과) | non-critical |
+| `no_missing_food` | 동의어 묶음마다, 공백을 지운 이름이 공백을 지운 동의어와 **완전히 같은** 항목이 있어야 통과 | non-critical |
+| `non_food_empty` | 음식 없는 사진에 `items` 가 빈 목록 | non-critical |
+| `standard_name` | NFKC + 대소문자 무시 후 금지어가 이름에 **부분 문자열**로 있으면 실패(붙여 쓴 "빙그레바나나우유" 도 실패) | non-critical |
+| `amount_accuracy` | 항상 통과 — note 에 이름 · 양 · 단위 | 관측 |
+| `confidence_calibration` | 항상 통과 — note 에 확신도 | 관측 |
+
+`GRAM_UNITS` 는 BE `backend/app/services/meal.py` 의 사본이다. 일치는 verify(`test_eval_analyze_meal_checks.py` 행 33)가 BE 를 import 하지 않고 AST 로 확인한다.
+
+### 판정 한계 (받아들임)
+
+- **자연 단위 축은 g · ml 밖이면 어떤 단위든 통과한다** — "피자 1.8 kg" · "수박 3000 cc" 처럼 지어낸 무게 · 부피도 통과다(BE 가 환산하지 않는 단위라 채점에는 들어가지 않는다).
+- 단위 축은 대소문자 · 전각 · 내부 공백 정규화를 하지 않는다 — "Ml" · "ｇ" · "m l" 은 g 가 아니다(BE `to_grams` 가 strip 만 하므로 일부러 같게 둔다).
+- `no_phantom_food` 는 낱말 단위라 붙여 쓴 비음식("나무젓가락" · "빈그릇")을 놓친다.
+- `standard_name` 은 부분 문자열이라 금지어가 표준명의 일부가 되는 낱말(예: "수제" → "수제비")을 라벨에 넣으면 오판한다 — 라벨 작성자가 피한다.
+- `no_missing_food` 는 완전 일치라 라벨에 없는 동의어("흰밥")는 누락으로 센다 — 동의어 묶음을 넉넉히 적는다. 라벨 밖 음식이 더 나오는 것은 벌하지 않는다.
+- 팩토리 축은 라벨 **마지막 원소**만 어긴 응답으로 검증했다 — 라벨 일부만 묶는 구현을 테스트가 다 잡지는 못한다.
+- 모양이 틀린 응답 처리는 축마다 다르다(이름이 틀리고 단위만 g 인 응답을 `gram_unit_default` 는 통과시킨다). 하네스는 계약을 통과한 회차만 판정 축에 넘기므로 실제 eval 에는 도달하지 않는다.
+- fixture 검사는 JPEG APP1 의 `Exif` 헤더만 본다(XMP 는 보지 않는다). Windows 에서는 디스크 이름이 `MEAL.JPG` 면 어떤 표기로 요청해도 404 — 소문자 확장자 규칙을 지키면 생기지 않는다.
+- 서버 요청 로그를 꺼서, 실행 중 fixture 누락과 모델 실패는 둘 다 `status 500` 으로 보인다 — 그래서 `main()` 이 실행 전에 fixture 를 검사한다.
+
+### 첫 실측 후 확인할 것
+
+1. 단위 두 축의 note — g 가 아닌 단위가 실제로 무엇으로 나오는지("개" · "조각" · "그람"), 덩어리 음식에 g 를 지어내는지
+2. `amount_accuracy` · `confidence_calibration` samples — 정답 g 를 잴 수 있게 되면 범위 판정으로 올릴지 정한다
+3. `contract_parseable` 실패는 모델 출력 파싱 실패(코드펜스 · 스키마)인지 게이트웨이 오류인지 크래시 로그 · note 로 가른다
+4. 프롬프트 결함 후보는 `ai/app` 을 고치지 말고 기록해 담당자에게 넘긴다. 이미 알려진 것: `RecognizedItem` docstring("양도 g 가 아니라 자연 단위로 준다", `app/schemas.py`)과 프롬프트("기본은 그램")가 서로 다르다
+5. 안정되면 `--save evals/baselines/analyze_meal_baseline.json` 으로 baseline 을 커밋한다
