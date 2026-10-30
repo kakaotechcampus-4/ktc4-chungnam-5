@@ -489,12 +489,18 @@ def cli_main(
     prompt_hash: str,
     crash_log: Path | None = None,
 ) -> int:
-    """CLI 진입점. 게이트 PASS 0 / FAIL 1 / 오용 2 / 키 없음 · 미연결 SKIP 0.
+    """CLI 진입점. 게이트 PASS 0 / FAIL 1 / 오용 · 케이스 0개 2 / 키 없음 · 미연결 SKIP 0.
 
     옵션: `--n` · `--pass-ratio` · `--save` · `--baseline` · `--max-errors` · `--only`.
-    순서: 오용 검사 → 키 확인 → 미연결 probe → 실행 → 비교 → 게이트 → 저장.
+    순서: 인자 해석(`--help` 는 여기서 0) → 케이스 0개 검사 → 오용 검사 → 키 확인 → 미연결 probe → 실행 → 비교 → 게이트 → 저장.
+    케이스 0개는 키 확인 · post 생성 전에 2 로 끝낸다 — 그대로 돌리면 0/0 으로 게이트 PASS 가 찍히고
+    `--save` 가 빈 baseline 을 만든다. 키 확인 뒤에 막으면 키 없는 PC 에서 SKIP(0) 으로 묻힌다.
+    `--only` 검사보다 먼저라 0개 문제가 "알 수 없는 case id" 로 보이지 않는다.
     """
     args = _parser().parse_args(argv)
+    if not cases:
+        print("측정할 케이스가 없다 — 0/0 으로 게이트 PASS 를 찍거나 빈 baseline 을 저장하지 않는다. 실행하지 않는다.")
+        return 2
     if args.n is not None and args.n < 1:
         print(f"--n 은 1 이상이어야 한다 (받은 값 {args.n}).")
         return 2

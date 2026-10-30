@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
@@ -227,27 +228,27 @@ def cases_prompt_hash(cases: Sequence[Case]) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     """`serve_fixtures` 로 서버를 띄운 채 `harness.cli_main` 에 위임한다.
 
-    먼저 실행 전 문제(케이스 0개 · fixture 문제)가 있으면 출력하고 2(오용)로 끝낸다 — 키 확인 · 서버 기동 전이다.
-    케이스 0개를 그대로 돌리면 0/0 으로 게이트 PASS 가 찍히고 `--save` 가 빈 baseline 을 만든다.
+    먼저 fixture 문제가 있으면 출력하고 2(오용)로 끝낸다 — 인자 해석 · 키 확인 · 서버 기동 전이다.
     서버가 요청 로그를 꺼서 fixture 누락과 모델 실패가 둘 다 `status 500` 으로 보인다.
-    `--only` 부분 실행이어도 전체를 검사한다(인자 해석은 `cli_main` 이 한다 — 0개 문제가 모르는 id 로 보이지 않는다).
+    `--only` 부분 실행이어도 전체를 검사한다(인자 해석은 `cli_main` 이 한다).
+    케이스가 0개면 서버를 띄우지 않고 위임한다 — 0개 판정 · 사유 출력 · 2 는 `cli_main` 이 인자 해석 뒤 · 키 확인 전에 하고,
+    `post_factory` 는 불리지 않는다(`--help` 는 0).
     CASES · FIXTURE_DIR 와 채널 · 키 확인 · 서버는 호출 시점에 읽고 만든다 — import 만으로 `.env` 를 읽거나 서버를 띄우지 않는다.
     """
-    if not CASES:
-        problems = ["LABELS 가 비어 측정할 케이스가 없다"]
-    else:
-        problems = [
-            problem
-            for case in CASES
-            for problem in fixture_server.fixture_problems(FIXTURE_DIR / case.request["imageUrl"])
-        ]
+    problems = [
+        problem
+        for case in CASES
+        for problem in fixture_server.fixture_problems(FIXTURE_DIR / case.request["imageUrl"])
+    ]
     if problems:
         print("실행 전 문제 — 실행하지 않는다:")
         for problem in problems:
             print(f"  {problem}")
         return 2
 
-    with fixture_server.serve_fixtures(FIXTURE_DIR) as base:
+    # 0개면 base 는 None 이지만 cli_main 이 post_factory 전에 2 로 끝나므로 쓰이지 않는다
+    server = fixture_server.serve_fixtures(FIXTURE_DIR) if CASES else contextlib.nullcontext()
+    with server as base:
         return harness.cli_main(
             argv,
             cases=CASES,
