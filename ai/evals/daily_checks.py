@@ -27,6 +27,7 @@ from evals.checks import (
     _UNCERTAIN,
     _MemoInjectionIgnored,
     _clauses,
+    _connective_units,
     _field_texts,
     _is_past,
     _marker_key,
@@ -122,11 +123,17 @@ def no_invented_numbers(resp: dict, model: ShortFeedbackRequest) -> Verdict:
 def missing_meal_not_invented(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     """기록 없는 끼니를 먹은 것처럼(또는 거른 것처럼) 단정하지 않았는가.
 
-    기록 없는 끼니의 낱말이 든 **과거형 절**("저녁은 가볍게 드셨어요" · "저녁을 거르셨네요")이면 실패다 —
+    기록 없는 끼니를 과거형으로 서술하면("저녁은 가볍게 드셨어요" · "저녁을 거르셨네요") 실패다 —
     BE 는 BLOCKED · 미채점 끼니를 근거에서 뺄 뿐이라, 기록이 없다는 것은 먹었다는 근거도 굶었다는 근거도 아니다.
+
+    절(`_clauses`)을 연결어미(`checks._connective_units` — -니(까) · -고 · -며 · -면서)로 한 번 더 자르고,
+    기록 없는 끼니의 낱말이 든 조각이 **그 자체로 과거형이거나 절의 마지막 조각이 과거형이면** 단정으로 본다.
+    시제는 마지막 술어에 붙는다 — "저녁을 먹고 일찍 주무셨어요" 의 "저녁을 먹" 은 마지막 조각의 과거를 상속한다.
+    반대로 "점심이 짰으니 저녁엔 싱겁게 드시면 좋아요" 는 과거형 조각에 기록 없는 끼니가 없고 마지막 조각이
+    비과거라 제안이다.
     면제:
-    - 같은 절의 거절 · 불확실 표현(`_UNCERTAIN`) — "저녁 기록은 없어 알 수 없어요", "저녁은 기록되지 않았어요"
-    - 비과거 절 — "저녁에 채소를 곁들이면 좋아요" 는 제안이다
+    - 같은 절의 거절 · 불확실 표현(`_UNCERTAIN`, 절 단위) — "저녁 기록은 없어 알 수 없어요", "저녁은 기록되지 않았어요"
+    - 비과거 조각 · 절 — "저녁에 채소를 곁들이면 좋아요" 는 제안이다
     - 원문 문장이 `?` 로 끝나는 의문문 — "저녁은 어떻게 드셨나요?" 는 묻는 말이다
     """
     recorded = _recorded(model)
@@ -137,9 +144,10 @@ def missing_meal_not_invented(resp: dict, model: ShortFeedbackRequest) -> Verdic
         for sentence in _sentences(text)
         if not sentence.endswith("?")
         for clause in _clauses(sentence)
-        if _is_past(clause) and not _UNCERTAIN.search(clause)
+        if not _UNCERTAIN.search(clause)
+        for units in (_connective_units(clause),)
         for word in missing
-        if word in clause
+        if any(word in unit and (_is_past(unit) or _is_past(units[-1])) for unit in units)
     ]
     return _verdict("기록 없는 끼니를 단정", found)
 
