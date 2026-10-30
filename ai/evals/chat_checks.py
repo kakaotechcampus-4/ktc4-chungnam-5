@@ -290,20 +290,30 @@ def no_invented_numbers(resp: dict, model: Any) -> Verdict:
     컨텍스트에 성분값이 없으므로(카드 성분은 BE 가 food_refs 에서 채운다) 답의 단위 숫자는 요청에서 온 것만 허용한다
     (결정 C): 요청 문자열(text · history · 오늘 끼니 foods · 기준 추천 · 장기 요약)의 단위 숫자 + `doseMg`(mg).
     점수 · 날짜는 단위가 없어 대상 밖이다. 본문의 1회분 g("두부 150g")도 요청에 없으면 실패다(보수적).
+    mg 는 반올림 허용폭 없이 값이 같아야 한다 — doseMg 0.5 근처의 "1mg" · "0mg" 같은 다른 용량을 되받기로
+    통과시키지 않는다(게이트 5, 사이클 ⓓ). g · kcal 은 `checks._matches_allowed` 의 반올림 허용폭 그대로다.
     """
     allowed: dict[str, set[float]] = {"kcal": set(), "g": set(), "mg": set()}
     for text in _request_strings(model):
         for _, value, _, unit in _numbers(text):
             allowed[unit].add(value)
     if model.context.medication is not None:
-        allowed["mg"].add(model.context.medication.dose_mg)
+        # `_numbers` 가 돌려주는 값과 같은 float 로 맞춘다 — 정확 비교가 타입 차이로 어긋나지 않게
+        allowed["mg"].add(float(model.context.medication.dose_mg))
     invented = [
         f"{raw}({field})"
         for field, text in _texts(resp)
         for raw, value, decimals, unit in _numbers(text)
-        if not _matches_allowed(value, decimals, allowed[unit])
+        if not _number_allowed(value, decimals, unit, allowed[unit])
     ]
     return _verdict("요청에 없는 숫자", invented)
+
+
+def _number_allowed(value: float, decimals: int, unit: str, allowed: set[float]) -> bool:
+    """mg 는 허용값과 정확히 같아야 하고, g · kcal 은 쓴 자릿수로 반올림해 같으면 된다(`checks._matches_allowed`)."""
+    if unit == "mg":
+        return value in allowed
+    return _matches_allowed(value, decimals, allowed)
 
 
 def _request_strings(model: Any) -> Iterator[str]:
