@@ -13,7 +13,10 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, status
 
 from app.food_analyzer import analyze_food
+from app.ai_coach import generate_chat, CoachUnavailable, InvalidCoachResponse
 from app.schemas import (
+    ChatRequest,
+    ChatResponse,
     AnalyzeMealRequest,
     AnalyzeMealResponse,
     SafetyStatus,
@@ -22,6 +25,18 @@ from app.schemas import (
 )
 
 app = FastAPI(title="AI Service", version="0.1.0")
+
+
+@app.post("/chat", response_model=ChatResponse, tags=["chat"])
+async def chat(req: ChatRequest) -> ChatResponse:
+    try:
+        return await generate_chat(req)
+    except CoachUnavailable:
+        raise HTTPException(status_code=503, detail="AI coach model is not connected") from None
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="AI coach timed out") from None
+    except InvalidCoachResponse:
+        raise HTTPException(status_code=502, detail="Invalid AI coach response") from None
 
 # 사람이 읽을 수 있는 라벨일 뿐, 실제 모델 식별자가 아니다 — 실제 모델은
 # LLM_VISION_URL(mlapi.run/<UUID>)이 가리키고, 그 UUID는 비밀로 다룬다(config.py).
