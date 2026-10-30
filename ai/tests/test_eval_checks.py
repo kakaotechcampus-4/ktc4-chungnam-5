@@ -1213,3 +1213,57 @@ def test_s12_clauses_still_split_past_go_and_jiman(text, expected):
     헬퍼를 옮기면서 `_CLAUSE_SPLIT` 을 건드리면 MEAL 266 이 기대는 과거형 절 분리(`_meal_clauses`)가 깨진다.
     """
     assert _clauses(text) == expected
+
+
+# ─────────────────────────── memo 팩토리 축 — 값 비교 ───────────────────────────
+
+# 팩토리마다 (인자 a 를 매번 새로 만드는 함수, a 와 다른 인자 b)
+_FACTORY_ARGS = [
+    (memo_injection_ignored, lambda: _MARKER, "QWERTY-0000-MANGO"),
+    (memo_reflected, lambda: ["두부", "달걀"], ["고등어"]),
+    (memo_medical_question, lambda: ["마셔도 괜찮", "드셔도 돼"], ["먹어도 괜찮"]),
+]
+_FACTORY_IDS = [factory.__name__ for factory, _, _ in _FACTORY_ARGS]
+
+
+@pytest.mark.parametrize(("factory", "make_a", "b"), _FACTORY_ARGS, ids=_FACTORY_IDS)
+def test_s20_factory_called_twice_with_same_argument_gives_equal_checks(factory, make_a, b):
+    """행 s20 — 같은 내용의 인자(리스트는 서로 다른 새 리스트)로 두 번 만든 memo 팩토리 축은 `==` 로 같다 (양방향-남김).
+
+    케이스를 값으로 비교하려면 축도 값으로 같아야 한다 — 호출마다 새 클로저면 같은 인자끼리도 다르다고 나온다.
+    """
+    assert factory(make_a()) == factory(make_a())
+
+
+@pytest.mark.parametrize(("factory", "make_a", "b"), _FACTORY_ARGS, ids=_FACTORY_IDS)
+def test_s21_factory_with_different_argument_gives_unequal_checks(factory, make_a, b):
+    """행 s21 — 인자가 다르면 같은 팩토리의 축이라도 `!=` 다 (양방향-거름, 행 s20 의 짝).
+
+    인자를 무시하고 늘 같다고 하는 `__eq__` 면 다른 메모 · marker 로 만든 케이스가 같다고 나온다.
+    """
+    assert factory(make_a()) != factory(b)
+
+
+def test_s22_different_factories_with_same_argument_are_unequal():
+    """행 s22 — 같은 모양의 인자를 받는 다른 팩토리끼리는 인자가 같아도 `!=` 다 (경계).
+
+    인자만 비교하는 범용 값이면 "메모 반영" 축과 "메모 의료 질문" 축이 같은 단어 목록으로 같다고 나온다.
+    """
+    assert memo_reflected(["x"]) != memo_medical_question(["x"])
+
+
+@pytest.mark.parametrize(
+    ("factory", "arg", "name"),
+    [
+        (memo_injection_ignored, _MARKER, "memo_injection_ignored"),
+        (memo_reflected, ["두부"], "memo_reflected"),
+        (memo_medical_question, ["마셔도 괜찮"], "memo_medical_question"),
+    ],
+    ids=["memo_injection_ignored", "memo_reflected", "memo_medical_question"],
+)
+def test_s23_memo_factory_check_name_is_factory_name(factory, arg, name):
+    """행 s23 — memo 팩토리가 만든 Check 의 `__name__` 은 팩토리 이름이다 (회귀).
+
+    하네스는 `check.__name__` 을 축 id 로 읽는다 — 값 객체로 바꾸면서 클래스 이름이 새면 baseline 의 축 id 가 바뀐다.
+    """
+    assert factory(arg).__name__ == name

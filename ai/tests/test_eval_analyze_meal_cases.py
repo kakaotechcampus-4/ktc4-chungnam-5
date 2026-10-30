@@ -562,77 +562,14 @@ def test_r49c_valid_words_build_a_case_with_their_factory_axis(key, value, axis_
 # ─────────────────────────── 실데이터 (LABELS · CASES · FIXTURE_DIR) ───────────────────────────
 
 
-def _label_words(*labels: dict) -> list[str]:
-    """라벨들의 `required` 동의어 · `non_foods` · `forbidden` 단어 전부 (정렬 · 중복 제거).
-
-    비교하는 **두 쪽 라벨 모두**에서 뽑는다 — 한쪽에만 있는 단어가 프로브에 없으면 그 차이를 못 본다.
-    """
-    words: set[str] = set()
-    for label_map in labels:
-        for label in label_map.values():
-            for group in label.get("required", []):
-                words.update(group)
-            words.update(label.get("non_foods", []))
-            words.update(label.get("forbidden", []))
-    return sorted(words)
-
-
-def _probes(words: list[str]) -> list[dict]:
-    """판정 비교용 프로브 응답 — 빈 items 하나 + 단어마다 그 단어 이름의 항목 하나."""
-    return [_resp(), *(_resp(_item(word)) for word in words)]
-
-
-def _shape(case: Case) -> tuple:
-    """함수 객체를 뺀 케이스 구조 — 축은 (id, 등급, pass_ratio) 만 본다."""
-    return (
-        case.id,
-        case.path,
-        case.request,
-        case.contract,
-        case.n,
-        [(axis.id, axis.grade, axis.pass_ratio) for axis in case.axes],
-    )
-
-
-def _case_differences(left: tuple[Case, ...], right: tuple[Case, ...], words: list[str]) -> list[str]:
-    """두 케이스 목록의 차이 — 빈 목록이면 "같음".
-
-    구조(`_shape`)가 같고, 같은 자리의 축마다 프로브 응답(`_probes(words)`)에 같은 `(통과?, note)` 를 내야 같다.
-    팩토리 축(`no_missing_food` · `no_phantom_food` · `standard_name`)은 부를 때마다 새 클로저라 함수 객체로는
-    같은 라벨끼리도 다르다 — 함수 객체 · 클로저 셀이 아니라 판정 결과로 라벨 값이 같게 묶였는지 본다.
-    """
-    if len(left) != len(right):
-        return [f"케이스 수 {len(left)} != {len(right)}"]
-    probes = _probes(words)
-    differences: list[str] = []
-    for a, b in zip(left, right):
-        if _shape(a) != _shape(b):
-            differences.append(f"{a.id} / {b.id}: 구조가 다르다")
-            continue
-        for axis_a, axis_b in zip(a.axes, b.axes):
-            for probe in probes:
-                verdict_a = axis_a.check(probe, a.request)
-                verdict_b = axis_b.check(probe, b.request)
-                if verdict_a != verdict_b:
-                    differences.append(f"{a.id}.{axis_a.id} {probe['items']}: {verdict_a} != {verdict_b}")
-    return differences
-
-
 def test_r50_empty_labels_give_no_cases_and_cases_follow_labels():
-    """행 50 — `build_cases({})` 는 빈 튜플이고, 모듈의 `CASES` 는 `build_cases(LABELS)` 와 같은 구조 · 같은 판정이다.
+    """행 50 — `build_cases({})` 는 빈 튜플이고, 모듈의 `CASES` 는 `build_cases(LABELS)` 와 같다.
 
     `CASES` 를 손으로 따로 두면 라벨을 고쳐도 케이스가 바뀌지 않는다 — 라벨이 유일한 입력이어야 한다.
-    팩토리 축은 부를 때마다 새 클로저라 `Case` 의 `==` 로는 같은 라벨끼리도 다르다 — 구조와 프로브 판정으로 비교한다
-    (비교 helper 자체의 양방향은 행 50b · 50c).
-    프로브 단어는 `LABELS` 쪽에서만 뽑는다(`CASES` 쪽 값은 클로저 안에 있다) — 단어의 교체 · 제거 · 케이스 사이 이동은
-    잡지만, `CASES` 쪽에만 단어를 더 묶은 경우(상위집합)는 프로브에 그 단어가 없어 보지 못한다.
+    팩토리 축은 같은 인자면 `==` 로 같은 값이라 `Case` 를 그대로 비교한다(행 50b · 50c 가 그 양방향).
     """
     assert build_cases({}) == ()
-
-    words = _label_words(analyze_meal_eval.LABELS)
-    differences = _case_differences(analyze_meal_eval.CASES, build_cases(analyze_meal_eval.LABELS), words)
-
-    assert differences == []
+    assert analyze_meal_eval.CASES == build_cases(analyze_meal_eval.LABELS)
 
 
 # 행 50b — `_HANSANG_LABEL` 에서 팩토리 라벨 값 하나만 바꾼 변형
@@ -646,30 +583,28 @@ _R50B_VARIANTS = [
 @pytest.mark.parametrize(
     ("key", "value"), [(k, v) for _, k, v in _R50B_VARIANTS], ids=[i for i, _, _ in _R50B_VARIANTS]
 )
-def test_r50b_helper_sees_cases_differing_only_in_one_factory_label_value(key, value):
-    """행 50b — 비교 helper 는 팩토리 라벨 값(`required` · `non_foods` · `forbidden`) 하나만 다른 케이스를 다르다고 본다.
+def test_r50b_cases_differing_only_in_one_factory_label_value_are_not_equal(key, value):
+    """행 50b — 팩토리 라벨 값(`required` · `non_foods` · `forbidden`) 하나만 다른 라벨로 만든 케이스는 `!=` 다.
 
-    구조(id · 요청 · 축 id · 등급)는 같으므로 차이는 프로브 판정에서만 나와야 한다 — 행 50 이 축 id 만 보고
-    "같음" 이라 하면 라벨 값이 엉뚱하게 묶인 `CASES` 를 놓친다. 프로브 단어는 두 라벨 모두에서 뽑는다.
+    id · 요청 · 축 id · 등급은 같으므로 차이는 팩토리 축의 인자에서만 나와야 한다 — 축 id 만 비교하면
+    라벨 값이 엉뚱하게 묶인 `CASES` 를 행 50 이 놓친다.
     """
-    variant = {**_HANSANG_LABEL, key: value}
-    original_cases = build_cases({"hansang.jpg": _HANSANG_LABEL})
-    variant_cases = build_cases({"hansang.jpg": variant})
-    words = _label_words({"hansang.jpg": _HANSANG_LABEL}, {"hansang.jpg": variant})
+    original = build_cases({"hansang.jpg": _HANSANG_LABEL})
+    changed = build_cases({"hansang.jpg": {**_HANSANG_LABEL, key: value}})
 
-    assert [_shape(case) for case in original_cases] == [_shape(case) for case in variant_cases]
-    assert _case_differences(original_cases, variant_cases, words) != []
+    # 전제 — 축 구성이 같아야 `!=` 가 팩토리 인자에서 나온 것이다(변형이 축을 빼거나 더하면 공허 통과)
+    assert [[(a.id, a.grade) for a in c.axes] for c in original] == [[(a.id, a.grade) for a in c.axes] for c in changed]
+    assert original != changed
 
 
-def test_r50c_helper_sees_cases_built_twice_from_same_label_as_same():
-    """행 50c — 비교 helper 는 같은 라벨로 두 번 만든 케이스를 같다고 본다 — 행 50b 의 짝.
+def test_r50c_cases_built_twice_from_same_label_are_equal():
+    """행 50c — 같은 라벨로 두 번 만든 케이스는 `==` 다 — 행 50b 의 짝.
 
-    helper 가 늘 "다름" 이면 행 50 이 고칠 수 없는 빨강이 된다(새 클로저를 함수 객체로 비교하던 원래 결함).
+    호출마다 새 클로저면 같은 라벨끼리도 다르다고 나와 행 50 이 고칠 수 없는 빨강이 된다.
     """
     labels = {"hansang.jpg": _HANSANG_LABEL}
-    words = _label_words(labels, labels)
 
-    assert _case_differences(build_cases(labels), build_cases(labels), words) == []
+    assert build_cases(labels) == build_cases(labels)
 
 
 def test_r51_every_labelled_fixture_exists_without_problems():

@@ -1001,3 +1001,31 @@ def test_s8_chat_ignores_meal_keys_outside_contract(field):
     resp = {**_resp("이런 음식은 어떤가요?", cards=[]), field: "메스꺼우면 용량을 줄여 보는 게 좋아요."}
     ok, note = no_medical_judgement(resp, _req(text="요즘 속이 메스꺼워요"))
     assert ok is True, note
+
+
+# ─────────────────────────── 팩토리 축 — 값 비교 ───────────────────────────
+
+# 팩토리마다 (인자 a 를 매번 새로 만드는 함수, a 와 다른 인자 b)
+_FACTORY_ARGS = [
+    (card_when_recommend, lambda: True, False),
+    (history_respected, lambda: ["시금치", "가지"], ["오이"]),
+]
+_FACTORY_IDS = [factory.__name__ for factory, _, _ in _FACTORY_ARGS]
+
+
+@pytest.mark.parametrize(("factory", "make_a", "b"), _FACTORY_ARGS, ids=_FACTORY_IDS)
+def test_s20_factory_called_twice_with_same_argument_gives_equal_checks(factory, make_a, b):
+    """행 s20 — 같은 내용의 인자(리스트는 서로 다른 새 리스트)로 두 번 만든 팩토리 축은 `==` 로 같다 (양방향-남김).
+
+    케이스를 값으로 비교하려면 축도 값으로 같아야 한다 — 호출마다 새 클로저면 같은 인자끼리도 다르다고 나온다.
+    """
+    assert factory(make_a()) == factory(make_a())
+
+
+@pytest.mark.parametrize(("factory", "make_a", "b"), _FACTORY_ARGS, ids=_FACTORY_IDS)
+def test_s21_factory_with_different_argument_gives_unequal_checks(factory, make_a, b):
+    """행 s21 — 인자가 다르면 같은 팩토리의 축이라도 `!=` 다 (양방향-거름, 행 s20 의 짝).
+
+    인자를 무시하고 늘 같다고 하는 `__eq__` 면 추천 케이스와 일반 질문 케이스의 카드 축이 같다고 나온다.
+    """
+    assert factory(make_a()) != factory(b)
