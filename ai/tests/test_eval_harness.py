@@ -511,3 +511,84 @@ def test_r93_unconnected_endpoint_skips_after_one_probe(status, tmp_path, capsys
     assert str(status) in out
     assert len(post.calls) == 1
     assert not saved.exists()
+
+
+# ─────────────────────────── CLI — 케이스 0개 ───────────────────────────
+
+
+def test_s13_no_cases_exits_2_with_reason_and_no_post(tmp_path, capsys):
+    """행 s13 — 케이스가 0개면 키가 있어도 `cli_main` 은 사유를 출력하고 2(오용)로 끝난다. post 를 만들지 않는다.
+
+    0개로 돌리면 `0/0` 으로 게이트 PASS 가 찍힌다 — 아무것도 재지 않았는데 통과로 보인다.
+    문구는 단언하지 않는다(무엇이 문제인지 출력했는가만 본다).
+    """
+    post = FakePost(_ok())
+    code, factory = _cli([], cases=[], post=post, tmp_path=tmp_path)
+    out = capsys.readouterr().out
+    assert code == 2
+    assert out.strip() != ""
+    assert factory.calls == 0
+    assert post.calls == []
+
+
+def test_s14_no_cases_checked_before_api_key(tmp_path, capsys):
+    """행 s14 — 0개 검사가 키 확인보다 먼저다. 키가 없어도 0개면 SKIP(0) 이 아니라 2 다.
+
+    키 확인 뒤에 막으면 키 없는 PC 에서 0개 문제가 SKIP 으로 묻힌다.
+    """
+    code, _ = _cli([], cases=[], post=FakePost(_ok()), has_key=False, tmp_path=tmp_path)
+    out = capsys.readouterr().out
+    assert code == 2
+    assert "SKIP" not in out
+
+
+def test_s15_no_cases_save_does_not_write_baseline(tmp_path):
+    """행 s15 — 케이스가 0개면 `--save` 를 줘도 2 로 끝나고 baseline 파일을 만들지 않는다.
+
+    빈 baseline 이 저장되면 다음 비교가 "비교할 케이스 없음" 으로 조용히 통과한다.
+    """
+    saved = tmp_path / "b.json"
+    code, _ = _cli(["--save", str(saved)], cases=[], post=FakePost(_ok()), tmp_path=tmp_path)
+    assert code == 2
+    assert not saved.exists(), "케이스 0개인데 baseline 이 저장됐다"
+
+
+def test_s16_no_cases_reported_before_unknown_only_id(tmp_path, capsys):
+    """행 s16 — 0개 사유가 `--only` 의 모르는 id 검사보다 먼저다. `["--only", "nope"]` 와 `[]` 는 둘 다 2 이고 출력이 같다.
+
+    `--only` 검사가 먼저면 0개 문제가 "알 수 없는 case id" 로 보여 원인을 잘못 찾게 된다.
+    """
+    code_only, _ = _cli(["--only", "nope"], cases=[], post=FakePost(_ok()), tmp_path=tmp_path)
+    out_only = capsys.readouterr().out
+    code_plain, _ = _cli([], cases=[], post=FakePost(_ok()), tmp_path=tmp_path)
+    out_plain = capsys.readouterr().out
+    assert code_only == 2
+    assert code_plain == 2
+    assert out_only == out_plain
+
+
+def test_s17_no_cases_help_still_exits_0(tmp_path):
+    """행 s17 — 케이스가 0개여도 `--help` 는 도움말을 내고 0 으로 끝난다. 키 확인 · post 생성은 0회다.
+
+    0개 검사는 인자 해석 뒤에 한다 — 해석 전에 막으면 케이스가 비었을 때 사용법조차 볼 수 없다.
+    """
+    key_checks: list[None] = []
+
+    def _key_check_forbidden() -> bool:
+        key_checks.append(None)
+        raise AssertionError("키 확인(has_key)까지 갔다 — --help 는 그 전에 끝나야 한다")
+
+    factory = FakePostFactory(FakePost(_ok()))
+    with pytest.raises(SystemExit) as exc_info:
+        cli_main(
+            ["--help"],
+            cases=[],
+            post_factory=factory,
+            has_key=_key_check_forbidden,
+            rule_version="v2",
+            prompt_hash="hash-abc",
+            crash_log=tmp_path / "crash.log",
+        )
+    assert exc_info.value.code == 0
+    assert key_checks == []
+    assert factory.calls == 0

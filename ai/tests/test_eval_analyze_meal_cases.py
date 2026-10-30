@@ -862,26 +862,37 @@ def _serve_forbidden(directory):
     raise AssertionError("fixture 서버를 띄웠다 — 케이스 0개면 그 전에 끝나야 한다")
 
 
-def _cli_main_forbidden(*args, **kwargs):
-    raise AssertionError("harness.cli_main 에 위임했다 — 케이스 0개면 그 전에 끝나야 한다")
-
-
 @pytest.mark.parametrize("argv", [[], ["--only", "nope"]], ids=["r56d-no-args", "r56d-only-nope"])
-def test_r56d_no_cases_exits_before_key_check_server_and_cli(monkeypatch, valid_fixture, model_posts, argv):
-    """행 56d — 케이스가 0개면 인자와 무관하게 키 확인 · 서버 기동 · `cli_main` 위임 · 모델 POST 전에 2 로 끝난다.
+def test_r56d_no_cases_exits_before_key_check_and_server(monkeypatch, valid_fixture, model_posts, argv):
+    """행 56d — 케이스가 0개면 인자와 무관하게 키 확인 · 서버 기동 · 모델 POST 전에 2 로 끝난다.
 
-    셋 다 "불리면 AssertionError" 대역으로 바꾼다. 키 확인 뒤에 막으면 키 없는 PC 에서 SKIP(0) 으로 묻히고,
-    `--only` 해석(`cli_main`)에 맡기면 0개 문제가 "모르는 id" 로 보인다.
-    구현은 `harness.has_api_key` · `harness.cli_main` · `fixture_server.serve_fixtures` 를 호출 시점에 모듈 속성으로 참조해야 한다.
+    0개 판정 · 사유 출력 · 2 는 `harness.cli_main` 이 한다(인자 해석 뒤, 키 확인 전). `main` 은 0개면 서버를 띄우지 않고 위임한다.
+    키 확인 · 서버 기동은 "불리면 AssertionError" 대역으로 바꾼다. 키 확인 뒤에 막으면 키 없는 PC 에서 SKIP(0) 으로 묻힌다.
+    구현은 `harness.has_api_key` · `fixture_server.serve_fixtures` 를 호출 시점에 모듈 속성으로 참조해야 한다.
     """
     _use_cases(monkeypatch, valid_fixture.dir)
     monkeypatch.setattr(harness, "has_api_key", _key_check_forbidden)
-    monkeypatch.setattr(harness, "cli_main", _cli_main_forbidden)
     monkeypatch.setattr(fixture_server, "serve_fixtures", _serve_forbidden)
 
     code = main(argv)
 
     assert code == 2
+    assert model_posts == []
+
+
+def test_s18_no_cases_help_exits_0(monkeypatch, valid_fixture, model_posts):
+    """행 s18 — 케이스가 0개여도 `main(["--help"])` 는 도움말을 내고 0 으로 끝난다. 키 확인 · 서버 기동은 하지 않는다.
+
+    0개 검사가 인자 해석 전에 있으면 케이스가 비었을 때 사용법조차 볼 수 없다(`--help` 도 2).
+    """
+    _use_cases(monkeypatch, valid_fixture.dir)
+    monkeypatch.setattr(harness, "has_api_key", _key_check_forbidden)
+    monkeypatch.setattr(fixture_server, "serve_fixtures", _serve_forbidden)
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--help"])
+
+    assert exc_info.value.code == 0
     assert model_posts == []
 
 
