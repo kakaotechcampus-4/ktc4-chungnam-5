@@ -104,6 +104,11 @@ def _clauses(text: str) -> list[str]:
     return [c.strip() for c in _CLAUSE_SPLIT.split(text) if c and c.strip()]
 
 
+def _connective_units(clause: str) -> list[str]:
+    """절을 현재형 연결어미 -니(까) · -고 · -며 · -면서 로 자른 조각 — `_CLAUSE_SPLIT` 과 별개."""
+    raise NotImplementedError("_connective_units 미구현")
+
+
 _PAST_EXCLUDED = frozenset("있겠")  # 받침 ㅆ 이지만 과거가 아니다 (있다 · 미래 겠)
 
 

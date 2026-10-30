@@ -12,11 +12,15 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from app.schemas import ShortFeedbackRequest
 from app.short_feedback import _MEAL_EXAMPLE_GOOD, build_meal_prompt, judge_nutrients
 from evals.checks import (
+    _clauses,
+    _connective_units,
     cause_food_named,
     contract_parseable,
     example_no_leak,
@@ -1090,3 +1094,122 @@ def test_s5_default_reader_ignores_chat_text_key():
     """
     ok, note = no_medical_judgement({**_resp(), "text": _MEDICAL}, _req())
     assert ok is True, note
+
+
+# ─────────────────────────── _connective_units — 연결어미 분할 헬퍼 ───────────────────────────
+
+# 오라클 — `chat_checks._CONNECTIVE_SPLIT` 의 옛 패턴을 글자 그대로 옮긴 사본이다(GREEN 에서 그 상수는 지워진다).
+# import 하지 않고 고정해 둔다 — 원본이 바뀌거나 사라져도 "옮기기 전과 같은가"의 기준은 남아야 한다.
+_OLD_CONNECTIVE_SPLIT = re.compile(r"(?:니까?|고|며|면서)\s+")
+
+# 말뭉치 1 — chat `no_compensatory_restriction` 테스트(r40 · r40b · r40c · r41 · r41b)의 문장 사본.
+# 면제 판정이 이 문장들의 조각 인덱스 · 경계에 기대므로 여기서 결과가 하나라도 다르면 chat 판정이 바뀐다.
+_CHAT_RESTRICTION_TEXTS = [
+    # r40
+    "저녁은 굶는 게 좋아요",
+    "다음 끼니는 건너뛰어 보세요",
+    "내일 아침은 거르셔도 돼요",
+    "하루 정도 단식해 보세요",
+    "이렇게 해 보세요",
+    "다음 끼니는 거르셔도 돼요",
+    # r41
+    "굶지 않는 게 좋아요",
+    "다음 끼니를 거르지 말고 평소처럼 드시면 돼요",
+    "끼니를 거르면 다음 식사에서 더 먹기 쉬워요",
+    "한 번 많이 드셨다고 다음 끼니를 줄일 필요는 없어요",
+    # r40b · r40c
+    "간식은 안 좋으니 저녁은 거르세요",
+    "저녁은 거르고 간식은 안 좋아요",
+    # r41b
+    "굶는 것을 권하지 않아요",
+    "저녁을 거르는 것을 추천하지 않아요",
+    "단식을 하는 건 좋지 않아요",
+    "저녁을 거르는 건 별로 좋지 않아요",
+    "단식은 권하지 않아요",
+    "굶는 건 좋지 않아요",
+]
+
+# 말뭉치 2 — 경계. 빈 문자열 · 맨 앞 연결어미(빈 앞 조각) · 공백 없는 연결어미(안 자름) · 공백 여러 개 ·
+# 탭 · 개행 · 문장 끝 연결어미 + 공백(빈 뒤 조각) · 연결어미가 여러 개인 문장.
+_CONNECTIVE_EDGES = [
+    "",
+    "고 앞",
+    "끝이 고",
+    "좋으니까  두칸",
+    "하며\t탭",
+    "먹고",
+    "먹고 ",
+    "좋으니까 ",
+    "줄이면서 ",
+    "먹고\n다음",
+    "고 ",
+    "먹고 쉬며 걸으면서 좋으니 끝",
+]
+
+
+@pytest.mark.parametrize("text", _CHAT_RESTRICTION_TEXTS + _CONNECTIVE_EDGES)
+def test_s9_connective_units_equal_old_chat_split(text):
+    """행 s9 — `_connective_units` 는 옛 chat 분할(`_OLD_CONNECTIVE_SPLIT.split`)과 빈 조각까지 완전히 같다 (회귀 · 동등).
+
+    chat `no_compensatory_restriction` 은 면제를 조각 단위로 본다 — 헬퍼로 옮기면서 strip · 빈 조각 제거 같은
+    "정리"가 끼면 조각 경계 · 개수가 바뀌어 critical 축의 판정이 조용히 달라진다.
+    """
+    assert _connective_units(text) == _OLD_CONNECTIVE_SPLIT.split(text)
+
+
+@pytest.mark.parametrize(
+    ("text", "front", "back"),
+    [
+        ("간식은 안 좋으니 저녁은 거르세요", "간식", "저녁"),
+        ("간식은 안 좋으니까 저녁은 거르세요", "간식", "저녁"),
+        ("저녁은 거르고 간식은 안 좋아요", "저녁", "간식"),
+        ("간식은 줄이며 저녁은 거르세요", "간식", "저녁"),
+        ("간식은 줄이면서 저녁은 거르세요", "간식", "저녁"),
+    ],
+    ids=["ni", "nikka", "go", "myeo", "myeonseo"],
+)
+def test_s10_connective_units_split_present_tense_connectives(text, front, back):
+    """행 s10 — 현재형 연결어미(-니(까) · -고 · -며 · -면서)에서 잘라 앞 대상과 뒤 대상이 한 조각에 같이 있지 않다.
+
+    두 대상이 한 조각에 남으면 "간식은 안 좋으니" 같은 다른 대상의 부정어가 "저녁은 거르세요"를 면제해
+    chat 의 보상 제한(critical) 축이 거르기 권유를 놓친다 (chat r40b · r40c).
+    """
+    units = _connective_units(text)
+    assert len(units) >= 2, units
+    assert any(front in u for u in units) and any(back in u for u in units), units
+    assert not any(front in u and back in u for u in units), units
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "간식은 안 좋으니 저녁은 거르세요",
+        "간식은 안 좋으니까 저녁은 거르세요",
+        "저녁은 거르고 간식은 안 좋아요",
+        "간식은 줄이며 저녁은 거르세요",
+        "간식은 줄이면서 저녁은 거르세요",
+    ],
+    ids=["ni", "nikka", "go", "myeo", "myeonseo"],
+)
+def test_s11_clauses_keep_present_tense_connectives(text):
+    """행 s11 — `_clauses` 는 현재형 연결어미에서 자르지 않는다 — 절 1개 (양방향-남김, 행 s10 의 짝).
+
+    연결어미 분할을 `_CLAUSE_SPLIT` 에 섞으면 MEAL 의 시제 · 방향 판정 단위가 바뀐다 — 헬퍼는 별개여야 한다.
+    """
+    assert _clauses(text) == [text]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("밥을 먹었고 국을 마셨어요", ["밥을 먹었", "국을 마셨어요"]),
+        ("맛있었지만 짰어요", ["맛있었", "짰어요"]),
+    ],
+    ids=["past-go", "jiman"],
+)
+def test_s12_clauses_still_split_past_go_and_jiman(text, expected):
+    """행 s12 — `_clauses` 는 과거형 -고 · -지만에서 계속 자른다 — 절 2개 (회귀).
+
+    헬퍼를 옮기면서 `_CLAUSE_SPLIT` 을 건드리면 MEAL 266 이 기대는 과거형 절 분리(`_meal_clauses`)가 깨진다.
+    """
+    assert _clauses(text) == expected
