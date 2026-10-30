@@ -25,10 +25,12 @@
 from __future__ import annotations
 
 import json
+import httpx
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
 from app.schemas import FeedbackItem, Scope, ShortFeedbackRequest, Stage, Suggestion
+from app.config import get_settings
 
 # ─────────────────────────── BE 채점 기준 사본 ───────────────────────────
 # `backend/app/services/evaluation/stage_profile.py` 에서 옮겼다. BE 가 기준을 바꾸면
@@ -410,10 +412,34 @@ async def generate_short_feedback(req: ShortFeedbackRequest) -> FeedbackDraft:
     else:
         system, user = MEAL_SYSTEM_PROMPT, build_meal_prompt(req, judge_nutrients(req))
 
-    # TODO: config.py 머지 후 LLM_REASONING_URL(Claude Sonnet 5 게이트웨이)로 httpx POST 한다.
-    #   1. system 은 system 프롬프트로, user 는 user 메시지로 보낸다
-    #   2. 응답 문자열을 parse_response(raw, req.scope) 로 넘긴다
-    raise NotImplementedError("short-feedback 모델 호출은 아직 붙이지 않았다")
+    return parse_response(await _call_reasoning_model(system, user), req.scope)
+
+
+async def _call_reasoning_model(system: str, user: str) -> str:
+    """food_analyzer와 같은 httpx 게이트웨이 경로. HTTP 실패만 설정 횟수만큼 재시도한다."""
+    settings = get_settings()
+    endpoint = f"{settings.LLM_REASONING_URL.rstrip('/')}/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {settings.LLM_API_KEY.get_secret_value()}"}
+    async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT_SEC) as client:
+        for attempt in range(settings.LLM_MAX_RETRIES + 1):
+            try:
+                response = await client.post(endpoint, headers=headers, json={
+                    "messages": [{"role": "system", "content": system},
+                                 {"role": "user", "content": user}],
+                })
+                response.raise_for_status()
+            except (httpx.HTTPStatusError, httpx.TransportError):
+                if attempt == settings.LLM_MAX_RETRIES:
+                    raise
+                continue
+            try:
+                content = response.json()["choices"][0]["message"]["content"]
+            except (ValueError, KeyError, IndexError, TypeError) as exc:
+                raise ValueError("피드백 게이트웨이 응답 형식이 잘못되었다") from exc
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError("피드백 게이트웨이 응답이 비어 있다")
+            return content
+    raise ValueError("모델 재시도 설정이 잘못되었다")
 
 
 def _load_json(raw: str | dict[str, Any]) -> dict[str, Any]:
