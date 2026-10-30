@@ -169,6 +169,49 @@ def upsert(
     return daily_feedback_id
 
 
+def upsert_scores(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    feedback_date: date,
+    quantity_score: int | None,
+    quality_score: int | None,
+    satiety_score: int | None,
+    safety_status: SafetyStatus,
+) -> uuid.UUID:
+    """점수만 덮는다. 행이 없으면 요약 없이 만든다. 행 id 를 돌려준다. flush 까지만.
+
+    끼니 피드백이 SAFE 가 아닐 때 쓴다. 그 문장은 하루 요약으로 올리지 않지만 점수는
+    Rule Engine 결과라 그 끼니까지 반영해야 한다 — 안 그러면 저녁을 먹었는데 점심까지의
+    점수가 남는다. 이미 있는 행의 summary · model_version · safety_status 는 앞 끼니까지의
+    요약에 붙은 값이라 건드리지 않는다.
+
+    행이 없을 때만 `safety_status` 를 쓴다 — 요약이 비어 있는 이유(AI 판정)를 남긴다.
+
+    `updated_at` 도 새로 찍는다. 안 찍으면 하루 조회의 stale 검사가 이 끼니를 "새 식사" 로
+    보는데, refresh 를 눌러도 `feedback.daily` 는 SAFE 끼니만 근거로 써서 같은 요약이 나온다.
+    """
+    scores = {
+        "quantity_score": quantity_score,
+        "quality_score": quality_score,
+        "satiety_score": satiety_score,
+    }
+    stmt = pg_insert(DailyFeedback).values(
+        user_id=user_id,
+        feedback_date=feedback_date,
+        summary=None,
+        safety_status=safety_status,
+        **scores,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[DailyFeedback.user_id, DailyFeedback.feedback_date],
+        set_={**scores, "updated_at": func.now()},
+    ).returning(DailyFeedback.id)
+    daily_feedback_id = db.execute(stmt).scalar_one()
+    db.flush()
+    return daily_feedback_id
+
+
 def day_score_averages(
     db: Session,
     *,

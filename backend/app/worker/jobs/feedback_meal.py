@@ -26,8 +26,8 @@ BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ShortFeedbackRequest` · `ShortFee
   4. 식사를 잠그고 다시 본다 — AI 를 기다리는 사이 지워지거나 고쳐졌거나 다시
      채점됐으면 쓰지 않는다
   5. `meal_feedbacks` 에 upsert
-  6. SAFE 면 그날(KST) `daily_feedbacks` 에 upsert — 문장은 이 끼니 피드백, 점수는 그날
-     끼니 평균. 근거 링크(`daily_feedback_sources`)에 이 끼니 피드백을 더한다
+  6. 그날(KST) `daily_feedbacks` 에 upsert — 점수는 늘 그날 끼니 평균으로 덮는다. 문장은
+     SAFE 일 때만 이 끼니 피드백으로 덮고 근거 링크(`daily_feedback_sources`)를 더한다
 """
 
 from __future__ import annotations
@@ -78,24 +78,47 @@ def _round_or_none(value: Decimal | None) -> int | None:
 
 
 def _upsert_daily(
-    db: Session, *, meal: Meal, meal_feedback_id: uuid.UUID, result: dict[str, Any]
+    db: Session,
+    *,
+    meal: Meal,
+    meal_feedback_id: uuid.UUID,
+    result: dict[str, Any],
+    safety_status: SafetyStatus,
 ) -> uuid.UUID:
-    """이 끼니 피드백을 그날 하루 피드백으로 upsert 하고 근거 링크를 더한다. 행 id 를 돌려준다."""
+    """이 끼니 피드백을 그날 하루 피드백에 반영한다. 행 id 를 돌려준다.
+
+    점수는 판정과 무관하게 그날 평균으로 덮는다 — Rule Engine 결과라 하루 조회가 BLOCKED 여도
+    내보낸다. 문장은 SAFE 일 때만 덮고 근거 링크를 더한다. SAFE 가 아닌 문장으로 덮으면
+    하루 조회가 요약을 숨겨(services/daily_feedback.py) 앞 끼니까지의 멀쩡한 요약이 사라진다.
+    """
     feedback_date = meal.eaten_at.astimezone(KST).date()
     range_start, range_end = _kst_day_range(feedback_date)
     averages = daily_feedback_crud.day_score_averages(
         db, user_id=meal.user_id, range_start=range_start, range_end=range_end
     )
+    scores = {
+        "quantity_score": _round_or_none(averages.quantity),
+        "quality_score": _round_or_none(averages.quality),
+        "satiety_score": _round_or_none(averages.satiety),
+    }
+
+    if safety_status is not SafetyStatus.SAFE:
+        return daily_feedback_crud.upsert_scores(
+            db,
+            user_id=meal.user_id,
+            feedback_date=feedback_date,
+            safety_status=safety_status,
+            **scores,
+        )
+
     daily_feedback_id = daily_feedback_crud.upsert(
         db,
         user_id=meal.user_id,
         feedback_date=feedback_date,
         summary=result["body"],
-        quantity_score=_round_or_none(averages.quantity),
-        quality_score=_round_or_none(averages.quality),
-        satiety_score=_round_or_none(averages.satiety),
         model_version=result["modelVersion"],
-        safety_status=SafetyStatus.SAFE,
+        safety_status=safety_status,
+        **scores,
     )
     daily_feedback_crud.add_source(
         db, daily_feedback_id=daily_feedback_id, meal_feedback_id=meal_feedback_id
@@ -296,12 +319,12 @@ def apply(db: Session, task: ClaimedTask, ctx: _Ctx, result: dict[str, Any]) -> 
         safety_status=safety_status,
     )
 
-    # SAFE 가 아니면 하루 피드백은 건드리지 않는다. 덮으면 하루 조회가 SAFE 아닌 요약을
-    # 숨겨(services/daily_feedback.py) 앞 끼니까지의 멀쩡한 요약이 화면에서 사라진다.
-    daily_feedback_id = (
-        _upsert_daily(db, meal=meal, meal_feedback_id=meal_feedback_id, result=result)
-        if safety_status is SafetyStatus.SAFE
-        else None
+    daily_feedback_id = _upsert_daily(
+        db,
+        meal=meal,
+        meal_feedback_id=meal_feedback_id,
+        result=result,
+        safety_status=safety_status,
     )
 
     # 커밋하지 않는다. 큐가 DONE 과 함께 한 번에 커밋한다(`queue.complete`).
@@ -316,7 +339,7 @@ def apply(db: Session, task: ClaimedTask, ctx: _Ctx, result: dict[str, Any]) -> 
 
     return {
         "mealFeedbackId": str(meal_feedback_id),
-        "dailyFeedbackId": None if daily_feedback_id is None else str(daily_feedback_id),
+        "dailyFeedbackId": str(daily_feedback_id),
         "suggestionCount": len(suggestions or []),
     }
 
