@@ -119,6 +119,12 @@ def no_invented_numbers(resp: dict, model: ShortFeedbackRequest) -> Verdict:
 # ─────────────────────────── missing_meal_not_invented ───────────────────────────
 
 
+def _asserted(clause: str, word: str) -> bool:
+    """`word` 가 든 연결어미 조각이 과거형인가 — 조각 자체가 과거형이거나 절의 마지막 조각(시제를 붙인 술어)이 과거형."""
+    units = _connective_units(clause)
+    return any(word in unit and (_is_past(unit) or _is_past(units[-1])) for unit in units)
+
+
 @_with_request
 def missing_meal_not_invented(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     """기록 없는 끼니를 먹은 것처럼(또는 거른 것처럼) 단정하지 않았는가.
@@ -145,9 +151,8 @@ def missing_meal_not_invented(resp: dict, model: ShortFeedbackRequest) -> Verdic
         if not sentence.endswith("?")
         for clause in _clauses(sentence)
         if not _UNCERTAIN.search(clause)
-        for units in (_connective_units(clause),)
         for word in missing
-        if any(word in unit and (_is_past(unit) or _is_past(units[-1])) for unit in units)
+        if _asserted(clause, word)
     ]
     return _verdict("기록 없는 끼니를 단정", found)
 
