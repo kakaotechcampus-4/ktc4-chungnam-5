@@ -116,8 +116,9 @@ def _is_past(clause: str) -> bool:
     return "던" in clause
 
 
-def _all_clauses(resp: object) -> Iterator[tuple[str, str]]:
-    for field, text in _texts(resp):
+def _all_clauses(resp: object, texts: TextReader = _texts) -> Iterator[tuple[str, str]]:
+    """(필드, 절) — `texts` 가 꺼낸 텍스트를 절로 나눈다. 기본은 MEAL 필드(`_texts`)."""
+    for field, text in texts(resp):
         for clause in _clauses(text):
             yield field, clause
 
@@ -528,10 +529,11 @@ def no_medical_judgement(resp: dict, req: dict, *, texts: TextReader = _texts) -
     "시작기라 속이 불편해")은 판단이 아니라 통과하고, 의료진 상담 안내 절도 통과한다.
     부정문은 면제하지 않는다 — "용량을 줄이면 안 돼요" 도 의료 판단이다.
 
-    `texts` 는 판정할 (필드, 텍스트) 를 응답에서 꺼내는 함수다. 기본은 MEAL 필드(`_texts`).
+    `texts` 는 판정할 (필드, 텍스트) 를 응답에서 꺼내는 함수다. 기본은 MEAL 필드(`_texts` — body · reasoning ·
+    advice). 넘기면 그 함수가 꺼낸 필드만 읽고, note 에는 그 함수가 붙인 필드 이름이 찍힌다(chat 은 `text` · `advice`).
     """
     found: list[str] = []
-    for field, clause in _all_clauses(resp):
+    for field, clause in _all_clauses(resp, texts):
         if _is_referral(clause):
             continue
         m = (

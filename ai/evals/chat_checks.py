@@ -4,9 +4,10 @@
 AI 에는 Chat 스키마가 없어 계약은 `ai-stub/schemas.py` 를 파일 경로로 읽는다(`load_contract`, 게이트 1 결정 A).
 import 시점에는 계약을 읽지 않는다 — 판정이 처음 필요할 때 읽는다.
 
-`checks.py` 의 텍스트 판정은 body · reasoning · suggestions[].advice 만 읽으므로 chat 응답(`text` · `foodCards`)을
-그대로 넘기면 항상 공허 통과한다. 재사용하는 판정(`no_medical_judgement`)은 어댑터를 거친다(결정 B).
-`checks.py` 는 고치지 않고 숫자 · 절 · 시제 · 불확실 헬퍼만 가져다 쓴다.
+`checks.py` 의 텍스트 판정은 기본으로 MEAL 필드(body · reasoning · suggestions[].advice)를 읽으므로 chat 응답
+(`text` · `foodCards`)을 그대로 넘기면 항상 공허 통과한다. 재사용하는 판정(`no_medical_judgement`)에는 chat 의
+`_texts` 를 읽을 필드로 넘긴다 — note 에 chat 필드 이름(`text` · `advice`)이 찍힌다.
+그 밖에는 `checks.py` 의 숫자 · 절 · 시제 · 불확실 헬퍼만 가져다 쓴다.
 
 판정 대상 텍스트는 `text` 와 카드의 `advice` 다(`_texts`). 카드 `foodName` 은 "두부 100g" 같은 1회분 표현이 붙는
 음식 이름이라 텍스트 판정 대상이 아니다(결정 C). 카드를 세거나 이름을 비교하는 축은 BE 가 실제로 저장할 카드
@@ -31,6 +32,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.schemas import SafetyStatus
+from app.short_feedback import _text
 from evals.checks import (
     _NEG_BEFORE,
     _QUANTITY_EVAL,
@@ -43,8 +45,7 @@ from evals.checks import (
     _numbers,
     _verdict,
 )
-from evals.checks import _texts as _feedback_texts
-from evals.checks import no_medical_judgement as _feedback_no_medical_judgement
+from evals.checks import no_medical_judgement as _meal_no_medical_judgement
 from evals.harness import Check, Verdict, redact
 
 AI_STUB_SCHEMAS: Path = Path(__file__).resolve().parents[2] / "ai-stub" / "schemas.py"
@@ -252,20 +253,19 @@ def food_question_safe(resp: dict, req: dict) -> Verdict:
 # ─────────────────────────── 본문 ───────────────────────────
 
 
-def _as_feedback(resp: object) -> dict:
-    """chat 응답 → `checks` 판정이 읽는 MEAL 모양 — `text` → body, `foodCards` → suggestions (결정 B)."""
-    return {"body": resp.get("text"), "suggestions": resp.get("foodCards")} if isinstance(resp, dict) else {}
-
-
 def _texts(resp: object) -> list[tuple[str, str]]:
-    """(필드, 텍스트) — `text` 와 카드 `advice` 의 비어 있지 않은 문자열. 모양이 틀린 값은 건너뛴다.
+    """(필드, 텍스트) — `text` 와 카드 `advice`(카드 순)의 비어 있지 않은 문자열. 모양이 틀린 값은 건너뛴다.
 
-    `checks._texts` 를 어댑터로 읽고 note 용 필드 이름만 chat 것(body → text)으로 되돌린다.
+    필드 이름은 chat 응답의 것(`text` · `advice`) 그대로다. 거르기는 `checks._texts` 와 같다 —
+    응답 · 카드가 dict 가 아니거나 값이 문자열이 아니거나 공백뿐이면 건너뛴다(BE 저장 거르기 `_kept_cards` 와는 다르다).
     """
-    return [
-        ("text" if field == "body" else field, text)
-        for field, text in _feedback_texts(_as_feedback(resp), ("body", "advice"))
-    ]
+    if not isinstance(resp, dict):
+        return []
+    out = [("text", _norm(value))] if (value := _text(resp.get("text"))) is not None else []
+    raw = resp.get("foodCards")
+    cards = [card for card in raw if isinstance(card, dict)] if isinstance(raw, list) else []
+    out += [("advice", _norm(value)) for card in cards if (value := _text(card.get("advice"))) is not None]
+    return out
 
 
 def _clauses_of(resp: object) -> Iterator[tuple[str, str]]:
@@ -275,12 +275,12 @@ def _clauses_of(resp: object) -> Iterator[tuple[str, str]]:
 
 
 def no_medical_judgement(resp: dict, req: dict) -> Verdict:
-    """SAFE 답 안에서 의료 판단을 하지 않았는가 — `checks.no_medical_judgement` 를 chat 응답에 맞춰 쓴다.
+    """SAFE 답 안에서 의료 판단을 하지 않았는가 — `checks.no_medical_judgement` 에 chat 의 `_texts` 를 넘겨 쓴다.
 
-    어댑터(`_as_feedback`)를 거친다 — 모양이 틀린 값은 `checks._texts` 가 건너뛴다. note 의 필드는 `(body)` 로 찍힌다.
-    BLOCKED(text null · 카드 없음)는 읽을 텍스트가 없어 통과한다.
+    `text` 와 카드 `advice` 만 읽는다(계약 밖 `body` · `reasoning` 키는 읽지 않는다). note 의 필드는 `(text)` ·
+    `(advice)` 로 찍힌다. BLOCKED(text null · 카드 없음)는 읽을 텍스트가 없어 통과한다.
     """
-    return _feedback_no_medical_judgement(_as_feedback(resp), req)
+    return _meal_no_medical_judgement(resp, req, texts=_texts)
 
 
 @_with_request
