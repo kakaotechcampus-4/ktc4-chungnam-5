@@ -227,25 +227,22 @@ def cases_prompt_hash(cases: Sequence[Case]) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     """`serve_fixtures` 로 서버를 띄운 채 `harness.cli_main` 에 위임한다.
 
-    케이스가 0개면 문제를 출력하고 2(오용)로 끝낸다 — 키 확인 · 서버 기동 전, `--only` 해석보다 먼저 막는다.
-    그대로 두면 키가 있을 때 0/0 으로 게이트 PASS 가 찍히고 `--save` 가 빈 baseline 을 만든다.
-    다음으로 모든 fixture 를 검사해 문제가 있으면 출력하고 2(오용)로 끝낸다 — 서버가 요청 로그를 꺼서
-    fixture 누락과 모델 실패가 둘 다 `status 500` 으로 보이므로 키 확인 · 서버 기동 전에 막는다.
-    `--only` 부분 실행이어도 전체를 검사한다(인자 해석은 `cli_main` 이 한다).
+    먼저 실행 전 문제(케이스 0개 · fixture 문제)가 있으면 출력하고 2(오용)로 끝낸다 — 키 확인 · 서버 기동 전이다.
+    케이스 0개를 그대로 돌리면 0/0 으로 게이트 PASS 가 찍히고 `--save` 가 빈 baseline 을 만든다.
+    서버가 요청 로그를 꺼서 fixture 누락과 모델 실패가 둘 다 `status 500` 으로 보인다.
+    `--only` 부분 실행이어도 전체를 검사한다(인자 해석은 `cli_main` 이 한다 — 0개 문제가 모르는 id 로 보이지 않는다).
     CASES · FIXTURE_DIR 와 채널 · 키 확인 · 서버는 호출 시점에 읽고 만든다 — import 만으로 `.env` 를 읽거나 서버를 띄우지 않는다.
     """
     if not CASES:
-        print("케이스 문제 — 실행하지 않는다:")
-        print("  LABELS 가 비어 측정할 케이스가 없다")
-        return 2
-
-    problems = [
-        problem
-        for case in CASES
-        for problem in fixture_server.fixture_problems(FIXTURE_DIR / case.request["imageUrl"])
-    ]
+        problems = ["LABELS 가 비어 측정할 케이스가 없다"]
+    else:
+        problems = [
+            problem
+            for case in CASES
+            for problem in fixture_server.fixture_problems(FIXTURE_DIR / case.request["imageUrl"])
+        ]
     if problems:
-        print("fixture 문제 — 실행하지 않는다:")
+        print("실행 전 문제 — 실행하지 않는다:")
         for problem in problems:
             print(f"  {problem}")
         return 2

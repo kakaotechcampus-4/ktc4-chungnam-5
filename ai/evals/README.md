@@ -253,7 +253,7 @@ python -X utf8 -m evals.analyze_meal_eval --only hotdog --n 1                   
 | 라벨 오류 | 잘못된 라벨은 **import 시점**에 `ValueError`(파일 이름 포함) — 실행 전에 드러난다 |
 | baseline | `rule_version` = `RULE_VERSION`(`"analyze-meal-labels-v1"`) — BE 규칙 버전이 없으므로 **라벨 · 판정을 바꾸면 올린다**. `prompt_hash` = 케이스가 쓰는 mealType 마다의 `_build_prompt` 해시 |
 | 크래시 로그 | `evals/analyze_meal_crashes.log` (커밋하지 않는다) |
-| 케이스 0개 | `LABELS` 가 비어 있으면 측정할 것이 없다 — 키 확인 · 서버 기동 전에 문제를 출력하고 2 로 끝난다(`--only` 해석보다 먼저라 `--help` 도 2). 0/0 으로 게이트 PASS 를 찍거나 `--save` 로 빈 baseline 을 만들지 않는다 |
+| 케이스 0개 | `LABELS` 가 비어 있으면 측정할 것이 없다 — 문제를 출력하고 2 로 끝난다(위 exit `2` 행. `--only` 해석보다 먼저라 `--help` 도 2). 0/0 으로 게이트 PASS 를 찍거나 `--save` 로 빈 baseline 을 만들지 않는다 |
 
 ### 사진 fixture 규칙
 
