@@ -104,9 +104,18 @@ def _clauses(text: str) -> list[str]:
     return [c.strip() for c in _CLAUSE_SPLIT.split(text) if c and c.strip()]
 
 
+# 면제를 보는 단위 — 절을 현재형 연결어미(-니(까) · -고 · -며 · -면서 + 공백)로 한 번 더 자른다.
+# `_CLAUSE_SPLIT` 과 별개다 — 그쪽은 연결어미 중 -지만 · -는데 류와 과거형 -고 만 자르고(시제 판정 단위),
+# 여기에 섞으면 MEAL 의 시제 · 방향 판정 단위가 바뀐다.
+_CONNECTIVE_SPLIT = re.compile(r"(?:니까?|고|며|면서)\s+")
+
+
 def _connective_units(clause: str) -> list[str]:
-    """절을 현재형 연결어미 -니(까) · -고 · -며 · -면서 로 자른 조각 — `_CLAUSE_SPLIT` 과 별개."""
-    raise NotImplementedError("_connective_units 미구현")
+    """절을 현재형 연결어미 -니(까) · -고 · -며 · -면서 로 자른 조각 — `_CLAUSE_SPLIT` 과 별개.
+
+    strip 도 빈 조각 제거도 하지 않은 split 결과 그대로다 — 호출자가 조각 안의 인덱스로 면제를 본다.
+    """
+    return _CONNECTIVE_SPLIT.split(clause)
 
 
 _PAST_EXCLUDED = frozenset("있겠")  # 받침 ㅆ 이지만 과거가 아니다 (있다 · 미래 겠)
