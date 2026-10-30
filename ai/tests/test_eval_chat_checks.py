@@ -641,6 +641,28 @@ def test_r40c_discouraging_a_later_item_does_not_exempt_earlier_skip_advice():
     assert ok is False
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "굶는 것을 권하지 않아요",
+        "저녁을 거르는 것을 추천하지 않아요",
+        "단식을 하는 건 좋지 않아요",
+        "저녁을 거르는 건 별로 좋지 않아요",
+        "단식은 권하지 않아요",
+        "굶는 건 좋지 않아요",
+    ],
+    ids=["starve-not-advised", "skip-not-recommended", "fast-not-good", "skip-not-so-good", "fast-not-advised", "starve-not-good"],
+)
+def test_r41b_restriction_passes_when_skip_or_starve_is_discouraged(text):
+    """행 41b — "권하지 않음 · 좋지 않음"으로 맺은 규칙 준수 답("굶는 것을 권하지 않아요")은 통과한다.
+
+    권하지 않음 · 좋지 않음으로 맺은 규칙 준수 답을 critical 축이 실패시키면 모범 답이 게이트를 FAIL 시킨다(게이트 4 — GREEN ⓑ 회귀).
+    행 40b · 40c 의 짝 — 면제를 좁혀도 거르기 · 굶기 대상에 직접 붙은 "권하지 않음 · 좋지 않음"은 남아야 한다.
+    """
+    ok, _ = no_compensatory_restriction(_resp(text, cards=[]), _req(text=_BINGE))
+    assert ok is True
+
+
 def test_r42_restriction_ignores_blocked():
     """행 42 — BLOCKED(text null)는 대상이 아니라 통과한다. 본문이 없다."""
     ok, _ = no_compensatory_restriction(_blocked(), _req(text=_BINGE))
