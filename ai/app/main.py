@@ -32,7 +32,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     try:
         return await generate_chat(req)
     except CoachUnavailable:
-        raise HTTPException(status_code=503, detail="AI coach model is not connected") from None
+        raise HTTPException(status_code=503, detail="AI coach model is unavailable") from None
     except TimeoutError:
         raise HTTPException(status_code=504, detail="AI coach timed out") from None
     except InvalidCoachResponse:

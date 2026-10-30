@@ -69,7 +69,10 @@ def test_output_medical_guard():
     assert result.safety_status.value == "BLOCKED"
 
 
-def test_unconnected_model_is_503():
+def test_unavailable_model_is_503(monkeypatch):
+    async def unavailable(messages):
+        raise ai_coach.CoachUnavailable()
+    monkeypatch.setattr(ai_coach, "call_model", unavailable)
     assert client.post("/chat", json=REQUEST).status_code == 503
 
 
@@ -105,3 +108,36 @@ def test_required_fields(field):
 def test_response_schema_rejects_empty_safe_text():
     with pytest.raises(ValueError):
         ChatResponse(text=" ", modelVersion="chat-v1", safetyStatus="SAFE")
+
+
+@pytest.mark.parametrize("scenario,expected", [("success", 200), ("http_error", 503),
+                                               ("timeout", 504), ("bad_json", 502)])
+def test_gateway_transport(monkeypatch, scenario, expected):
+    import httpx
+    from app.config import CoachSettings
+    settings = CoachSettings(_env_file=None, LLM_API_KEY="test-key",
+                             LLM_COACH_URL="https://mlapi.run/test-reasoning")
+    monkeypatch.setattr(ai_coach, "get_coach_settings", lambda: settings)
+    requests = []
+    def handle(request):
+        requests.append(request)
+        assert request.url.path == "/test-reasoning/v1/chat/completions"
+        assert request.headers["Authorization"] == "Bearer test-key"
+        payload = json.loads(request.content)
+        assert payload["max_completion_tokens"] == 2000
+        assert payload["messages"][0]["role"] == "system"
+        if scenario == "timeout":
+            raise httpx.ReadTimeout("private endpoint", request=request)
+        if scenario == "http_error":
+            return httpx.Response(429, text="private upstream error")
+        if scenario == "bad_json":
+            return httpx.Response(200, json={"choices": []})
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(
+            {"safetyStatus": "SAFE", "text": "두부는 어떤가요?", "foodCards": []})}}]})
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(ai_coach.httpx, "AsyncClient",
+                        lambda **kwargs: original_client(transport=httpx.MockTransport(handle), **kwargs))
+    response = client.post("/chat", json=REQUEST)
+    assert response.status_code == expected
+    assert len(requests) == 1
+    assert "private" not in response.text

@@ -1,6 +1,6 @@
-"""AI Coach 준비 계층. 실제 모델 연결은 call_model에서 구현한다.
+"""AI Coach — 공용 reasoning 게이트웨이로 식단 대안을 생성한다.
 
-기본 실행은 모델 미연결을 503으로 알린다. 정상 답변을 꾸며 반환하지 않는다.
+게이트웨이 실패는 민감한 응답·URL을 노출하지 않고 503으로 알린다.
 입출력 규칙 검사는 보조 수단이며 모델 연결 후 의료 안전성 평가가 필요하다.
 """
 from __future__ import annotations
@@ -10,6 +10,10 @@ import json
 import re
 from typing import Any
 
+import httpx
+from pydantic import ValidationError
+
+from app.config import get_coach_settings
 from app.schemas import ChatFoodCard, ChatRequest, ChatResponse, SafetyStatus
 
 MODEL_VERSION = "chat-v1"
@@ -71,8 +75,32 @@ def build_messages(req: ChatRequest) -> list[dict[str, str]]:
 
 
 async def call_model(messages: list[dict[str, str]]) -> str | dict[str, Any]:
-    """모델 연결 지점. 추후 공용 설정의 reasoning 엔드포인트를 사용한다."""
-    raise CoachUnavailable()
+    """비전과 같은 OpenAI 호환 경로로 호출한다. 자동 재시도는 하지 않는다."""
+    try:
+        settings = get_coach_settings()
+    except ValidationError:
+        raise CoachUnavailable() from None
+    if not settings.LLM_API_KEY.get_secret_value():
+        raise CoachUnavailable()
+    try:
+        async with httpx.AsyncClient(timeout=CHAT_TIMEOUT_SEC) as client:
+            response = await client.post(
+                settings.LLM_COACH_URL.rstrip("/") + "/v1/chat/completions",
+                headers={"Authorization": "Bearer " + settings.LLM_API_KEY.get_secret_value()},
+                json={"messages": messages, "max_completion_tokens": 2000},
+            )
+            response.raise_for_status()
+    except httpx.TimeoutException:
+        raise TimeoutError() from None
+    except httpx.HTTPError:
+        raise CoachUnavailable() from None
+    try:
+        content = response.json()["choices"][0]["message"]["content"]
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError()
+        return content
+    except (ValueError, KeyError, IndexError, TypeError):
+        raise InvalidCoachResponse() from None
 
 
 def _blocked() -> ChatResponse:
