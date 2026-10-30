@@ -119,10 +119,19 @@ def no_invented_numbers(resp: dict, model: ShortFeedbackRequest) -> Verdict:
 # ─────────────────────────── missing_meal_not_invented ───────────────────────────
 
 
+# 바람 "-(으)면" 바로 앞 음절 — "드셨으면 · 먹었으면 좋겠어요" 의 받침 ㅆ 는 단정이 아니다. "-으면서" 는 연결어미라 제외
+_WISH = re.compile(r"([가-힣])(?=으면(?!서))")
+
+
+def _is_past_unit(unit: str) -> bool:
+    """조각이 과거형인가 — `checks._is_past` 와 같되, 바람 "-으면" 바로 앞의 과거 음절은 지우고 본다."""
+    return _is_past(_WISH.sub(lambda m: "" if _is_past(m[1]) else m[1], unit))
+
+
 def _asserted(clause: str, word: str) -> bool:
     """`word` 가 든 연결어미 조각이 과거형인가 — 조각 자체가 과거형이거나 절의 마지막 조각(시제를 붙인 술어)이 과거형."""
     units = _connective_units(clause)
-    return any(word in unit and (_is_past(unit) or _is_past(units[-1])) for unit in units)
+    return any(word in unit and (_is_past_unit(unit) or _is_past_unit(units[-1])) for unit in units)
 
 
 @_with_request
@@ -140,6 +149,8 @@ def missing_meal_not_invented(resp: dict, model: ShortFeedbackRequest) -> Verdic
     면제:
     - 같은 절의 거절 · 불확실 표현(`_UNCERTAIN`, 절 단위) — "저녁 기록은 없어 알 수 없어요", "저녁은 기록되지 않았어요"
     - 비과거 조각 · 절 — "저녁에 채소를 곁들이면 좋아요" 는 제안이다
+    - 바람 표현 — 받침 ㅆ 음절 바로 뒤의 "-으면"("저녁엔 싱겁게 드셨으면 좋겠어요" · "먹었으면 해요")은 과거로 보지 않는다.
+      "-으면서"("드셨으면서도")는 연결어미라 면제하지 않는다
     - 원문 문장이 `?` 로 끝나는 의문문 — "저녁은 어떻게 드셨나요?" 는 묻는 말이다
     """
     recorded = _recorded(model)
