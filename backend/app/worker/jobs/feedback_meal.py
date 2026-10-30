@@ -26,7 +26,8 @@ BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ShortFeedbackRequest` · `ShortFee
      채점됐으면 쓰지 않는다
   5. `meal_feedbacks` 에 upsert
   6. 그날(KST) `daily_feedbacks` 에 upsert — 점수는 늘 그날 끼니 평균으로 덮는다. 문장은
-     SAFE 일 때만 이 끼니 피드백으로 덮고 근거 링크(`daily_feedback_sources`)를 더한다
+     SAFE 이고 그날 이보다 늦게 먹은 확정 끼니가 없을 때만 이 끼니 피드백으로 덮고
+     근거 링크(`daily_feedback_sources`)를 더한다
 """
 
 from __future__ import annotations
@@ -88,6 +89,10 @@ def _upsert_daily(
     점수는 판정과 무관하게 그날 평균으로 덮는다 — Rule Engine 결과라 판정과 상관없이
     쓴다. 문장은 SAFE 일 때만 덮고 근거 링크를 더한다. SAFE 가 아닌 문장으로 덮으면 앞
     끼니까지의 멀쩡한 요약이 사라진다 — 장기 피드백은 SAFE 하루 요약만 근거로 쓴다.
+
+    그날 이 끼니보다 늦게 먹은 확정 끼니가 있으면 문장도 덮지 않는다. 하루 피드백은 가장
+    늦은 끼니의 누적 문장이어야 하는데, 앞 끼니를 뒤늦게 입력·재확정하면 작업이 늦게 끝나
+    앞 끼니만 본 문장이 저녁 문장을 덮는다.
     """
     feedback_date = meal.eaten_at.astimezone(KST).date()
     range_start, range_end = _kst_day_range(feedback_date)
@@ -106,6 +111,17 @@ def _upsert_daily(
             user_id=meal.user_id,
             feedback_date=feedback_date,
             safety_status=safety_status,
+            **scores,
+        )
+
+    if meal_crud.has_later_evaluated_meal(db, meal=meal, range_end=range_end):
+        # 행이 없을 때만 쓰이는 판정이다 — 문장 없는 행을 SAFE 로 만들지 않는다.
+        # 늦은 끼니의 작업이 아직 안 끝난 경우라, 그 작업이 문장을 채운다.
+        return daily_feedback_crud.upsert_scores(
+            db,
+            user_id=meal.user_id,
+            feedback_date=feedback_date,
+            safety_status=SafetyStatus.REVIEW_REQUIRED,
             **scores,
         )
 
