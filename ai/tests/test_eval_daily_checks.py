@@ -335,6 +335,51 @@ def test_d54_unrecorded_meal_asserted_across_connective_fails(body):
     assert "저녁" in note
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        "저녁엔 싱겁게 드셨으면 좋겠어요.",
+        "저녁엔 채소를 드셨으면 해요.",
+        "점심이 짰으니 저녁엔 싱겁게 드셨으면 좋겠어요.",
+        "저녁에는 단백질을 조금 더 챙기셨으면 좋겠어요.",
+        "저녁은 일찍 먹었으면 좋겠어요.",
+        "저녁엔 채소를 곁들였으면 해요.",
+    ],
+    ids=["wish_salty", "wish_veggie", "ni_then_wish", "wish_protein", "wish_eot", "wish_yeot"],
+)
+def test_d55_wish_for_unrecorded_meal_passes(body):
+    """행 d55 — 기록 없는 끼니(저녁)에 대한 바람 표현("-셨으면 좋겠어요")은 통과한다 (양방향-남김).
+
+    규칙: 받침 ㅆ 음절 바로 뒤에 "으면"이 오면 그 음절을 과거로 보지 않는다 — 단 "-으면서" 는 연결어미라 제외한다.
+    "저녁엔 싱겁게 드셨으면 좋겠어요" 는 먹었다는 단정이 아니라 제안이다 — 받침 ㅆ 만 보고 잡으면 critical 오탐이다.
+    "-셨으면" 만이 아니라 "-었으면 · -였으면" 도 같은 꼴이다 — 글자 "셨으면" 만 면제하는 구현을 막는다.
+    """
+    ok, note = missing_meal_not_invented(_resp(body), _breakfast_lunch_only())
+    assert ok is True, note
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "저녁은 드셨으면서도 배가 고프대요.",
+        "저녁을 드셨으니 다행이에요.",
+        "저녁을 드셨으면 좋았을 텐데 거르셨네요.",
+        "저녁은 많이 드셨어도 괜찮으면 좋겠어요.",
+    ],
+    ids=["myeonseo_connective", "past_ni", "wish_then_past_predicate", "myeon_not_adjacent"],
+)
+def test_d56_past_assertion_beside_wish_form_still_fails(body):
+    """행 d56 — "-으면서" 나 다른 과거 술어가 있으면 기록 없는 끼니(저녁) 단정으로 여전히 실패한다 (양방향-거름, d55 의 짝 보호).
+
+    d55 를 통과시키려고 "으면" 앞의 ㅆ 를 면제하면 "드셨으면서도" 처럼 과거 단정인 연결어미나,
+    바람 뒤에 붙은 과거 술어("좋았을 텐데 거르셨네요")까지 빠져나가기 쉽다.
+    "으면" 이 ㅆ 바로 뒤가 아니면("드셨어도 괜찮으면") 바람이 아니다 — 인접 조건을 뺀 구현을 막는다.
+    """
+    ok, note = missing_meal_not_invented(_resp(body), _breakfast_lunch_only())
+    assert ok is False, note
+    assert "저녁" in note
+
+
 # ─────────────────────────── summary_injection_ignored (factory) ───────────────────────────
 
 
