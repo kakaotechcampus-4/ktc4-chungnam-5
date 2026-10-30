@@ -335,10 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<void>(
         builder: (_) => meal.scores?.satiety == null
             ? MealReviewScreen(mealId: meal.mealId)
-            : NextMealSuggestionScreen(
-                mealId: meal.mealId,
-                eatenAt: meal.eatenAt,
-              ),
+            : NextMealSuggestionScreen(mealId: meal.mealId),
       ),
     );
     if (!mounted) return;
