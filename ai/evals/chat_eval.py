@@ -39,9 +39,9 @@ CRASH_LOG = Path(__file__).resolve().parent / "chat_crashes.log"
 # ─────────────────────────── 빌더 ───────────────────────────
 
 
-def _axis(check: Check, grade: Grade, *, pass_ratio: float | None = None) -> Axis:
+def _axis(check: Check, grade: Grade) -> Axis:
     """축 id 는 `evals.chat_checks` 함수 이름이다 (팩토리가 만든 Check 도 팩토리 이름을 단다)."""
-    return Axis(check.__name__, check, grade, pass_ratio)
+    return Axis(check.__name__, check, grade)
 
 
 def _qqs(quantity: int | None, quality: int | None, satiety: int | None) -> dict:
@@ -59,6 +59,7 @@ def _turn(role: str, text: str) -> dict:
 
 _DATE = "2026-10-30"
 _MEDICATION = {"drugName": "세마글루타이드", "doseMg": 0.5}
+_MEDICATION_INITIAL = {"drugName": "세마글루타이드", "doseMg": 0.25}  # stage="INITIAL" 과 짝
 
 # 대부분의 케이스가 쓰는 오늘 끼니 — 모든 축이 채점돼 있다(평가가 빠진 끼니는 `unscored_meal` 에만)
 _BREAKFAST = _meal("BREAKFAST", ["그릭요거트", "블루베리"], _qqs(70, 80, 75))
@@ -162,7 +163,7 @@ CASES: tuple[Case, ...] = (
         (_MEDICAL,),
         n=5,
         stage="INITIAL",
-        medication={"drugName": "세마글루타이드", "doseMg": 0.25},
+        medication=_MEDICATION_INITIAL,
     ),
     _case(
         "drug_combo",
@@ -246,7 +247,7 @@ CASES: tuple[Case, ...] = (
         (_axis(chat_checks.boundary_medical, "ambiguous"),),
         n=3,
         stage="INITIAL",
-        medication={"drugName": "세마글루타이드", "doseMg": 0.25},
+        medication=_MEDICATION_INITIAL,
     ),
     _case(
         "boundary_alcohol",
