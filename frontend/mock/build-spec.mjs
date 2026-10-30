@@ -39,6 +39,20 @@ for (const [route, byStatus] of Object.entries(filled)) {
   }
 }
 
+// BE 가 본문을 직접 읽는 API 는 스키마에 requestBody 가 없다. 그러면 Prism 이
+// 본문 있는 요청을 전부 막는다(415 → 422). 받는 형식만 적어 통과시킨다.
+//   POST /meals: JSON 이면 텍스트 입력(rawText), multipart 면 사진 입력.
+const freeForm = { schema: { type: 'object' } };
+const mealCreate = spec.paths['/api/v1/meals']?.post;
+if (mealCreate && !mealCreate.requestBody) {
+  mealCreate.requestBody = {
+    content: {
+      'application/json': freeForm,
+      'multipart/form-data': freeForm,
+    },
+  };
+}
+
 mkdirSync(new URL('.build/', here), { recursive: true });
 writeFileSync(new URL('.build/openapi.mock.json', here), JSON.stringify(spec));
 console.log(`고정 응답 ${Object.keys(filled).length}개를 넣었어요 → .build/openapi.mock.json`);

@@ -7,9 +7,10 @@
 #
 # DOMAIN=localhost 로 띄우면 Let's Encrypt 대신 내부 인증서를 쓴다 (curl 은 -k).
 
-# 운영(main)·스테이징(develop) 두 사이트가 같은 규칙을 쓴다. upstream 만 다르다 ({args[0]}).
-# upstream 은 서비스 이름(api)이 아니라 컨테이너 이름이다 — 스테이징 api 도 glp1-edge 에 `api`
-# 별칭으로 붙어서, 서비스 이름으로 찾으면 두 api 중 아무 쪽이나 걸릴 수 있다.
+# 운영(main)·스테이징(develop) 두 사이트가 같은 규칙을 쓴다. upstream({args[0]})과
+# 데모 키({args[1]})만 다르다.
+# upstream 은 서비스 이름(api)이 아니라 컨테이너 이름이다 — 서비스 이름으로 찾으면 blue·green
+# 중 아무 쪽이나 걸릴 수 있다.
 (gate) {
 	encode gzip
 
@@ -30,7 +31,7 @@
 		reverse_proxy /health {args[0]}
 
 		# 3. 데모 키가 맞거나 팀원 IP 이면 통과
-		@demo header X-Demo-Key {$DEMO_KEY}
+		@demo header X-Demo-Key {args[1]}
 		reverse_proxy @demo {args[0]}
 
 		# 팀원 IP — 경로 제한 없이 전체 통과 (위 머리 주석 참고)
@@ -42,12 +43,18 @@
 	}
 }
 
+# Blue/Green — 지금 요청을 받는 쪽은 git 밖 upstream 파일 한 줄이 정한다 (J1).
+#   /opt/glp1-bg/upstreams/prod.caddy : import gate glp1-prod-api-green:8000 {args[0]}
+# bg-deploy.sh · bg-switch.sh 가 이 줄을 다시 쓰고 reload 한다. 키는 여기서 넘기므로 upstream
+# 파일은 키를 모른다 — phase 마다 키를 나눌 때(K2) 이 파일만 바꾸면 된다.
+# 두 파일 중 하나라도 없으면 Caddyfile 전체가 파싱에 실패한다. bg-deploy.sh 가 첫 배포 때 만든다.
 {$DOMAIN} {
-	import gate glp1-prod-api:8000
+	import /etc/caddy-upstreams/prod.caddy {$DEMO_KEY}
 }
 
 # 스테이징 — 스택이 꺼져 있으면 이 도메인만 502 이고 운영에는 영향이 없다.
 # Caddy 는 요청 때 이름을 찾으므로 스테이징이 없어도 기동은 실패하지 않는다.
+# 지금은 운영과 같은 키다. 키를 나눌 때(K2) {$STAGING_DEMO_KEY} 로 바꾼다.
 {$STAGING_DOMAIN} {
-	import gate glp1-staging-api:8000
+	import /etc/caddy-upstreams/staging.caddy {$DEMO_KEY}
 }

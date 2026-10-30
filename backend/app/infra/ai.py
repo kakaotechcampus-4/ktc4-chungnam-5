@@ -29,6 +29,8 @@ class AiClient(Protocol):
 
     def long_feedback(self, payload: dict[str, Any]) -> dict[str, Any]: ...
 
+    def chat(self, payload: dict[str, Any]) -> dict[str, Any]: ...
+
 
 class AiSettings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -97,6 +99,9 @@ class HttpAiClient:
 
     def long_feedback(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post("/long-feedback", payload)
+
+    def chat(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/chat", payload)
 
     def close(self) -> None:
         self._client.close()

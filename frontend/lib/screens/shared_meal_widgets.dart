@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../api/meal_api.dart';
+import '../common/api_format.dart';
+import '../common/api_image.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -126,6 +129,7 @@ class MealCard extends StatelessWidget {
     required this.quantityLabel,
     required this.quality,
     required this.satiety,
+    this.thumbnailUrl,
     this.onTap,
     this.showChevron = false,
   });
@@ -147,6 +151,9 @@ class MealCard extends StatelessWidget {
   final int? quality;
   final int? satiety;
 
+  /// 서버가 준 사진 경로(`/media/...`). 사진 없이 기록했으면 null — 빈 자리만 보인다.
+  final String? thumbnailUrl;
+
   final VoidCallback? onTap;
   final bool showChevron;
 
@@ -163,13 +170,16 @@ class MealCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 실제 사진은 S3 URL 로 교체한다. 지금은 자리만 잡는다.
-              Container(
-                width: _thumbnailSize,
-                height: _thumbnailSize,
-                decoration: const BoxDecoration(
+              ClipRRect(
+                borderRadius: AppRadius.mdRadius,
+                child: Container(
+                  width: _thumbnailSize,
+                  height: _thumbnailSize,
                   color: AppColors.surfaceSage,
-                  borderRadius: AppRadius.mdRadius,
+                  child: switch (thumbnailUrl) {
+                    final url? => ApiImage(url),
+                    null => null,
+                  },
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -365,6 +375,61 @@ class MealCardSkeleton extends StatelessWidget {
   }
 }
 
+/// 음식 100g 에 든 영양소 칩(`100g당` `단백질 8g` `식이섬유 2.1g`). 끼니 피드백 제안과
+/// 챗봇 음식 카드가 같이 쓴다. 비어 있으면 아무것도 그리지 않는다.
+///
+/// 값은 "먹으면 늘어나는 양" 이 아니라 그 음식의 함량이라 `+` 를 붙이지 않는다.
+class NutrientAmountChips extends StatelessWidget {
+  const NutrientAmountChips({super.key, required this.nutrients});
+
+  final List<NutrientAmount> nutrients;
+
+  /// `단백질 8g` · `나트륨 350mg` · `칼로리 120kcal`. 10 미만만 소수 한 자리.
+  static String format(NutrientAmount n) {
+    final v = n.amount;
+    final fixed = v.toStringAsFixed(1);
+    final number = v >= 10 || fixed.endsWith('.0')
+        ? v.round().toString()
+        : fixed;
+    return '${nutrientLabel(n.code)} $number${n.unit}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (nutrients.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 5,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          '100g당',
+          style: AppTypography.caption.copyWith(
+            fontSize: 9,
+            color: AppColors.textTertiary,
+          ),
+        ),
+        for (final n in nutrients)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.qualityBg,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Text(
+              format(n),
+              style: AppTypography.emphasis.copyWith(
+                fontSize: 9,
+                height: 1.25,
+                color: AppColors.quality,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// 불러오기 실패. 문구 + 다시 시도.
 class RetryBlock extends StatelessWidget {
   const RetryBlock({
@@ -396,6 +461,45 @@ class RetryBlock extends StatelessWidget {
           OutlinedButton(onPressed: onRetry, child: const Text('다시 시도')),
         ],
       ),
+    );
+  }
+}
+
+/// AI 가 만드는 한 줄(제안·요약·인사이트)을 기다리다 멈춘 자리.
+///
+/// 화면의 나머지는 이미 보이므로 [RetryBlock] 처럼 크게 막지 않고 안내 한 줄과
+/// 작은 버튼만 둔다. 시간이 지나 멈췄으면 "나중에 확인" 을 안내하고
+/// [actionLabel] 로 다시 묻게 하고, 실패했으면 다시 만들게 한다.
+class WaitNotice extends StatelessWidget {
+  const WaitNotice({
+    super.key,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = actionLabel;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(message, style: AppTypography.bodySecondary),
+        if (label != null && onAction != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(label),
+          ),
+      ],
     );
   }
 }

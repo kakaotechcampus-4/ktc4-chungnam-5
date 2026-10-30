@@ -653,12 +653,34 @@
         "suggestions": [
           {
             "foodName": "두부 반 모",
-            "nutrients": [],
+            "nutrients": [
+              {
+                "code": "PROTEIN",
+                "amount": 8.1,
+                "unit": "g"
+              },
+              {
+                "code": "CALORIE",
+                "amount": 84,
+                "unit": "kcal"
+              }
+            ],
             "advice": "단백질을 조금 더 채우는 쪽이에요"
           },
           {
             "foodName": "나물 한 접시",
-            "nutrients": [],
+            "nutrients": [
+              {
+                "code": "FIBER",
+                "amount": 2.6,
+                "unit": "g"
+              },
+              {
+                "code": "SODIUM",
+                "amount": 320,
+                "unit": "mg"
+              }
+            ],
             "advice": "식이섬유가 포만감을 늘리는 데 도움이 돼요"
           }
         ],
@@ -818,6 +840,324 @@
       "data": {
         "feedbackStatus": "GENERATING",
         "pollIntervalMs": 1500
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/chat/conversations": {
+    "201": {
+      "success": true,
+      "data": {
+        "conversationId": "00000000-0000-0000-0000-000000000c01",
+        "mealId": "00000000-0000-0000-0000-000000000456",
+        "messages": [
+          {
+            "messageId": "00000000-0000-0000-0000-000000000d01",
+            "role": "ASSISTANT",
+            "status": "READY",
+            "text": "다음 끼니로 이 음식은 어떤가요?",
+            "foodCards": [
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f01",
+                "foodName": "두부 반 모",
+                "effects": [
+                  {
+                    "code": "PROTEIN",
+                    "amount": 8.1,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "CALORIE",
+                    "amount": 84,
+                    "unit": "kcal"
+                  }
+                ]
+              },
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f02",
+                "foodName": "나물 한 접시",
+                "effects": [
+                  {
+                    "code": "FIBER",
+                    "amount": 2.6,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "SODIUM",
+                    "amount": 320,
+                    "unit": "mg"
+                  }
+                ]
+              }
+            ],
+            "safetyStatus": "SAFE",
+            "createdAt": "{{today}}T12:40:00+09:00"
+          }
+        ]
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/chat/conversations/latest": {
+    "200": {
+      "success": true,
+      "data": {
+        "conversationId": "00000000-0000-0000-0000-000000000c01",
+        "mealId": "00000000-0000-0000-0000-000000000456",
+        "messages": [
+          {
+            "messageId": "00000000-0000-0000-0000-000000000d01",
+            "role": "ASSISTANT",
+            "status": "READY",
+            "text": "다음 끼니로 이 음식은 어떤가요?",
+            "foodCards": [
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f01",
+                "foodName": "두부 반 모",
+                "effects": [
+                  {
+                    "code": "PROTEIN",
+                    "amount": 8.1,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "CALORIE",
+                    "amount": 84,
+                    "unit": "kcal"
+                  }
+                ]
+              },
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f02",
+                "foodName": "나물 한 접시",
+                "effects": [
+                  {
+                    "code": "FIBER",
+                    "amount": 2.6,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "SODIUM",
+                    "amount": 320,
+                    "unit": "mg"
+                  }
+                ]
+              }
+            ],
+            "safetyStatus": "SAFE",
+            "createdAt": "{{today}}T12:40:00+09:00"
+          },
+          {
+            "messageId": "00000000-0000-0000-0000-000000000d02",
+            "role": "USER",
+            "status": "READY",
+            "text": "저녁엔 뭘 먹으면 좋을까요?",
+            "foodCards": [],
+            "safetyStatus": null,
+            "createdAt": "{{today}}T12:41:00+09:00"
+          },
+          {
+            "messageId": "00000000-0000-0000-0000-000000000d03",
+            "role": "ASSISTANT",
+            "status": "READY",
+            "text": "점심에 단백질이 적었으니 저녁엔 단백질을 조금 더 챙겨 보세요.",
+            "foodCards": [
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f03",
+                "foodName": "삶은 달걀 2개",
+                "effects": [
+                  {
+                    "code": "PROTEIN",
+                    "amount": 12.6,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "FAT",
+                    "amount": 9.5,
+                    "unit": "g"
+                  }
+                ]
+              },
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f01",
+                "foodName": "두부 반 모",
+                "effects": [
+                  {
+                    "code": "PROTEIN",
+                    "amount": 8.1,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "CALORIE",
+                    "amount": 84,
+                    "unit": "kcal"
+                  }
+                ]
+              }
+            ],
+            "safetyStatus": "SAFE",
+            "createdAt": "{{today}}T12:41:00+09:00"
+          }
+        ]
+      },
+      "error": null
+    }
+  },
+  "GET /api/v1/chat/conversations/{conversation_id}": {
+    "200": {
+      "success": true,
+      "data": {
+        "conversationId": "00000000-0000-0000-0000-000000000c01",
+        "mealId": "00000000-0000-0000-0000-000000000456",
+        "messages": [
+          {
+            "messageId": "00000000-0000-0000-0000-000000000d01",
+            "role": "ASSISTANT",
+            "status": "READY",
+            "text": "다음 끼니로 이 음식은 어떤가요?",
+            "foodCards": [
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f01",
+                "foodName": "두부 반 모",
+                "effects": [
+                  {
+                    "code": "PROTEIN",
+                    "amount": 8.1,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "CALORIE",
+                    "amount": 84,
+                    "unit": "kcal"
+                  }
+                ]
+              },
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f02",
+                "foodName": "나물 한 접시",
+                "effects": [
+                  {
+                    "code": "FIBER",
+                    "amount": 2.6,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "SODIUM",
+                    "amount": 320,
+                    "unit": "mg"
+                  }
+                ]
+              }
+            ],
+            "safetyStatus": "SAFE",
+            "createdAt": "{{today}}T12:40:00+09:00"
+          },
+          {
+            "messageId": "00000000-0000-0000-0000-000000000d02",
+            "role": "USER",
+            "status": "READY",
+            "text": "저녁엔 뭘 먹으면 좋을까요?",
+            "foodCards": [],
+            "safetyStatus": null,
+            "createdAt": "{{today}}T12:41:00+09:00"
+          },
+          {
+            "messageId": "00000000-0000-0000-0000-000000000d03",
+            "role": "ASSISTANT",
+            "status": "READY",
+            "text": "점심에 단백질이 적었으니 저녁엔 단백질을 조금 더 챙겨 보세요.",
+            "foodCards": [
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f03",
+                "foodName": "삶은 달걀 2개",
+                "effects": [
+                  {
+                    "code": "PROTEIN",
+                    "amount": 12.6,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "FAT",
+                    "amount": 9.5,
+                    "unit": "g"
+                  }
+                ]
+              },
+              {
+                "foodCardId": "00000000-0000-0000-0000-000000000f01",
+                "foodName": "두부 반 모",
+                "effects": [
+                  {
+                    "code": "PROTEIN",
+                    "amount": 8.1,
+                    "unit": "g"
+                  },
+                  {
+                    "code": "CALORIE",
+                    "amount": 84,
+                    "unit": "kcal"
+                  }
+                ]
+              }
+            ],
+            "safetyStatus": "SAFE",
+            "createdAt": "{{today}}T12:41:00+09:00"
+          }
+        ]
+      },
+      "error": null
+    }
+  },
+  "POST /api/v1/chat/conversations/{conversation_id}/messages": {
+    "202": {
+      "success": true,
+      "data": {
+        "userMessage": {
+          "messageId": "00000000-0000-0000-0000-000000000d02",
+          "role": "USER",
+          "status": "READY",
+          "text": "저녁엔 뭘 먹으면 좋을까요?",
+          "foodCards": [],
+          "safetyStatus": null,
+          "createdAt": "{{today}}T12:41:00+09:00"
+        },
+        "assistantMessageId": "00000000-0000-0000-0000-000000000d03",
+        "pollIntervalMs": 1000,
+        "timeoutMs": 30000
+      },
+      "error": null
+    }
+  },
+  "PUT /api/v1/meals/{meal_id}/feedback/suggestions": {
+    "200": {
+      "success": true,
+      "data": {
+        "feedbackStatus": "READY",
+        "summary": "유지기 기준으로 보면 포만감이 부족한 식사예요.",
+        "reasoning": "지금은 포만감 유지가 중요한데 단백질 비중이 낮았어요.",
+        "suggestions": [
+          {
+            "foodName": "두부 반 모",
+            "nutrients": [
+              {
+                "code": "PROTEIN",
+                "amount": 8.1,
+                "unit": "g"
+              },
+              {
+                "code": "CALORIE",
+                "amount": 84,
+                "unit": "kcal"
+              }
+            ],
+            "advice": "단백질을 조금 더 채우는 쪽이에요"
+          }
+        ],
+        "expectedSatietyPct": {
+          "current": 68,
+          "after": 79
+        },
+        "safetyStatus": "SAFE"
       },
       "error": null
     }

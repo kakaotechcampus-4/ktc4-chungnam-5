@@ -60,6 +60,7 @@ docker compose -f ../infra/docker-compose.ai-stub.yml up -d
 | `POST /analyze-meal` | 사진·텍스트 → 음식 후보 목록 | BE Worker |
 | `POST /short-feedback` | 한 끼(`scope=MEAL`) · 하루(`scope=DAILY`) 코멘트 | BE Worker |
 | `POST /long-feedback` | 주간·월간·전체 추이 피드백 | BE Worker |
+| `POST /chat` | 챗봇 질문 · 지난 대화 · 사용자 컨텍스트 → 답변 텍스트 · 음식 카드 | BE Worker (`chat.reply`) |
 
 **BE API 는 이 서버를 직접 부르지 않는다.** API 는 큐에 넣고 202 를 돌려주고, Worker 가 꺼내서 호출한다.
 

@@ -21,9 +21,11 @@ from app.crud import medication as medication_crud
 from app.crud import meal as meal_crud
 from app.crud.evaluation import NutrientTotals
 from app.infra.queue import enqueue
+from app.infra.storage import build_file_storage
 from app.models.enums import MealItemSource, MealStatus, MealType, NutrientCode, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.models.meal import Meal, MealItem, SatietyLog
+from app.models.medication import MedicationSnapshot
 from app.schemas.feedback import FeedbackSuggestion
 from app.schemas.meal import (
     EVALUATED_STEPS,
@@ -186,13 +188,15 @@ def _build_scores(
 
 
 def _build_thumbnail_url(image_key: str | None) -> str | None:
-    """image_key 를 실제 접근 가능한 URL 로 바꾼다.
+    """image_key 를 앱이 열 수 있는 주소로 바꾼다. 사진이 없으면 None.
 
-    TODO: 6번(POST /meals)에서 infra/ FileStorage 붙이면 presigned URL 로 교체.
+    주소 규칙은 저장소가 정한다 (`infra/storage.py::FileStorage.client_url`) — 로컬 디스크면
+    `/media/…`(앱이 서버 주소를 붙인다), S3 면 presigned URL. 여기서 경로를 직접 만들면
+    S3 로 바꿨을 때 업로드는 S3 로 가는데 화면엔 서버 경로가 나가 사진이 깨진다.
     """
     if image_key is None:
         return None
-    return f"/media/{image_key}"
+    return build_file_storage().client_url(image_key)
 
 
 def encode_cursor(eaten_at: datetime, meal_id: uuid.UUID) -> str:
@@ -542,7 +546,8 @@ def update_items(
             unit=update.request.unit,
             amount_g=update.amount_g,
             # 이름이 그대로면 기존 링크를 지킨다. 다시 찾으면 AI 가 정확히 연결해 둔
-            # 항목이 끊길 수 있다 — 이름 매칭은 흔한 음식에 None 을 주기 때문이다
+            # 항목이 끊기거나 다른 행으로 바뀔 수 있다 — 이름 매칭은 정확히 같은 이름만,
+            # GENERAL 먼저 찾기 때문이다
             # (`endpoints/meal_items.py` 의 update_meal_items 독스트링 참고).
             # 지킬 링크가 없을 때(`food_ref_id IS NULL`)는 얘기가 다르다. AI 가
             # `candidateFoodRefId` 를 못 줬다는 뜻이고 이름 매칭은 워커가 쓰지 않는
@@ -958,7 +963,21 @@ def delete_item(
     )
 
 
-def create_meal(
+@dataclass(frozen=True)
+class SelectedFood:
+    """검색 탭에서 사용자가 고른 공공 DB 음식 하나.
+
+    `display_name` 은 공공 DB 이름이다. 그 조회는 `services/nutrition.py` 의 일이라
+    호출부(api 레이어)가 채워 넣는다(README 절대 규칙 5).
+    """
+
+    food_ref_id: str
+    display_name: str
+    amount: Decimal
+    unit: str
+
+
+def _insert_meal(
     db: Session,
     *,
     user_id: uuid.UUID,
@@ -967,20 +986,11 @@ def create_meal(
     image_key: str | None,
     raw_text: str | None,
     satiety_before_pct: int | None,
-) -> MealCreateResponse:
-    """새 식사를 등록하고 분석 작업을 큐에 넣는다.
+) -> tuple[Meal, MedicationSnapshot]:
+    """끼니 한 행 + 그 시점의 투약 스냅샷 + (있으면) 식전 포만감을 넣는다. 커밋하지 않는다.
 
-    `crud/__init__.py` 의 "커밋은 부르는 쪽이 한다" 절에 있는 POST /meals 예시를
-    그대로 따른다. `crud.medication` 을 직접 부르는 건 규칙 5 위반이 아니다 —
-    막힌 건 services 끼리의 참조이지, 다른 도메인의 crud 호출이 아니다
-    (`services.medication.create_snapshot_for_meal` 독스트링 참고).
-
-    큐에는 presigned URL 이 아니라 `image_key` 만 싣는다(PR #42 리뷰 반영).
-    presigned URL 은 발급 후 몇 분 안에 만료되는데, 워커가 이 작업을 실제로
-    집는 시점은 큐 적체·재시도 backoff 로 훨씬 늦을 수 있어 미리 만든 URL을
-    실으면 워커가 열어볼 때 이미 죽어 있을 위험이 있다. URL 은 실제로 필요한
-    시점(워커가 AI 를 부르기 직전)에 `image_key` 로 새로 발급해야 한다 —
-    `worker/jobs/analyze_meal.py` 구현 시 반영 필요.
+    입력 형식(사진·고른 음식)과 상관없이 끼니가 생기는 방식은 같다 — 다른 건
+    그 뒤에 분석을 맡기느냐(`create_meal`) 항목을 바로 넣느냐(`create_meal_from_foods`)다.
     """
     current_record = medication_crud.get_current(db, user_id)
     snapshot = medication_crud.add_snapshot(db, user_id=user_id, source=current_record)
@@ -1003,6 +1013,115 @@ def create_meal(
             logged_at=datetime.now(UTC),
         )
 
+    return meal, snapshot
+
+
+def _summarize_foods(foods: list[SelectedFood]) -> str:
+    """고른 음식을 `"계란말이 120g, 바나나 100g"` 처럼 한 줄로 적는다.
+
+    `meals` 는 `image_key` · `raw_text` 중 하나가 꼭 있어야 한다(`input_present`
+    CHECK 제약). 고른 음식에는 둘 다 없으므로 무엇을 골랐는지를 글로 남겨 그 자리를
+    채운다 — 예전에 FE 가 rawText 로 이어 붙여 보내던 모양 그대로다. 분석에 쓰이지
+    않는 기록용 값이다.
+    """
+    return ", ".join(
+        f"{food.display_name} {food.amount.normalize():f}{food.unit}" for food in foods
+    )
+
+
+def create_meal_from_foods(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_type: MealType,
+    eaten_at: datetime,
+    satiety_before_pct: int | None,
+    foods: list[SelectedFood],
+) -> MealCreateResponse:
+    """검색 탭에서 고른 음식들로 끼니를 만든다. **AI 분석을 거치지 않는다.**
+
+    사용자가 공공 DB 음식을 직접 고르고 양까지 정했으므로 AI 에게 물을 것이 없다 —
+    `add_item` 이 큐를 쓰지 않는 것과 같은 이유다. 그래서 큐에 아무것도 넣지 않고
+    곧바로 `REVIEW_REQUIRED`(확인 화면) 로 둔다. 이후 흐름(항목 수정 → [확인])은 AI 가
+    만든 끼니와 똑같다.
+
+    항목은 `crud.meal.add_item` 그대로다 — `source=USER`, 양은 `confirmed_*`,
+    `confidence` 는 NULL. 영양정보는 저장하지 않고 `food_ref_id` 와 g 환산값만
+    남긴다 — `GET /meals/{mealId}` 가 그 둘로 매번 환산한다(`PUT .../nutrition` 으로
+    후보를 고른 항목과 같은 모양).
+    """
+    meal, _ = _insert_meal(
+        db,
+        user_id=user_id,
+        meal_type=meal_type,
+        eaten_at=eaten_at,
+        image_key=None,
+        raw_text=_summarize_foods(foods),
+        satiety_before_pct=satiety_before_pct,
+    )
+
+    for food in foods:
+        meal_crud.add_item(
+            db,
+            meal_id=meal.id,
+            display_name=food.display_name,
+            amount=food.amount,
+            unit=food.unit,
+            amount_g=to_grams(food.amount, food.unit),
+            food_ref_id=food.food_ref_id,
+        )
+    meal_crud.set_status(db, meal, MealStatus.REVIEW_REQUIRED)
+
+    # 트랜잭션 경계는 services 가 정한다(README 절대 규칙 5).
+    db.commit()
+
+    return MealCreateResponse(
+        meal_id=meal.id,
+        status=meal.status,
+        # `GET /meals/{mealId}` 와 같은 steps — 같은 끼니가 화면마다 다르게 보이지 않게.
+        steps=_resolve_steps(meal.status, meal.is_recalculation),
+        poll_interval_ms=None,
+        timeout_ms=None,
+    )
+
+
+def create_meal(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_type: MealType,
+    eaten_at: datetime,
+    image_key: str,
+    satiety_before_pct: int | None,
+) -> MealCreateResponse:
+    """사진으로 새 식사를 등록하고 분석 작업을 큐에 넣는다.
+
+    텍스트(`rawText`) 입력은 없어졌다 — 검색 탭에서 고른 음식은
+    `create_meal_from_foods` 로 분석 없이 들어간다. 워커는 옛 작업을 위해
+    payload 의 `rawText` 를 여전히 `.get()` 으로 읽지만 여기서는 싣지 않는다.
+
+    `crud/__init__.py` 의 "커밋은 부르는 쪽이 한다" 절에 있는 POST /meals 예시를
+    그대로 따른다. `crud.medication` 을 직접 부르는 건 규칙 5 위반이 아니다 —
+    막힌 건 services 끼리의 참조이지, 다른 도메인의 crud 호출이 아니다
+    (`services.medication.create_snapshot_for_meal` 독스트링 참고).
+
+    큐에는 presigned URL 이 아니라 `image_key` 만 싣는다(PR #42 리뷰 반영).
+    presigned URL 은 발급 후 몇 분 안에 만료되는데, 워커가 이 작업을 실제로
+    집는 시점은 큐 적체·재시도 backoff 로 훨씬 늦을 수 있어 미리 만든 URL을
+    실으면 워커가 열어볼 때 이미 죽어 있을 위험이 있다. URL 은 실제로 필요한
+    시점(워커가 AI 를 부르기 직전)에 `image_key` 로 새로 발급해야 한다 —
+    `worker/jobs/analyze_meal.py` 구현 시 반영 필요.
+    """
+    meal, snapshot = _insert_meal(
+        db,
+        user_id=user_id,
+        meal_type=meal_type,
+        eaten_at=eaten_at,
+        image_key=image_key,
+        raw_text=None,
+        satiety_before_pct=satiety_before_pct,
+    )
+
     enqueue(
         db,
         "meal.analyze",
@@ -1012,7 +1131,6 @@ def create_meal(
             "eatenAt": eaten_at.isoformat(),
             "stage": snapshot.stage.value,
             "imageKey": image_key,
-            "rawText": raw_text,
         },
     )
 

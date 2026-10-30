@@ -211,3 +211,91 @@ class LongFeedbackResponse(_Camel):
     recommendation: str
     model_version: str
     safety_status: SafetyStatus
+
+
+# ─────────────────────────── /chat ───────────────────────────
+
+
+class ChatRole(str, Enum):
+    USER = "USER"
+    ASSISTANT = "ASSISTANT"
+
+
+class ChatTurn(_Camel):
+    """지난 대화 한 줄. BE 가 BLOCKED · FAILED 답과 그 질문은 빼고 보낸다."""
+
+    role: ChatRole
+    text: str
+
+
+class Medication(_Camel):
+    drug_name: str
+    dose_mg: float
+
+
+class TodayMeal(_Camel):
+    """오늘(KST) 확정된 끼니 하나. 점수는 BE Rule Engine 이 매겼다."""
+
+    meal_type: MealType
+    foods: list[str] = Field(default_factory=list)
+    qqs: QQS | None = None  # 평가 행이 없으면 null
+
+
+class TodayContext(_Camel):
+    date: dt.date
+    meals: list[TodayMeal] = Field(default_factory=list)
+
+
+class BaseMealSuggestion(_Camel):
+    food_name: str
+    advice: str
+
+
+class BaseMeal(_Camel):
+    """대화의 기준 끼니. `suggestions` 는 사용자가 지금 보고 있는 "현재 추천" 이다."""
+
+    meal_id: str
+    meal_type: MealType
+    qqs: QQS | None = None
+    suggestions: list[BaseMealSuggestion] = Field(default_factory=list)
+
+
+class LongTermContext(_Camel):
+    period_type: PeriodType
+    trend_summary: str
+    recommendation: str | None = None
+
+
+class ChatContext(_Camel):
+    """BE 가 매 메시지마다 선주입하는 사용자 정보. AI 가 tool 로 다시 묻지 않게 한다."""
+
+    stage: Stage
+    medication: Medication | None = None
+    today: TodayContext
+    base_meal: BaseMeal | None = None
+    long_term: LongTermContext | None = None
+
+
+class ChatRequest(_Camel):
+    user_id: str
+    conversation_id: str
+    text: str = Field(min_length=1)
+    history: list[ChatTurn] = Field(default_factory=list)
+    context: ChatContext
+
+
+class ChatFoodCard(_Camel):
+    """nutrients 는 여기 없다 — BE 가 food_refs 에서 채운다."""
+
+    food_name: str
+    advice: str
+    candidate_food_ref_id: str | None = None
+
+
+class ChatResponse(_Camel):
+    """BLOCKED 면 `text` 는 null, `foodCards` 는 [] 다 (입력 · 출력 가드레일 모두)."""
+
+    text: str | None
+    model_version: str
+    safety_status: SafetyStatus
+    food_cards: list[ChatFoodCard] = Field(default_factory=list)

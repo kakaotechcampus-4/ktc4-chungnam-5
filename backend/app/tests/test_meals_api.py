@@ -125,7 +125,10 @@ def test_detail_feedback_suggestions_are_objects_like_the_feedback_endpoint(clie
     user = make_user(db)
     meal = make_meal(db, user_id=user.id, status=MealStatus.EVALUATED)
     make_qqs_evaluation(db, meal_id=meal.id)
-    make_food_ref(db, food_ref_id="KFD_TOFU", protein_g=Decimal("8.000"), fiber_g=None)
+    make_food_ref(
+        db, food_ref_id="KFD_TOFU", protein_g=Decimal("8.000"), fiber_g=None,
+        calories=None, fat_g=None, carbohydrate_g=None, sodium_mg=None,
+    )
     make_meal_feedback(
         db,
         user_id=user.id,
@@ -143,7 +146,7 @@ def test_detail_feedback_suggestions_are_objects_like_the_feedback_endpoint(clie
         {
             "foodName": "두부 반 모",
             "advice": "단백질을 채워요",
-            "nutrients": [{"code": "PROTEIN", "amountG": 8.0}],
+            "nutrients": [{"code": "PROTEIN", "amount": 8.0, "unit": "g"}],
         },
         {"foodName": "나물", "advice": "식이섬유", "nutrients": []},
     ]

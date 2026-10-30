@@ -157,6 +157,22 @@ def resolve_by_food_ref_id(
     return _nutrition_from_food_ref(food_ref, amount_g)
 
 
+def get_food_names(db: Session, *, food_ref_ids: list[str]) -> dict[str, str]:
+    """고른 음식들의 공공 DB 이름 — `{food_ref_id: name}`.
+
+    `POST /meals` 의 `items[]` 가 쓴다. 항목의 `displayName` 이 곧 이 이름이다.
+
+    하나라도 없으면 `FoodRefNotFoundError` 다 — `resolve_by_food_ref_id` 와 같은
+    이유로, 후보 목록에서 고른 id 가 없다는 건 클라이언트가 틀렸다는 뜻이다. 없는
+    것만 빼고 끼니를 만들면 사용자가 고른 음식이 조용히 사라진다.
+    """
+    names = food_crud.get_names_by_ids(db, set(food_ref_ids))
+    missing = sorted(set(food_ref_ids) - names.keys())
+    if missing:
+        raise FoodRefNotFoundError(f"food_ref {', '.join(missing)} 를 찾을 수 없습니다.")
+    return names
+
+
 def search_candidates(db: Session, *, query: str, limit: int) -> list[FoodCandidate]:
     """사용자가 고를 후보를 찾는다. 못 찾으면 빈 목록.
 

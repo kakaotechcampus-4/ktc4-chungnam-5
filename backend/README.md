@@ -118,7 +118,7 @@ pytest
 # 1. 테이블 수 — 19 가 나와야 한다
 docker exec glp1-db psql -U glp1 -d glp1_dev -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';"
 
-# 2. 시드 건수 — GENERAL 19617 / PROCESSED 316734
+# 2. 시드 건수 — GENERAL 14991 / PROCESSED 261101
 docker exec glp1-db psql -U glp1 -d glp1_dev -c "SELECT category, count(*) FROM food_refs GROUP BY category;"
 
 # 3. 모델과 DB 가 어긋나지 않았는지
@@ -128,7 +128,7 @@ alembic check
 | 확인 | 기대값 |
 | --- | --- |
 | 테이블 수 | **19** — 도메인 테이블 17개 + 작업 큐 `task_queue` 1개 + Alembic 이 쓰는 `alembic_version` 1개 |
-| `food_refs` | GENERAL 19,617 · PROCESSED 316,734 (합 336,351) |
+| `food_refs` | GENERAL 14,991 · PROCESSED 261,101 (합 276,092) |
 | `alembic check` | `No new upgrade operations detected.` |
 
 > 테이블 목록을 직접 보려면 `docker exec -it glp1-db psql -U glp1 -d glp1_dev -c "\dt"`.
@@ -140,8 +140,14 @@ alembic check
 
 ### 공공 영양DB 적재
 
-`food_refs` 는 식약처 식품영양성분DB 복제본이다(336,351건). 엑셀 원본은 204MB 라 레포에
-넣지 않고, **압축 덤프(7.9MB)를 `infra/seed/` 에 커밋해 공유한다.**
+`food_refs` 는 식약처 식품영양성분DB 복제본이다. 원본 336,351건 중 **이름이 같은 음식은
+`(category, 이름)` 마다 한 행으로 합치고 성분은 100g 당 평균으로 둔다**(276,092건). 일반음식과
+가공식품은 이름이 같아도 따로 남는다. 엑셀 원본은 204MB 라 레포에 넣지 않고, **압축
+덤프(7.0MB)를 `infra/seed/` 에 커밋해 공유한다.**
+
+> 병합 전 덤프를 이미 복원해 둔 DB 는 `alembic upgrade head` 만 돌리면 된다 —
+> 마이그레이션 `8d3f6a1c5e27` 이 같은 규칙으로 합치고, 지워지는 행을 가리키던
+> `meal_items` · 채팅 카드 · 끼니 피드백 제안의 id 도 대표 행으로 옮긴다.
 
 #### 팀원 — 덤프 복원 (권장)
 
@@ -160,7 +166,7 @@ docker exec -i glp1-db pg_restore -U glp1 -d glp1_dev --data-only --no-owner < .
 
 ```bash
 docker exec glp1-db psql -U glp1 -d glp1_dev -c "SELECT category, count(*) FROM food_refs GROUP BY category;"
-# PROCESSED 316734 / GENERAL 19617
+# PROCESSED 261101 / GENERAL 14991
 ```
 
 #### 엑셀 원본에서 재적재 (데이터셋이 갱신됐을 때만)
@@ -170,7 +176,7 @@ python -m scripts.load_food_refs GENERAL   "<경로>/20260828_음식DB_19617건.
 python -m scripts.load_food_refs PROCESSED "<경로>/20260828_가공식품DB_316734건.xlsx"
 ```
 
-`ON CONFLICT DO UPDATE` 라 여러 번 돌려도 안전하고, 트랜잭션 하나로 처리해 중간에
+적재하면서 같은 이름을 평균으로 합친다(위 규칙과 동일). `ON CONFLICT DO UPDATE` 라 여러 번 돌려도 안전하고, 트랜잭션 하나로 처리해 중간에
 실패하면 아무것도 들어가지 않는다. 가공식품DB 적재에 몇 분 걸린다.
 
 새 덤프를 만들어 공유하려면:
@@ -599,15 +605,15 @@ AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/
 
 ## `food_refs`
 
-공공 영양 DB 복제본
+공공 영양 DB 복제본. 같은 `(category, 정규화한 이름)` 은 한 행이고 성분은 100g 당 평균이다
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
-| id | VARCHAR PK | 공공 DB 음식 ID |
+| id | VARCHAR PK | 공공 DB 음식 ID (동명 그룹에서 가장 작은 ID) |
 | name | VARCHAR | 표준 음식명 |
 | category | ENUM, NULL | PROCESSED(가공식품) / GENERAL(일반음식). 공공 DB 적재 시 미분류면 NULL |
-| origin_type | VARCHAR | 식품기원명 |
-| serving_size | DECIMAL | 영양성분함량기준량 |
+| origin_type | VARCHAR | 식품기원명. 동명 그룹 안에서 값이 갈리면 NULL |
+| serving_size | DECIMAL | 영양성분함량기준량 (병합 후 100) |
 | calories | DECIMAL | 열량 |
 | carbohydrate_g | DECIMAL | 탄수화물 |
 | protein_g | DECIMAL | 단백질 |

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../api/meal_api.dart';
+import '../common/polling.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -23,10 +24,10 @@ enum _Stopped { failed, timedOut }
 
 /// AI 분석 진행 — Figma `hOxrHBitBpjwIBBg2GO49y` node `89:6`.
 ///
-/// `GET /meals/{mealId}` 를 서버가 준 간격(`pollIntervalMs`)으로 불러
-/// 최초 분석이 끝나면(`REVIEW_REQUIRED`) 음식 확인 화면으로 넘어간다.
-/// 서버가 준 한도(`timeoutMs`)를 넘기면 폴링만 멈춘다 — 분석은 서버에서
-/// 계속되므로 기록 탭에서 이어 볼 수 있다. 알림으로 넘기는 건 FE-14 몫이다.
+/// `GET /meals/{mealId}` 를 서버가 준 간격(`pollIntervalMs`)부터 점점 늘려 가며
+/// 불러([pollUntil]) 최초 분석이 끝나면(`REVIEW_REQUIRED`) 음식 확인 화면으로
+/// 넘어간다. 서버가 준 한도(`timeoutMs`)를 넘기면 폴링만 멈추고 "다시 확인" 과
+/// "나중에 확인" 을 고르게 한다 — 분석은 서버에서 계속되므로 기록 탭에서 이어 볼 수 있다.
 class MealAnalysisScreen extends StatefulWidget {
   const MealAnalysisScreen({super.key, required this.meal, this.photo});
 
@@ -55,23 +56,23 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
   }
 
   Future<void> _poll() async {
-    final deadline = DateTime.now().add(widget.meal.timeout);
-    while (mounted) {
-      await Future.delayed(widget.meal.pollInterval);
-      if (!mounted) return;
-      final MealDetail meal;
-      try {
-        meal = await _api.fetchMeal(widget.meal.mealId);
-      } catch (_) {
-        // 한 번 실패는 넘기고 다음 차례에 다시 묻는다. 한도는 그대로 센다.
-        if (DateTime.now().isAfter(deadline)) return _stop(_Stopped.timedOut);
-        continue;
-      }
-      if (!mounted) return;
-      if (meal.status == 'FAILED') return _stop(_Stopped.failed);
-      if (!meal.isFirstAnalysis) return _finish();
-      if (DateTime.now().isAfter(deadline)) return _stop(_Stopped.timedOut);
-    }
+    final meal = await pollUntil<MealDetail>(
+      fetch: () => _api.fetchMeal(widget.meal.mealId),
+      isDone: (m) => m.status == 'FAILED' || !m.isFirstAnalysis,
+      isActive: () => mounted,
+      first: widget.meal.pollInterval,
+      budget: widget.meal.timeout,
+    );
+    if (!mounted) return;
+    if (meal == null) return _stop(_Stopped.timedOut);
+    if (meal.status == 'FAILED') return _stop(_Stopped.failed);
+    _finish();
+  }
+
+  /// 시간이 지나 멈춘 뒤 "다시 확인하기" — 같은 한도로 한 번 더 기다린다.
+  void _pollAgain() {
+    setState(() => _stopped = null);
+    _poll();
   }
 
   void _stop(_Stopped reason) {
@@ -115,7 +116,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
   String get _subtitle => switch (_stopped) {
     null => '보통 5~10초 걸려요. 화면을 벗어나도 계속 분석돼요.',
     _Stopped.failed => '사진을 다시 찍거나 먹은 음식을 직접 적어 주세요.',
-    _Stopped.timedOut => '분석은 계속돼요. 끝나면 기록 탭에서 이어서 확인할 수 있어요.',
+    _Stopped.timedOut => '분석은 서버에서 계속돼요. 나중에 기록 탭에서 확인해 주세요.',
   };
 
   @override
@@ -228,18 +229,29 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                     style: AppTypography.bodySecondary,
                   ),
                 )
-              else
+              else ...[
                 SizedBox(
                   width: double.infinity,
                   height: AppLayout.primaryButtonHeight,
                   child: FilledButton(
                     onPressed: _stopped == _Stopped.failed ? _retry : _cancel,
                     child: Text(
-                      _stopped == _Stopped.failed ? '다시 기록하기' : '닫기',
+                      _stopped == _Stopped.failed ? '다시 기록하기' : '나중에 확인할게요',
                       style: AppTypography.buttonLabel,
                     ),
                   ),
                 ),
+                if (_stopped == _Stopped.timedOut) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: _pollAgain,
+                      child: const Text('다시 확인하기'),
+                    ),
+                  ),
+                ],
+              ],
             ],
           ),
         ),

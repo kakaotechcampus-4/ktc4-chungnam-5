@@ -125,6 +125,37 @@ Amount = Annotated[
 ]
 
 
+MAX_SELECTED_FOODS = 50
+"""`POST /meals` 의 `items[]` 상한. 한 끼에 50 가지를 넘게 고를 일은 없다."""
+
+
+class MealCreateFoodItem(CamelModel):
+    """`POST /meals` (C) 형식의 항목 하나 — 검색 탭에서 사용자가 고른 공공 DB 음식.
+
+    `unit` 을 g · ml 로 좁힌 건 FE 가 그 둘로만 보내기 때문이고, 그 덕에 항상 g 으로
+    환산돼(`services.meal.to_grams`) 영양정보가 비는 항목이 생기지 않는다.
+    """
+
+    food_ref_id: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)
+    ]
+    amount: Amount
+    unit: Literal["g", "ml"]
+
+
+class MealCreateFoodsRequest(CamelModel):
+    """`POST /meals` (C) 형식에서 `items[]` 만 떼어 검증하는 그릇.
+
+    엔드포인트는 Content-Type 으로 형식을 직접 나누느라 body 를 `Request` 로 받는다
+    (`endpoints/meals.py::parse_meal_input`). 그래서 `mealType` 같은 공통 필드는
+    거기서 손으로 보고, 모양이 복잡한 `items[]` 만 여기서 pydantic 으로 검증한다.
+    """
+
+    items: Annotated[
+        list[MealCreateFoodItem], Field(min_length=1, max_length=MAX_SELECTED_FOODS)
+    ]
+
+
 class MealItemCreateRequest(CamelModel):
     """POST /meals/{mealId}/items 요청.
 
@@ -354,10 +385,15 @@ MEAL_ANALYSIS_TIMEOUT_MS = 30000
 
 
 class MealCreateResponse(CamelModel):
-    """POST /meals 응답 (202)."""
+    """POST /meals 응답.
+
+    사진·텍스트는 202 + `ANALYZING` 이고 폴링 안내(`pollIntervalMs` · `timeoutMs`)가
+    붙는다. 고른 음식(`items[]`)은 분석이 없어 201 + `REVIEW_REQUIRED` 이고 두 값이
+    `null` 이다 — FE 는 폴링 없이 곧바로 확인 화면으로 간다.
+    """
 
     meal_id: uuid.UUID
     status: MealStatus
     steps: list[AnalysisStep]
-    poll_interval_ms: int
-    timeout_ms: int
+    poll_interval_ms: int | None
+    timeout_ms: int | None

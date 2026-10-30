@@ -11,7 +11,6 @@ import '../screens/meal_history_screen.dart';
 import '../state/profile_state.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
-import 'feedback_branch_popup.dart';
 import 'nav_icons.dart';
 
 /// 하단 탭 4개(홈·피드백·AI·마이)를 오가는 앱 루트 셸.
@@ -106,7 +105,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }) async {
     setState(() => _feedbackPopupOpen = true);
     try {
-      return await showFeedbackBranchPopup(
+      return await context.read<PopupGate>().showFeedbackBranch(
         context,
         anchorCenterX: anchorCenterX,
         bottomOffset: bottomOffset,

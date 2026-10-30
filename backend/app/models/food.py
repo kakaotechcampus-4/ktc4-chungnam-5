@@ -10,7 +10,12 @@ from app.models.enums import FoodCategory, pg_enum
 
 
 class FoodRef(Base):
-    """공공 영양 DB 음식 1건. id 는 공공 DB 의 음식 ID 를 그대로 쓴다."""
+    """공공 영양 DB 음식 1건.
+
+    공공 DB 에서 `(category, 정규화한 이름)` 이 같은 행들을 **하나로 합친 것**이다
+    (`scripts/load_food_refs.py`). id · name 은 그중 식품코드가 가장 작은 행의 것이고,
+    성분은 100g 당으로 맞춘 평균이다(`serving_size` 는 100).
+    """
 
     __tablename__ = "food_refs"
 

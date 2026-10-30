@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
+import '../common/polling.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import 'shared_meal_widgets.dart' show EmptyBlock;
+import 'shared_meal_widgets.dart' show EmptyBlock, WaitNotice;
 
 class DailyScore {
   final String date;
@@ -194,6 +195,10 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen>
   DashboardData? dashboard;
   List<DoseEvent> doseEvents = [];
   LongTermInsight? insight;
+
+  /// 인사이트를 받지 못했는지(요청 실패), 기다리다 한도를 넘겼는지.
+  bool insightFailed = false;
+  bool insightTimedOut = false;
   bool isLoading = true;
   String? errorMessage;
 
@@ -247,30 +252,45 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen>
   }
 
   /// 인사이트를 받고, 없거나 낡았으면 새로 만들어 달라고 한 뒤 준비될
-  /// 때까지 잠깐씩 다시 묻는다(약 30초). 실패해도 그래프는 그대로 둔다.
-  Future<void> _loadInsight(String forPeriod) async {
-    const pollLimit = 20;
+  /// 때까지 간격을 늘려 가며 다시 묻는다(약 1분). [refresh] 면(실패 뒤
+  /// "다시 시도") 상태와 상관없이 새로 만들어 달라고 한다. 실패해도 그래프는 그대로 둔다.
+  Future<void> _loadInsight(String forPeriod, {bool refresh = false}) async {
+    bool isCurrent() => mounted && forPeriod == period;
+    setState(() {
+      insightFailed = false;
+      insightTimedOut = false;
+    });
+    final Duration interval;
     try {
       var result = await _api.fetchInsight(forPeriod);
-      if (!mounted || forPeriod != period) return;
+      if (!isCurrent()) return;
       setState(() => insight = result);
       // 데이터가 모자라면 서버가 PENDING 으로 줘도 기다려 봐야 만들어지지 않는다.
       if (!result.dataSufficient) return;
-      if (!result.needsRefresh && !result.isGenerating) return;
-      final interval = result.needsRefresh
+      refresh = refresh || result.needsRefresh;
+      if (!refresh && !result.isGenerating) return;
+      interval = refresh
           ? await _api.refreshInsight(forPeriod)
           : const Duration(milliseconds: 1500);
-      for (var i = 0; i < pollLimit; i++) {
-        await Future.delayed(interval);
-        if (!mounted || forPeriod != period) return;
+      if (!isCurrent()) return;
+      if (refresh) {
+        // 새로 만드는 중으로 보이게 한다(실패 문구가 남지 않게).
         result = await _api.fetchInsight(forPeriod);
-        if (!mounted || forPeriod != period) return;
+        if (!isCurrent()) return;
         setState(() => insight = result);
-        if (!result.dataSufficient || !result.isGenerating) return;
       }
     } catch (_) {
-      // 인사이트 한 줄이 없어도 화면은 쓸 수 있다.
+      if (isCurrent()) setState(() => insightFailed = true);
+      return;
     }
+    final result = await pollUntil<LongTermInsight>(
+      fetch: () => _api.fetchInsight(forPeriod),
+      isDone: (r) => !r.dataSufficient || !r.isGenerating,
+      isActive: isCurrent,
+      onResult: (r) => setState(() => insight = r),
+      first: interval,
+    );
+    if (isCurrent() && result == null) setState(() => insightTimedOut = true);
   }
 
   void _onPeriodTap(String newPeriod) {
@@ -316,7 +336,13 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen>
               ],
               const SizedBox(height: AppSpacing.cardGap),
               if (insight != null)
-                _buildInsightBanner(insight!, dashboard?.series.length ?? 0),
+                _buildInsightBanner(insight!, dashboard?.series.length ?? 0)
+              else if (insightFailed)
+                WaitNotice(
+                  message: '인사이트를 불러오지 못했어요.',
+                  actionLabel: '다시 시도',
+                  onAction: () => _loadInsight(period),
+                ),
             ],
           ),
         ),
@@ -664,10 +690,20 @@ class _LongTermFeedbackScreenState extends State<LongTermFeedbackScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (insight.trendSummary == null)
-            Text(
-              insight.isGenerating ? '인사이트를 만들고 있어요…' : '지금은 인사이트를 만들지 못했어요.',
-              style: AppTypography.body,
-            )
+            if (insightTimedOut)
+              WaitNotice(
+                message: '인사이트를 만드는 데 시간이 걸리고 있어요. 나중에 다시 확인해 주세요.',
+                actionLabel: '다시 확인하기',
+                onAction: () => _loadInsight(period),
+              )
+            else if (insight.isGenerating && !insightFailed)
+              Text('인사이트를 만들고 있어요…', style: AppTypography.body)
+            else
+              WaitNotice(
+                message: '지금은 인사이트를 만들지 못했어요.',
+                actionLabel: '다시 시도',
+                onAction: () => _loadInsight(period, refresh: true),
+              )
           else
             Text(
               insight.trendSummary!,

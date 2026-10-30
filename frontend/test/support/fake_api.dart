@@ -95,6 +95,15 @@ class FakeApi implements HttpClientAdapter {
   }
 }
 
+/// mock 고정 응답 한 건(`'GET /api/v1/home'`)의 body. 날짜 자리는 서버와 같게 채운다.
+/// 일부만 고쳐 [FakeApi.on] 으로 돌려줄 때 쓴다.
+Map<String, dynamic> fakeExample(String route) {
+  final raw = FakeApi._fillDates(File('mock/examples.json').readAsStringSync());
+  final byStatus =
+      (jsonDecode(raw) as Map<String, dynamic>)[route] as Map<String, dynamic>;
+  return byStatus.values.first as Map<String, dynamic>;
+}
+
 typedef FakeHandler = (int, Object?) Function(RequestOptions options);
 
 Map<String, Object?> fakeOk(Object? data) => {

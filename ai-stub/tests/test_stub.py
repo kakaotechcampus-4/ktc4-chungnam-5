@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app
-from schemas import AnalyzeMealResponse, LongFeedbackResponse, ShortFeedbackResponse
+from schemas import AnalyzeMealResponse, ChatResponse, LongFeedbackResponse, ShortFeedbackResponse
 
 client = TestClient(app)
 
@@ -36,12 +36,40 @@ LONG = {
     "periodEnd": "2026-08-21",
     "stage": "MAINTENANCE",
 }
+CHAT = {
+    "userId": "user_1",
+    "conversationId": "conv_1",
+    "text": "시금치는 맛이 없어! 다른 음식 추천해줘",
+    "history": [{"role": "ASSISTANT", "text": "다음 끼니로 이 음식은 어떤가요?"}],
+    "context": {
+        "stage": "MAINTENANCE",
+        "medication": {"drugName": "위고비", "doseMg": 1.0},
+        "today": {
+            "date": "2026-08-21",
+            "meals": [
+                {
+                    "mealType": "LUNCH",
+                    "foods": ["참치김밥"],
+                    "qqs": {"quantity": 80, "quality": None, "satiety": 70},
+                }
+            ],
+        },
+        "baseMeal": {
+            "mealId": "meal_456",
+            "mealType": "LUNCH",
+            "qqs": None,
+            "suggestions": [{"foodName": "시금치나물", "advice": "식이섬유를 채워요"}],
+        },
+        "longTerm": {"periodType": "WEEKLY", "trendSummary": "Quality 가 오르는 흐름이에요.", "recommendation": None},
+    },
+}
 
 CASES = [
     ("/analyze-meal", ANALYZE, AnalyzeMealResponse),
     ("/short-feedback", SHORT_MEAL, ShortFeedbackResponse),
     ("/short-feedback", SHORT_DAILY, ShortFeedbackResponse),
     ("/long-feedback", LONG, LongFeedbackResponse),
+    ("/chat", CHAT, ChatResponse),
 ]
 
 
@@ -129,3 +157,38 @@ def test_item_without_amount_is_accepted():
         "items": [{"displayName": "엄마표 반찬", "amount": None, "unit": None, "nutrition": None}],
     }
     assert client.post("/short-feedback", json=payload).status_code == 200
+
+
+def test_chat_cards_have_no_nutrition_fields():
+    """AI 는 성분값을 만들지 않는다 — BE 가 food_refs 에서 채운다."""
+    card = client.post("/chat", json=CHAT).json()["foodCards"][0]
+
+    assert set(card) == {"foodName", "advice", "candidateFoodRefId"}
+
+
+def test_chat_blocked_has_no_text_or_cards():
+    """명세: BLOCKED 메시지는 `text: null`, `foodCards: []`."""
+    body = client.post("/chat", json=CHAT, headers={"X-Stub-Scenario": "BLOCKED"}).json()
+
+    assert body["text"] is None
+    assert body["foodCards"] == []
+
+
+def test_chat_minimal_context_is_accepted():
+    """처음 쓰는 사용자 — 투약 · 기준 끼니 · 장기 피드백이 없고 오늘 끼니도 없다."""
+    payload = {
+        **CHAT,
+        "history": [],
+        "context": {
+            "stage": "PRE_DOSE",
+            "medication": None,
+            "today": {"date": "2026-08-21", "meals": []},
+            "baseMeal": None,
+            "longTerm": None,
+        },
+    }
+    assert client.post("/chat", json=payload).status_code == 200
+
+
+def test_chat_rejects_empty_text():
+    assert client.post("/chat", json={**CHAT, "text": ""}).status_code == 422

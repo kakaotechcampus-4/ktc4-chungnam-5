@@ -126,6 +126,7 @@ class MealDetail {
     required this.items,
     this.imageUrl,
     this.clarifyQuestion,
+    this.satietyAfterPct,
   });
 
   final String mealId;
@@ -146,6 +147,10 @@ class MealDetail {
   final String? imageUrl;
   final String? clarifyQuestion;
 
+  /// 확정 때 적은 식후 포만감(`satiety.afterPct`). 확정 전이면 null.
+  /// 끼니 피드백이 실패했을 때 같은 값으로 다시 확정해 재생성을 건다.
+  final int? satietyAfterPct;
+
   /// 최초 분석이 아직 도는 중인지. 고친 뒤의 `ANALYZING` 은 아니다.
   bool get isFirstAnalysis => status == 'ANALYZING' && !isRecalculation;
 
@@ -161,6 +166,8 @@ class MealDetail {
     eatenAtInstant: DateTime.parse(json['eatenAt'] as String),
     imageUrl: json['imageUrl'] as String?,
     clarifyQuestion: json['clarifyQuestion'] as String?,
+    satietyAfterPct:
+        (json['satiety'] as Map<String, dynamic>?)?['afterPct'] as int?,
     items: (json['items'] as List<dynamic>)
         .map((e) => MealItem.fromJson(e as Map<String, dynamic>))
         .toList(),
@@ -274,12 +281,46 @@ class MealEvaluation {
   }
 }
 
-/// 제안 음식이 채우는 영양소(`{code, amountG}`).
-class SuggestionNutrient {
-  const SuggestionNutrient({required this.code, required this.amountG});
+/// 음식 **100g 에 든** 영양소 하나(`{code, amount, unit}`). 끼니 피드백 제안
+/// (`suggestions[].nutrients[]`)과 챗봇 음식 카드(`foodCards[].effects[]`)가 같이 쓴다.
+///
+/// "먹으면 늘어나는 양" 이 아니라 그 음식의 함량이라 0 이상이다. BE 가
+/// `food_refs` 에서 채운다(`crud/feedback.py::nutrients_by_food_ref`).
+class NutrientAmount {
+  const NutrientAmount({
+    required this.code,
+    required this.amount,
+    required this.unit,
+  });
 
+  /// `CALORIE` · `PROTEIN` · `FAT` · `CARB` · `FIBER` · `SODIUM`.
   final String code;
-  final double amountG;
+  final double amount;
+
+  /// `g` · `mg` · `kcal`.
+  final String unit;
+
+  /// 읽을 수 있는 항목만 돌려준다. 예전 모양 `{code, amountG}` 도 g 으로 읽는다 —
+  /// BE 가 `{amount, unit}` 으로 바꾸는 중이라 어느 쪽이 먼저 배포돼도 칩이 남는다.
+  static List<NutrientAmount> listFrom(Object? json) => [
+    for (final n in json is List<dynamic> ? json : const <dynamic>[])
+      ?_tryParse(n),
+  ];
+
+  static NutrientAmount? _tryParse(Object? n) {
+    if (n is! Map<String, dynamic> || n['code'] is! String) return null;
+    final (amount, unit) = switch (n) {
+      {'amount': final num a, 'unit': final String u} => (a, u),
+      {'amountG': final num a} => (a, 'g'),
+      _ => (null, null),
+    };
+    if (amount == null || unit == null || amount < 0) return null;
+    return NutrientAmount(
+      code: n['code'] as String,
+      amount: amount.toDouble(),
+      unit: unit,
+    );
+  }
 }
 
 class MealSuggestion {
@@ -290,22 +331,12 @@ class MealSuggestion {
   });
 
   final String foodName;
-  final List<SuggestionNutrient> nutrients;
+  final List<NutrientAmount> nutrients;
   final String advice;
 
   factory MealSuggestion.fromJson(Map<String, dynamic> json) => MealSuggestion(
     foodName: json['foodName'] as String,
-    // 명세가 항목 모양을 정해 두지 않아(object) 읽을 수 있는 것만 쓴다.
-    nutrients: [
-      for (final n in json['nutrients'] as List<dynamic>? ?? const [])
-        if (n is Map<String, dynamic> &&
-            n['code'] is String &&
-            n['amountG'] is num)
-          SuggestionNutrient(
-            code: n['code'] as String,
-            amountG: (n['amountG'] as num).toDouble(),
-          ),
-    ],
+    nutrients: NutrientAmount.listFrom(json['nutrients']),
     advice: json['advice'] as String,
   );
 }
@@ -354,12 +385,26 @@ class DailyFeedback {
     required this.feedbackStatus,
     required this.stale,
     this.summary,
+    this.hasRow = false,
+    this.safetyStatus,
   });
 
   /// `PENDING` · `GENERATING` · `READY` · `FAILED`.
   final String feedbackStatus;
+
+  /// `safetyStatus` 가 `SAFE` 일 때만 온다.
   final String? summary;
   final bool stale;
+
+  /// 서버에 그날 요약 행이 있는지(`dailyFeedbackId`). `READY` 인데 행이 없으면
+  /// 요약할 근거(평가된 끼니)가 없어 워커가 만들지 않은 것이다 — 실패가 아니다.
+  final bool hasRow;
+
+  /// `SAFE` · `BLOCKED` · `REVIEW_REQUIRED`. 행이 없으면 null.
+  final String? safetyStatus;
+
+  /// 만들었지만 안전 검사에 걸려 문장을 보여 주지 않는다.
+  bool get isHidden => safetyStatus != null && safetyStatus != 'SAFE';
 
   /// 새로 만들어 달라고 할지.
   bool get needsRefresh => feedbackStatus == 'PENDING' || stale;
@@ -370,6 +415,8 @@ class DailyFeedback {
     feedbackStatus: json['feedbackStatus'] as String,
     summary: json['summary'] as String?,
     stale: json['stale'] as bool? ?? false,
+    hasRow: json['dailyFeedbackId'] != null,
+    safetyStatus: json['safetyStatus'] as String?,
   );
 }
 
@@ -545,9 +592,27 @@ class MealApiService {
   Future<MealEvaluation> fetchEvaluation(String mealId) async =>
       MealEvaluation.fromResult(await _client.get('/meals/$mealId/evaluation'));
 
-  /// `GET /meals/{mealId}/feedback` — 처음 부르면 서버가 생성 작업을 건다.
+  /// `GET /meals/{mealId}/feedback` — 조회만 한다. 생성 작업은 확정
+  /// (`POST /confirm`)이 건다.
   Future<MealFeedback> fetchFeedback(String mealId) async {
     final result = await _client.get('/meals/$mealId/feedback');
+    return MealFeedback.fromJson(result.dataMap);
+  }
+
+  /// `PUT /meals/{mealId}/feedback/suggestions` — 챗봇 카드 한 장으로 이 끼니의
+  /// 다음 끼니 추천을 **통째로** 바꾼다(본문·점수는 그대로).
+  ///
+  /// - 404 `NOT_FOUND`: 끼니나 카드가 없다(다른 끼니 대화의 카드 포함).
+  /// - 409 `NOT_CONFIRMED`: 끼니가 확정 상태가 아니다.
+  /// - 409 `CONFLICT`: 카드가 끼니를 고치기 전에 만들어졌거나 피드백이 아직 준비 전이다.
+  Future<MealFeedback> replaceSuggestion(
+    String mealId, {
+    required String foodCardId,
+  }) async {
+    final result = await _client.put(
+      '/meals/$mealId/feedback/suggestions',
+      body: {'foodCardId': foodCardId},
+    );
     return MealFeedback.fromJson(result.dataMap);
   }
 

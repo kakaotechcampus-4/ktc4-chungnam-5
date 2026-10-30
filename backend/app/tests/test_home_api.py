@@ -555,6 +555,40 @@ def test_21_display_name_and_thumbnail_equal_get_meals(client, db):
     assert home_item["thumbnailUrl"] is not None
 
 
+def test_21_s3_thumbnail_is_presigned_and_equal_everywhere(client, db, monkeypatch):
+    """#21 의 S3 판 — `STORAGE_TYPE=s3` 이면 홈 · 목록 · 상세가 같은 사진의 presigned URL 을 낸다.
+
+    `/media/…` 가 하드코딩돼 있으면 업로드는 S3 로 가는데 화면엔 서버 경로가 나가 사진이 깨진다.
+    presigned URL 은 만들 때마다 서명 시각이 달라질 수 있어 쿼리 문자열은 비교하지 않는다.
+    """
+    from urllib.parse import urlparse
+
+    from moto import mock_aws
+
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("STORAGE_TYPE", "s3")
+    monkeypatch.setenv("S3_BUCKET", "glp1-media-test")
+    user = make_user(db)
+    meal = _meal(db, user, _at(D_DATE, 12))
+    db.execute(update(Meal).where(Meal.id == meal.id).values(image_key="meals/lunch-01.jpg"))
+    db.flush()
+    db.expire_all()
+
+    with mock_aws():
+        home_url = _home(client, user)["today"]["meals"][0]["thumbnailUrl"]
+        list_url = _meals_list_item(client, user, meal.id)["thumbnailUrl"]
+        detail_url = _data(
+            client.get(f"/api/v1/meals/{meal.id}", headers=_headers(user))
+        )["imageUrl"]
+
+    expected = ("https", "glp1-media-test.s3.ap-northeast-2.amazonaws.com", "/meals/lunch-01.jpg")
+    for url in (home_url, list_url, detail_url):
+        parsed = urlparse(url)
+        assert (parsed.scheme, parsed.netloc, parsed.path) == expected
+        assert "X-Amz-Signature=" in parsed.query
+
+
 def test_22_meal_without_photo_has_null_thumbnail(client, db):
     """#22: 사진이 없는(image_key NULL) 식사의 thumbnailUrl 은 null 이다."""
     user = make_user(db)

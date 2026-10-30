@@ -19,6 +19,7 @@ from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import satiety as satiety_crud
 from app.crud import user as user_crud
+from app.infra.storage import build_file_storage
 from app.models.enums import MealType, SafetyStatus
 from app.models.feedback import MealFeedback
 from app.schemas.home import HomeMeal, HomeMedication, HomeResponse, HomeStomach, HomeToday
@@ -55,10 +56,10 @@ def _build_scores(
 
 def _build_thumbnail_url(image_key: str | None) -> str | None:
     # services/meal.py 의 _build_thumbnail_url 과 같은 규칙 — services 끼리 import 하지 않는다.
-    # 그쪽이 presigned URL 로 바뀌면 여기도 같이 바꾼다 (test_home_api.py #21 이 GET /meals 와 비교한다).
+    # 주소 규칙은 저장소 한 곳에 있어 둘이 어긋나지 않는다 (test_home_api.py #21 이 GET /meals 와 비교한다).
     if image_key is None:
         return None
-    return f"/media/{image_key}"
+    return build_file_storage().client_url(image_key)
 
 
 def _safe_feedback_body(feedback: MealFeedback | None) -> str | None:

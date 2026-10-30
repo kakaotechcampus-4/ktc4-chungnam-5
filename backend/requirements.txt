@@ -18,6 +18,11 @@ httpx==0.28.1
 # POST /meals 멀티파트(사진 업로드) 파싱
 python-multipart==0.0.20
 
+# 사진 저장소 S3 (infra/storage.py::S3Storage). 자격 증명은 EC2 인스턴스 역할에서 받는다
+boto3==1.43.93
+
 # 테스트
 pytest==9.1.1
 testcontainers[postgres]==4.15.0
+# 가짜 S3 (test_storage.py) — 실제 AWS 없이 boto3 코드를 그대로 시험한다
+moto[s3]==5.2.4
