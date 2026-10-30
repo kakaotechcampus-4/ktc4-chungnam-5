@@ -23,7 +23,6 @@ services 로 환산하고, crud 로 저장한다.
 
 API 요청 없이 시간이 트리거하는 일이다. 큐를 거치지 않는다.
 
-    매일      그날 meal_feedbacks 를 모아 daily_feedbacks 생성
     주간·월간  daily_feedbacks 를 모아 long_term_feedbacks 생성
     주기적    개인 baseline 재계산 (users.baseline_meal_kcal, D7)
     주기적    ANALYZING 인 채 오래된 식사를 FAILED 로 정리

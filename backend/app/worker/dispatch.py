@@ -25,8 +25,8 @@
 
 ## 피드백 셋을 한 타입으로 묶지 않는다
 
-AI 쪽은 끼니와 하루를 같은 `/short-feedback` 으로 받는다 — AI 가 하는 일이 같기 때문이다.
-하지만 Worker 는 다르다. 모으는 데이터도 쓰는 테이블도 셋이 전부 다르다.
+끼니와 장기는 모으는 데이터도 쓰는 테이블도 다르다. 하루 피드백은 따로 작업을 두지
+않는다 — `feedback.meal` 이 끼니 피드백을 쓰면서 그날 하루 행도 upsert 한다.
 
 묶으면 `type` 이 정보를 거의 담지 못하고 진짜 구분자가 본문 안에 숨는다. DLQ 분류도
 쓸모가 없어진다 — "feedback 10건 실패" 보다 "feedback.long 10건 실패" 가 훨씬 낫다.
@@ -35,11 +35,10 @@ AI 쪽은 끼니와 하루를 같은 `/short-feedback` 으로 받는다 — AI �
 from __future__ import annotations
 
 from app.worker.job import Job
-from app.worker.jobs import analyze_meal, chat_reply, feedback_daily, feedback_long, feedback_meal
+from app.worker.jobs import analyze_meal, chat_reply, feedback_long, feedback_meal
 
 _JOBS: dict[str, Job] = {
     "meal.analyze": analyze_meal.JOB,
-    "feedback.daily": feedback_daily.JOB,
     "feedback.meal": feedback_meal.JOB,
     "feedback.long": feedback_long.JOB,
     "chat.reply": chat_reply.JOB,

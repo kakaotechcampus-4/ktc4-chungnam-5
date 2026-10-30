@@ -8,15 +8,14 @@
 
 이 작업은 **확인 API(`POST /meals/{mealId}/confirm`)가 큐에 넣는다** — 채점과 같은
 트랜잭션이다(`services/evaluation/__init__.py::confirm`). 제안 화면을 열 때 넣지 않는
-이유는 하루 피드백이 끼니 피드백을 근거로 쓰기 때문이다 — 화면을 안 연 끼니가 하루
-요약에서 조용히 빠진다(`crud/daily_feedback.py::list_day_evidence`).
+이유는 하루 피드백이 끼니 피드백으로 채워지기 때문이다(6) — 화면을 안 연 끼니가 하루
+요약에서 조용히 빠진다.
 
 BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ShortFeedbackRequest` · `ShortFeedbackResponse` 다.
 
 **끼니 피드백은 그날 앞 끼니를 누적한 문장이다.** AI 가 아침 피드백을 토대로 점심을,
 아침+점심을 토대로 저녁을 쓴다. 그래서 가장 최근 끼니 피드백이 곧 그날의 하루 피드백이다 —
-쓸 때마다 `daily_feedbacks` 에도 upsert 한다(6). `feedback.daily` 를 따로 돌리지 않아도
-하루 피드백이 채워진다.
+쓸 때마다 `daily_feedbacks` 에도 upsert 한다(6). 하루 피드백을 만드는 곳은 여기뿐이다.
 
 순서 (load 1~3 전반 · call_ai 3 · apply 4~6):
   1. 식사를 읽는다. 없거나 지워졌거나 확정 상태가 아니면 AI 를 부르지 않고 끝낸다
@@ -67,13 +66,12 @@ def _number(value: Decimal | int | None) -> float | None:
 
 def _kst_day_range(day: date) -> tuple[datetime, datetime]:
     """KST 하루 [00:00, 다음날 00:00). eaten_at 은 UTC 로 저장되므로 UTC 날짜로 자르지 않는다."""
-    # jobs/feedback_daily.py 의 _kst_day_range 와 같은 규칙 — 같은 하루 행을 두 작업이 쓴다.
     start = datetime.combine(day, time.min, tzinfo=KST)
     return start, start + timedelta(days=1)
 
 
 def _round_or_none(value: Decimal | None) -> int | None:
-    # Python round(은행가 반올림) — jobs/feedback_daily.py 의 _average 와 같은 규칙.
+    # Python round(은행가 반올림) — services/dashboard.py 의 _round_or_none 과 같은 규칙.
     return None if value is None else round(value)
 
 
@@ -87,9 +85,9 @@ def _upsert_daily(
 ) -> uuid.UUID:
     """이 끼니 피드백을 그날 하루 피드백에 반영한다. 행 id 를 돌려준다.
 
-    점수는 판정과 무관하게 그날 평균으로 덮는다 — Rule Engine 결과라 하루 조회가 BLOCKED 여도
-    내보낸다. 문장은 SAFE 일 때만 덮고 근거 링크를 더한다. SAFE 가 아닌 문장으로 덮으면
-    하루 조회가 요약을 숨겨(services/daily_feedback.py) 앞 끼니까지의 멀쩡한 요약이 사라진다.
+    점수는 판정과 무관하게 그날 평균으로 덮는다 — Rule Engine 결과라 판정과 상관없이
+    쓴다. 문장은 SAFE 일 때만 덮고 근거 링크를 더한다. SAFE 가 아닌 문장으로 덮으면 앞
+    끼니까지의 멀쩡한 요약이 사라진다 — 장기 피드백은 SAFE 하루 요약만 근거로 쓴다.
     """
     feedback_date = meal.eaten_at.astimezone(KST).date()
     range_start, range_end = _kst_day_range(feedback_date)
