@@ -1,0 +1,28 @@
+{
+  "scope": "MEAL",
+  "userId": "manual-user",
+  "mealId": "manual-meal",
+  "stage": "MAINTENANCE",
+  "qqs": {"quantity": 100, "quality": 62, "satiety": 68},
+  "items": [
+    {
+      "displayName": "참치김밥",
+      "amount": 1,
+      "unit": "줄",
+      "nutrition": {"kcal": 450, "proteinG": 15, "fatG": 12, "carbG": 70, "fiberG": 2, "sodiumMg": 890}
+    },
+    {
+      "displayName": "라면",
+      "amount": 0.5,
+      "unit": "개",
+      "nutrition": {"kcal": 250, "proteinG": 5, "fatG": 8, "carbG": 40, "fiberG": 1.1, "sodiumMg": 900}
+    }
+  ],
+  "satiety": {
+    "beforePct": 20,
+    "afterPct": 55,
+    "checkins": [{"checkinOffsetHours": 2, "satietyPct": 25}],
+    "hungerReturnMinutes": 110,
+    "userComment": "점심은 편의점에서 먹었어요."
+  }
+}

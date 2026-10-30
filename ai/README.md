@@ -103,3 +103,23 @@ pytest
 ## 참고
 
 - 개발 규칙: [`../CLAUDE.md`](../CLAUDE.md)
+
+## short-feedback 연결 상태
+
+- `short_feedback.py`가 영양 판정 → scope별 system/user 메시지 → reasoning 게이트웨이 호출 → 응답 파싱을 맡는다.
+- `food_analyzer.py`와 같이 `config.get_settings()`와 `httpx.AsyncClient`를 사용한다.
+  `LLM_REASONING_URL` 뒤에 `/v1/chat/completions`를 붙이고 OpenAI 호환 `messages`를 전송한다.
+  2026-10-30 선택한 reasoning 엔드포인트에서 실제 끼니 피드백 생성·파싱을 확인했다.
+  다른 모델 엔드포인트의 호환성, 다양한 입력의 품질과 BE 연동은 별도 검증 대상이다.
+- HTTP 오류·전송 오류는 `LLM_MAX_RETRIES`만큼 추가 호출한다. 응답 형식 오류는 내부 재호출하지 않는다.
+  최종 타임아웃은 API 504, 그 외 모델 호출·응답 오류는 502로 반환해 BE 워커가 실패를 처리하게 한다.
+  오류 응답에는 게이트웨이 주소·키·모델 원문을 포함하지 않는다.
+- `main.py`가 `modelVersion=reasoning-gateway`와 `safetyStatus`를 붙인다.
+  모델 버전 라벨은 실제 모델 식별자가 아니며 모델 선택은 설정 URL이 담당한다.
+- `safety_guard.py`는 입력 기록과 출력(body·reasoning·추천)의 명시적인 약물 용량 변경·복용 지시,
+  일부 질병 단정 표현을 검사한다. 감지 시 원문·추천을 제거하고 `BLOCKED` 상담 안내를 반환한다.
+  입력 차단 시 모델을 호출하지 않는다. 정규식 기반 최소 규칙으로 우회 표현·모든 의료 판단을 포괄하지 못하며,
+  의료 내용을 서술한 기록도 보수적으로 차단할 수 있다.
+- 자동 테스트는 실제 과금 호출 없이 HTTP 전송을 모킹한다. 실행: `cd ai && python -m pytest -q`.
+- JSON을 편집해 실제 모델의 중간 과정·피드백을 확인하려면 [수동 품질 테스트 도구](manual_feedback/README.md)를 사용한다.
+  실험 결과와 `.env`는 커밋하지 않는다.
