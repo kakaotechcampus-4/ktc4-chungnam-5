@@ -133,9 +133,9 @@ def upsert(
     user_id: uuid.UUID,
     feedback_date: date,
     summary: str | None,
-    quantity_score: int,
-    quality_score: int,
-    satiety_score: int,
+    quantity_score: int | None,
+    quality_score: int | None,
+    satiety_score: int | None,
     model_version: str | None,
     safety_status: SafetyStatus,
 ) -> uuid.UUID:
@@ -146,6 +146,8 @@ def upsert(
     `ON CONFLICT DO UPDATE` 는 SQLAlchemy 의 `onupdate` 를 타지 않으므로 SET 에 직접 넣는다.
 
     `ON CONFLICT` 한 문장이다 — 같은 날 작업이 둘 겹쳐도 무결성 위반으로 죽지 않는다.
+
+    점수가 None 이면 그날 그 축을 채점한 끼니가 없다는 뜻이다 (`day_score_averages`).
     """
     values = {
         "summary": summary,
@@ -165,6 +167,53 @@ def upsert(
     daily_feedback_id = db.execute(stmt).scalar_one()
     db.flush()
     return daily_feedback_id
+
+
+def day_score_averages(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    range_start: datetime,
+    range_end: datetime,
+) -> Row:
+    """그날([range_start, range_end), KST 하루 경계) 채점된 끼니의 축별 Q/Q/S 평균.
+
+    행은 (quantity, quality, satiety) — 각각 Decimal 이거나, 그 축을 채점한 끼니가 없으면 None.
+    `AVG` 는 NULL 을 건너뛴다 — 채점 못 한 축을 0 으로 세지 않는다. 지워진 식사는 뺀다.
+    `list_day_evidence` 와 달리 끼니 피드백의 safety_status 는 보지 않는다 — 점수는 AI 가 쓴
+    문장이 아니라 Rule Engine 결과다.
+    """
+    stmt = (
+        select(
+            func.avg(QQSEvaluation.quantity_score).label("quantity"),
+            func.avg(QQSEvaluation.quality_score).label("quality"),
+            func.avg(QQSEvaluation.satiety_score).label("satiety"),
+        )
+        .join(Meal, Meal.id == QQSEvaluation.meal_id)
+        .where(
+            Meal.user_id == user_id,
+            Meal.deleted_at.is_(None),
+            Meal.eaten_at >= range_start,
+            Meal.eaten_at < range_end,
+        )
+    )
+    return db.execute(stmt).one()
+
+
+def add_source(
+    db: Session, *, daily_feedback_id: uuid.UUID, meal_feedback_id: uuid.UUID
+) -> None:
+    """근거 링크 하나를 더한다. 이미 있으면 아무 일도 없다. flush 까지만.
+
+    끼니 피드백이 그날 앞 끼니들을 누적해 쓴 문장이라 링크도 지우지 않고 쌓는다.
+    같은 끼니가 다시 돌아도(재확정·재시도) PK 에 걸려 깨지지 않게 `ON CONFLICT DO NOTHING`.
+    """
+    db.execute(
+        pg_insert(DailyFeedbackSource)
+        .values(daily_feedback_id=daily_feedback_id, meal_feedback_id=meal_feedback_id)
+        .on_conflict_do_nothing()
+    )
+    db.flush()
 
 
 def replace_sources(

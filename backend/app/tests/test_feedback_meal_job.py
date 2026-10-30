@@ -6,6 +6,7 @@
   - AI 가 준 safetyStatus 를 SAFE 로 올리는 것 (규칙 1)
   - 낡은 작업(삭제·재계산 중인 식사)에 AI 를 부르거나 옛 문장을 쓰는 것
   - 워커 안에서 커밋하는 것 — 큐가 DONE 과 함께 커밋해야 실패 시 통째로 롤백된다
+  - 하루 피드백 upsert 를 UTC 날짜로 하거나, 검수 안 된(SAFE 아닌) 문장으로 덮는 것
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -24,9 +25,11 @@ from app.crud import satiety as satiety_crud
 from app.infra.queue import ClaimedTask
 from app.models.enums import MealStatus, MedicationStage, SafetyStatus
 from app.models.evaluation import QQSEvaluation
-from app.models.feedback import MealFeedback
+from app.models.feedback import DailyFeedback, DailyFeedbackSource, MealFeedback
 from app.models.meal import Meal, SatietyLog
 from app.tests.factories import (
+    EATEN_AT,
+    make_daily_feedback,
     make_food_ref,
     make_meal,
     make_meal_feedback,
@@ -148,6 +151,29 @@ def _only_row(db, meal_id: uuid.UUID) -> MealFeedback:
     return rows[0]
 
 
+def _dailies(db, user_id: uuid.UUID) -> list[DailyFeedback]:
+    db.expire_all()
+    return list(
+        db.execute(select(DailyFeedback).where(DailyFeedback.user_id == user_id)).scalars()
+    )
+
+
+def _only_daily(db, user_id: uuid.UUID) -> DailyFeedback:
+    rows = _dailies(db, user_id)
+    assert len(rows) == 1
+    return rows[0]
+
+
+def _source_ids(db, daily_feedback_id: uuid.UUID) -> set[uuid.UUID]:
+    return set(
+        db.execute(
+            select(DailyFeedbackSource.meal_feedback_id).where(
+                DailyFeedbackSource.daily_feedback_id == daily_feedback_id
+            )
+        ).scalars()
+    )
+
+
 def _soft_delete(db, meal_id: uuid.UUID) -> None:
     db.execute(update(Meal).where(Meal.id == meal_id).values(deleted_at=datetime.now(UTC)))
 
@@ -180,7 +206,12 @@ def test_returns_ids_and_counts_only(db):
     result = run(db, _task(meal.id), FakeAi())
 
     row = _only_row(db, meal.id)
-    assert result == {"mealFeedbackId": str(row.id), "suggestionCount": 1}
+    daily = _only_daily(db, user.id)
+    assert result == {
+        "mealFeedbackId": str(row.id),
+        "dailyFeedbackId": str(daily.id),
+        "suggestionCount": 1,
+    }
 
 
 def test_rerun_overwrites_the_same_row(db):
@@ -501,6 +532,150 @@ def test_unsafe_result_is_stored_as_is(db, status):
     run(db, _task(meal.id), FakeAi(safety_status=status))
 
     assert _only_row(db, meal.id).safety_status == SafetyStatus(status)
+
+
+# ─────────────────────────── 하루 피드백 upsert ───────────────────────────
+
+
+def test_meal_feedback_is_upserted_into_daily_feedback(db):
+    """끼니 피드백이 그날(KST) 하루 피드백이 된다 — AI 가 그날 앞 끼니를 누적해 쓴 문장이다."""
+    user = make_user(db)
+    meal = _evaluated_meal(db, user, scores=(80, 60, 70))
+
+    run(db, _task(meal.id), FakeAi(body="누적 본문", model_version="stub-short-9"))
+
+    daily = _only_daily(db, user.id)
+    assert daily.feedback_date == date(2026, 8, 22)
+    assert daily.summary == "누적 본문"
+    assert daily.model_version == "stub-short-9"
+    assert daily.safety_status == SafetyStatus.SAFE
+    assert (daily.quantity_score, daily.quality_score, daily.satiety_score) == (80, 60, 70)
+    assert _source_ids(db, daily.id) == {_only_row(db, meal.id).id}
+
+
+def test_next_meal_overwrites_the_same_daily_row(db):
+    """같은 날 다음 끼니는 같은 행을 덮는다 — 문장은 최신 것, 근거 링크는 쌓인다."""
+    user = make_user(db)
+    breakfast = _evaluated_meal(db, user, scores=(80, 60, 70))
+    lunch = _evaluated_meal(db, user, scores=(60, 90, 50))
+
+    run(db, _task(breakfast.id), FakeAi(body="아침"))
+    first_id = _only_daily(db, user.id).id
+    run(db, _task(lunch.id), FakeAi(body="아침+점심"))
+
+    daily = _only_daily(db, user.id)
+    assert daily.id == first_id
+    assert daily.summary == "아침+점심"
+    assert _source_ids(db, daily.id) == {
+        _only_row(db, breakfast.id).id,
+        _only_row(db, lunch.id).id,
+    }
+
+
+def test_daily_scores_are_the_day_average(db):
+    """점수는 그날 채점된 끼니의 평균이다. 채점 못 한 축(NULL)은 평균에서 빠진다."""
+    user = make_user(db)
+    _evaluated_meal(db, user, scores=(80, None, 70))
+    meal = _evaluated_meal(db, user, scores=(61, 90, None))
+
+    run(db, _task(meal.id), FakeAi())
+
+    daily = _only_daily(db, user.id)
+    # 141 / 2 = 70.5 → 은행가 반올림 70
+    assert (daily.quantity_score, daily.quality_score, daily.satiety_score) == (70, 90, 70)
+
+
+def test_axis_unscored_all_day_stays_null(db):
+    user = make_user(db)
+    meal = _evaluated_meal(db, user, scores=(None, None, 68))
+
+    run(db, _task(meal.id), FakeAi())
+
+    daily = _only_daily(db, user.id)
+    assert daily.quantity_score is None
+    assert daily.quality_score is None
+    assert daily.satiety_score == 68
+
+
+def test_daily_scores_ignore_deleted_other_day_and_other_user_meals(db):
+    user = make_user(db)
+    other_user = make_user(db)
+    meal = _evaluated_meal(db, user, scores=(50, 50, 50))
+    deleted = _evaluated_meal(db, user, scores=(100, 100, 100))
+    _soft_delete(db, deleted.id)
+    yesterday = make_meal(
+        db, user_id=user.id, eaten_at=datetime(2026, 8, 21, 3, 0, tzinfo=UTC),
+        status=MealStatus.EVALUATED,
+    )
+    make_qqs_evaluation(db, meal_id=yesterday.id, quantity_score=100, quality_score=100, satiety_score=100)
+    _evaluated_meal(db, other_user, scores=(100, 100, 100))
+
+    run(db, _task(meal.id), FakeAi())
+
+    daily = _only_daily(db, user.id)
+    assert (daily.quantity_score, daily.quality_score, daily.satiety_score) == (50, 50, 50)
+
+
+def test_daily_date_is_the_kst_day(db):
+    """UTC 2026-08-22 16:00 은 KST 08-23 01:00 이다 — UTC 날짜로 자르면 전날 요약을 덮는다."""
+    user = make_user(db)
+    meal = make_meal(
+        db, user_id=user.id, eaten_at=datetime(2026, 8, 22, 16, 0, tzinfo=UTC),
+        status=MealStatus.EVALUATED,
+    )
+    make_qqs_evaluation(db, meal_id=meal.id)
+
+    run(db, _task(meal.id), FakeAi())
+
+    assert _only_daily(db, user.id).feedback_date == date(2026, 8, 23)
+
+
+@pytest.mark.parametrize("status", ["BLOCKED", "REVIEW_REQUIRED"])
+def test_unsafe_meal_feedback_does_not_touch_daily(db, status):
+    """검수 안 된 문장으로 하루 피드백을 덮지 않는다 — 앞 끼니까지의 SAFE 요약이 남는다."""
+    user = make_user(db)
+    make_daily_feedback(db, user_id=user.id, feedback_date=EATEN_AT.date(), summary="아침까지")
+    meal = _evaluated_meal(db, user)
+
+    result = run(db, _task(meal.id), FakeAi(body="점심", safety_status=status))
+
+    daily = _only_daily(db, user.id)
+    assert daily.summary == "아침까지"
+    assert daily.safety_status == SafetyStatus.SAFE
+    assert _source_ids(db, daily.id) == set()
+    assert result["dailyFeedbackId"] is None
+
+
+def test_unsafe_meal_feedback_creates_no_daily_row(db):
+    user = make_user(db)
+    meal = _evaluated_meal(db, user)
+
+    run(db, _task(meal.id), FakeAi(safety_status="BLOCKED"))
+
+    assert _dailies(db, user.id) == []
+
+
+def test_skipped_task_does_not_touch_daily(db):
+    user = make_user(db)
+    meal = _evaluated_meal(db, user)
+    ai = FakeAi(on_call=lambda: _soft_delete(db, meal.id))
+
+    run(db, _task(meal.id), ai)
+
+    assert _dailies(db, user.id) == []
+
+
+def test_rerun_keeps_a_single_source_link(db):
+    """같은 끼니가 다시 돌아도 근거 링크는 하나다 — PK(daily, meal_feedback) 에 걸려 깨지지 않는다."""
+    user = make_user(db)
+    meal = _evaluated_meal(db, user)
+
+    run(db, _task(meal.id), FakeAi(body="A"))
+    run(db, _task(meal.id), FakeAi(body="B"))
+
+    daily = _only_daily(db, user.id)
+    assert daily.summary == "B"
+    assert _source_ids(db, daily.id) == {_only_row(db, meal.id).id}
 
 
 # ─────────────────────────── 낡은 작업 ───────────────────────────
