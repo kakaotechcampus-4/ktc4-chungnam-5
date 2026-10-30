@@ -69,14 +69,12 @@ def search_nutrition_candidates(
     밖의 별도 작업이고, 그때까지 FE 는 사용자가 다른 이름으로 다시 검색하거나
     직접 입력으로 넘어갈 수 있게 두어야 한다.
 
-    ## ⚠️ 같은 이름이 여러 건 나온다 — FE 가 구분해 보여줘야 한다
+    ## 같은 이름은 최대 두 건이다
 
-    공공 DB 에는 이름이 똑같고 성분이 다른 행이 흔하다(`김치찌개` 는 GENERAL 만
-    5건, `미역국` 14건의 열량이 7~450 kcal). 그게 애초에 이름 매칭이 포기하고
-    이 화면으로 넘어온 이유이므로 서버가 임의로 하나로 합치지 않는다
-    (`crud.food.find_unique_by_name` 참고). **후보 목록에 이름만 띄우면 사용자는
-    똑같은 줄 다섯 개를 보게 된다** — `nutrition.kcal` 을 함께 보여줘야 고를 수
-    있다. 그 값이 `servingSizeG` 기준량이라는 점도 함께 적어야 한다
+    공공 DB 의 동명 음식은 적재할 때 `(category, 이름)` 마다 평균으로 합쳐 두었다
+    (`crud.food.find_unique_by_name` 참고). 그래도 일반음식과 가공식품에 같은 이름이
+    한 건씩 있으면 두 줄이 나온다 — `nutrition.kcal` 을 함께 보여줘야 고를 수 있다.
+    그 값이 `servingSizeG` 기준량이라는 점도 함께 적어야 한다
     (`schemas.nutrition.FoodCandidate`).
 
     ## 인증 이음새를 타는 이유

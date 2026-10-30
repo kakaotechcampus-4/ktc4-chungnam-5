@@ -30,6 +30,7 @@
     부분 유니크라 먼저 닫아야 하는 것
       user_goal          진행 중 목표는 사용자당 하나 → close 먼저
       medication_record  effective_to IS NULL 인 행도 하나 → close 먼저
+      chat_conversation  closed_at IS NULL 인 대화도 하나 → close 먼저 (lock_user 로 줄 세운 뒤)
 
 ## meals 는 soft delete 다
 

@@ -65,10 +65,11 @@ def add_meal_item(
           → 사용자가 고르거나 직접 입력
           → PUT /meals/{mealId}/items/{itemId}/nutrition
 
-    이름 매칭을 일부러 좁게 잡았다 — 틀린 영양성분이 `food_ref_id` 로 박제돼
-    Q/Q/S 채점까지 흘러가는 것보다 비어 있는 편이 낫기 때문이다(`quality_score`
-    가 NULL 허용인 이유). 그래서 흔한 음식도 이 경로로 간다: 실측하면
-    `김치찌개` · `미역국` · `제육볶음` · `현미밥` 이 전부 여기 해당한다.
+    이름 매칭은 정규화한 이름이 **정확히 같을 때만** 건다 — 틀린 영양성분이
+    `food_ref_id` 로 박제돼 Q/Q/S 채점까지 흘러가는 것보다 비어 있는 편이 낫기
+    때문이다(`quality_score` 가 NULL 허용인 이유). 같은 이름의 여러 건은 적재할 때
+    평균으로 합쳐 두었으므로(`crud.food.find_unique_by_name`) 이 경로로 오는 건
+    공공 DB 에 그 이름이 없는 경우다.
 
     두 엔드포인트 모두 붙어 있다 — 이 파일의 `set_meal_item_nutrition` 과
     `endpoints/nutrition.py` 의 `search_nutrition_candidates` 다.
@@ -173,9 +174,10 @@ def update_meal_items(
     ## 이름이 바뀌거나 링크가 없을 때 공공 DB 를 다시 찾는다
 
     **이름이 그대로고 `food_ref_id` 가 이미 있으면** 그 링크를 지킨다. 이름 매칭
-    (`crud.food.find_unique_by_name`)은 일부러 보수적이라 `김치찌개` 같은 흔한
-    음식에 `None` 을 주는데, AI 가 `candidateFoodRefId` 로 정확히 연결해 둔 링크를
-    "250g → 220g" 같은 수정이 끊어 버리면 영양정보가 이유 없이 사라진다.
+    (`crud.food.find_unique_by_name`)은 정확히 같은 이름만 찾고 GENERAL 을 먼저
+    고르므로, AI 가 `candidateFoodRefId` 로 연결해 둔 링크(이름이 조금 다른 행이나
+    가공식품)와 다를 수 있다. "250g → 220g" 같은 수정이 그 링크를 바꾸거나 끊어
+    버리면 영양정보가 이유 없이 달라진다.
 
     **이름이 그대로여도 `food_ref_id` 가 NULL 이면 새로 찾은 결과를 건다.** AI 가
     후보를 주지 못했다는 뜻이고 이름 매칭은 워커가 쓰지 않는 별개의 신호라, 지킬
