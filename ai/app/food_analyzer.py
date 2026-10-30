@@ -48,6 +48,8 @@ async def _call_vision_model(image_url: str, prompt: str) -> str:
     - 응답은 OpenAI 호환 형식 — `choices[0].message.content`.
     """
     settings = get_settings()
+    if not settings.LLM_VISION_URL:
+        raise ValueError("음식 분석에는 LLM_VISION_URL 설정이 필요하다")
     endpoint = f"{settings.LLM_VISION_URL}/v1/chat/completions"
     headers = {"Authorization": f"Bearer {settings.LLM_API_KEY.get_secret_value()}"}
 
