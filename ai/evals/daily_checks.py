@@ -44,11 +44,15 @@ from evals.harness import Check, Verdict
 
 # 문장 하나 — 문장 끝(. ! ? 。)까지. 숫자 사이의 점("2.4g")은 소수점이라 문장을 나누지 않는다
 _SENTENCE = re.compile(r"(?:[^.!?。]|(?<=\d)\.(?=\d))+(?:[.!?。]+|$)")
+_WORD = re.compile(r"\w")
+
+# 이보다 짧은 절(음식 이름 · "든든했어요")은 베끼기 · 되풀이로 보지 않는다 (공백 · 문장부호를 지운 길이)
+_COPY_MIN = 8
 
 
 def _sentences(text: str) -> list[str]:
     """문장 목록 — 문장부호 · 공백만 남은 조각은 버린다. 마침표 없이 이어 쓴 문장은 한 문장이다."""
-    return [s.strip() for s in _SENTENCE.findall(text) if re.search(r"\w", s)]
+    return [s.strip() for s in _SENTENCE.findall(text) if _WORD.search(s)]
 
 
 # 끼니 → 그 끼니를 가리키는 낱말. "중식" 은 중국 음식과 겹쳐 넣지 않는다
@@ -125,21 +129,18 @@ def missing_meal_not_invented(resp: dict, model: ShortFeedbackRequest) -> Verdic
     - 비과거 절 — "저녁에 채소를 곁들이면 좋아요" 는 제안이다
     - 원문 문장이 `?` 로 끝나는 의문문 — "저녁은 어떻게 드셨나요?" 는 묻는 말이다
     """
-    missing = [(meal_type, words) for meal_type, words in _MEAL_WORDS.items() if meal_type not in _recorded(model)]
-    found: list[str] = []
-    for field, text in _texts(resp):
-        for sentence in _sentences(text):
-            if sentence.endswith("?"):
-                continue
-            for clause in _clauses(sentence):
-                if not _is_past(clause) or _UNCERTAIN.search(clause):
-                    continue
-                found += [
-                    f"{word} '{clause}'({field})"
-                    for _, words in missing
-                    for word in words
-                    if word in clause
-                ]
+    recorded = _recorded(model)
+    missing = [word for meal_type, words in _MEAL_WORDS.items() if meal_type not in recorded for word in words]
+    found = [
+        f"{word} '{clause}'({field})"
+        for field, text in _texts(resp)
+        for sentence in _sentences(text)
+        if not sentence.endswith("?")
+        for clause in _clauses(sentence)
+        if _is_past(clause) and not _UNCERTAIN.search(clause)
+        for word in missing
+        if word in clause
+    ]
     return _verdict("기록 없는 끼니를 단정", found)
 
 
@@ -183,18 +184,17 @@ def _daily_examples() -> list[str]:
     시제 음절(받침 ㅆ — 졌 · 었 · 했)을 떼서 "짧아졌어요" · "짧아져요" 같은 어미 변형도 같은 문장으로 본다.
     예시를 찾지 못하면 import 시점에 실패한다 — 판정이 조용히 공허해지지 않게 한다.
     """
-    found = re.findall(r"\(예:\s*([^)]+)\)", DAILY_SYSTEM_PROMPT)
-    if not found:
-        raise RuntimeError("DAILY_SYSTEM_PROMPT 에서 (예: …) 를 찾지 못했다 — daily_checks.example_no_leak 를 고친다")
     cores = []
-    for example in found:
+    for example in re.findall(r"\(예:\s*([^)]+)\)", DAILY_SYSTEM_PROMPT):
         core = re.sub(r"(?:습니다|니다|어요|아요|에요|예요|요|다)$", "", _squash(example))
-        if core and _is_past(core[-1]):
+        if _is_past(core[-1:]):
             core = core[:-1]
-        if len(core) >= 8:
+        if len(core) >= _COPY_MIN:
             cores.append(core)
     if not cores:
-        raise RuntimeError("DAILY_SYSTEM_PROMPT 의 예시가 비교하기에 너무 짧다 — daily_checks.example_no_leak 를 고친다")
+        raise RuntimeError(
+            "DAILY_SYSTEM_PROMPT 에서 비교할 (예: …) 문장을 찾지 못했다 — daily_checks.example_no_leak 를 고친다"
+        )
     return cores
 
 
@@ -217,9 +217,6 @@ def example_no_leak(resp: dict, req: dict) -> Verdict:
 
 # ─────────────────────────── 관측 (ambiguous) ───────────────────────────
 
-_REPEAT_MIN = 8  # 이보다 짧은 절(음식 이름 · "든든했어요")은 되풀이로 보지 않는다
-
-
 @_with_request
 def no_summary_repeat(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     """끼니 summary 를 되풀이하지 않았는가 (관측).
@@ -227,12 +224,12 @@ def no_summary_repeat(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     summary 를 절로 나눠 공백 · 문장부호를 지운 8자 이상 절이 body 에 그대로 들어 있으면 실패다.
     음식 이름만 겹치는 것("점심 순두부찌개 뒤로 …")은 되풀이가 아니다.
     """
-    bodies = [_squash(text) for text in _field_texts(resp, "body")]
+    body = _squash(" ".join(_field_texts(resp, "body")))
     found = [
         f"{meal.meal_type.value} '{clause}'"
         for meal in model.meals
         for clause in _clauses(meal.summary)
-        if len(squashed := _squash(clause)) >= _REPEAT_MIN and any(squashed in body for body in bodies)
+        if len(squashed := _squash(clause)) >= _COPY_MIN and squashed in body
     ]
     return _verdict("끼니 summary 를 되풀이", found)
 
@@ -241,11 +238,11 @@ def no_summary_repeat(resp: dict, model: ShortFeedbackRequest) -> Verdict:
 def meal_named(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     """어느 끼니 이야기인지 드러나는가 (관측) — body 가 기록된 끼니의 낱말을 하나 이상 짚었는가."""
     body = " ".join(_field_texts(resp, "body"))
-    recorded = [meal_type for meal_type in _MEAL_WORDS if meal_type in _recorded(model)]
-    if any(word in body for meal_type in recorded for word in _MEAL_WORDS[meal_type]):
+    recorded = _recorded(model)
+    named = [words for meal_type, words in _MEAL_WORDS.items() if meal_type in recorded]
+    if any(word in body for words in named for word in words):
         return True, ""
-    names = ", ".join(_MEAL_WORDS[meal_type][0] for meal_type in recorded)
-    return False, f"body 가 기록된 끼니({names})를 짚지 않았다"
+    return False, f"body 가 기록된 끼니({', '.join(words[0] for words in named)})를 짚지 않았다"
 
 
 @_with_request
