@@ -45,6 +45,23 @@ ContractCheck = Callable[[int, object], Verdict]
 Grade = Literal["critical", "non_critical", "ambiguous"]
 
 
+class FactoryCheck:
+    """팩토리가 인자를 묶어 만드는 Check 의 공용 기반 — 같은 팩토리 · 같은 인자면 `==` 로 같은 값이다.
+
+    클로저는 호출마다 새 함수라 같은 라벨로 만든 `Case` 끼리도 `==` 가 거짓이 된다. 그래서 팩토리는 값을 돌려준다.
+    서브클래스는 판정 모듈에 `@dataclass(frozen=True)` 로 두고
+    - 판정에 쓰는 인자를 불변 필드(tuple · frozenset)로 받는다 — 팩토리가 생성 시점에 복사 · 정규화해 넘긴다
+    - `__name__` 을 클래스 속성으로 팩토리 이름에 맞춘다 — 빌더가 `check.__name__` 을 축 id 로 읽는다
+    - `__call__(resp, req) -> Verdict` 를 구현한다
+
+    `==` 는 dataclass 규칙대로 클래스가 같고 필드가 모두 같을 때만 참이다 — 다른 팩토리끼리는 인자가 같아도 다르다.
+    `__module__` 은 서브클래스를 정의한 판정 모듈이다. 해시는 요구하지 않는다(`Case.request` 가 dict 라 `Case` 도 해시 불가).
+    """
+
+    def __call__(self, resp: dict, req: dict) -> Verdict:
+        raise NotImplementedError(f"{type(self).__qualname__}.__call__ 미구현")
+
+
 @dataclass(frozen=True)
 class Observation:
     """한 회차의 응답. 하네스가 판정하는 단위다."""

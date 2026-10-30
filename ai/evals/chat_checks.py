@@ -14,7 +14,8 @@ import 시점에는 계약을 읽지 않는다 — 판정이 처음 필요할 �
 (`_kept_cards` — BE `parse_suggestions` + `chat_reply.apply` 의 거르기)만 본다(결정 H).
 
 질문별 기대값(회피 음식 · 카드 기대 여부)은 요청 JSON 에 실을 수 없어(계약 밖 필드)
-팩토리가 클로저로 묶은 Check 를 만든다. 팩토리가 만든 Check 의 이름은 팩토리 이름과 같다 — 축 id 가 된다.
+팩토리가 기대값을 묶은 값 Check(`harness.FactoryCheck`)를 만든다 — 같은 인자로 만든 Check 는 `==` 로 같다.
+팩토리가 만든 Check 의 이름은 팩토리 이름과 같다 — 축 id 가 된다.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ import itertools
 import re
 import sys
 from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -47,7 +49,7 @@ from evals.checks import (
     _verdict,
 )
 from evals.checks import no_medical_judgement as _meal_no_medical_judgement
-from evals.harness import Check, Verdict, redact
+from evals.harness import Check, FactoryCheck, Verdict, redact
 
 AI_STUB_SCHEMAS: Path = Path(__file__).resolve().parents[2] / "ai-stub" / "schemas.py"
 """BE ↔ AI 계약의 정본. 사본을 두지 않고 이 파일을 읽는다 — 파일이 없으면 조용히 넘어가지 않는다."""
@@ -444,21 +446,26 @@ def _cards(resp: object) -> list[dict[str, Any]]:
     return _kept_cards(resp.get("foodCards")) if isinstance(resp, dict) else []
 
 
+@dataclass(frozen=True)
+class _CardWhenRecommend(FactoryCheck):
+    __name__ = "card_when_recommend"
+    expect_cards: bool
+
+    def __call__(self, resp: dict, req: dict) -> Verdict:
+        count = len(_cards(resp))
+        if self.expect_cards and not 1 <= count <= 3:
+            return False, f"추천 요청인데 카드 {count}장 (1~3장이어야 한다)"
+        if not self.expect_cards and count:
+            return False, f"일반 질문인데 카드 {count}장 (0장이어야 한다)"
+        return True, ""
+
+
 def card_when_recommend(expect_cards: bool) -> Check:
     """추천 요청(`expect_cards=True`)엔 카드 1~3장, 일반 질문엔 0장인가를 판정하는 Check 를 만든다.
 
     BE 가 버릴 카드(공백 이름 · 긴 이름 · 깨진 원소)는 세지 않는다 — 사용자에게 안 보인다(결정 H).
     """
-
-    def card_when_recommend(resp: dict, req: dict) -> Verdict:
-        count = len(_cards(resp))
-        if expect_cards and not 1 <= count <= 3:
-            return False, f"추천 요청인데 카드 {count}장 (1~3장이어야 한다)"
-        if not expect_cards and count:
-            return False, f"일반 질문인데 카드 {count}장 (0장이어야 한다)"
-        return True, ""
-
-    return card_when_recommend
+    return _CardWhenRecommend(expect_cards)
 
 
 # 이름 끝의 1회분 표현 — "연두부 반 모" · "두부 100g" · "쌈채소 한 접시"
@@ -505,16 +512,14 @@ def replace_differs(resp: dict, model: Any) -> Verdict:
     return _verdict("현재 추천과 같은 음식", same)
 
 
-def history_respected(avoided: Sequence[str]) -> Check:
-    """이전 턴에서 싫다고 한 음식(`avoided`)을 카드로 추천하지 않았는가를 판정하는 Check 를 만든다.
+@dataclass(frozen=True)
+class _HistoryRespected(FactoryCheck):
+    __name__ = "history_respected"
+    keys: tuple[str, ...]
+    """`_name_key` 한 회피 음식 — 빈 키는 뺐다."""
 
-    카드 이름만 본다 — 본문에서 "시금치 말고" 라고 말하는 것은 추천이 아니다. 공백을 지우고 부분 문자열로 비교한다
-    ("시금치나물" · "시금치 된장국"). 카드가 없으면 실패다(결정 L).
-    """
-    keys = [key for food in avoided if (key := _name_key(food))]
-
-    def history_respected(resp: dict, req: dict) -> Verdict:
-        if not keys:
+    def __call__(self, resp: dict, req: dict) -> Verdict:
+        if not self.keys:
             return False, "회피 음식 목록이 비어 있다 — 판정 불가"
         cards = _cards(resp)
         if not cards:
@@ -522,11 +527,18 @@ def history_respected(avoided: Sequence[str]) -> Check:
         hits = [
             card["foodName"]
             for card in cards
-            if (name := _name_key(card["foodName"])) and any(key in name for key in keys)
+            if (name := _name_key(card["foodName"])) and any(key in name for key in self.keys)
         ]
         return _verdict("싫다고 한 음식을 추천", hits)
 
-    return history_respected
+
+def history_respected(avoided: Sequence[str]) -> Check:
+    """이전 턴에서 싫다고 한 음식(`avoided`)을 카드로 추천하지 않았는가를 판정하는 Check 를 만든다.
+
+    카드 이름만 본다 — 본문에서 "시금치 말고" 라고 말하는 것은 추천이 아니다. 공백을 지우고 부분 문자열로 비교한다
+    ("시금치나물" · "시금치 된장국"). 카드가 없으면 실패다(결정 L).
+    """
+    return _HistoryRespected(tuple(key for food in avoided if (key := _name_key(food))))
 
 
 # ─────────────────────────── 관측 ───────────────────────────
