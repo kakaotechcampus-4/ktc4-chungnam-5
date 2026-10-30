@@ -3,8 +3,8 @@
 모델 · 키 · 외부 네트워크 없음. 테스트 이름의 `r<번호>` 는 계획 §14 명세표 행 번호다.
 
 - 행 44–49 는 `build_cases` 에 **테스트 안에서 만든 라벨**을 넘긴다(실제 `LABELS` 와 무관).
-- 행 50–52 는 실제 `LABELS` · `CASES` · `FIXTURE_DIR` 를 쓴다. 행 51 · 52 는 `LABELS` 가 비면 공허 통과한다 —
-  의도다. 팀원이 첫 사진과 함께 "LABELS 비지 않음" 가드를 추가한다(ⓒ-2 첫 RED).
+- 행 50–52 는 실제 `LABELS` · `CASES` · `FIXTURE_DIR` 를 쓴다. 행 51 · 52 는 `LABELS` 를 돌며 검사하므로
+  `LABELS` 가 비면 공허 통과한다 — 행 51a 가 `LABELS` 가 비지 않음을 막는다.
 - 행 54–59 는 `main()` 을 부른다. **실제 `.env` 를 읽지 않는다** — 모든 테스트에서 `app.config.get_settings` ·
   `app.food_analyzer.get_settings` 를 "부르면 실패" 로 바꿔 두고(autouse), 필요한 테스트만 가짜 설정으로 덮는다.
   같은 autouse 가 작업 디렉터리를 `tmp_path` 로 옮긴다 — `Settings()` 를 직접 만들어도 cwd 기준 `ai/.env` 를 못 읽는다.
@@ -562,19 +562,120 @@ def test_r49c_valid_words_build_a_case_with_their_factory_axis(key, value, axis_
 # ─────────────────────────── 실데이터 (LABELS · CASES · FIXTURE_DIR) ───────────────────────────
 
 
+def _label_words(*labels: dict) -> list[str]:
+    """라벨들의 `required` 동의어 · `non_foods` · `forbidden` 단어 전부 (정렬 · 중복 제거).
+
+    비교하는 **두 쪽 라벨 모두**에서 뽑는다 — 한쪽에만 있는 단어가 프로브에 없으면 그 차이를 못 본다.
+    """
+    words: set[str] = set()
+    for label_map in labels:
+        for label in label_map.values():
+            for group in label.get("required", []):
+                words.update(group)
+            words.update(label.get("non_foods", []))
+            words.update(label.get("forbidden", []))
+    return sorted(words)
+
+
+def _probes(words: list[str]) -> list[dict]:
+    """판정 비교용 프로브 응답 — 빈 items 하나 + 단어마다 그 단어 이름의 항목 하나."""
+    return [_resp(), *(_resp(_item(word)) for word in words)]
+
+
+def _shape(case: Case) -> tuple:
+    """함수 객체를 뺀 케이스 구조 — 축은 (id, 등급, pass_ratio) 만 본다."""
+    return (
+        case.id,
+        case.path,
+        case.request,
+        case.contract,
+        case.n,
+        [(axis.id, axis.grade, axis.pass_ratio) for axis in case.axes],
+    )
+
+
+def _case_differences(left: tuple[Case, ...], right: tuple[Case, ...], words: list[str]) -> list[str]:
+    """두 케이스 목록의 차이 — 빈 목록이면 "같음".
+
+    구조(`_shape`)가 같고, 같은 자리의 축마다 프로브 응답(`_probes(words)`)에 같은 `(통과?, note)` 를 내야 같다.
+    팩토리 축(`no_missing_food` · `no_phantom_food` · `standard_name`)은 부를 때마다 새 클로저라 함수 객체로는
+    같은 라벨끼리도 다르다 — 함수 객체 · 클로저 셀이 아니라 판정 결과로 라벨 값이 같게 묶였는지 본다.
+    """
+    if len(left) != len(right):
+        return [f"케이스 수 {len(left)} != {len(right)}"]
+    probes = _probes(words)
+    differences: list[str] = []
+    for a, b in zip(left, right):
+        if _shape(a) != _shape(b):
+            differences.append(f"{a.id} / {b.id}: 구조가 다르다")
+            continue
+        for axis_a, axis_b in zip(a.axes, b.axes):
+            for probe in probes:
+                verdict_a = axis_a.check(probe, a.request)
+                verdict_b = axis_b.check(probe, b.request)
+                if verdict_a != verdict_b:
+                    differences.append(f"{a.id}.{axis_a.id} {probe['items']}: {verdict_a} != {verdict_b}")
+    return differences
+
+
 def test_r50_empty_labels_give_no_cases_and_cases_follow_labels():
-    """행 50 — `build_cases({})` 는 빈 튜플이고, 모듈의 `CASES` 는 `build_cases(LABELS)` 와 같다.
+    """행 50 — `build_cases({})` 는 빈 튜플이고, 모듈의 `CASES` 는 `build_cases(LABELS)` 와 같은 구조 · 같은 판정이다.
 
     `CASES` 를 손으로 따로 두면 라벨을 고쳐도 케이스가 바뀌지 않는다 — 라벨이 유일한 입력이어야 한다.
+    팩토리 축은 부를 때마다 새 클로저라 `Case` 의 `==` 로는 같은 라벨끼리도 다르다 — 구조와 프로브 판정으로 비교한다
+    (비교 helper 자체의 양방향은 행 50b · 50c).
+    프로브 단어는 `LABELS` 쪽에서만 뽑는다(`CASES` 쪽 값은 클로저 안에 있다) — 단어의 교체 · 제거 · 케이스 사이 이동은
+    잡지만, `CASES` 쪽에만 단어를 더 묶은 경우(상위집합)는 프로브에 그 단어가 없어 보지 못한다.
     """
     assert build_cases({}) == ()
-    assert analyze_meal_eval.CASES == build_cases(analyze_meal_eval.LABELS)
+
+    words = _label_words(analyze_meal_eval.LABELS)
+    differences = _case_differences(analyze_meal_eval.CASES, build_cases(analyze_meal_eval.LABELS), words)
+
+    assert differences == []
+
+
+# 행 50b — `_HANSANG_LABEL` 에서 팩토리 라벨 값 하나만 바꾼 변형
+_R50B_VARIANTS = [
+    ("r50b-required", "required", [["밥", "쌀밥", "흰쌀밥"], ["김치찌개"]]),
+    ("r50b-non-foods", "non_foods", ["그릇", "젓가락"]),
+    ("r50b-forbidden", "forbidden", ["청정원"]),
+]
+
+
+@pytest.mark.parametrize(
+    ("key", "value"), [(k, v) for _, k, v in _R50B_VARIANTS], ids=[i for i, _, _ in _R50B_VARIANTS]
+)
+def test_r50b_helper_sees_cases_differing_only_in_one_factory_label_value(key, value):
+    """행 50b — 비교 helper 는 팩토리 라벨 값(`required` · `non_foods` · `forbidden`) 하나만 다른 케이스를 다르다고 본다.
+
+    구조(id · 요청 · 축 id · 등급)는 같으므로 차이는 프로브 판정에서만 나와야 한다 — 행 50 이 축 id 만 보고
+    "같음" 이라 하면 라벨 값이 엉뚱하게 묶인 `CASES` 를 놓친다. 프로브 단어는 두 라벨 모두에서 뽑는다.
+    """
+    variant = {**_HANSANG_LABEL, key: value}
+    original_cases = build_cases({"hansang.jpg": _HANSANG_LABEL})
+    variant_cases = build_cases({"hansang.jpg": variant})
+    words = _label_words({"hansang.jpg": _HANSANG_LABEL}, {"hansang.jpg": variant})
+
+    assert [_shape(case) for case in original_cases] == [_shape(case) for case in variant_cases]
+    assert _case_differences(original_cases, variant_cases, words) != []
+
+
+def test_r50c_helper_sees_cases_built_twice_from_same_label_as_same():
+    """행 50c — 비교 helper 는 같은 라벨로 두 번 만든 케이스를 같다고 본다 — 행 50b 의 짝.
+
+    helper 가 늘 "다름" 이면 행 50 이 고칠 수 없는 빨강이 된다(새 클로저를 함수 객체로 비교하던 원래 결함).
+    """
+    labels = {"hansang.jpg": _HANSANG_LABEL}
+    words = _label_words(labels, labels)
+
+    assert _case_differences(build_cases(labels), build_cases(labels), words) == []
 
 
 def test_r51_every_labelled_fixture_exists_without_problems():
     """행 51 — `LABELS` 의 모든 파일이 `FIXTURE_DIR` 에 있고 `fixture_problems` 가 비어 있다 (없음 · 크기 · EXIF · 형식).
 
-    지금은 `LABELS` 가 비어 공허 통과한다 — 의도다. 팀원이 첫 사진과 함께 "LABELS 비지 않음" 가드를 추가한다.
+    `LABELS` 를 돌며 검사하므로 `LABELS` 가 비면 공허 통과한다 — 행 51a 가 `LABELS` 가 비지 않음을 막는다.
     """
     problems = [
         problem
@@ -585,12 +686,20 @@ def test_r51_every_labelled_fixture_exists_without_problems():
     assert problems == []
 
 
+def test_r51a_labels_are_not_empty():
+    """행 51a — 사진 라벨(`LABELS`)이 하나 이상 있다.
+
+    행 51(사진 존재 · 파일 검사) · 52(few-shot 겹침)는 `LABELS` 를 돌며 검사한다 — 라벨이 비면 아무것도 보지 않고 통과한다.
+    """
+    assert len(analyze_meal_eval.LABELS) >= 1
+
+
 def test_r52_required_synonyms_avoid_meal_few_shot_foods():
     """행 52 — `LABELS` 의 `required` 동의어에 MEAL few-shot 예시 음식(참치김밥 · 김밥 · 라면 · 삶은 달걀 · 방울토마토)이 없다.
 
     겹치면 예시를 베낀 답이 정답처럼 보인다. 금지어는 **단어 첫머리에서만** 찾는다(`test_eval_meal_cases.py` 와 같은 규칙) —
     매칭 규칙 자체를 먼저 확인한다(이 자기 검사는 지금도 실제로 돈다).
-    지금은 `LABELS` 가 비어 본 검사는 공허 통과한다 — 의도다. 팀원이 첫 사진과 함께 "LABELS 비지 않음" 가드를 추가한다.
+    본 검사는 `LABELS` 를 돌므로 `LABELS` 가 비면 공허 통과한다 — 행 51a 가 `LABELS` 가 비지 않음을 막는다.
     """
     # 매칭 규칙 자기 검사 — 단어 첫머리의 예시 음식은 잡고, 낱말 안쪽 · 다른 음식은 잡지 않는다
     assert _example_hits("라면") == ["라면"]
@@ -716,6 +825,63 @@ def test_r56_fixture_problem_exits_2_before_key_check_and_model_call(
 
     assert code == 2
     assert name in capsys.readouterr().out
+    assert model_posts == []
+
+
+def test_r56b_no_cases_exits_2_with_message(monkeypatch, capsys, valid_fixture, model_posts):
+    """행 56b — 케이스가 0개면(`CASES == ()`) 키가 있어도 `main([])` 은 문제를 출력하고 2(오용)로 끝난다.
+
+    0개로 돌리면 `0/0` 으로 게이트 PASS 가 찍힌다 — 아무것도 재지 않았는데 통과로 보인다.
+    문구는 단언하지 않는다(무엇이 문제인지 출력했는가만 본다).
+    """
+    _use_cases(monkeypatch, valid_fixture.dir)
+    monkeypatch.setattr(harness, "has_api_key", lambda: True)
+
+    code = main([])
+
+    assert code == 2
+    assert capsys.readouterr().out.strip() != ""
+
+
+def test_r56c_no_cases_save_does_not_write_baseline(monkeypatch, valid_fixture, model_posts, tmp_path):
+    """행 56c — 케이스가 0개면 `main(["--save", 경로])` 는 2 로 끝나고 baseline 파일을 만들지 않는다.
+
+    빈 baseline 이 저장되면 다음 비교가 "비교할 케이스 없음" 으로 조용히 통과한다.
+    """
+    _use_cases(monkeypatch, valid_fixture.dir)
+    monkeypatch.setattr(harness, "has_api_key", lambda: True)
+    saved = tmp_path / "b.json"
+
+    code = main(["--save", str(saved)])
+
+    assert code == 2
+    assert not saved.exists(), "케이스 0개인데 baseline 이 저장됐다"
+
+
+def _serve_forbidden(directory):
+    raise AssertionError("fixture 서버를 띄웠다 — 케이스 0개면 그 전에 끝나야 한다")
+
+
+def _cli_main_forbidden(*args, **kwargs):
+    raise AssertionError("harness.cli_main 에 위임했다 — 케이스 0개면 그 전에 끝나야 한다")
+
+
+@pytest.mark.parametrize("argv", [[], ["--only", "nope"]], ids=["r56d-no-args", "r56d-only-nope"])
+def test_r56d_no_cases_exits_before_key_check_server_and_cli(monkeypatch, valid_fixture, model_posts, argv):
+    """행 56d — 케이스가 0개면 인자와 무관하게 키 확인 · 서버 기동 · `cli_main` 위임 · 모델 POST 전에 2 로 끝난다.
+
+    셋 다 "불리면 AssertionError" 대역으로 바꾼다. 키 확인 뒤에 막으면 키 없는 PC 에서 SKIP(0) 으로 묻히고,
+    `--only` 해석(`cli_main`)에 맡기면 0개 문제가 "모르는 id" 로 보인다.
+    구현은 `harness.has_api_key` · `harness.cli_main` · `fixture_server.serve_fixtures` 를 호출 시점에 모듈 속성으로 참조해야 한다.
+    """
+    _use_cases(monkeypatch, valid_fixture.dir)
+    monkeypatch.setattr(harness, "has_api_key", _key_check_forbidden)
+    monkeypatch.setattr(harness, "cli_main", _cli_main_forbidden)
+    monkeypatch.setattr(fixture_server, "serve_fixtures", _serve_forbidden)
+
+    code = main(argv)
+
+    assert code == 2
     assert model_posts == []
 
 
