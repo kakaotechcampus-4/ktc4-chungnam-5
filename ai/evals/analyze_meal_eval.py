@@ -26,7 +26,35 @@ FIXTURE_DIR: Path = Path(__file__).resolve().parent / "fixtures" / "analyze_meal
 RULE_VERSION: str = "analyze-meal-labels-v1"
 """baseline 비교 조건. analyze-meal 은 BE 규칙 버전이 없어 라벨 · 판정을 바꾸면 이 값을 올린다."""
 
-LABELS: dict[str, dict] = {}
+LABELS: dict[str, dict] = {
+    "piece_of_pizza.jpg": {"meal_type": "DINNER", "unit": "gram"},
+    "whole_cake.jpg": {
+        "meal_type": "SNACK",
+        "unit": "natural",
+        "forbidden": ["투레쥬르", "tous les jours"],
+    },
+    "food_and_notfood.jpg": {
+        "meal_type": "DINNER",
+        "non_foods": ["나이프", "포크", "숟가락", "도마", "접시"],
+    },
+    "manybanchan.jpg": {
+        "meal_type": "DINNER",
+        # 2026-10-30 4회 실측 응답 기준(무피클을 깍두기로 잘못 라벨했던 걸 바로잡고,
+        # "불고기비빔밥"/"소불고기비빔밥" 양쪽으로 불리는 걸 확인해 동의어에 둘 다 추가):
+        # (소)불고기비빔밥·공깃밥/쌀밥·콩나물국·잡채·배추김치·양배추샐러드·브로콜리두부무침·
+        # 양념두부/연두부·미역초무침·무피클·더덕구이
+        "required": [
+            ["비빔밥", "불고기비빔밥", "소불고기비빔밥"],
+            ["콩나물국", "콩나물냉국"],
+            ["잡채"],
+            ["무피클", "깍두기", "무김치"],
+        ],
+    },
+    "branded_drinks.jpg": {"meal_type": "SNACK", "forbidden": ["모구모구", "mogu"]},
+    "nonfood.jpg": {"meal_type": "LUNCH", "empty": True},
+    "blurry.jpg": {"meal_type": "LUNCH", "empty": True},
+    "occludedfood.jpg": {"meal_type": "SNACK", "unit": "gram"},
+}
 """사진별 라벨. 키 = fixture 파일 이름. 팀원이 채운다 — 형식은 `evals/README.md`."""
 
 _PATH = "/analyze-meal"
