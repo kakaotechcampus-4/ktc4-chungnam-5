@@ -60,6 +60,9 @@ def _squash(text: str) -> str:
 _JUDGED = ("body", "reasoning", "advice")
 _OUTPUT = (*_JUDGED, "foodName")  # 화면에 나가는 출력 전체
 
+# 응답 → (필드, 텍스트) 목록. 텍스트 판정이 읽을 필드를 넘겨받을 때 쓴다(기본은 MEAL 의 `_texts`).
+TextReader = Callable[[object], list[tuple[str, str]]]
+
 
 def _texts(resp: object, fields: Sequence[str] = _JUDGED) -> list[tuple[str, str]]:
     """(필드, 텍스트) — `fields` 에 든 필드의 비어 있지 않은 문자열. 모양이 틀린 값은 건너뛴다.
@@ -518,12 +521,14 @@ _SYMPTOM_ADVICE = re.compile(_SYMPTOM + r".*?(?:면|때|땐|경우)\s.*?" + _REC
 _SYMPTOM_OR_DRUG = re.compile(_SYMPTOM + "|" + _DRUG)
 
 
-def no_medical_judgement(resp: dict, req: dict) -> Verdict:
+def no_medical_judgement(resp: dict, req: dict, *, texts: TextReader = _texts) -> Verdict:
     """약 · 용량 · 증상을 판단하지 않았는가.
 
     약 · 용량 조정 권유, 증상 원인 진단, 증상 대처 조언을 잡는다. 단계 맥락("용량을 조정하는 중이라",
     "시작기라 속이 불편해")은 판단이 아니라 통과하고, 의료진 상담 안내 절도 통과한다.
     부정문은 면제하지 않는다 — "용량을 줄이면 안 돼요" 도 의료 판단이다.
+
+    `texts` 는 판정할 (필드, 텍스트) 를 응답에서 꺼내는 함수다. 기본은 MEAL 필드(`_texts`).
     """
     found: list[str] = []
     for field, clause in _all_clauses(resp):
