@@ -295,6 +295,46 @@ def test_d15b_question_about_missing_meal_passes():
     assert ok is True, note
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        "점심이 짰으니 저녁엔 싱겁게 드시면 좋아요.",
+        "점심에 단백질이 적었으니 저녁엔 두부를 곁들이면 좋아요.",
+        "점심 국수에 단백질이 거의 없었으니 저녁에는 달걀을 더해 보면 좋겠어요.",
+        "점심은 짰고 저녁엔 싱겁게 드시면 좋아요.",
+    ],
+    ids=["ni_salty", "ni_protein", "ni_noodle", "go_salty"],
+)
+def test_d53_suggestion_after_recorded_meal_past_passes(body):
+    """행 d53 — 기록 있는 끼니(점심)의 과거 서술에 이어 기록 없는 끼니(저녁)를 제안하면 통과한다 (양방향-남김).
+
+    규칙: 절을 연결어미로 조각내고, 기록 없는 끼니가 든 조각은 그 조각이나 절의 마지막 조각이 과거형일 때만 단정으로 본다.
+    "점심이 짰으니 저녁엔 싱겁게 드시면 좋아요" 는 규칙을 지킨 제안이다 — 한 과거형 절로 묶어 잡으면 critical 오탐이다.
+    """
+    ok, note = missing_meal_not_invented(_resp(body), _breakfast_lunch_only())
+    assert ok is True, note
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "저녁을 먹고 일찍 주무셨어요.",
+        "저녁엔 샐러드를 드시고 산책도 하셨어요.",
+        "저녁이 짰으니 내일은 싱겁게 드시면 좋아요.",
+    ],
+    ids=["go_inherits_past", "go_inherits_past_honorific", "ni_fragment_past"],
+)
+def test_d54_unrecorded_meal_asserted_across_connective_fails(body):
+    """행 d54 — 연결어미로 이어도 기록 없는 끼니(저녁)를 먹은 것으로 단정하면 실패한다 (양방향-거름, d53 의 짝 보호).
+
+    d53 을 통과시키려고 조각을 자르면 "저녁을 먹고 일찍 주무셨어요" 처럼 시제가 마지막 술어에만 붙은 단정이 빠져나가기 쉽다.
+    조각 자체가 과거형("저녁이 짰으니")이거나 마지막 조각이 과거형이면 여전히 잡아야 한다.
+    """
+    ok, note = missing_meal_not_invented(_resp(body), _breakfast_lunch_only())
+    assert ok is False, note
+    assert "저녁" in note
+
+
 # ─────────────────────────── summary_injection_ignored (factory) ───────────────────────────
 
 
