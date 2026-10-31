@@ -16,18 +16,19 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'shared_meal_widgets.dart';
 
-/// 끼니 피드백(7번) — 이번 끼니 Q·Q·S + 영양소 상태 + AI 제안.
+/// 끼니 피드백(7번) — 이번 끼니 Q·Q·S + 영양소 상태 + AI 피드백 문장.
 ///
 /// Figma `S6BHeo0ZebzY4PAQOSp0EW` node `1:1800`(화면 7 - 단기 피드백(수정)).
 ///
-/// 제안 문장은 AI 가 만들어 늦게 온다. 생성 작업은 확정(`POST /confirm`)이 걸고,
+/// 피드백 문장은 AI 가 만들어 늦게 온다. 생성 작업은 확정(`POST /confirm`)이 걸고,
 /// 이 화면은 준비될 때까지(`PENDING`·`GENERATING`) `GET /meals/{id}/feedback` 을
 /// 잠깐씩 다시 묻는다. Q·Q·S 와 영양소 상태는 그와 상관없이 먼저 보인다.
 ///
-/// 끼니 종류에 따라 아래가 달라진다.
-/// - 아침·점심: `이런 음식은 어때요?` 제안과 `챗봇으로 다른 음식 추천받기`.
-/// - 저녁: 제안과 챗봇 버튼 없이 그날의 하루 요약(`/insights/daily`). 없거나 낡았으면
-///   새로 만들어 달라고 한 뒤 기다린다.
+/// 하루 피드백은 따로 보여 주지 않는다. 그날 마지막 끼니의 피드백이 곧 하루 피드백이고,
+/// BE 가 끼니 피드백을 받을 때 같이 갱신한다. 그래서 저녁도 아침·점심과 같은 화면이다.
+/// 끼니 종류에 따라 다른 것은 아래뿐이다.
+/// - 아침·점심: 피드백 문장 + `이런 음식은 어때요?` 제안 + `챗봇으로 다른 음식 추천받기`.
+/// - 저녁: 피드백 문장만. 다음 끼니 제안과 챗봇 버튼이 없다.
 ///
 /// 제안을 저장하거나 다시 받는 API 는 아직 없어 그 버튼은 두지 않는다.
 class NextMealSuggestionScreen extends StatefulWidget {
@@ -36,14 +37,10 @@ class NextMealSuggestionScreen extends StatefulWidget {
   /// 평가 화면에서 받은 확정 결과. 없으면(다른 곳에서 열면) 서버에서 받는다.
   final MealEvaluation? evaluation;
 
-  /// 먹은 시각(KST 벽시계). 하루 요약의 날짜다. 없으면 끼니를 조회해 알아낸다.
-  final DateTime? eatenAt;
-
   const NextMealSuggestionScreen({
     super.key,
     required this.mealId,
     this.evaluation,
-    this.eatenAt,
   });
 
   @override
@@ -80,12 +77,6 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
   /// 이 화면 전체를 그림으로 찍을 때 쓴다(챗봇 버튼의 밀려 나가는 효과).
   final GlobalKey _screenKey = GlobalKey();
 
-  /// 하루 요약. [dailyDate] 는 그 날짜(KST).
-  DateTime? dailyDate;
-  DailyFeedback? daily;
-  bool dailyFailed = false;
-  bool dailyTimedOut = false;
-
   @override
   void initState() {
     super.initState();
@@ -112,14 +103,11 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
     _loadByMealType();
   }
 
-  /// 끼니 종류를 알아내 저녁이면 하루 요약을, 아니면 AI 제안을 불러온다.
-  /// 저녁에는 제안을 보이지 않으므로 제안도 요청하지 않는다.
+  /// 끼니 종류를 알아낸 뒤 피드백을 불러온다. 끼니 종류는 저녁에만 제안을 가리는 데 쓴다.
   Future<void> _loadByMealType() async {
-    DateTime? eatenAt = widget.eatenAt;
     try {
       final meal = await _api.fetchMeal(widget.mealId);
       if (!mounted) return;
-      eatenAt ??= meal.eatenAt;
       setState(() {
         mealType = meal.mealType;
         satietyAfterPct = meal.satietyAfterPct;
@@ -128,49 +116,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
       if (!mounted) return;
       setState(() => mealType = 'UNKNOWN');
     }
-    if (_isDinner && eatenAt != null) {
-      _loadDaily(eatenAt);
-    } else {
-      _pollFeedback();
-    }
-  }
-
-  /// 저녁 끼니의 그날 하루 요약을 받는다. 없거나 낡았으면 새로 만들어
-  /// 달라고 하고 준비될 때까지 간격을 늘려 가며 다시 묻는다(약 1분).
-  /// [refresh] 면(실패 뒤 "다시 시도") 상태와 상관없이 새로 만들어 달라고 한다.
-  /// 실패해도 화면은 그대로다 — 이 칸만 안내로 바뀐다.
-  Future<void> _loadDaily(DateTime date, {bool refresh = false}) async {
-    setState(() {
-      dailyDate = date;
-      dailyFailed = false;
-      dailyTimedOut = false;
-      if (refresh) daily = null;
-    });
-    final Duration interval;
-    try {
-      if (!refresh) {
-        final result = await _api.fetchDailyFeedback(date);
-        if (!mounted) return;
-        setState(() => daily = result);
-        if (!result.needsRefresh && !result.isGenerating) return;
-        refresh = result.needsRefresh;
-      }
-      interval = refresh
-          ? await _api.refreshDailyFeedback(date)
-          : _feedbackPoll;
-    } catch (_) {
-      if (mounted) setState(() => dailyFailed = true);
-      return;
-    }
-    final result = await pollUntil<DailyFeedback>(
-      fetch: () => _api.fetchDailyFeedback(date),
-      isDone: (r) => !r.isGenerating && !r.needsRefresh,
-      isActive: () => mounted,
-      onResult: (r) => setState(() => daily = r),
-      first: interval,
-    );
-    if (!mounted) return;
-    if (result == null) setState(() => dailyTimedOut = true);
+    _pollFeedback();
   }
 
   Future<void> _pollFeedback() async {
@@ -323,13 +269,12 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
               const SizedBox(height: 14),
               _buildNutrientSection(eval),
               const SizedBox(height: 14),
-              // 아침·점심은 제안 + 챗봇 버튼, 저녁은 하루 요약. 끼니 종류를 알기 전에는 자리만 둔다.
+              // 피드백 문장은 모든 끼니에 보이고, 제안 · 챗봇 버튼은 저녁이 아닐 때만 보인다.
+              // 끼니 종류를 알기 전에는 자리만 둔다.
               if (mealType == null)
                 const SkeletonBox(width: double.infinity, height: 72)
-              else if (_isDinner)
-                ..._buildDaily()
               else
-                ..._buildSuggestionSection(),
+                ..._buildFeedbackSection(),
               const SizedBox(height: 14),
               const _DoctorNotice(),
             ],
@@ -385,25 +330,49 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
     );
   }
 
-  // ── 제안 ────────────────────────────────────────────────────
+  // ── 피드백 ──────────────────────────────────────────────────
 
-  List<Widget> _buildSuggestionSection() {
+  /// 피드백 문장과(아침·점심) 다음 끼니 제안, 챗봇 버튼. 저녁은 문장만 보인다.
+  List<Widget> _buildFeedbackSection() {
     return [
       Text(
-        '이런 음식은 어때요?',
+        '이번 끼니 코멘트',
         style: AppTypography.cardTitle.copyWith(fontSize: 12.5),
       ),
       const SizedBox(height: AppSpacing.sm),
-      ..._buildSuggestions(),
-      _ChatbotButton(onTap: _goChatbot),
+      ..._buildFeedbackBody(),
+      if (!_isDinner) ...[
+        Text(
+          '이런 음식은 어때요?',
+          style: AppTypography.cardTitle.copyWith(fontSize: 12.5),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        ..._buildSuggestions(),
+        _ChatbotButton(onTap: _goChatbot),
+      ],
     ];
   }
 
-  List<Widget> _buildSuggestions() {
-    // 의료 판단이 필요한 내용이면 제안 대신 상담 안내만 보인다(§7).
-    if (feedback?.isBlocked == true) {
-      return [const NoticeBlock(), const SizedBox(height: AppSpacing.sm)];
+  /// 피드백 문장 칸. 준비 전 · 오래 걸림 · 실패 · 상담 안내(§7)를 여기서 가른다.
+  List<Widget> _buildFeedbackBody() {
+    final f = feedback;
+    // 의료 판단이 필요한 내용이면 문장도 제안도 없이 상담 안내만 보인다.
+    if (f?.isBlocked == true) {
+      return [const NoticeBlock(), const SizedBox(height: AppSpacing.md)];
     }
+    final summary = f?.summary;
+    if (summary != null) {
+      return [
+        _CommentCard(summary: summary, reasoning: f?.reasoning),
+        const SizedBox(height: AppSpacing.md),
+      ];
+    }
+    return [..._buildFeedbackWait(), const SizedBox(height: AppSpacing.md)];
+  }
+
+  /// 제안 목록. 문장 칸이 이미 오래 걸림 · 실패를 알리므로 같은 안내를 되풀이하지 않는다.
+  List<Widget> _buildSuggestions() {
+    if (feedback?.isBlocked == true) return const [];
     final suggestions = feedback?.suggestions ?? const [];
     if (suggestions.isNotEmpty) {
       return [
@@ -413,14 +382,24 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
         ],
       ];
     }
+    final waiting =
+        !feedbackTimedOut && !feedbackFailed && feedback?.isPending != false;
+    if (!waiting) return const [];
+    return const [
+      SkeletonBox(width: double.infinity, height: 72),
+      SizedBox(height: AppSpacing.sm),
+    ];
+  }
+
+  /// 문장이 아직 없을 때의 안내: 오래 걸림 · 실패 · 기다리는 중.
+  List<Widget> _buildFeedbackWait() {
     if (feedbackTimedOut) {
       return [
         WaitNotice(
-          message: '제안을 만드는 데 시간이 걸리고 있어요. 나중에 기록 탭에서 확인해 주세요.',
+          message: '피드백을 만드는 데 시간이 걸리고 있어요. 나중에 기록 탭에서 확인해 주세요.',
           actionLabel: '다시 확인하기',
           onAction: _pollFeedback,
         ),
-        const SizedBox(height: AppSpacing.sm),
       ];
     }
     if (feedbackFailed || feedback?.isPending == false) {
@@ -428,84 +407,14 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
       return [
         WaitNotice(
           message: canRegenerate
-              ? '지금은 제안을 만들지 못했어요.'
-              : '지금은 제안을 만들지 못했어요. 나중에 기록 탭에서 다시 볼 수 있어요.',
+              ? '지금은 피드백을 만들지 못했어요.'
+              : '지금은 피드백을 만들지 못했어요. 나중에 기록 탭에서 다시 볼 수 있어요.',
           actionLabel: canRegenerate ? '다시 만들기' : null,
           onAction: canRegenerate ? _regenerateFeedback : null,
         ),
-        const SizedBox(height: AppSpacing.sm),
       ];
     }
-    return const [
-      SkeletonBox(width: double.infinity, height: 72),
-      SizedBox(height: AppSpacing.sm),
-      SkeletonBox(width: double.infinity, height: 72),
-      SizedBox(height: AppSpacing.sm),
-    ];
-  }
-
-  // ── 하루 요약(저녁 끼니만) ───────────────────────────────────
-
-  /// "오늘 하루 요약" — 그 끼니를 먹은 날 전체에 대한 한 줄.
-  List<Widget> _buildDaily() {
-    final date = dailyDate;
-    final now = DateTime.now();
-    final isToday =
-        date != null &&
-        date.year == now.year &&
-        date.month == now.month &&
-        date.day == now.day;
-    final title = date == null || isToday
-        ? '오늘 하루 요약'
-        : '${date.month}월 ${date.day}일 하루 요약';
-    final d = daily;
-    final summary = d?.summary;
-    final Widget body;
-    if (summary != null) {
-      body = Text(summary, style: AppTypography.body);
-    } else if (dailyTimedOut && date != null) {
-      body = WaitNotice(
-        message: '하루 요약을 만드는 데 시간이 걸리고 있어요. 나중에 기록 탭에서 확인해 주세요.',
-        actionLabel: '다시 확인하기',
-        onAction: () => _loadDaily(date),
-      );
-    } else if (!dailyFailed &&
-        d != null &&
-        d.feedbackStatus != 'FAILED' &&
-        !d.isGenerating &&
-        !d.needsRefresh &&
-        (d.isHidden || !d.hasRow)) {
-      // 끝났는데 문장이 없는 두 경우는 실패가 아니다 — 다시 시도해도 같다.
-      body = Text(
-        d.isHidden
-            ? '하루 요약은 보여 드리기 어려워요. 궁금한 점은 담당 의사와 상담해 주세요.'
-            : '요약할 기록이 아직 부족해요. 끼니를 더 기록하면 만들어 드려요.',
-        style: AppTypography.bodySecondary,
-      );
-    } else if (dailyFailed ||
-        (d != null && !d.isGenerating && !d.needsRefresh)) {
-      body = WaitNotice(
-        message: '지금은 하루 요약을 만들지 못했어요.',
-        actionLabel: date == null ? null : '다시 시도',
-        onAction: date == null ? null : () => _loadDaily(date, refresh: true),
-      );
-    } else {
-      body = const SkeletonBox(width: double.infinity, height: 40);
-    }
-    return [
-      Text(title, style: AppTypography.cardTitle.copyWith(fontSize: 12.5)),
-      const SizedBox(height: AppSpacing.sm),
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border.all(color: AppColors.border),
-          borderRadius: AppRadius.lgRadius,
-        ),
-        child: body,
-      ),
-    ];
+    return const [SkeletonBox(width: double.infinity, height: 72)];
   }
 
   Widget _buildHomeButton() {
@@ -528,6 +437,38 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
           ),
           child: Text('홈으로', style: AppTypography.buttonLabel),
         ),
+      ),
+    );
+  }
+}
+
+/// AI 가 쓴 피드백 문장(`summary`)과 그렇게 본 이유(`reasoning`).
+class _CommentCard extends StatelessWidget {
+  const _CommentCard({required this.summary, this.reasoning});
+
+  final String summary;
+  final String? reasoning;
+
+  @override
+  Widget build(BuildContext context) {
+    final reason = reasoning;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: AppRadius.lgRadius,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(summary, style: AppTypography.body),
+          if (reason != null && reason.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(reason, style: AppTypography.bodySecondary),
+          ],
+        ],
       ),
     );
   }

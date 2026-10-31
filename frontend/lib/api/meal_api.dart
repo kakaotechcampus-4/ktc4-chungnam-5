@@ -347,12 +347,16 @@ class MealFeedback {
     required this.feedbackStatus,
     required this.suggestions,
     this.summary,
+    this.reasoning,
     this.safetyStatus,
   });
 
   /// `PENDING` · `GENERATING` · `READY` · `FAILED`.
   final String feedbackStatus;
+
+  /// 피드백 문장과 그렇게 본 이유. `safetyStatus` 가 `SAFE` 일 때만 온다.
   final String? summary;
+  final String? reasoning;
   final List<MealSuggestion> suggestions;
 
   /// `SAFE` · `BLOCKED` · `REVIEW_REQUIRED`. 아직 없으면 null.
@@ -369,54 +373,10 @@ class MealFeedback {
     feedbackStatus: json['feedbackStatus'] as String,
     safetyStatus: json['safetyStatus'] as String?,
     summary: json['summary'] as String?,
+    reasoning: json['reasoning'] as String?,
     suggestions: (json['suggestions'] as List<dynamic>? ?? const [])
         .map((e) => MealSuggestion.fromJson(e as Map<String, dynamic>))
         .toList(),
-  );
-}
-
-/// `GET /insights/daily?date=` — 그날(KST) 하루 피드백.
-///
-/// 새로고침(`POST /insights/daily/refresh`)을 불러야 만들어진다. 한 번도 안
-/// 만들었으면 `PENDING`, 만든 뒤 그날 식사가 바뀌었으면 [stale] 이다. 만들었는데
-/// 근거(평가한 끼니)가 없으면 `READY` 인데 [summary] 가 비어 있다.
-class DailyFeedback {
-  const DailyFeedback({
-    required this.feedbackStatus,
-    required this.stale,
-    this.summary,
-    this.hasRow = false,
-    this.safetyStatus,
-  });
-
-  /// `PENDING` · `GENERATING` · `READY` · `FAILED`.
-  final String feedbackStatus;
-
-  /// `safetyStatus` 가 `SAFE` 일 때만 온다.
-  final String? summary;
-  final bool stale;
-
-  /// 서버에 그날 요약 행이 있는지(`dailyFeedbackId`). `READY` 인데 행이 없으면
-  /// 요약할 근거(평가된 끼니)가 없어 워커가 만들지 않은 것이다 — 실패가 아니다.
-  final bool hasRow;
-
-  /// `SAFE` · `BLOCKED` · `REVIEW_REQUIRED`. 행이 없으면 null.
-  final String? safetyStatus;
-
-  /// 만들었지만 안전 검사에 걸려 문장을 보여 주지 않는다.
-  bool get isHidden => safetyStatus != null && safetyStatus != 'SAFE';
-
-  /// 새로 만들어 달라고 할지.
-  bool get needsRefresh => feedbackStatus == 'PENDING' || stale;
-
-  bool get isGenerating => feedbackStatus == 'GENERATING';
-
-  factory DailyFeedback.fromJson(Map<String, dynamic> json) => DailyFeedback(
-    feedbackStatus: json['feedbackStatus'] as String,
-    summary: json['summary'] as String?,
-    stale: json['stale'] as bool? ?? false,
-    hasRow: json['dailyFeedbackId'] != null,
-    safetyStatus: json['safetyStatus'] as String?,
   );
 }
 
@@ -614,27 +574,6 @@ class MealApiService {
       body: {'foodCardId': foodCardId},
     );
     return MealFeedback.fromJson(result.dataMap);
-  }
-
-  /// `GET /insights/daily?date=` — [date] 는 KST 날짜.
-  Future<DailyFeedback> fetchDailyFeedback(DateTime date) async {
-    final result = await _client.get(
-      '/insights/daily',
-      query: {'date': formatApiDate(date)},
-    );
-    return DailyFeedback.fromJson(result.dataMap);
-  }
-
-  /// `POST /insights/daily/refresh` — 새로 만들어 달라고 한다(202).
-  /// 다음에 다시 물어볼 간격을 돌려준다.
-  Future<Duration> refreshDailyFeedback(DateTime date) async {
-    final result = await _client.post(
-      '/insights/daily/refresh',
-      body: {'date': formatApiDate(date)},
-    );
-    return Duration(
-      milliseconds: result.dataMap['pollIntervalMs'] as int? ?? 1500,
-    );
   }
 
   /// `POST /meals/{mealId}/satiety-checkins` — 식사 몇 시간 뒤 포만감.
