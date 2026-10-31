@@ -854,6 +854,39 @@ def item_nutrition(
     return None, None
 
 
+def meal_nutrition(
+    items: list[MealItem], public_db_by_item: dict[uuid.UUID, NutritionInfo | None]
+) -> NutritionInfo:
+    """한 끼 영양 합계 — `meals.total_*` 에 들어갈 값.
+
+    항목마다 `item_nutrition` 을 거친다. 합계를 따로 유도하면 화면에 보인 항목 숫자와
+    AI 가 받는 합계가 갈라진다.
+
+    **성분 하나라도 모르는 항목이 있으면 그 성분의 합계는 None 이다.** 0 으로 치고
+    더하면 "안 먹었다" 가 되어 합계가 거짓으로 작아지고, 받는 쪽은 그게 부분합인지
+    알 길이 없다. 항목이 하나도 없어도 None 이다 — 0 kcal 끼니가 아니라 모르는 끼니다.
+
+    `public_db_by_item` 을 인자로 받는 건 `item_nutrition` 과 같은 이유다 — 공공 DB
+    환산은 `services/nutrition.py` 의 일이다(README 절대 규칙 5).
+    """
+    per_item = [item_nutrition(item, public_db_by_item.get(item.id))[0] for item in items]
+
+    def total(field: str) -> Decimal | None:
+        values = [None if n is None else getattr(n, field) for n in per_item]
+        if not values or any(value is None for value in values):
+            return None
+        return sum(values, Decimal(0))
+
+    return NutritionInfo(
+        kcal=total("kcal"),
+        protein_g=total("protein_g"),
+        fat_g=total("fat_g"),
+        carb_g=total("carb_g"),
+        fiber_g=total("fiber_g"),
+        sodium_mg=total("sodium_mg"),
+    )
+
+
 def set_item_nutrition(
     db: Session,
     *,

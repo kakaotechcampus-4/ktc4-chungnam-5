@@ -54,6 +54,24 @@ class Meal(Base):
     )
     """사용자가 음식을 고쳐서 다시 분석 중인지. FE 는 최초 분석과 재분석의 문구를 다르게 띄운다."""
 
+    # 한 끼 영양 합계 — AI 입력용 스냅샷이다. 확정(`POST /meals/{mealId}/confirm`)이
+    # 음식별 영양성분을 **화면과 같은 규칙**(`services.meal.item_nutrition`: 직접 입력 →
+    # 공공 DB 환산)으로 더해 쓰고, 음식이 바뀌면 `crud.meal.mark_recalculating` 이
+    # 점수와 함께 NULL 로 되돌린다. 확정 전에는 NULL 이다.
+    #
+    # ⚠️ **NULL 은 0 이 아니라 "모른다" 다.** 성분을 못 구한 음식이 하나라도 있으면 그
+    # 성분의 합계를 남기지 않는다 — 일부만 더한 값은 완전한 값처럼 읽힌다
+    # (`services.meal.meal_nutrition`).
+    #
+    # 정밀도가 `manual_*`(10, 3)보다 넓은 건 합계라서다 — 항목 값끼리 더하면 넘칠 수
+    # 있고, 넘치면 확정이 500 으로 죽는다. `crud.evaluation._scaled` 의 cast 와 같다.
+    total_kcal: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_protein_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_fat_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_carb_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_fiber_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_sodium_mg: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+
     created_at: Mapped[datetime] = created_at()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     """NULL 이면 살아있는 식사. soft delete — 값이 채워지면 삭제된 것으로 취급한다."""

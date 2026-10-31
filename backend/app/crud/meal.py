@@ -411,10 +411,41 @@ def mark_recalculating(db: Session, meal: Meal) -> None:
     목록 화면을 실제로 열어 봐야 보인다.
 
     확정 전 수정에서는 지울 행이 없어 0 행 `DELETE` 다.
+
+    **영양 합계(`meals.total_*`)도 같은 이유로 비운다** — 확정이 쓴 스냅샷이라 음식이
+    바뀌면 낡는다. 다시 확정하면 새로 채워진다.
     """
     meal.status = MealStatus.ANALYZING
     meal.is_recalculation = True
+    set_nutrient_totals(
+        db, meal=meal, kcal=None, protein_g=None, fat_g=None,
+        carb_g=None, fiber_g=None, sodium_mg=None,
+    )
     evaluation_crud.delete_by_meal(db, meal.id)
+
+
+def set_nutrient_totals(
+    db: Session,
+    *,
+    meal: Meal,
+    kcal: Decimal | None,
+    protein_g: Decimal | None,
+    fat_g: Decimal | None,
+    carb_g: Decimal | None,
+    fiber_g: Decimal | None,
+    sodium_mg: Decimal | None,
+) -> None:
+    """한 끼 영양 합계를 쓴다. 커밋하지 않는다.
+
+    `db` 를 받지만 쓰지 않는다 — `mark_recalculating` 과 같은 이유다. 여섯 값을 각각
+    받는 건 `set_item_manual_nutrition` 과 같은 이유다(`crud/` 는 `schemas/` 를 모른다).
+    """
+    meal.total_kcal = kcal
+    meal.total_protein_g = protein_g
+    meal.total_fat_g = fat_g
+    meal.total_carb_g = carb_g
+    meal.total_fiber_g = fiber_g
+    meal.total_sodium_mg = sodium_mg
 
 
 def get_items_by_ids(

@@ -20,6 +20,7 @@ Q/Q/S 는 순수 함수라 0.01 초면 끝난다(절대 규칙 2). 확정은 200
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Final, NamedTuple
 
@@ -51,6 +52,7 @@ from app.schemas.evaluation import (
     NutrientRow,
     QqsScores,
 )
+from app.schemas.nutrition import NutritionInfo
 from app.models.evaluation import QQSEvaluation
 from app.services.evaluation.rule_engine import MealTargets, Scores, evaluate, meal_targets
 from app.services.evaluation.stage_profile import emphasis_for, profile_for
@@ -354,8 +356,15 @@ def confirm(
     user_id: uuid.UUID,
     meal_id: uuid.UUID,
     request: MealConfirmRequest,
+    nutrition_of: Callable[[Meal], NutritionInfo],
 ) -> EvaluationResult:
     """식사를 확정하고 Q/Q/S 를 매긴다. 커밋까지 한다.
+
+    한 끼 영양 합계(`meals.total_*`)도 여기서 남긴다. 합계 규칙은 `services/meal.py`
+    (항목 규칙)와 `services/nutrition.py`(공공 DB 환산)에 있어 여기서 부를 수 없으므로
+    (README 절대 규칙 5) api 레이어가 엮은 `nutrition_of` 를 받는다. **미리 계산한 값이
+    아니라 함수를 받는 이유:** 식사 행을 잠근 뒤에 항목을 읽어야 한다. 잠그기 전에
+    더하면 그 사이 고친 음식이 점수에는 들어가고 합계에는 안 들어간다.
 
     **식사 행부터 잠근다.** `feedback.meal` 워커가 `meals` → `meal_feedbacks` 순으로
     잠그므로 여기도 같은 순서여야 한다 — 거꾸로 잡으면(`invalidate_by_meal` 이 먼저)
@@ -407,6 +416,17 @@ def confirm(
         # 채점과 **같은 트랜잭션**에 넣는다 — 점수는 저장됐는데 작업은 없는 상태가
         # 생기지 않는다. 제안 화면을 열 때가 아니라 여기서 넣는 이유는 모듈 독스트링 참고.
         enqueue(db, feedback_crud.FEEDBACK_TASK_TYPE, {"mealId": str(meal.id)})
+    totals_for_ai = nutrition_of(meal)
+    meal_crud.set_nutrient_totals(
+        db,
+        meal=meal,
+        kcal=totals_for_ai.kcal,
+        protein_g=totals_for_ai.protein_g,
+        fat_g=totals_for_ai.fat_g,
+        carb_g=totals_for_ai.carb_g,
+        fiber_g=totals_for_ai.fiber_g,
+        sodium_mg=totals_for_ai.sodium_mg,
+    )
     meal_crud.set_status(db, meal, MealStatus.EVALUATED)
     db.commit()
 
