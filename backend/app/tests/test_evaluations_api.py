@@ -1133,26 +1133,26 @@ def test_meal_totals_use_manual_nutrition_like_the_screen(
     )
 
 
-def test_meal_totals_are_null_when_an_item_has_no_nutrition(
+def test_meal_totals_count_an_item_without_nutrition_as_zero(
     client: TestClient, db: Session
 ) -> None:
-    """성분을 못 구한 음식이 하나라도 있으면 합계를 남기지 않는다.
-
-    일부만 더한 값을 남기면 AI 가 적게 나온 숫자를 완전한 값으로 읽는다.
-    """
-    user, meal = _ready_meal(db)
+    """성분을 못 구한 음식은 0 으로 더한다 — 합계는 나머지 음식만큼이다."""
+    user, meal = _ready_meal(db)                                  # 공공 DB 250g
     make_meal_item(db, meal_id=meal.id, display_name="이름 모를 반찬")  # food_ref 없음
 
     _post_confirm(client, user, meal, pct=68)
     db.refresh(meal)
 
-    assert _totals(meal) == (None,) * 6
+    assert _totals(meal) == (
+        Decimal("125.000"), Decimal("7.500"), Decimal("3.750"),
+        Decimal("10.000"), Decimal("1.250"), Decimal("1500.000"),
+    )
 
 
-def test_meal_totals_drop_only_the_nutrient_that_is_missing(
+def test_meal_totals_count_a_missing_nutrient_as_zero(
     client: TestClient, db: Session
 ) -> None:
-    """공공 DB 에 식이섬유만 비어 있으면 식이섬유 합계만 NULL 이다."""
+    """공공 DB 에 식이섬유만 비어 있으면 그 음식의 식이섬유만 0 으로 더한다."""
     user, meal = _ready_meal(db)
     make_food_ref(db, food_ref_id="KFD_TEST_02", name="두부", fiber_g=None)
     make_meal_item(db, meal_id=meal.id, display_name="두부", food_ref_id="KFD_TEST_02")
@@ -1160,7 +1160,7 @@ def test_meal_totals_drop_only_the_nutrient_that_is_missing(
     _post_confirm(client, user, meal, pct=68)
     db.refresh(meal)
 
-    assert meal.total_fiber_g is None
+    assert meal.total_fiber_g == Decimal("1.250")                 # 미역국 250g 몫만
     assert meal.total_kcal == Decimal("250.000")
 
 

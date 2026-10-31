@@ -33,7 +33,7 @@ _COLUMNS = (
 def upgrade() -> None:
     """Upgrade schema."""
     # 한 끼 영양 합계. AI 입력용 스냅샷으로, 확정 시점에 채우고 음식이 바뀌면 비운다.
-    # NULL 은 "모른다" 다 — 성분을 못 구한 음식이 하나라도 있으면 그 성분은 비워 둔다.
+    # 비어 있는 영양정보는 0 으로 더하므로 NULL 은 "아직 확정 전" 뿐이다.
     for name in _COLUMNS:
         op.add_column(
             'meals',

@@ -59,9 +59,9 @@ class Meal(Base):
     # 공공 DB 환산)으로 더해 쓰고, 음식이 바뀌면 `crud.meal.mark_recalculating` 이
     # 점수와 함께 NULL 로 되돌린다. 확정 전에는 NULL 이다.
     #
-    # ⚠️ **NULL 은 0 이 아니라 "모른다" 다.** 성분을 못 구한 음식이 하나라도 있으면 그
-    # 성분의 합계를 남기지 않는다 — 일부만 더한 값은 완전한 값처럼 읽힌다
-    # (`services.meal.meal_nutrition`).
+    # 비어 있는 영양정보(성분을 못 구한 음식 · 공공 DB 의 빈 성분)는 0 으로 더한다
+    # (`services.meal.meal_nutrition`). 그래서 **NULL 은 "아직 확정 전" 뿐이다.**
+    # ⚠️ 그 대가로 합계가 실제보다 작을 수 있다.
     #
     # 정밀도가 `manual_*`(10, 3)보다 넓은 건 합계라서다 — 항목 값끼리 더하면 넘칠 수
     # 있고, 넘치면 확정이 500 으로 죽는다. `crud.evaluation._scaled` 의 cast 와 같다.
