@@ -1077,3 +1077,101 @@ def test_state_agrees_with_the_displayed_target(client: TestClient, db: Session)
     fiber = next(r for r in _confirm(client, user, meal)["nutrients"] if r["code"] == "FIBER")
 
     assert (fiber["current"], fiber["target"], fiber["state"]) == (8.3, 8.3, "OK")
+
+
+# ── 끼니 영양 합계(meals.total_*) — AI 입력용 스냅샷 ─────────────────────
+
+
+def _totals(meal) -> tuple[Decimal | None, ...]:
+    return (
+        meal.total_kcal,
+        meal.total_protein_g,
+        meal.total_fat_g,
+        meal.total_carb_g,
+        meal.total_fiber_g,
+        meal.total_sodium_mg,
+    )
+
+
+def test_confirm_stores_the_meal_nutrient_totals(client: TestClient, db: Session) -> None:
+    """확정하면 음식별 영양성분(섭취량 환산)을 더해 `meals.total_*` 에 남긴다.
+
+    미역국(100g 당 50kcal) 250g + 같은 음식 100g → 350g 어치.
+    """
+    user, meal = _ready_meal(db)
+    make_meal_item(db, meal_id=meal.id, food_ref_id="KFD_TEST_01",
+                   estimated_amount=Decimal("100.00"))
+
+    _post_confirm(client, user, meal, pct=68)
+    db.refresh(meal)
+
+    assert _totals(meal) == (
+        Decimal("175.000"), Decimal("10.500"), Decimal("5.250"),
+        Decimal("14.000"), Decimal("1.750"), Decimal("2100.000"),
+    )
+
+
+def test_meal_totals_use_manual_nutrition_like_the_screen(
+    client: TestClient, db: Session
+) -> None:
+    """직접 입력이 있으면 그 값을 더한다 — 화면(`item_nutrition`)과 같은 규칙이다."""
+    user, meal = _ready_meal(db)                                  # 공공 DB 250g
+    manual = make_meal_item(db, meal_id=meal.id, display_name="닭가슴살")
+    meal_crud.set_item_manual_nutrition(
+        db, item=manual, kcal=Decimal("100"), protein_g=Decimal("20"),
+        fat_g=Decimal("1"), carb_g=Decimal("0"), fiber_g=Decimal("0"),
+        sodium_mg=Decimal("50"),
+    )
+    db.flush()
+
+    _post_confirm(client, user, meal, pct=68)
+    db.refresh(meal)
+
+    assert _totals(meal) == (
+        Decimal("225.000"), Decimal("27.500"), Decimal("4.750"),
+        Decimal("10.000"), Decimal("1.250"), Decimal("1550.000"),
+    )
+
+
+def test_meal_totals_count_an_item_without_nutrition_as_zero(
+    client: TestClient, db: Session
+) -> None:
+    """성분을 못 구한 음식은 0 으로 더한다 — 합계는 나머지 음식만큼이다."""
+    user, meal = _ready_meal(db)                                  # 공공 DB 250g
+    make_meal_item(db, meal_id=meal.id, display_name="이름 모를 반찬")  # food_ref 없음
+
+    _post_confirm(client, user, meal, pct=68)
+    db.refresh(meal)
+
+    assert _totals(meal) == (
+        Decimal("125.000"), Decimal("7.500"), Decimal("3.750"),
+        Decimal("10.000"), Decimal("1.250"), Decimal("1500.000"),
+    )
+
+
+def test_meal_totals_count_a_missing_nutrient_as_zero(
+    client: TestClient, db: Session
+) -> None:
+    """공공 DB 에 식이섬유만 비어 있으면 그 음식의 식이섬유만 0 으로 더한다."""
+    user, meal = _ready_meal(db)
+    make_food_ref(db, food_ref_id="KFD_TEST_02", name="두부", fiber_g=None)
+    make_meal_item(db, meal_id=meal.id, display_name="두부", food_ref_id="KFD_TEST_02")
+
+    _post_confirm(client, user, meal, pct=68)
+    db.refresh(meal)
+
+    assert meal.total_fiber_g == Decimal("1.250")                 # 미역국 250g 몫만
+    assert meal.total_kcal == Decimal("250.000")
+
+
+def test_editing_food_clears_the_meal_totals(client: TestClient, db: Session) -> None:
+    """음식이 바뀌면 합계는 낡는다. 점수와 같이 지운다 — 다시 확정하면 새로 남는다."""
+    user, meal = _ready_meal(db)
+    _post_confirm(client, user, meal, pct=68)
+    db.refresh(meal)
+    assert meal.total_kcal is not None
+
+    meal_crud.mark_recalculating(db, meal)
+    db.flush()
+
+    assert _totals(meal) == (None,) * 6
