@@ -8,6 +8,7 @@
   - 워커 안에서 커밋하는 것 — 큐가 DONE 과 함께 커밋해야 실패 시 통째로 롤백된다
   - 하루 피드백 upsert 를 UTC 날짜로 하거나, 검수 안 된(SAFE 아닌) 문장으로 덮는 것
   - SAFE 가 아니라고 점수까지 건너뛰어 앞 끼니까지의 점수를 남기는 것
+  - 하루 영양 합계를 끼니마다 더해 가서 재확정·재시도에 두 번 더하는 것
   - 앞 끼니를 뒤늦게 입력·재확정했을 때 그 문장이 더 늦은 끼니의 문장을 덮는 것
 """
 
@@ -636,6 +637,140 @@ def test_daily_date_is_the_kst_day(db):
     run(db, _task(meal.id), FakeAi())
 
     assert _only_daily(db, user.id).feedback_date == date(2026, 8, 23)
+
+
+def _set_totals(db, meal: Meal, **totals: Decimal | None) -> None:
+    """확정이 남기는 끼니 영양 합계(`meals.total_*`). 안 넘긴 성분은 0 이다."""
+    values = {name: Decimal(0) for name in _TOTAL_COLUMNS}
+    values.update(totals)
+    db.execute(update(Meal).where(Meal.id == meal.id).values(**values))
+
+
+_TOTAL_COLUMNS = (
+    "total_kcal",
+    "total_protein_g",
+    "total_fat_g",
+    "total_carb_g",
+    "total_fiber_g",
+    "total_sodium_mg",
+)
+
+
+def _daily_totals(daily: DailyFeedback) -> dict[str, Decimal | None]:
+    return {name: getattr(daily, name) for name in _TOTAL_COLUMNS}
+
+
+def test_daily_nutrient_totals_are_the_day_sum(db):
+    """영양 합계는 평균이 아니라 그날 끼니의 합이다 — "오늘 단백질 몇 g" 이다."""
+    user = make_user(db)
+    breakfast = _evaluated_meal(db, user, eaten_at=BREAKFAST_AT)
+    _set_totals(
+        db, breakfast,
+        total_kcal=Decimal("400.5"), total_protein_g=Decimal(12), total_fat_g=Decimal(10),
+        total_carb_g=Decimal(65), total_fiber_g=Decimal(4), total_sodium_mg=Decimal(780),
+    )
+    lunch = _evaluated_meal(db, user, eaten_at=LUNCH_AT)
+    _set_totals(
+        db, lunch,
+        total_kcal=Decimal(600), total_protein_g=Decimal("30.25"), total_fat_g=Decimal(20),
+        total_carb_g=Decimal(70), total_fiber_g=Decimal(6), total_sodium_mg=Decimal(1200),
+    )
+
+    run(db, _task(lunch.id), FakeAi())
+
+    assert _daily_totals(_only_daily(db, user.id)) == {
+        "total_kcal": Decimal("1000.5"),
+        "total_protein_g": Decimal("42.25"),
+        "total_fat_g": Decimal(30),
+        "total_carb_g": Decimal(135),
+        "total_fiber_g": Decimal(10),
+        "total_sodium_mg": Decimal(1980),
+    }
+
+
+def test_daily_nutrient_totals_are_recomputed_not_added(db):
+    """같은 끼니가 다시 돌아도 두 번 더하지 않는다 — 매번 그날 전체를 다시 더해 덮는다."""
+    user = make_user(db)
+    meal = _evaluated_meal(db, user)
+    _set_totals(db, meal, total_protein_g=Decimal(20))
+
+    run(db, _task(meal.id), FakeAi())
+    run(db, _task(meal.id), FakeAi())
+
+    assert _only_daily(db, user.id).total_protein_g == Decimal(20)
+
+
+def test_daily_nutrient_totals_ignore_deleted_other_day_and_other_user_meals(db):
+    user = make_user(db)
+    other_user = make_user(db)
+    meal = _evaluated_meal(db, user)
+    _set_totals(db, meal, total_protein_g=Decimal(10))
+    deleted = _evaluated_meal(db, user)
+    _set_totals(db, deleted, total_protein_g=Decimal(100))
+    _soft_delete(db, deleted.id)
+    yesterday = _evaluated_meal(db, user, eaten_at=datetime(2026, 8, 21, 3, 0, tzinfo=UTC))
+    _set_totals(db, yesterday, total_protein_g=Decimal(100))
+    others = _evaluated_meal(db, other_user)
+    _set_totals(db, others, total_protein_g=Decimal(100))
+
+    run(db, _task(meal.id), FakeAi())
+
+    assert _only_daily(db, user.id).total_protein_g == Decimal(10)
+
+
+def test_meal_without_totals_is_left_out_of_the_day_sum(db):
+    """합계가 NULL 인 끼니(확정 전 · 음식을 고쳐 재계산 대기)는 뺀다. 다시 확정하면 그 작업이 채운다."""
+    user = make_user(db)
+    make_meal(db, user_id=user.id, eaten_at=BREAKFAST_AT, status=MealStatus.ANALYZING)
+    meal = _evaluated_meal(db, user)
+    _set_totals(db, meal, total_kcal=Decimal(500))
+
+    run(db, _task(meal.id), FakeAi())
+
+    assert _only_daily(db, user.id).total_kcal == Decimal(500)
+
+
+def test_daily_nutrient_totals_stay_null_without_any_totals(db):
+    """그날 합계를 남긴 끼니가 하나도 없으면 NULL 이다 — 0 은 "아무것도 안 먹었다" 다."""
+    user = make_user(db)
+    meal = _evaluated_meal(db, user)
+
+    run(db, _task(meal.id), FakeAi())
+
+    assert set(_daily_totals(_only_daily(db, user.id)).values()) == {None}
+
+
+@pytest.mark.parametrize("status", ["BLOCKED", "REVIEW_REQUIRED"])
+def test_unsafe_meal_feedback_updates_nutrient_totals(db, status):
+    """문장을 덮지 않을 때도 영양 합계는 이 끼니까지 반영한다 — 점수와 같은 이유다."""
+    user = make_user(db)
+    breakfast = _evaluated_meal(db, user, eaten_at=BREAKFAST_AT)
+    _set_totals(db, breakfast, total_protein_g=Decimal(10))
+    run(db, _task(breakfast.id), FakeAi(body="아침까지"))
+    dinner = _evaluated_meal(db, user, eaten_at=DINNER_AT)
+    _set_totals(db, dinner, total_protein_g=Decimal(25))
+
+    run(db, _task(dinner.id), FakeAi(body="저녁", safety_status=status))
+
+    daily = _only_daily(db, user.id)
+    assert daily.summary == "아침까지"
+    assert daily.total_protein_g == Decimal(35)
+
+
+def test_earlier_meal_updates_nutrient_totals_without_the_summary(db):
+    """앞 끼니를 뒤늦게 확정해 문장을 덮지 않는 경우에도 합계는 반영한다."""
+    user = make_user(db)
+    dinner = _evaluated_meal(db, user, eaten_at=DINNER_AT)
+    _set_totals(db, dinner, total_protein_g=Decimal(25))
+    run(db, _task(dinner.id), FakeAi(body="저녁까지"))
+    breakfast = _evaluated_meal(db, user, eaten_at=BREAKFAST_AT)
+    _set_totals(db, breakfast, total_protein_g=Decimal(10))
+
+    run(db, _task(breakfast.id), FakeAi(body="아침"))
+
+    daily = _only_daily(db, user.id)
+    assert daily.summary == "저녁까지"
+    assert daily.total_protein_g == Decimal(35)
 
 
 @pytest.mark.parametrize("status", ["BLOCKED", "REVIEW_REQUIRED"])
