@@ -25,7 +25,8 @@ BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ShortFeedbackRequest` · `ShortFee
   4. 식사를 잠그고 다시 본다 — AI 를 기다리는 사이 지워지거나 고쳐졌거나 다시
      채점됐으면 쓰지 않는다
   5. `meal_feedbacks` 에 upsert
-  6. 그날(KST) `daily_feedbacks` 에 upsert — 점수는 늘 그날 끼니 평균으로 덮는다. 문장은
+  6. 그날(KST) `daily_feedbacks` 에 upsert — 점수는 늘 그날 끼니 평균으로, 영양 합계는
+     그날 끼니 합으로 덮는다. 문장은
      SAFE 이고 그날 이보다 늦게 먹은 확정 끼니가 없을 때만 이 끼니 피드백으로 덮고
      근거 링크(`daily_feedback_sources`)를 더한다
 """
@@ -103,6 +104,10 @@ def _upsert_daily(
         "quantity_score": _round_or_none(averages.quantity),
         "quality_score": _round_or_none(averages.quality),
         "satiety_score": _round_or_none(averages.satiety),
+        # 영양 합계도 점수와 같이 그날 전체를 다시 더해 덮는다 — 문장과 무관한 값이다.
+        "nutrient_totals": daily_feedback_crud.day_nutrient_totals(
+            db, user_id=meal.user_id, range_start=range_start, range_end=range_end
+        ),
     }
 
     if safety_status is not SafetyStatus.SAFE:
