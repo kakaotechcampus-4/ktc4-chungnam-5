@@ -78,7 +78,9 @@ class RecognizedItem(_Camel):
     """meal_items 한 행에 대응한다.
 
     성분(kcal·단백질) 필드는 일부러 없다. AI 는 음식을 지목만 하고
-    성분은 BE 가 food_refs 에서 채운다. 양도 g 가 아니라 자연 단위로 준다.
+    성분은 BE 가 food_refs 에서 채운다. 양은 그램(g)을 기본으로 추정하고,
+    크기가 표준화돼 있지 않은 덩어리 음식(피자 한 판 등)만 자연 단위로 준다
+    (`food_analyzer._build_prompt` 참고 — g/ml 만 BE `to_grams`가 자동 환산한다).
     길이·범위 제한은 BE 가 저장 전에 거르는 기준(meal_items 컬럼)과 같다.
     """
 
