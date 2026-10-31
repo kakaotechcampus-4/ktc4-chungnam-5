@@ -148,9 +148,8 @@ def get_feedback(
     트랜잭션에서 넣고(`services/evaluation/__init__.py::confirm`), 워커가 채우면 여기서
     `READY` 가 된다. FE 는 `PENDING` · `GENERATING` 인 동안 폴링만 한다.
 
-    제안 화면을 열 때(이 GET) 넣지 않는 이유: 하루 피드백이 끼니 피드백을 근거로 쓰므로
-    (`crud/daily_feedback.py::list_day_evidence`), 화면을 안 연 끼니가 하루 요약에서
-    조용히 빠진다.
+    제안 화면을 열 때(이 GET) 넣지 않는 이유: 하루 피드백이 끼니 피드백으로 채워지므로
+    (`worker/jobs/feedback_meal.py::_upsert_daily`), 화면을 안 연 끼니가 하루 요약에서 조용히 빠진다.
 
     `FAILED` 는 보여 줄 문장이 없는데 가장 최근 `feedback.meal` 작업이 격리됐거나
     끝났을 때다 — 어느 쪽이든 기다려도 문장이 오지 않는다.

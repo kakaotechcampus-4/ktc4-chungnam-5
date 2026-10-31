@@ -8,12 +8,16 @@
 
 이 작업은 **확인 API(`POST /meals/{mealId}/confirm`)가 큐에 넣는다** — 채점과 같은
 트랜잭션이다(`services/evaluation/__init__.py::confirm`). 제안 화면을 열 때 넣지 않는
-이유는 하루 피드백이 끼니 피드백을 근거로 쓰기 때문이다 — 화면을 안 연 끼니가 하루
-요약에서 조용히 빠진다(`crud/daily_feedback.py::list_day_evidence`).
+이유는 하루 피드백이 끼니 피드백으로 채워지기 때문이다(6) — 화면을 안 연 끼니가 하루
+요약에서 조용히 빠진다.
 
 BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ShortFeedbackRequest` · `ShortFeedbackResponse` 다.
 
-순서 (load 1~3 전반 · call_ai 3 · apply 4~5):
+**끼니 피드백은 그날 앞 끼니를 누적한 문장이다.** AI 가 아침 피드백을 토대로 점심을,
+아침+점심을 토대로 저녁을 쓴다. 그래서 가장 최근 끼니 피드백이 곧 그날의 하루 피드백이다 —
+쓸 때마다 `daily_feedbacks` 에도 upsert 한다(6). 하루 피드백을 만드는 곳은 여기뿐이다.
+
+순서 (load 1~3 전반 · call_ai 3 · apply 4~6):
   1. 식사를 읽는다. 없거나 지워졌거나 확정 상태가 아니면 AI 를 부르지 않고 끝낸다
   2. `qqs_evaluations` 에서 Q/Q/S 를 읽는다. 없으면 채점이 아직이다 — raise 해서
      재시도에 맡긴다
@@ -21,6 +25,9 @@ BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ShortFeedbackRequest` · `ShortFee
   4. 식사를 잠그고 다시 본다 — AI 를 기다리는 사이 지워지거나 고쳐졌거나 다시
      채점됐으면 쓰지 않는다
   5. `meal_feedbacks` 에 upsert
+  6. 그날(KST) `daily_feedbacks` 에 upsert — 점수는 늘 그날 끼니 평균으로 덮는다. 문장은
+     SAFE 이고 그날 이보다 늦게 먹은 확정 끼니가 없을 때만 이 끼니 피드백으로 덮고
+     근거 링크(`daily_feedback_sources`)를 더한다
 """
 
 from __future__ import annotations
@@ -28,11 +35,14 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.time import KST
+from app.crud import daily_feedback as daily_feedback_crud
 from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.crud import food as food_crud
@@ -53,6 +63,81 @@ logger = logging.getLogger("worker.feedback_meal")
 def _number(value: Decimal | int | None) -> float | None:
     # AI payload 는 JSON 으로 나간다 — Decimal 을 싣지 않는다. None 은 "모른다" 라 그대로 둔다.
     return None if value is None else float(value)
+
+
+def _kst_day_range(day: date) -> tuple[datetime, datetime]:
+    """KST 하루 [00:00, 다음날 00:00). eaten_at 은 UTC 로 저장되므로 UTC 날짜로 자르지 않는다."""
+    start = datetime.combine(day, time.min, tzinfo=KST)
+    return start, start + timedelta(days=1)
+
+
+def _round_or_none(value: Decimal | None) -> int | None:
+    # Python round(은행가 반올림) — services/dashboard.py 의 _round_or_none 과 같은 규칙.
+    return None if value is None else round(value)
+
+
+def _upsert_daily(
+    db: Session,
+    *,
+    meal: Meal,
+    meal_feedback_id: uuid.UUID,
+    result: dict[str, Any],
+    safety_status: SafetyStatus,
+) -> uuid.UUID:
+    """이 끼니 피드백을 그날 하루 피드백에 반영한다. 행 id 를 돌려준다.
+
+    점수는 판정과 무관하게 그날 평균으로 덮는다 — Rule Engine 결과라 판정과 상관없이
+    쓴다. 문장은 SAFE 일 때만 덮고 근거 링크를 더한다. SAFE 가 아닌 문장으로 덮으면 앞
+    끼니까지의 멀쩡한 요약이 사라진다 — 장기 피드백은 SAFE 하루 요약만 근거로 쓴다.
+
+    그날 이 끼니보다 늦게 먹은 확정 끼니가 있으면 문장도 덮지 않는다. 하루 피드백은 가장
+    늦은 끼니의 누적 문장이어야 하는데, 앞 끼니를 뒤늦게 입력·재확정하면 작업이 늦게 끝나
+    앞 끼니만 본 문장이 저녁 문장을 덮는다.
+    """
+    feedback_date = meal.eaten_at.astimezone(KST).date()
+    range_start, range_end = _kst_day_range(feedback_date)
+    averages = daily_feedback_crud.day_score_averages(
+        db, user_id=meal.user_id, range_start=range_start, range_end=range_end
+    )
+    scores = {
+        "quantity_score": _round_or_none(averages.quantity),
+        "quality_score": _round_or_none(averages.quality),
+        "satiety_score": _round_or_none(averages.satiety),
+    }
+
+    if safety_status is not SafetyStatus.SAFE:
+        return daily_feedback_crud.upsert_scores(
+            db,
+            user_id=meal.user_id,
+            feedback_date=feedback_date,
+            safety_status=safety_status,
+            **scores,
+        )
+
+    if meal_crud.has_later_evaluated_meal(db, meal=meal, range_end=range_end):
+        # 행이 없을 때만 쓰이는 판정이다 — 문장 없는 행을 SAFE 로 만들지 않는다.
+        # 늦은 끼니의 작업이 아직 안 끝난 경우라, 그 작업이 문장을 채운다.
+        return daily_feedback_crud.upsert_scores(
+            db,
+            user_id=meal.user_id,
+            feedback_date=feedback_date,
+            safety_status=SafetyStatus.REVIEW_REQUIRED,
+            **scores,
+        )
+
+    daily_feedback_id = daily_feedback_crud.upsert(
+        db,
+        user_id=meal.user_id,
+        feedback_date=feedback_date,
+        summary=result["body"],
+        model_version=result["modelVersion"],
+        safety_status=safety_status,
+        **scores,
+    )
+    daily_feedback_crud.add_source(
+        db, daily_feedback_id=daily_feedback_id, meal_feedback_id=meal_feedback_id
+    )
+    return daily_feedback_id
 
 
 def _skip_reason(meal: Meal | None) -> str | None:
@@ -236,6 +321,7 @@ def apply(db: Session, task: ClaimedTask, ctx: _Ctx, result: dict[str, Any]) -> 
 
     suggestions = _stored_suggestions(db, result.get("suggestions"))
     # safetyStatus 는 AI 가 준 그대로 저장한다. SAFE 로 올리지 않는다 (규칙 1).
+    safety_status = SafetyStatus(result["safetyStatus"])
     meal_feedback_id = feedback_crud.upsert(
         db,
         user_id=meal.user_id,
@@ -244,7 +330,15 @@ def apply(db: Session, task: ClaimedTask, ctx: _Ctx, result: dict[str, Any]) -> 
         reasoning=result.get("reasoning"),
         suggestions=suggestions,
         model_version=result["modelVersion"],
-        safety_status=SafetyStatus(result["safetyStatus"]),
+        safety_status=safety_status,
+    )
+
+    daily_feedback_id = _upsert_daily(
+        db,
+        meal=meal,
+        meal_feedback_id=meal_feedback_id,
+        result=result,
+        safety_status=safety_status,
     )
 
     # 커밋하지 않는다. 큐가 DONE 과 함께 한 번에 커밋한다(`queue.complete`).
@@ -259,6 +353,7 @@ def apply(db: Session, task: ClaimedTask, ctx: _Ctx, result: dict[str, Any]) -> 
 
     return {
         "mealFeedbackId": str(meal_feedback_id),
+        "dailyFeedbackId": str(daily_feedback_id),
         "suggestionCount": len(suggestions or []),
     }
 
