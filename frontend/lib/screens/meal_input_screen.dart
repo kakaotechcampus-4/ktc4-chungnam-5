@@ -12,6 +12,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'food_search_screen.dart';
 import 'meal_analysis_screen.dart';
+import 'meal_review_screen.dart';
 
 const List<String> _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -191,10 +192,13 @@ class _MealInputScreenState extends State<MealInputScreen> {
     food.amount.dispose();
   }
 
-  /// 분석 시작(`POST /meals`) → AI 분석 진행 화면(4번)으로 교체 이동.
+  /// 등록(`POST /meals`) 뒤 화면으로 교체 이동한다.
   ///
-  /// 교체(`pushReplacement`)라서 분석 이후 화면에서 뒤로 가면 입력 화면이 아니라
-  /// 이 화면을 연 탭으로 바로 돌아간다.
+  /// - 사진: AI 분석 진행 화면(4번)
+  /// - 검색에서 고른 음식: 분석이 없어 곧바로 음식 확인 화면(5번)
+  ///
+  /// 교체(`pushReplacement`)라서 뒤로 가면 입력 화면이 아니라 이 화면을 연 탭으로
+  /// 바로 돌아간다.
   Future<void> _startAnalysis() async {
     final manual = _selectedTab == 1;
     final photo = manual ? null : _photoBytes;
@@ -214,10 +218,13 @@ class _MealInputScreenState extends State<MealInputScreen> {
     try {
       final mealType = _mealTypes[_selectedMealType];
       final created = photo == null
-          ? await _api.createWithText(
+          ? await _api.createWithFoods(
               mealType: mealType,
               eatenAt: _eatenAt,
-              text: _foodsAsText(),
+              foods: [
+                for (final f in _foods)
+                  (foodRefId: f.candidate.foodRefId, amountG: f.amountG!),
+              ],
             )
           : await _api.createWithPhoto(
               mealType: mealType,
@@ -228,7 +235,9 @@ class _MealInputScreenState extends State<MealInputScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => MealAnalysisScreen(meal: created, photo: photo),
+          builder: (_) => created.needsAnalysis
+              ? MealAnalysisScreen(meal: created, photo: photo)
+              : MealReviewScreen(mealId: created.mealId),
         ),
       );
     } catch (e) {
@@ -237,16 +246,6 @@ class _MealInputScreenState extends State<MealInputScreen> {
       setState(() => _submitting = false);
     }
   }
-
-  /// 고른 음식을 `rawText` 한 줄로 만든다(`참치김밥 250g, 달걀 삶은것 100g`).
-  ///
-  /// 임시 연결이다. `POST /meals` 는 아직 음식 목록(`items[]`)을 받지 않아 텍스트
-  /// 입력 경로로 보내고, AI 가 다시 음식을 나눈다. 이름을 DB 이름 그대로 보내
-  /// 서버의 이름 매칭이 같은 음식을 찾게 한다. BE 가 `items[]`(+`foodRefId`)를
-  /// 받게 되면 고른 음식을 그대로 보내 AI 를 건너뛴다(API 요청서 B-1).
-  String _foodsAsText() => _foods
-      .map((f) => '${f.candidate.displayName} ${_formatAmount(f.amountG!)}g')
-      .join(', ');
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));

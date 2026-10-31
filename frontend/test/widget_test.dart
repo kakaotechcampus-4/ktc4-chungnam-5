@@ -1577,13 +1577,16 @@ void main() {
     final post = api.requests.singleWhere(
       (r) => r.method == 'POST' && r.path == '/meals',
     );
-    expect(
-      (post.data as Map)['rawText'],
-      '계란말이 120g, 바로먹는 삶은계란 100g',
-    );
-    expect(find.text('식사 기록'), findsNothing); // 분석 화면으로 넘어갔다.
+    final body = post.data as Map;
+    expect(body.containsKey('rawText'), isFalse);
+    // 고른 음식의 foodRefId 와 g 이 그대로 간다(이름으로 다시 추측시키지 않는다).
+    final items = (body['items'] as List).cast<Map>();
+    expect(items.map((i) => i['unit']), everyElement('g'));
+    expect(items.map((i) => i['amount']), [120, 100]);
+    expect(items.map((i) => i['foodRefId']), everyElement(isNotEmpty));
+    expect(find.text('식사 기록'), findsNothing); // 확인 화면으로 넘어갔다.
 
-    // 분석 화면의 폴링 대기를 끝낸다.
+    // 화면의 대기를 끝낸다.
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 10));
   });

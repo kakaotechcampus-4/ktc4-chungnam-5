@@ -60,8 +60,8 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
       fetch: () => _api.fetchMeal(widget.meal.mealId),
       isDone: (m) => m.status == 'FAILED' || !m.isFirstAnalysis,
       isActive: () => mounted,
-      first: widget.meal.pollInterval,
-      budget: widget.meal.timeout,
+      first: widget.meal.pollInterval ?? const Duration(milliseconds: 1500),
+      budget: widget.meal.timeout ?? const Duration(seconds: 30),
     );
     if (!mounted) return;
     if (meal == null) return _stop(_Stopped.timedOut);

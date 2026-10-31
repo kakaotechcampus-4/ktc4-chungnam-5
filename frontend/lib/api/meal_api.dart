@@ -10,21 +10,29 @@ import 'api_client.dart';
 class MealCreated {
   const MealCreated({
     required this.mealId,
-    required this.pollInterval,
-    required this.timeout,
+    this.pollInterval,
+    this.timeout,
   });
 
   final String mealId;
 
-  /// 서버가 정해 주는 폴링 간격·한도.
-  final Duration pollInterval;
-  final Duration timeout;
+  /// 서버가 정해 주는 폴링 간격·한도. 분석할 것이 없으면(고른 음식으로 등록, 201)
+  /// 서버가 둘 다 `null` 로 준다.
+  final Duration? pollInterval;
+  final Duration? timeout;
 
-  factory MealCreated.fromJson(Map<String, dynamic> json) => MealCreated(
-    mealId: json['mealId'] as String,
-    pollInterval: Duration(milliseconds: json['pollIntervalMs'] as int),
-    timeout: Duration(milliseconds: json['timeoutMs'] as int),
-  );
+  /// 사진 분석을 기다려야 하는지. 아니면 곧바로 음식 확인(`REVIEW_REQUIRED`) 단계다.
+  bool get needsAnalysis => pollInterval != null;
+
+  factory MealCreated.fromJson(Map<String, dynamic> json) {
+    final interval = json['pollIntervalMs'] as int?;
+    final timeout = json['timeoutMs'] as int?;
+    return MealCreated(
+      mealId: json['mealId'] as String,
+      pollInterval: interval == null ? null : Duration(milliseconds: interval),
+      timeout: timeout == null ? null : Duration(milliseconds: timeout),
+    );
+  }
 }
 
 /// 음식 1개(또는 후보 1개)의 영양 정보. 모르는 값은 null 이다.
@@ -428,11 +436,14 @@ class MealApiService {
 
   final ApiClient _client;
 
-  /// `POST /meals` — 텍스트 입력(JSON).
-  Future<MealCreated> createWithText({
+  /// `POST /meals` — 검색 탭에서 고른 음식(JSON `items[]`).
+  ///
+  /// 이미 고른 `foodRefId` 와 g 이 있으니 AI 분석 없이 곧바로 음식 확인
+  /// (`REVIEW_REQUIRED`) 단계로 등록된다(201). 양은 g 으로만 보낸다.
+  Future<MealCreated> createWithFoods({
     required String mealType,
     required DateTime eatenAt,
-    required String text,
+    required List<({String foodRefId, double amountG})> foods,
     int? satietyBeforePct,
   }) async {
     final result = await _client.post(
@@ -440,7 +451,10 @@ class MealApiService {
       body: {
         'mealType': mealType,
         'eatenAt': formatApiDateTime(eatenAt),
-        'rawText': text,
+        'items': [
+          for (final f in foods)
+            {'foodRefId': f.foodRefId, 'amount': f.amountG, 'unit': 'g'},
+        ],
         'satietyBeforePct': ?satietyBeforePct,
       },
     );
