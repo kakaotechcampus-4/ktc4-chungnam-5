@@ -79,7 +79,8 @@ ai/
 | ------------------------------------------ | ------------------------- |
 | `LLM_API_KEY`                              | Serverless API 키  |
 | `LLM_VISION_URL`                           | 음식 인식 (Gemini Flash)  |
-| `LLM_REASONING_URL`                        | 피드백 (Claude Sonnet 5)  |
+| `LLM_REASONING_URL`                        | 피드백 모델 엔드포인트  |
+| `LLM_COACH_URL`                            | AI Coach 전용 모델 엔드포인트 |
 | `LLM_TIMEOUT_SEC` · `LLM_MAX_RETRIES`      | 기본 45초 / 1회           |
 | `BE_INTERNAL_BASE_URL`                     | BE `/internal/v1` 주소    |
 | `INTERNAL_SERVICE_TOKEN`                   | BE와 공유하는 서비스 토큰 |
@@ -103,3 +104,45 @@ pytest
 ## 참고
 
 - 개발 규칙: [`../CLAUDE.md`](../CLAUDE.md)
+
+
+## AI Coach (`POST /chat`)
+
+`app/ai_coach.py`에 프롬프트 구성, 입력·출력 의료 요청 기본 규칙,
+모델 응답 파싱을 구현했다. 계약 스키마는 `app/schemas.py`, 라우트는 `app/main.py`에 있다.
+BE가 제공한 context와 history를 사용하며 별도 조회는 하지 않는다.
+ID는 기존 BE/stub와 맞춰 문자열로 받고, history는 필수 배열이다.
+
+`ai_coach.call_model(messages)`는 `.env`의 `LLM_API_KEY`와 `LLM_COACH_URL`을 사용한다.
+`CoachSettings`로 코치에 필요한 설정만 검증하므로 vision 설정과 독립적으로 실행된다.
+OpenAI 호환 `/v1/chat/completions` 경로로 호출하며, 현재 게이트웨이는
+`max_completion_tokens`를 요구하고 비스트리밍 응답은 최대 2000토큰까지 허용한다.
+명백한 의료 요청은 모델 호출 전에 BLOCKED로 반환한다.
+25초 전체 호출 제한을 적용하고 재시도하지 않는다. 게이트웨이/설정 오류는 503으로 반환한다.
+타임아웃은 504, 모델 JSON 계약 위반은 502로 반환한다.
+자동 테스트는 호출부 또는 HTTP 전송을 대체하므로 외부 API를 호출하지 않는다.
+
+- SAFE는 공백 아닌 text가 필요하다. BLOCKED/REVIEW_REQUIRED는 본문과 카드를 비운다.
+- 잘못된 개별 카드는 제거한다. 모델이 생성한 영양 필드와 미검증 식품 ID는 버린다.
+- 질문·답변·음식명은 애플리케이션 로그에 기록하지 않는다.
+- QQS null 축 평가 금지는 프롬프트 규칙이다. 실제 준수 여부는 모델 연결 후 평가해야 한다.
+- 정규식 가드레일은 보조 규칙이며 의료 안전성을 보장하지 않는다.
+  모델 연결 시 우회 표현·영문·문맥 의존 질문과 위험 출력에 대한 안전성 평가가 필요하다.
+
+검증: `python -m pytest ai/tests -q` (저장소 루트에서 실행).
+
+
+### 실제 모델 테스트
+
+`ai/` 디렉터리에서 `.env`에 실제 키와 coach 기본 URL을 설정한 뒤 실행한다.
+추가 패키지는 `requirements.txt`를 설치한다. 모델 사용 비용이 발생한다.
+
+```bash
+cd ai
+python scripts/smoke_ai_coach.py
+python scripts/smoke_ai_coach.py '편의점에서 살 수 있는 반찬으로 추천해줘'
+```
+
+합성 식사 기록으로 실제 앱의 `/chat` 라우트를 호출하고 상태 코드·소요 시간·처리된 답변을 출력한다.
+기본 테스트는 실제 게이트웨이에서 HTTP 200, SAFE, 추천 카드 2개를 확인했다.
+단일 호출 결과이며 추천 품질·안전성·지연에 대한 종합 평가는 별도로 필요하다.

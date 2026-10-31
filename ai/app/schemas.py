@@ -185,3 +185,107 @@ class ShortFeedbackResponse(_Camel):
 
 # ─────────────────────────── /long-feedback ───────────────────────────
 # TODO: 계약 미확정. 확정되면 ai-stub/schemas.py 구조를 기준으로 작성한다.
+
+
+# ─────────────────────────── /chat ───────────────────────────
+
+
+class PeriodType(str, Enum):
+    WEEKLY = "WEEKLY"
+    MONTHLY = "MONTHLY"
+    ALL = "ALL"
+
+
+class ChatRole(str, Enum):
+    USER = "USER"
+    ASSISTANT = "ASSISTANT"
+
+
+class ChatTurn(_Camel):
+    """지난 대화 한 줄. BE가 필터링한 이력. 연속 USER와 FAILED 질문도 올 수 있다."""
+
+    role: ChatRole
+    text: str
+
+
+class Medication(_Camel):
+    drug_name: str
+    dose_mg: float
+
+
+class TodayMeal(_Camel):
+    """오늘(KST) 확정된 끼니 하나. 점수는 BE Rule Engine 이 매겼다."""
+
+    meal_type: MealType
+    foods: list[str] = Field(default_factory=list)
+    qqs: QQS | None = None  # 평가 행이 없으면 null
+
+
+class TodayContext(_Camel):
+    date: dt.date
+    meals: list[TodayMeal] = Field(default_factory=list)
+
+
+class BaseMealSuggestion(_Camel):
+    food_name: str
+    advice: str
+
+
+class BaseMeal(_Camel):
+    """대화의 기준 끼니. `suggestions` 는 사용자가 지금 보고 있는 "현재 추천" 이다."""
+
+    meal_id: str
+    meal_type: MealType
+    qqs: QQS | None = None
+    suggestions: list[BaseMealSuggestion] = Field(default_factory=list)
+
+
+class LongTermContext(_Camel):
+    period_type: PeriodType
+    trend_summary: str
+    recommendation: str | None = None
+
+
+class ChatContext(_Camel):
+    """BE 가 매 메시지마다 선주입하는 사용자 정보. AI 가 tool 로 다시 묻지 않게 한다."""
+
+    stage: Stage
+    medication: Medication | None = None
+    today: TodayContext
+    base_meal: BaseMeal | None = None
+    long_term: LongTermContext | None = None
+
+
+class ChatRequest(_Camel):
+    user_id: str
+    conversation_id: str
+    text: str = Field(min_length=1)
+    history: list[ChatTurn]
+    context: ChatContext
+
+
+class ChatFoodCard(_Camel):
+    """nutrients 는 여기 없다 — BE 가 food_refs 에서 채운다."""
+
+    food_name: str = Field(min_length=1, max_length=255)
+    advice: str = Field(min_length=1)
+    candidate_food_ref_id: str | None = None
+
+
+class ChatResponse(_Camel):
+    """BLOCKED 면 `text` 는 null, `foodCards` 는 [] 다 (입력 · 출력 가드레일 모두)."""
+
+    text: str | None
+    model_version: str
+    safety_status: SafetyStatus
+    food_cards: list[ChatFoodCard] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _safety_contract(self) -> ChatResponse:
+        if self.safety_status is SafetyStatus.SAFE:
+            if not self.text or not self.text.strip():
+                raise ValueError("SAFE 응답에는 공백 아닌 text가 필요하다")
+        else:
+            self.text = None
+            self.food_cards = []
+        return self
