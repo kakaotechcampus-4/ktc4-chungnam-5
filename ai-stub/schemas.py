@@ -184,6 +184,9 @@ class ShortFeedbackRequest(_Camel):
     # 그날(KST) 끼니 영양 합 — daily_feedbacks.total_* 와 같은 값. 확정 끼니가 남긴 합계를
     # 더한 것이라 식사 안 함 · 확인 전 끼니는 빠진다. 더할 합계가 없으면 null
     daily_nutrition_totals: Nutrition | None = None
+    # 사용자 체중(kg). 먹을 때의 체중, 그 이전 기록이 없으면 가장 최근 체중이다 — BE 가
+    # Quality 채점에 쓴 값과 같다. 기록이 하나도 없으면 null
+    weight_kg: float | None = None
 
     # scope=DAILY
     date: dt.date | None = None

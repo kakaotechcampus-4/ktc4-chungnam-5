@@ -133,6 +133,7 @@ def test_skipped_meal_feedback_accepts_null_scores_and_previous_meals():
             }
         ],
         "dailyNutritionTotals": {"kcal": 180, "proteinG": 12},
+        "weightKg": 82.4,
     }
 
     res = client.post("/short-feedback", json=payload)

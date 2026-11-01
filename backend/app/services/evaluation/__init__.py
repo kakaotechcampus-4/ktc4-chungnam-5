@@ -187,12 +187,8 @@ def _weight_at(db: Session, meal: Meal) -> Decimal | None:
     경우는 가입 직후 과거 시각으로 식사를 적었을 때다 — 그때 체중이 없다고 Quality 를
     비우면, 온보딩에서 받은 체중이 있는데도 점수가 안 나온다.
     """
-    weight = user_state_crud.get_latest_weight_before(
-        db, user_id=meal.user_id, before=meal.eaten_at
-    )
-    if weight is None:
-        weight = user_state_crud.get_latest_weight(db, meal.user_id)
-    return weight
+    # 규칙은 crud 한 곳에 있다 — 끼니 피드백 AI 요청도 같은 체중을 보낸다.
+    return user_state_crud.get_weight_at(db, user_id=meal.user_id, at=meal.eaten_at)
 
 
 def _targets(

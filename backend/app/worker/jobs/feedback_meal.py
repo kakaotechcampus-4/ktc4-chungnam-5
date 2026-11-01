@@ -58,6 +58,7 @@ from app.crud import feedback as feedback_crud
 from app.crud import food as food_crud
 from app.crud import meal as meal_crud
 from app.crud import satiety as satiety_crud
+from app.crud import user_state as user_state_crud
 from app.infra.ai import AiClient
 from app.infra.queue import ClaimedTask
 from app.models.enums import MealStatus, MealType, SafetyStatus
@@ -416,6 +417,10 @@ def load(db: Session, task: ClaimedTask) -> _Ctx | Skip:
             "satiety": satiety,
             "previousMeals": _previous_meals_payload(db, meal),
             "dailyNutritionTotals": _daily_totals_payload(db, meal),
+            # 먹을 때의 체중(없으면 가장 최근). Quality 채점이 쓰는 값과 같다. 기록이 없으면 null.
+            "weightKg": _number(
+                user_state_crud.get_weight_at(db, user_id=meal.user_id, at=meal.eaten_at)
+            ),
         },
     )
 

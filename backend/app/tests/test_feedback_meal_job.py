@@ -39,6 +39,7 @@ from app.tests.factories import (
     make_meal_item,
     make_qqs_evaluation,
     make_user,
+    make_weight,
 )
 from app.worker.dispatch import get_job
 from app.worker.jobs import feedback_meal
@@ -1397,3 +1398,41 @@ def test_daily_nutrition_totals_are_null_without_any_totals(db):
     run(db, _task(meal.id), ai)
 
     assert ai.calls[0]["dailyNutritionTotals"] is None
+
+
+def test_weight_is_the_one_at_eating_time(db):
+    """먹을 때의 체중을 보낸다 — Quality 채점이 쓴 값과 같아야 한다. 먹은 뒤의 기록은 아니다."""
+    user = make_user(db)
+    make_weight(db, user_id=user.id, weight_kg=Decimal("82.40"),
+                recorded_at=datetime(2026, 8, 20, 0, 0, tzinfo=UTC))
+    make_weight(db, user_id=user.id, weight_kg=Decimal("80.10"),
+                recorded_at=datetime(2026, 8, 30, 0, 0, tzinfo=UTC))
+    meal = _evaluated_meal(db, user)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["weightKg"] == 82.4
+
+
+def test_weight_falls_back_to_the_latest_record(db):
+    """먹기 전 기록이 없으면(가입 직후 과거 시각 식사) 가장 최근 체중으로 대신한다."""
+    user = make_user(db)
+    make_weight(db, user_id=user.id, weight_kg=Decimal("80.10"),
+                recorded_at=datetime(2026, 8, 30, 0, 0, tzinfo=UTC))
+    meal = _skipped_meal(db, user)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["weightKg"] == 80.1
+
+
+def test_weight_is_null_without_any_record(db):
+    user = make_user(db)
+    meal = _evaluated_meal(db, user)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["weightKg"] is None
