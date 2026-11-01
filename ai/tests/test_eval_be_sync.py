@@ -170,10 +170,13 @@ def test_r105a_sodium_per_stage_matches_ai_constant():
 
 @pytest.mark.parametrize("stage", list(Stage), ids=lambda s: s.value)
 def test_r106_fiber_per_stage_matches_be(stage):
-    """행 106 — 단계별 하루 식이섬유 기준이 BE `STAGE_PROFILES` 와 같다 (INITIAL 만 ×2/3)."""
+    """행 106′ — 단계별 하루 식이섬유 기준이 BE `STAGE_PROFILES` 와 Decimal 로 정확히 같다 (INITIAL 만 ×2/3).
+
+    양쪽 모두 Decimal 이다 — float 로 바꾸거나 근사로 비교하지 않는다(INITIAL 의 25×2/3 도 같은 Decimal 연산이다).
+    """
     be = _stage_fiber(_read(_STAGE_PROFILE))
     assert stage.value in be, f"BE STAGE_PROFILES 에 {stage.value} 가 없다"
-    assert _FIBER_G_PER_DAY[stage] == pytest.approx(float(be[stage.value]))
+    assert _FIBER_G_PER_DAY[stage] == be[stage.value]
 
 
 def test_r106a_stage_names_match_be():

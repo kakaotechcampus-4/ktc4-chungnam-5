@@ -8,9 +8,12 @@
 
 팩토리 축(`summary_injection_ignored`)의 marker 는 꺼내 읽지 않는다 — 응답을 넣어 보고 **판정 결과로** 확인한다.
 
-`main` 을 부르는 행 d50–d52 는 **실제 `.env` 를 읽지 않는다** — 모든 테스트에서 `app.config.get_settings` ·
-`app.food_analyzer.get_settings` 를 "부르면 기록하고 실패" 로 바꿔 두고(autouse), cwd 를 `tmp_path` 로 옮긴다.
-라우트 안에서 설정을 읽으면 그 AssertionError 는 500 응답으로 삼켜지므로, 읽기 0회는 기록 목록으로 단언한다.
+`main` 을 부르는 행 d50′–d52 는 **실제 `.env` 를 읽지 않는다** — 모든 테스트에서 `app.config.get_settings` ·
+`app.food_analyzer.get_settings` · `app.short_feedback.get_settings` 를 "부르면 기록하고 실패" 로 바꿔 두고(autouse),
+cwd 를 `tmp_path` 로 옮긴다. 라우트 안에서 설정을 읽으면 그 AssertionError 는 500 응답으로 삼켜지므로, 읽기 0회는 기록 목록으로 단언한다.
+
+`/short-feedback` 은 라우트가 연결돼 있다(501 → SKIP 이 아니다). 키가 있으면 실제 앱 경로가 모델을 부르므로,
+실제 앱을 거치는 행(d50′)은 모델 진입점(`app.main.generate_short_feedback`)을 Fake 로 바꾸고 HTTP 클라이언트 생성을 막는다.
 
 구현이 지켜야 하는 참조 방식 (테스트가 monkeypatch 하는 위치):
 - `main` 은 `evals.harness` 를 모듈째 참조해 `harness.has_api_key` · `harness.default_post` 를 호출 시점에 꺼낸다.
@@ -87,6 +90,10 @@ _NEUTRAL = "하루 흐름이 고르게 이어졌어요."
 def settings_reads(monkeypatch, tmp_path) -> list[str]:
     """모든 테스트에서 실제 설정 읽기를 막는다 — 부르면 기록하고 AssertionError. 기록 목록을 돌려준다.
 
+    `/short-feedback` 라우트는 `app.short_feedback` 가 import 해 둔 `get_settings` 를 부르므로 그 이름도 따로 막는다 (d-fx) —
+    막지 않으면 lru_cache 가 채워졌거나 OS 환경변수에 `LLM_*` 가 있는 PC 에서 실제 앱을 거치는 행이 게이트웨이로 나갈 수 있다.
+    라벨(`app.short_feedback`)로 어느 경로가 읽었는지 가른다.
+
     `Settings` 는 `.env` 를 cwd 기준으로 읽는다 — `get_settings` 를 거치지 않고 `Settings()` 를 직접 만드는 경로도
     `ai/.env` 를 못 읽게 cwd 를 빈 `tmp_path` 로 옮긴다. 이 파일의 테스트는 상대경로에 기대지 않는다.
     라우트 안의 AssertionError 는 `raise_server_exceptions=False` 채널에서 500 으로 바뀌어 사라지므로 기록을 남긴다.
@@ -102,6 +109,7 @@ def settings_reads(monkeypatch, tmp_path) -> list[str]:
 
     monkeypatch.setattr("app.config.get_settings", _forbidden("app.config"))
     monkeypatch.setattr("app.food_analyzer.get_settings", _forbidden("app.food_analyzer"))
+    monkeypatch.setattr("app.short_feedback.get_settings", _forbidden("app.short_feedback"))
     monkeypatch.chdir(tmp_path)
     return reads
 
@@ -420,22 +428,43 @@ def test_d49_one_char_summary_change_changes_hash():
 # ─────────────────────────── main ───────────────────────────
 
 
-def test_d50_real_app_short_feedback_501_skips_unconnected(monkeypatch, capsys, settings_reads):
-    """행 d50 — 키가 있어도 실제 앱(`harness.default_post`)의 `/short-feedback` 이 501 이라 `main([])` 은
-    `SKIP: 미연결` 로 0 을 내고, 출력에 `/short-feedback` · `501` 이 있으며 설정을 한 번도 읽지 않는다 (정상).
+def test_d50_connected_route_502_is_gate_fail_not_skip(monkeypatch, capsys, settings_reads, tmp_path):
+    """행 d50′ — 키가 있고 실제 앱(`harness.default_post`)의 `/short-feedback` 라우트가 연결돼 있으면 `main([])` 은
+    SKIP 하지 않는다. 모델 진입점이 응답 무효(ValueError → 502)를 내면 게이트 FAIL(1) 로 끝나고, 게이트 절의 실패 사유에
+    `contract_parseable` critical 0 이 있다 (금지, 결정 B). 케이스 행에는 통과해도 `<id>/contract_parseable` 이 찍히므로
+    게이트 절(`=== 게이트 ===` 뒤)만 본다.
 
-    **라우트가 연결되면 이 행을 바꾼다** — 이 테스트가 깨지는 것은 의도된 경보다.
+    미연결은 404 · 501 만이다 — 502 를 SKIP 으로 넓히면 모델 오류가 "측정 안 함" 으로 숨는다.
+    모델 진입점을 Fake 로 바꾸고 HTTP 클라이언트 생성 0회 · 설정 읽기 0회로 네트워크 0 을 단언한다.
     """
     monkeypatch.setattr(harness, "has_api_key", lambda: True)
+    monkeypatch.setattr(daily_eval, "CRASH_LOG", tmp_path / "crashes.log")
+    model_calls: list[object] = []
+
+    async def _invalid_model(req):
+        model_calls.append(req)
+        raise ValueError("Fake 모델 응답 무효")
+
+    monkeypatch.setattr("app.main.generate_short_feedback", _invalid_model)
+    clients: list[None] = []
+
+    def _forbidden_client(*args, **kwargs):
+        clients.append(None)
+        raise AssertionError("short_feedback 이 HTTP 클라이언트를 만들었다 — 모델 진입점은 Fake 여야 한다")
+
+    monkeypatch.setattr("app.short_feedback.httpx.AsyncClient", _forbidden_client)
 
     code = main([])
 
     out = capsys.readouterr().out
-    assert code == 0
-    assert "SKIP: 미연결" in out
-    assert "/short-feedback" in out
-    assert "501" in out
+    assert code == 1
+    assert "SKIP" not in out
+    gate_section = out.split("=== 게이트 ===", 1)[-1]
+    assert "FAIL" in gate_section
+    assert "/contract_parseable: critical 0/" in gate_section
+    assert len(model_calls) >= 1
     assert settings_reads == []
+    assert clients == []
 
 
 def test_d51_no_api_key_skips_with_exit_0_and_no_post_factory_call(monkeypatch, capsys):

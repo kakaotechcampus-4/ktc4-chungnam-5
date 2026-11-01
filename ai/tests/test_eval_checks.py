@@ -21,6 +21,7 @@ from app.short_feedback import _MEAL_EXAMPLE_GOOD, build_meal_prompt, judge_nutr
 from evals.checks import (
     _clauses,
     _connective_units,
+    _example_foods,
     cause_food_named,
     contract_parseable,
     example_no_leak,
@@ -54,8 +55,11 @@ _MARKER = "ZQX-7731-PAPAYA"
 # ─────────────────────────── 빌더 ───────────────────────────
 
 
-def _req(*, stage="MAINTENANCE", qqs=None, items=None, satiety=None) -> dict:
-    """MEAL 요청 JSON. 계약(`ShortFeedbackRequest`)을 만족하는지 여기서 한 번 확인한다."""
+def _req(*, stage="MAINTENANCE", qqs=None, items=None, satiety=None, weight_kg=None) -> dict:
+    """MEAL 요청 JSON. 계약(`ShortFeedbackRequest`)을 만족하는지 여기서 한 번 확인한다.
+
+    `weight_kg` 가 있을 때만 `weightKg` 를 싣는다 — 앱은 체중이 있을 때만 단백질을 판정한다.
+    """
     data = {
         "scope": "MEAL",
         "userId": "u1",
@@ -65,6 +69,8 @@ def _req(*, stage="MAINTENANCE", qqs=None, items=None, satiety=None) -> dict:
         "items": items if items is not None else [_item()],
         "satiety": satiety,
     }
+    if weight_kg is not None:
+        data["weightKg"] = weight_kg
     ShortFeedbackRequest.model_validate(data)
     return data
 
@@ -827,16 +833,15 @@ def test_r46a_short_nutrient_addressed_passes():
     assert ok is True
 
 
-def test_r46b_inferred_protein_short_addressed_passes():
-    """행 46b — 추정 단백질 부족(inferred)도 이 축의 대상이고, 다루면 통과한다 (게이트 ⓑ-2).
+def test_r46b_weighted_protein_short_addressed_passes():
+    """행 46b′ — 체중이 있어 판정된 단백질 부족도 이 축의 대상이고, 다루면 통과한다 (게이트 ⓑ-2).
 
-    `build_meal_prompt` 의 제안 방향이 추정 단백질도 "단백질 채우기" 로 지시한다.
+    앱은 `weightKg` 가 있을 때만 단백질을 판정한다 — 체중을 실어 단백질 SHORT 를 만든다. 판정 기준은 그대로다.
+    `build_meal_prompt` 의 제안 방향이 단백질 부족을 "단백질 채우기" 로 지시한다.
     """
-    req = _req(items=[_item("제육덮밥", proteinG=20, fiberG=9, sodiumMg=500)])
-    # 전제: quality 62 < 100 · 식이섬유 · 나트륨 충족 → 단백질 SHORT(inferred) — 깨지면 이 테스트는 무의미해진다
+    req = _req(weight_kg=60, items=[_item("제육덮밥", proteinG=20, fiberG=9, sodiumMg=500)])
+    # 전제: 체중 60kg 의 끼니 단백질 목표 > 20g · 식이섬유 · 나트륨 충족 — 깨지면 이 테스트는 무의미해진다
     assert _states(req) == {"protein": "SHORT", "fiber": "OK", "sodium": "OK"}
-    protein = judge_nutrients(ShortFeedbackRequest.model_validate(req))[0]
-    assert protein.name == "protein" and protein.inferred is True
     assert "단백질 채우기" in _prompt(req)
     resp = _resp(suggestions=_with_advice("다음 끼니에 곁들이면 단백질을 채울 수 있어요"))
     ok, _ = gap_addressed(resp, req)
@@ -919,9 +924,9 @@ def test_r52_concrete_observation_passes():
 # ─────────────────────────── example_no_leak ───────────────────────────
 
 
-@pytest.mark.parametrize("food_name", ["삶은 달걀 2개", "방울토마토 한 줌"], ids=["egg", "cherry-tomato"])
+@pytest.mark.parametrize("food_name", ["두부 반 모", "찐 브로콜리 한 접시"], ids=["tofu", "broccoli"])
 def test_r53_example_suggestion_leak_fails(food_name):
-    """행 53 — few-shot 예시 제안(foodName)이 새면 실패한다. 이번 끼니가 아니라 예시를 베꼈다."""
+    """행 53′ — few-shot 예시 제안(foodName — "두부 반 모" · "찐 브로콜리 한 접시")이 새면 실패한다. 이번 끼니가 아니라 예시를 베꼈다."""
     resp = _resp(suggestions=[{"foodName": food_name, "advice": "이번 끼니에 곁들일 수 있어요"}])
     ok, _ = example_no_leak(resp, _req())
     assert ok is False
@@ -952,12 +957,77 @@ def test_r54_example_food_or_sentence_leak_fails(field, text):
     assert ok is False
 
 
-@pytest.mark.parametrize("food_name", ["그릭요거트 1개", "두부 반 모"], ids=["yogurt", "tofu-format-example"])
+def test_r54b_first_meal_food_in_new_header_leak_fails():
+    """행 54b — 새 예시 헤더의 첫 끼니 음식("채소 계란말이")이 body 에 새면 실패한다 (양방향-거름).
+
+    헤더가 "아침 채소 계란말이 → 점심 참치김밥+라면" 으로 바뀌었다 — 화살표 앞 끼니의 음식도 예시 음식이다.
+    """
+    ok, _ = example_no_leak(_resp(body="채소 계란말이를 곁들이셨네요."), _req())
+    assert ok is False
+
+
+@pytest.mark.parametrize("food_name", ["그릭요거트 1개", "삶은 달걀 2개"], ids=["yogurt", "egg-format-example"])
 def test_r55_non_example_suggestion_passes(food_name):
-    """행 55 — 예시와 다른 제안은 통과한다. 프롬프트 형식 예시 "두부 반 모" 도 누출로 보지 않는다 (결정 E)."""
+    """행 55′ — 예시와 다른 제안은 통과한다. 프롬프트 형식 설명 줄의 예시 "삶은 달걀 2개" 도 누출로 보지 않는다 (결정 E)."""
     resp = _resp(suggestions=[{"foodName": food_name, "advice": "이번 끼니에 곁들일 수 있어요"}])
     ok, _ = example_no_leak(resp, _req())
     assert ok is True
+
+
+def test_r55b_meal_words_in_header_are_not_example_foods():
+    """행 55b — 예시 헤더의 끼니 이름("아침" · "점심")은 예시 음식이 아니다 — 끼니를 말하는 body 는 통과한다 (행 54b 의 짝).
+
+    끼니 이름을 음식으로 잡으면 끼니 흐름을 말하는 평범한 문장이 모두 누출로 보인다.
+    """
+    ok, _ = example_no_leak(_resp(body="아침과 점심 사이 간격이 길었어요."), _req())
+    assert ok is True
+
+
+# ─────────────────────────── _example_foods — few-shot 예시 헤더 파싱 ───────────────────────────
+#
+# 행 B1–B4 — 프롬프트 · 예시 답을 인자로 넣어 헤더 파싱만 본다. 앱 프롬프트가 바뀌어도 파싱이 조용히 비지 않게 한다.
+
+_B_GOOD = {"suggestions": [{"foodName": "연근조림 한 접시", "advice": "다음 끼니에 곁들일 수 있어요"}]}
+
+
+def test_b1_new_header_drops_meal_prefix_and_arrow():
+    """행 B1 — 새 헤더("아침 … → 점심 …+…")에서 끼니 접두 · `→` 를 떼고 음식만 낸다 (정상)."""
+    prompt = "예시\n좋은 답 (아침 콩나물국밥 → 점심 비빔밥+된장국, 누적 나트륨 한도 대비 90.0%):\n{...}"
+    foods = _example_foods(prompt=prompt, good=_B_GOOD)
+    assert set(foods) == {"콩나물국밥", "비빔밥", "된장국", "연근조림"}
+
+
+def test_b2_old_header_without_arrow_is_still_read():
+    """행 B2 — 옛 헤더(화살표 · 끼니 접두 없음)도 읽는다 (회귀)."""
+    prompt = "예시\n좋은 답 (참치김밥+라면, 나트륨 OVER):\n{...}"
+    foods = _example_foods(prompt=prompt, good=_B_GOOD)
+    assert set(foods) == {"참치김밥", "라면", "연근조림"}
+
+
+def test_b3_missing_header_raises():
+    """행 B3 — 프롬프트에 예시 헤더("좋은 답 (")가 없으면 RuntimeError 로 멈춘다 (금지).
+
+    조용히 빈 목록을 내면 example_no_leak 가 아무것도 거르지 않는 채로 통과한다.
+    """
+    with pytest.raises(RuntimeError):
+        _example_foods(prompt="예시\n모범 답:\n{...}", good=_B_GOOD)
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "예시\n좋은 답 (아침 콩나물국밥 ⇒ 점심 비빔밥, 누적 나트륨 한도 대비 90.0%):\n{...}",
+        "예시\n좋은 답 ( , 누적 나트륨 한도 대비 90.0%):\n{...}",
+    ],
+    ids=["unknown-separator", "empty-chunk"],
+)
+def test_b4_unexpected_header_shape_raises(prompt):
+    """행 B4 — 헤더 모양이 예상과 다르면(모르는 구분자 · 빈 덩어리) RuntimeError 로 멈춘다 (금지).
+
+    "아침 콩나물국밥 ⇒ 점심 비빔밥" 을 한 덩어리 음식으로 잡으면 실제 음식을 놓친다 — 이번 사이클의 r54 회귀가 이 경우였다.
+    """
+    with pytest.raises(RuntimeError):
+        _example_foods(prompt=prompt, good=_B_GOOD)
 
 
 # ─────────────────────────── 관측 (ambiguous) ───────────────────────────

@@ -25,8 +25,9 @@ from __future__ import annotations
 import functools
 import re
 import unicodedata
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -775,7 +776,9 @@ def no_cliche(resp: dict, req: dict) -> Verdict:
     return _verdict("상투구", found)
 
 
-def _example_foods() -> list[str]:
+def _example_foods(
+    *, prompt: str = MEAL_SYSTEM_PROMPT, good: Mapping[str, Any] = _MEAL_EXAMPLE_GOOD
+) -> list[str]:
     """few-shot 예시 음식 — 예시 끼니("참치김밥+라면")와 예시 제안의 음식 부분("삶은 달걀")."""
     m = re.search(r"좋은 답 \(([^,)]+)", MEAL_SYSTEM_PROMPT)
     if m is None:
