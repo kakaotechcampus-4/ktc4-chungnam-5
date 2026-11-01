@@ -10,6 +10,7 @@ import 'package:frontend/common/api_format.dart';
 import 'package:frontend/common/api_image.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/popups/daily_condition_popup.dart';
+import 'package:frontend/popups/popup_gate.dart';
 import 'package:frontend/screens/home_screen.dart' show StomachGauge;
 import 'package:frontend/api/meal_api.dart';
 import 'package:frontend/screens/meal_analysis_screen.dart';
@@ -1393,6 +1394,87 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
     expect(find.byType(MealReviewScreen), findsOneWidget);
+  });
+
+  /// 확인 화면(5번)을 다른 화면 위에 띄운다 — 뒤로 갈 곳이 있어야 나가기를 볼 수 있다.
+  Future<FakeApi> pumpReviewOnTop(WidgetTester tester) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    final api = FakeApi();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider(create: (_) => ApiClient(session: session, dio: api.dio)),
+          Provider(create: (_) => PopupGate()),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MealReviewScreen(mealId: 'm1'),
+                  ),
+                ),
+                child: const Text('열기'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('열기'));
+    await _settle(tester);
+    return api;
+  }
+
+  testWidgets('leaving an unconfirmed review can delete the meal', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpReviewOnTop(tester);
+    await tester.tap(find.byIcon(Icons.chevron_left));
+    await tester.pumpAndSettle();
+    expect(find.text('음식 확인을 마치지 않았어요'), findsOneWidget);
+
+    await tester.tap(find.text('기록 삭제'));
+    await _settle(tester);
+
+    final delete = api.requests.singleWhere((r) => r.method == 'DELETE');
+    expect(delete.path, '/meals/m1');
+    expect(find.byType(MealReviewScreen), findsNothing);
+    expect(find.text('열기'), findsOneWidget);
+  });
+
+  testWidgets('leaving an unconfirmed review later keeps the meal', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpReviewOnTop(tester);
+    // 시스템 뒤로가기도 같은 확인을 거친다.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('음식 확인을 마치지 않았어요'), findsOneWidget);
+
+    await tester.tap(find.text('나중에'));
+    await _settle(tester);
+
+    expect(api.requests.where((r) => r.method == 'DELETE'), isEmpty);
+    expect(find.byType(MealReviewScreen), findsNothing);
+  });
+
+  testWidgets('continuing stays on the review screen', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpReviewOnTop(tester);
+    await tester.tap(find.byIcon(Icons.chevron_left));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('계속하기'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MealReviewScreen), findsOneWidget);
+    expect(find.text('음식 확인을 마치지 않았어요'), findsNothing);
+    expect(api.requests.where((r) => r.method == 'DELETE'), isEmpty);
   });
 
   testWidgets('after an amount edit the nutrition line shows the new value', (

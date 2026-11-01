@@ -68,7 +68,9 @@ class _MealItemEditSheet extends StatefulWidget {
 }
 
 class _MealItemEditSheetState extends State<_MealItemEditSheet> {
-  static const _baseUnits = ['g', 'ml', '개', '인분'];
+  /// MVP 는 g 만 고른다. 사진 분석이 개·인분으로 적어 온 항목은 `_units` 가 그
+  /// 값을 함께 보여 준다(없으면 드롭다운이 깨진다).
+  static const _baseUnits = ['g'];
 
   late final _name = TextEditingController(text: widget.item.displayName);
   late final _search = TextEditingController(text: widget.item.displayName);

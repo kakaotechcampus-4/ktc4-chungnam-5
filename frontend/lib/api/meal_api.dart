@@ -485,6 +485,9 @@ class MealApiService {
   Future<void> deleteItem(String mealId, String itemId) =>
       _client.delete('/meals/$mealId/items/$itemId');
 
+  /// `DELETE /meals/{mealId}` — 끼니 통째로 soft delete. 되돌리는 API 는 없다.
+  Future<void> deleteMeal(String mealId) => _client.delete('/meals/$mealId');
+
   /// `GET /nutrition/candidates?q=`
   Future<List<FoodCandidate>> searchCandidates(String query) async {
     final result = await _client.get(
