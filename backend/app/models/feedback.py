@@ -74,6 +74,19 @@ class DailyFeedback(Base):
     quality_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     satiety_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
 
+    # 그날 영양 합계 — 끼니 영양 합계(`meals.total_*`)를 그날(KST) 끼니만큼 **더한** 값이다.
+    # 점수와 같이 `feedback.meal` 이 끼니마다 그날 전체를 다시 더해 덮는다(누적해 더하지
+    # 않는다 — 재확정·재시도에 두 번 더해진다).
+    #
+    # NULL 은 그날 합계를 남긴 끼니가 하나도 없다는 뜻이다. 끼니 쪽이 빈 영양정보를 0 으로
+    # 더하므로 ⚠️ 이 값도 실제보다 작을 수 있다(`services.meal.meal_nutrition`).
+    total_kcal: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_protein_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_fat_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_carb_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_fiber_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    total_sodium_mg: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+
     model_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     safety_status: Mapped[SafetyStatus] = mapped_column(
         pg_enum(SafetyStatus, "safety_status"),

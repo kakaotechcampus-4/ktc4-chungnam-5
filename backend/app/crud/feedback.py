@@ -26,7 +26,7 @@ FEEDBACK_TASK_TYPE: Final = "feedback.meal"
 FAILED · GENERATING 이 조용히 PENDING 이 된다. 워커 등록(`worker/dispatch.py`)도 같은 문자열이다.
 
 crud 에 두는 건 services → crud 방향만 import 가 허용되기 때문이다
-(`crud/daily_feedback.py::REFRESH_TASK_TYPE` 과 같은 자리)."""
+(`crud/insight.py::REFRESH_TASK_TYPE` 과 같은 자리)."""
 
 
 def get_by_meal(db: Session, meal_id: uuid.UUID) -> MealFeedback | None:
