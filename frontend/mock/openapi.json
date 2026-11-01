@@ -11,7 +11,7 @@
           "meals"
         ],
         "summary": "Create Meal",
-        "description": "사진 또는 텍스트로 식사를 등록한다. 실제 분석은 워커가 비동기로 한다 (202).\n\n**일부러 `def` 다.** body 파싱(진짜 비동기 I/O)은 `parse_meal_input` 의존성이\n이미 끝내고 넘겨주고, 여기 남은 건 DB 쓰기·디스크 저장(둘 다 동기)뿐이다.\n`async def` 였다면 그 동기 작업이 끝날 때까지 이벤트 루프 전체가 막혀 다른\n요청도 같이 기다렸을 것이다 — `def` 면 FastAPI 가 스레드풀에서 돌려준다.\n\n사진 인식·`meal_items` 채우기(`worker/jobs/analyze_meal.py`)는 이번 범위 밖이다\n— 큐에 작업만 넣고, 실제 AI 연동 로직은 아직 스켈레톤(TODO) 상태로 남겨둔다.",
+        "description": "사진 또는 고른 음식으로 식사를 등록한다.\n\n사진은 실제 분석을 워커가 비동기로 한다 (202).\n\n## 고른 음식(`items[]`)은 분석하지 않는다 (201)\n\n검색 탭에서 공공 DB 음식을 직접 고른 경우다. 이미 정확한 `foodRefId` 와 g 이\n있으니 AI 에게 다시 추측시키지 않고 그대로 항목을 만들어 `REVIEW_REQUIRED` 로\n돌려준다 — 기다릴 작업이 없으므로 202 가 아니라 201 이다. 없는 `foodRefId` 가\n섞이면 404 다(`PUT .../nutrition` 과 같다).\n\n**일부러 `def` 다.** body 파싱(진짜 비동기 I/O)은 `parse_meal_input` 의존성이\n이미 끝내고 넘겨주고, 여기 남은 건 DB 쓰기·디스크 저장(둘 다 동기)뿐이다.\n`async def` 였다면 그 동기 작업이 끝날 때까지 이벤트 루프 전체가 막혀 다른\n요청도 같이 기다렸을 것이다 — `def` 면 FastAPI 가 스레드풀에서 돌려준다.\n\n## 식사 안 함(`skipped: true`)은 확정까지 끝난 채로 만든다 (201)\n\n`{ \"mealType\", \"eatenAt\", \"skipped\": true }` 만 받는다. 음식 분석도 확인 화면도 없이\n`EVALUATED` 로 두고 끼니 피드백 작업을 함께 넣는다 — FE 는 확정을 부르지 않고 곧바로\n`GET /meals/{mealId}/feedback` 을 폴링한다. 점수는 매기지 않는다(세 축 모두 null).\n\n사진 인식·`meal_items` 채우기(`worker/jobs/analyze_meal.py`)는 이번 범위 밖이다\n— 큐에 작업만 넣고, 실제 AI 연동 로직은 아직 스켈레톤(TODO) 상태로 남겨둔다.",
         "operationId": "create_meal_api_v1_meals_post",
         "parameters": [
           {
@@ -32,6 +32,16 @@
           }
         ],
         "responses": {
+          "201": {
+            "description": "고른 음식(items[])으로 등록 — 분석 없이 REVIEW_REQUIRED. 식사 안 함(skipped: true) — 곧바로 EVALUATED, 끼니 피드백 생성 중",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MealCreateResponse_"
+                }
+              }
+            }
+          },
           "202": {
             "description": "Successful Response",
             "content": {
@@ -44,6 +54,16 @@
           },
           "401": {
             "description": "인증 실패 — UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
             "content": {
               "application/json": {
                 "schema": {
@@ -403,7 +423,7 @@
           "meals"
         ],
         "summary": "Add Meal Item",
-        "description": "사용자가 빠진 음식을 직접 더한다.\n\nAI 가 준 후보(`candidateFoodRefId`)가 없으므로 공공 DB 를 이름으로 찾는다.\n`matched` 는 API 명세서의 정의대로 **\"영양정보가 함께 나가는가\"** 이지\n\"공공 DB 에서 음식을 찾았는가\" 가 아니다. 세 갈래다:\n\n| 결과 | `matched` | `nutrition` | DB `food_ref_id` |\n|---|---|---|---|\n| 하나로 좁혀짐 + g 환산 가능 | `true` | 있음 | 연결 |\n| 하나로 좁혀짐 + 환산 불가(\"2개\") | `false` | `null` | **연결 유지** |\n| 못 좁힘 (없음 · \"김치찌개\" 28건) | `false` | `null` | `NULL` |\n\n두 번째가 링크를 남기는 건 사용자가 나중에 양을 g 으로 고치면 곧바로 환산되기\n때문이다. 매칭 규칙은 `crud.food.find_unique_by_name` 참고.\n\n## `matched: false` 는 에러가 아니라 폴백 신호다\n\n항목은 **정상 저장된다(201).** 영양정보만 비어 있다. FE 는 이 값을 보고 API\n명세서의 \"영양정보 폴백\" 으로 넘어간다:\n\n    matched: false\n      → GET /nutrition/candidates?q=<displayName>&limit=5   후보 검색\n      → 사용자가 고르거나 직접 입력\n      → PUT /meals/{mealId}/items/{itemId}/nutrition\n\n이름 매칭을 일부러 좁게 잡았다 — 틀린 영양성분이 `food_ref_id` 로 박제돼\nQ/Q/S 채점까지 흘러가는 것보다 비어 있는 편이 낫기 때문이다(`quality_score`\n가 NULL 허용인 이유). 그래서 흔한 음식도 이 경로로 간다: 실측하면\n`김치찌개` · `미역국` · `제육볶음` · `현미밥` 이 전부 여기 해당한다.\n\n두 엔드포인트 모두 붙어 있다 — 이 파일의 `set_meal_item_nutrition` 과\n`endpoints/nutrition.py` 의 `search_nutrition_candidates` 다.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다\n(`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).\n\n여기서 조합한다: g 환산 → 공공 DB 매칭 → 저장. `services/` 끼리는 서로 부르지\n않으므로(README 절대 규칙 5) 순서를 아는 건 이 레이어뿐이다.\n\n## ANALYZING 은 \"워커가 도는 중\" 이 아니다\n\n응답의 `status: ANALYZING` · `isRecalculation: true` 는 API 명세서\n(`contracts/API.md` POST /meals/{mealId}/items)를 그대로 따른다. 항목 하나가\n아니라 **식사 전체**의 상태이며, 여기서는 **\"점수가 아직 유효하지 않다\"** 는\n뜻이다 — 백그라운드 작업이 도는 중이라는 뜻이 아니다.\n\n명세서의 비동기 규약은 `202 + 폴링` 이고 그 자리는 `POST /meals` 다(사진에서\n음식을 인식하는 진짜 AI 작업, `steps` 배열로 진행상황까지 준다). 이 엔드포인트는\n`201` 이라 폴링 대상이 아니다. 사용자는 확인 화면에 그대로 머물러 음식을 계속\n고치고, 다 되면 [확인] 을 누른다.\n\n그래서 여기서는 큐에 아무것도 넣지 않는다. 사용자가 음식명과 양을 직접\n알려줬으므로 AI 에게 물을 것이 없고, 다시 계산할 Q/Q/S 는 순수 함수라\n0.01 초면 끝난다(README 절대 규칙 2). 확인 화면은 [확인] 전까지 점수를 보여\n주지도 않는다.\n\n## 🔗 의존성 — `POST /meals/{mealId}/confirm` 이 이 상태를 해소한다\n\n**confirm 은 `status = ANALYZING` + `is_recalculation = true` 인 식사를 정상\n입력으로 받아 채점하고 `EVALUATED` 로 옮겨야 한다.**\n\n이 조합은 \"사용자가 확인 화면에서 음식을 고쳤다\" 는 뜻이지 \"워커가 분석 중\"\n이 아니다. confirm 이 `ANALYZING` 을 통째로 막으면(예: 409 NOT_CONFIRMED)\n**사용자는 음식을 고친 뒤 영원히 확정하지 못한다** — 이 상태를 풀어 줄 다른\n경로가 없기 때문이다. confirm 작업에 이 문단을 함께 전달할 것.\n\n최초 분석(`is_recalculation = false`)의 `ANALYZING` 은 반대로 워커가 푼다\n(`jobs/analyze_meal.py` 8단계). 두 `ANALYZING` 의 해소 주체가 다르다 —\n가르는 건 `is_recalculation` 이다(`services.meal._is_editable` 참고).",
+        "description": "사용자가 빠진 음식을 직접 더한다.\n\nAI 가 준 후보(`candidateFoodRefId`)가 없으므로 공공 DB 를 이름으로 찾는다.\n`matched` 는 API 명세서의 정의대로 **\"영양정보가 함께 나가는가\"** 이지\n\"공공 DB 에서 음식을 찾았는가\" 가 아니다. 세 갈래다:\n\n| 결과 | `matched` | `nutrition` | DB `food_ref_id` |\n|---|---|---|---|\n| 하나로 좁혀짐 + g 환산 가능 | `true` | 있음 | 연결 |\n| 하나로 좁혀짐 + 환산 불가(\"2개\") | `false` | `null` | **연결 유지** |\n| 못 좁힘 (없음 · \"김치찌개\" 28건) | `false` | `null` | `NULL` |\n\n두 번째가 링크를 남기는 건 사용자가 나중에 양을 g 으로 고치면 곧바로 환산되기\n때문이다. 매칭 규칙은 `crud.food.find_unique_by_name` 참고.\n\n## `matched: false` 는 에러가 아니라 폴백 신호다\n\n항목은 **정상 저장된다(201).** 영양정보만 비어 있다. FE 는 이 값을 보고 API\n명세서의 \"영양정보 폴백\" 으로 넘어간다:\n\n    matched: false\n      → GET /nutrition/candidates?q=<displayName>&limit=5   후보 검색\n      → 사용자가 고르거나 직접 입력\n      → PUT /meals/{mealId}/items/{itemId}/nutrition\n\n이름 매칭은 정규화한 이름이 **정확히 같을 때만** 건다 — 틀린 영양성분이\n`food_ref_id` 로 박제돼 Q/Q/S 채점까지 흘러가는 것보다 비어 있는 편이 낫기\n때문이다(`quality_score` 가 NULL 허용인 이유). 같은 이름의 여러 건은 적재할 때\n평균으로 합쳐 두었으므로(`crud.food.find_unique_by_name`) 이 경로로 오는 건\n공공 DB 에 그 이름이 없는 경우다.\n\n두 엔드포인트 모두 붙어 있다 — 이 파일의 `set_meal_item_nutrition` 과\n`endpoints/nutrition.py` 의 `search_nutrition_candidates` 다.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다\n(`DELETE /meals/{mealId}` 와 같은 이유 — 소유권 누출 방지).\n\n여기서 조합한다: g 환산 → 공공 DB 매칭 → 저장. `services/` 끼리는 서로 부르지\n않으므로(README 절대 규칙 5) 순서를 아는 건 이 레이어뿐이다.\n\n## ANALYZING 은 \"워커가 도는 중\" 이 아니다\n\n응답의 `status: ANALYZING` · `isRecalculation: true` 는 API 명세서\n(`contracts/API.md` POST /meals/{mealId}/items)를 그대로 따른다. 항목 하나가\n아니라 **식사 전체**의 상태이며, 여기서는 **\"점수가 아직 유효하지 않다\"** 는\n뜻이다 — 백그라운드 작업이 도는 중이라는 뜻이 아니다.\n\n명세서의 비동기 규약은 `202 + 폴링` 이고 그 자리는 `POST /meals` 다(사진에서\n음식을 인식하는 진짜 AI 작업, `steps` 배열로 진행상황까지 준다). 이 엔드포인트는\n`201` 이라 폴링 대상이 아니다. 사용자는 확인 화면에 그대로 머물러 음식을 계속\n고치고, 다 되면 [확인] 을 누른다.\n\n그래서 여기서는 큐에 아무것도 넣지 않는다. 사용자가 음식명과 양을 직접\n알려줬으므로 AI 에게 물을 것이 없고, 다시 계산할 Q/Q/S 는 순수 함수라\n0.01 초면 끝난다(README 절대 규칙 2). 확인 화면은 [확인] 전까지 점수를 보여\n주지도 않는다.\n\n## 🔗 의존성 — `POST /meals/{mealId}/confirm` 이 이 상태를 해소한다\n\n**confirm 은 `status = ANALYZING` + `is_recalculation = true` 인 식사를 정상\n입력으로 받아 채점하고 `EVALUATED` 로 옮겨야 한다.**\n\n이 조합은 \"사용자가 확인 화면에서 음식을 고쳤다\" 는 뜻이지 \"워커가 분석 중\"\n이 아니다. confirm 이 `ANALYZING` 을 통째로 막으면(예: 409 NOT_CONFIRMED)\n**사용자는 음식을 고친 뒤 영원히 확정하지 못한다** — 이 상태를 풀어 줄 다른\n경로가 없기 때문이다. confirm 작업에 이 문단을 함께 전달할 것.\n\n최초 분석(`is_recalculation = false`)의 `ANALYZING` 은 반대로 워커가 푼다\n(`jobs/analyze_meal.py` 8단계). 두 `ANALYZING` 의 해소 주체가 다르다 —\n가르는 건 `is_recalculation` 이다(`services.meal._is_editable` 참고).",
         "operationId": "add_meal_item_api_v1_meals__meal_id__items_post",
         "parameters": [
           {
@@ -501,7 +521,7 @@
           "meals"
         ],
         "summary": "Update Meal Items",
-        "description": "사용자가 확인 화면에서 AI 인식 결과를 고친다.\n\n고친 항목만 배열에 담아 보낸다. 항목 하나는 통째로 교체된다 — 세 필드가 모두\n필수다(`MealItemUpdate` 참고).\n\n## 이름이 바뀌거나 링크가 없을 때 공공 DB 를 다시 찾는다\n\n**이름이 그대로고 `food_ref_id` 가 이미 있으면** 그 링크를 지킨다. 이름 매칭\n(`crud.food.find_unique_by_name`)은 일부러 보수적이라 `김치찌개` 같은 흔한\n음식에 `None` 을 주는데, AI 가 `candidateFoodRefId` 로 정확히 연결해 둔 링크를\n\"250g → 220g\" 같은 수정이 끊어 버리면 영양정보가 이유 없이 사라진다.\n\n**이름이 그대로여도 `food_ref_id` 가 NULL 이면 새로 찾은 결과를 건다.** AI 가\n후보를 주지 못했다는 뜻이고 이름 매칭은 워커가 쓰지 않는 별개의 신호라, 지킬\n링크가 없는데 버릴 이유가 없다. \"미역국 2개 → 200g\" 처럼 이제 g 으로 환산되는\n수정이 영양정보를 얻는 경로다. 이름으로도 못 좁히면 NULL 그대로다.\n\n이름이 바뀌면 다른 음식이 된 것이므로 다시 찾고, 못 찾으면 링크를 끊는다\n(`matched: false` 폴백 경로로 간다 — `add_meal_item` 독스트링 참고).\n\n이름을 바꾸면 `confidence` 도 지운다 — AI 가 다른 이름에 매긴 신뢰도다. 남겨 두면\n사용자가 직접 써 넣은 이름이 FE 에서 `< 0.8` 로 강조된다. 지운 값은\n`user_corrections.original_value` 에 남아 인식 성능 평가에 쓸 수 있다.\n\n## g 으로 환산되지 않는 양도 버리지 않는다\n\n`confirmed_amount_g` 는 환산된 값만 담으므로 \"2개\" 는 NULL 이 된다. 사용자가\n입력한 숫자·단위는 `confirmed_amount` · `confirmed_unit` 에 그대로 남는다 —\n출처(MODEL/USER)와 무관하게 같은 자리다. 이 컬럼들이 없으면 \"계란 2개 → 3개\" 같은\n수정이 200 을 받고도 아무 데도 남지 않는다.\n\n## 값이 하나도 안 바뀌어도 재계산 대기로 옮긴다\n\n확인 화면이 고치지 않은 항목까지 보내면 `EVALUATED` 식사가 `ANALYZING` 으로\n되돌아가 점수가 무효 표시되고, 사용자는 [확인] 을 다시 눌러야 한다. 그래도 이렇게\n두는 건 명세서 응답이 `status: ANALYZING` 으로 고정이기 때문이다 — 바뀐 게 없을\n때만 상태를 유지하면 그 응답은 `status: EVALUATED` 인데 `steps` 는\n`DB_MATCHING: RUNNING` 이라, FE 가 믿을 값이 하나도 남지 않는다.\n\n**FE 는 고친 항목만 보낸다** — 명세서의 요청 모양(`items` 배열)이 이미 그 전제다.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다. 요청한 항목 중\n하나라도 이 식사의 것이 아닐 때도 404 이며, 이 경우 **아무 항목도 반영되지\n않는다**(`services.meal.update_items` 참고).\n\n## ⚠️ 이름을 바꾸면 영양정보가 조용히 비워질 수 있다\n\n새 이름을 공공 DB 에서 못 좁히면 링크가 끊기는데(위 참고) **이 응답에는 그 사실을\n알리는 필드가 없다** — 명세서가 `matched` 를 POST 응답에만 두기 때문이다. FE 는\n`GET /meals/{mealId}` 로 다시 읽어야 알 수 있다.\n\n**이름이나 양이 실제로 바뀌면 직접 입력한 영양정보(`PUT .../nutrition` 의\n`manual`)도 함께 지워진다.** 그 값은 섭취량 기준 총량이라 양이 바뀌면 거짓이\n되고, 이름이 바뀌면 다른 음식의 값이 된다(`services.meal.update_items` 참고).\n고치지 않은 항목을 그대로 되돌려보내는 정상 경로에서는 지워지지 않는다.\n\n## ⚠️ 응답의 `steps` 는 고정값이다\n\n명세서(`contracts/API.md`)의 예시를 그대로 돌려준다 — 실시간 진행상황이\n아니다. POST 와 마찬가지로 여기서는 큐에 아무것도 넣지 않으므로\n(`schemas.meal.RECALCULATION_STEPS` 참고) `DB_MATCHING: RUNNING` 이라고 나가도\n실제로 도는 작업은 없다. 공공 DB 매칭은 이 요청을 처리하는 동안 끝난다.\n\n**FE 가 이 응답을 보고 `GET /meals/{mealId}` 폴링을 시작하면 상태는 영원히\n바뀌지 않는다.** `ANALYZING` + `is_recalculation = true` 를 푸는 것은 워커가\n아니라 사용자가 [확인] 을 누를 때 불리는 `POST /meals/{mealId}/confirm` 이다.",
+        "description": "사용자가 확인 화면에서 AI 인식 결과를 고친다.\n\n고친 항목만 배열에 담아 보낸다. 항목 하나는 통째로 교체된다 — 세 필드가 모두\n필수다(`MealItemUpdate` 참고).\n\n## 이름이 바뀌거나 링크가 없을 때 공공 DB 를 다시 찾는다\n\n**이름이 그대로고 `food_ref_id` 가 이미 있으면** 그 링크를 지킨다. 이름 매칭\n(`crud.food.find_unique_by_name`)은 정확히 같은 이름만 찾고 GENERAL 을 먼저\n고르므로, AI 가 `candidateFoodRefId` 로 연결해 둔 링크(이름이 조금 다른 행이나\n가공식품)와 다를 수 있다. \"250g → 220g\" 같은 수정이 그 링크를 바꾸거나 끊어\n버리면 영양정보가 이유 없이 달라진다.\n\n**이름이 그대로여도 `food_ref_id` 가 NULL 이면 새로 찾은 결과를 건다.** AI 가\n후보를 주지 못했다는 뜻이고 이름 매칭은 워커가 쓰지 않는 별개의 신호라, 지킬\n링크가 없는데 버릴 이유가 없다. \"미역국 2개 → 200g\" 처럼 이제 g 으로 환산되는\n수정이 영양정보를 얻는 경로다. 이름으로도 못 좁히면 NULL 그대로다.\n\n이름이 바뀌면 다른 음식이 된 것이므로 다시 찾고, 못 찾으면 링크를 끊는다\n(`matched: false` 폴백 경로로 간다 — `add_meal_item` 독스트링 참고).\n\n이름을 바꾸면 `confidence` 도 지운다 — AI 가 다른 이름에 매긴 신뢰도다. 남겨 두면\n사용자가 직접 써 넣은 이름이 FE 에서 `< 0.8` 로 강조된다. 지운 값은\n`user_corrections.original_value` 에 남아 인식 성능 평가에 쓸 수 있다.\n\n## g 으로 환산되지 않는 양도 버리지 않는다\n\n`confirmed_amount_g` 는 환산된 값만 담으므로 \"2개\" 는 NULL 이 된다. 사용자가\n입력한 숫자·단위는 `confirmed_amount` · `confirmed_unit` 에 그대로 남는다 —\n출처(MODEL/USER)와 무관하게 같은 자리다. 이 컬럼들이 없으면 \"계란 2개 → 3개\" 같은\n수정이 200 을 받고도 아무 데도 남지 않는다.\n\n## 값이 하나도 안 바뀌어도 재계산 대기로 옮긴다\n\n확인 화면이 고치지 않은 항목까지 보내면 `EVALUATED` 식사가 `ANALYZING` 으로\n되돌아가 점수가 무효 표시되고, 사용자는 [확인] 을 다시 눌러야 한다. 그래도 이렇게\n두는 건 명세서 응답이 `status: ANALYZING` 으로 고정이기 때문이다 — 바뀐 게 없을\n때만 상태를 유지하면 그 응답은 `status: EVALUATED` 인데 `steps` 는\n`DB_MATCHING: RUNNING` 이라, FE 가 믿을 값이 하나도 남지 않는다.\n\n**FE 는 고친 항목만 보낸다** — 명세서의 요청 모양(`items` 배열)이 이미 그 전제다.\n\n없는 식사 · 남의 식사 · 삭제된 식사는 전부 404 로 같게 응답한다. 요청한 항목 중\n하나라도 이 식사의 것이 아닐 때도 404 이며, 이 경우 **아무 항목도 반영되지\n않는다**(`services.meal.update_items` 참고).\n\n## ⚠️ 이름을 바꾸면 영양정보가 조용히 비워질 수 있다\n\n새 이름을 공공 DB 에서 못 좁히면 링크가 끊기는데(위 참고) **이 응답에는 그 사실을\n알리는 필드가 없다** — 명세서가 `matched` 를 POST 응답에만 두기 때문이다. FE 는\n`GET /meals/{mealId}` 로 다시 읽어야 알 수 있다.\n\n**이름이나 양이 실제로 바뀌면 직접 입력한 영양정보(`PUT .../nutrition` 의\n`manual`)도 함께 지워진다.** 그 값은 섭취량 기준 총량이라 양이 바뀌면 거짓이\n되고, 이름이 바뀌면 다른 음식의 값이 된다(`services.meal.update_items` 참고).\n고치지 않은 항목을 그대로 되돌려보내는 정상 경로에서는 지워지지 않는다.\n\n## ⚠️ 응답의 `steps` 는 고정값이다\n\n명세서(`contracts/API.md`)의 예시를 그대로 돌려준다 — 실시간 진행상황이\n아니다. POST 와 마찬가지로 여기서는 큐에 아무것도 넣지 않으므로\n(`schemas.meal.RECALCULATION_STEPS` 참고) `DB_MATCHING: RUNNING` 이라고 나가도\n실제로 도는 작업은 없다. 공공 DB 매칭은 이 요청을 처리하는 동안 끝난다.\n\n**FE 가 이 응답을 보고 `GET /meals/{mealId}` 폴링을 시작하면 상태는 영원히\n바뀌지 않는다.** `ANALYZING` + `is_recalculation = true` 를 푸는 것은 워커가\n아니라 사용자가 [확인] 을 누를 때 불리는 `POST /meals/{mealId}/confirm` 이다.",
         "operationId": "update_meal_items_api_v1_meals__meal_id__items_patch",
         "parameters": [
           {
@@ -811,7 +831,7 @@
           "nutrition"
         ],
         "summary": "Search Nutrition Candidates",
-        "description": "사용자가 고를 공공 DB 후보를 검색한다.\n\n`matched: false` 로 나간 음식(`POST /meals/{mealId}/items` 독스트링 참고)에\n영양정보를 붙이는 폴백의 첫 단계다. 사용자가 여기서 고른 `foodRefId` 는\n`PUT /meals/{mealId}/items/{itemId}/nutrition` 으로 간다.\n\n## 검색은 두 단계다\n\n1. **부분일치** — `q` 를 공백으로 쪼갠 토큰이 전부 들어간 이름\n2. **퍼지 폴백** — 1단계가 `limit` 을 못 채웠을 때만, 두 글자 조각이 겹치는\n   순으로 채운다. `김치찌게` 같은 오타를 구제한다\n\n둘 다 33만건 순차 스캔이다 — `LIKE '%…%'` 는 인덱스를 타지 못한다. 1단계가\n목록을 채우면 2단계 쿼리는 아예 돌지 않으므로, 흔한 검색어일수록 싸다.\n왜 `pg_trgm` 이 아닌지는 `crud.food.search_by_bigrams` 에 적어 두었다.\n\n## ⚠️ 비용 상한은 인증이 아니라 쿼리 쪽에 있다\n\n`X-User-Id` 는 **인증이 아니다** — `core.deps.get_current_user_id` 는 헤더의\nUUID 형식만 보고 DB 를 조회하지 않는다. 즉 아무 UUID 나 넣으면 통과하므로,\n\"인증이 있으니 비싼 요청을 못 돌린다\" 는 말은 성립하지 않는다.\n\n그래서 상한을 요청 내용에 직접 건다 — 단어 수(`MAX_QUERY_TOKENS`)와 퍼지 조각\n수(`MAX_FUZZY_FRAGMENTS`)다. 상한이 없을 때 48자 검색어 한 줄이 4.2초를 썼고,\n`limit` 은 이 비용을 전혀 줄이지 못한다(정렬 전에 모든 행을 평가해야 한다).\n\n## ⚠️ 동의어를 모른다\n\n`계란` 과 `달걀` 은 다른 글자다. 공공 DB 의 삶은 달걀은 `달걀_삶은것` 이라\n`q=계란` 으로는 **어떤 방식으로도 나오지 않는다** — 명세서\n(`contracts/API.md`)의 예시가 정확히 이 경우다. 동의어 사전은 이 엔드포인트\n밖의 별도 작업이고, 그때까지 FE 는 사용자가 다른 이름으로 다시 검색하거나\n직접 입력으로 넘어갈 수 있게 두어야 한다.\n\n## ⚠️ 같은 이름이 여러 건 나온다 — FE 가 구분해 보여줘야 한다\n\n공공 DB 에는 이름이 똑같고 성분이 다른 행이 흔하다(`김치찌개` 는 GENERAL 만\n5건, `미역국` 14건의 열량이 7~450 kcal). 그게 애초에 이름 매칭이 포기하고\n이 화면으로 넘어온 이유이므로 서버가 임의로 하나로 합치지 않는다\n(`crud.food.find_unique_by_name` 참고). **후보 목록에 이름만 띄우면 사용자는\n똑같은 줄 다섯 개를 보게 된다** — `nutrition.kcal` 을 함께 보여줘야 고를 수\n있다. 그 값이 `servingSizeG` 기준량이라는 점도 함께 적어야 한다\n(`schemas.nutrition.FoodCandidate`).\n\n## 인증 이음새를 타는 이유\n\n공개 데이터를 읽을 뿐이지만 다른 모든 라우트와 같은 이음새를 탄다(README 절대\n규칙 6). JWT 가 붙으면 이 라우트도 함께 진짜 인증이 된다 — 그때까지 이 헤더는\n비용 방어가 아니라 자리만 잡아 두는 것이다(위 문단 참고).",
+        "description": "사용자가 고를 공공 DB 후보를 검색한다.\n\n`matched: false` 로 나간 음식(`POST /meals/{mealId}/items` 독스트링 참고)에\n영양정보를 붙이는 폴백의 첫 단계다. 사용자가 여기서 고른 `foodRefId` 는\n`PUT /meals/{mealId}/items/{itemId}/nutrition` 으로 간다.\n\n## 검색은 두 단계다\n\n1. **부분일치** — `q` 를 공백으로 쪼갠 토큰이 전부 들어간 이름\n2. **퍼지 폴백** — 1단계가 `limit` 을 못 채웠을 때만, 두 글자 조각이 겹치는\n   순으로 채운다. `김치찌게` 같은 오타를 구제한다\n\n둘 다 33만건 순차 스캔이다 — `LIKE '%…%'` 는 인덱스를 타지 못한다. 1단계가\n목록을 채우면 2단계 쿼리는 아예 돌지 않으므로, 흔한 검색어일수록 싸다.\n왜 `pg_trgm` 이 아닌지는 `crud.food.search_by_bigrams` 에 적어 두었다.\n\n## ⚠️ 비용 상한은 인증이 아니라 쿼리 쪽에 있다\n\n`X-User-Id` 는 **인증이 아니다** — `core.deps.get_current_user_id` 는 헤더의\nUUID 형식만 보고 DB 를 조회하지 않는다. 즉 아무 UUID 나 넣으면 통과하므로,\n\"인증이 있으니 비싼 요청을 못 돌린다\" 는 말은 성립하지 않는다.\n\n그래서 상한을 요청 내용에 직접 건다 — 단어 수(`MAX_QUERY_TOKENS`)와 퍼지 조각\n수(`MAX_FUZZY_FRAGMENTS`)다. 상한이 없을 때 48자 검색어 한 줄이 4.2초를 썼고,\n`limit` 은 이 비용을 전혀 줄이지 못한다(정렬 전에 모든 행을 평가해야 한다).\n\n## ⚠️ 동의어를 모른다\n\n`계란` 과 `달걀` 은 다른 글자다. 공공 DB 의 삶은 달걀은 `달걀_삶은것` 이라\n`q=계란` 으로는 **어떤 방식으로도 나오지 않는다** — 명세서\n(`contracts/API.md`)의 예시가 정확히 이 경우다. 동의어 사전은 이 엔드포인트\n밖의 별도 작업이고, 그때까지 FE 는 사용자가 다른 이름으로 다시 검색하거나\n직접 입력으로 넘어갈 수 있게 두어야 한다.\n\n## 같은 이름은 최대 두 건이다\n\n공공 DB 의 동명 음식은 적재할 때 `(category, 이름)` 마다 평균으로 합쳐 두었다\n(`crud.food.find_unique_by_name` 참고). 그래도 일반음식과 가공식품에 같은 이름이\n한 건씩 있으면 두 줄이 나온다 — `nutrition.kcal` 을 함께 보여줘야 고를 수 있다.\n그 값이 `servingSizeG` 기준량이라는 점도 함께 적어야 한다\n(`schemas.nutrition.FoodCandidate`).\n\n## 인증 이음새를 타는 이유\n\n공개 데이터를 읽을 뿐이지만 다른 모든 라우트와 같은 이음새를 탄다(README 절대\n규칙 6). JWT 가 붙으면 이 라우트도 함께 진짜 인증이 된다 — 그때까지 이 헤더는\n비용 방어가 아니라 자리만 잡아 두는 것이다(위 문단 참고).",
         "operationId": "search_nutrition_candidates_api_v1_nutrition_candidates_get",
         "parameters": [
           {
@@ -2254,166 +2274,6 @@
         }
       }
     },
-    "/api/v1/insights/daily": {
-      "get": {
-        "tags": [
-          "insights"
-        ],
-        "summary": "Get Daily Feedback",
-        "description": "그날 하루 피드백 조회. 읽기 전용 — FE 는 refresh 202 뒤 이 API 를 폴링한다.",
-        "operationId": "get_daily_feedback_api_v1_insights_daily_get",
-        "parameters": [
-          {
-            "name": "date",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date",
-              "title": "Date"
-            }
-          },
-          {
-            "name": "x-user-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponse_DailyFeedbackResponse_"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "인증 실패 — UNAUTHORIZED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/insights/daily/refresh": {
-      "post": {
-        "tags": [
-          "insights"
-        ],
-        "summary": "Refresh Daily Feedback",
-        "description": "그날 하루 피드백 재생성 요청. 작업만 등록하고 202 를 돌려준다.",
-        "operationId": "refresh_daily_feedback_api_v1_insights_daily_refresh_post",
-        "parameters": [
-          {
-            "name": "x-user-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-User-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DailyFeedbackRefreshRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponse_InsightRefreshResponse_"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "인증 실패 — UNAUTHORIZED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "대상을 찾을 수 없음 — NOT_FOUND · USER_NOT_FOUND",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "요청 검증 실패 — VALIDATION_ERROR · FOOD_NOT_RECOGNIZED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/home": {
       "get": {
         "tags": [
@@ -2840,6 +2700,23 @@
           }
         }
       }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Health Ready",
+        "description": "요청을 받을 준비가 됐는지 — DB 에 `select 1` 까지 해 본다.\n\nBlue/Green 배포가 새 api 로 트래픽을 넘기기 **전에** 이 경로로 확인한다\n(컨테이너 healthcheck, `infra/bg-deploy.sh` 의 Caddy 쪽 확인). `/health` 는 DB 를\n보지 않아서 DB 에 못 붙는 api 로도 전환될 수 있다. `/health` 는 Caddy·배포 워크플로가\n키 없이 부르는 경로라 그대로 두고, 여기만 DB 를 본다. Caddy 는 `/health` 만 키 없이\n통과시키므로 이 경로는 키(또는 팀원 IP) 없이는 밖에서 보이지 않는다. 보여도 DB 상태만\n알려 줄 뿐이다.",
+        "operationId": "health_ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2962,39 +2839,6 @@
           "success"
         ],
         "title": "ApiResponse[CurrentMedicationResponse]"
-      },
-      "ApiResponse_DailyFeedbackResponse_": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DailyFeedbackResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "error": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ErrorBody"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "success"
-        ],
-        "title": "ApiResponse[DailyFeedbackResponse]"
       },
       "ApiResponse_DashboardResponse_": {
         "properties": {
@@ -3839,6 +3683,13 @@
             "type": "array",
             "title": "Recordedmealtypes"
           },
+          "skippedMealTypes": {
+            "items": {
+              "$ref": "#/components/schemas/MealType"
+            },
+            "type": "array",
+            "title": "Skippedmealtypes"
+          },
           "stage": {
             "$ref": "#/components/schemas/MedicationStage"
           }
@@ -3848,6 +3699,7 @@
           "date",
           "count",
           "recordedMealTypes",
+          "skippedMealTypes",
           "stage"
         ],
         "title": "CalendarDay",
@@ -4103,126 +3955,6 @@
         ],
         "title": "CurrentMedicationResponse",
         "description": "`GET /medications/current`.\n\n명세가 한 줄로 끝낸다 — **\"`POST /medications` 응답과 동일 구조.\"** 그래서 필드를\n새로 적지 않고 **상속한다.** 따로 나열하면 두 스키마가 조용히 갈라진다. 실제로\n갈라져 있었다 — 이쪽만 `effectiveFrom` 을 들고 있었고 명세 14필드 중 7개가 없었다.\n\n`medicationId` 가 필수라 **투약 기록이 있어야 만들 수 있다.** 기록이 없는 사용자는\n이 응답을 만들 수 없고 `STAGE_NOT_SET` 으로 나간다 (명세 `GET /medications/current`).\n\n아래 넷은 **구조상 늘 같은 값이다.** 쓰기 결과를 담는 자리라 조회에는 대응물이\n없다. 빼지 않는 건 FE 가 파서를 하나만 쓰게 하려고 명세가 같은 모양을 요구해서다.\n설명을 덮어써 두는 건 상속한 문구(\"이번 요청으로 …\")가 조회에서는 거짓이라\nopenapi.json 이 FE 에게 잘못 말하기 때문이다.\n\n**기본값을 주지 않는다.** 값이 정해져 있다고 `= False` 를 달면 openapi 의\n`required` 에서 빠져 FE 코드 생성기가 선택 필드로 만든다 — 늘 실려 나가는데\nFE 만 `undefined` 분기를 떠안는다. 서비스가 매번 명시적으로 채운다."
-      },
-      "DailyFeedbackRefreshRequest": {
-        "properties": {
-          "date": {
-            "type": "string",
-            "format": "date",
-            "title": "Date"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "date"
-        ],
-        "title": "DailyFeedbackRefreshRequest",
-        "description": "POST /insights/daily/refresh 요청.\n\nextra=\"forbid\": 오타난 필드(예: dat)를 조용히 무시하지 않는다 —\nschemas/user_state.py UserStateCreateRequest 와 같은 이유."
-      },
-      "DailyFeedbackResponse": {
-        "properties": {
-          "dailyFeedbackId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dailyfeedbackid"
-          },
-          "feedbackDate": {
-            "type": "string",
-            "format": "date",
-            "title": "Feedbackdate"
-          },
-          "feedbackStatus": {
-            "$ref": "#/components/schemas/FeedbackStatus"
-          },
-          "summary": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Summary"
-          },
-          "scores": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MealScores"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "sourceMealIds": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "title": "Sourcemealids"
-          },
-          "safetyStatus": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SafetyStatus"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "generatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Generatedat"
-          },
-          "stale": {
-            "type": "boolean",
-            "title": "Stale"
-          },
-          "staleReason": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StaleReason"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "dailyFeedbackId",
-          "feedbackDate",
-          "feedbackStatus",
-          "summary",
-          "scores",
-          "sourceMealIds",
-          "safetyStatus",
-          "generatedAt",
-          "stale",
-          "staleReason"
-        ],
-        "title": "DailyFeedbackResponse",
-        "description": "GET /insights/daily 응답.\n\n그날 행이 없으면 daily_feedback_id · summary · scores · safety_status · generated_at ·\nstale_reason 은 None, source_meal_ids 는 [], stale 은 False 다.\nsummary 는 safety_status 가 SAFE 일 때만 채운다."
       },
       "DashboardPeriod": {
         "properties": {
@@ -4760,6 +4492,10 @@
                 "type": "null"
               }
             ]
+          },
+          "skipped": {
+            "type": "boolean",
+            "title": "Skipped"
           }
         },
         "type": "object",
@@ -4769,10 +4505,11 @@
           "eatenAt",
           "displayName",
           "thumbnailUrl",
-          "scores"
+          "scores",
+          "skipped"
         ],
         "title": "HomeMeal",
-        "description": "오늘의 식사 항목 하나. 평가 전이면 scores 는 None."
+        "description": "오늘의 식사 항목 하나. 평가 전이거나 식사 안 함이면 scores 는 None."
       },
       "HomeMedication": {
         "properties": {
@@ -4993,7 +4730,7 @@
           "feedbackStatus"
         ],
         "title": "InsightRefreshResponse",
-        "description": "POST /insights/long-term/refresh · /insights/daily/refresh 202 응답."
+        "description": "POST /insights/long-term/refresh 202 응답."
       },
       "LongTermInsightResponse": {
         "properties": {
@@ -5285,11 +5022,25 @@
             "title": "Steps"
           },
           "pollIntervalMs": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Pollintervalms"
           },
           "timeoutMs": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Timeoutms"
           }
         },
@@ -5302,7 +5053,7 @@
           "timeoutMs"
         ],
         "title": "MealCreateResponse",
-        "description": "POST /meals 응답 (202)."
+        "description": "POST /meals 응답.\n\n사진·텍스트는 202 + `ANALYZING` 이고 폴링 안내(`pollIntervalMs` · `timeoutMs`)가\n붙는다. 고른 음식(`items[]`)은 분석이 없어 201 + `REVIEW_REQUIRED` 이고 두 값이\n`null` 이다 — FE 는 폴링 없이 곧바로 확인 화면으로 간다.\n\n식사 안 함(`skipped: true`)은 분석도 확인도 없어 201 + `EVALUATED` 이고 `steps` 가\n빈 배열, 두 값이 `null` 이다. 끼니 피드백은 이미 큐에 들어가 있어 FE 는 곧바로\n`GET /meals/{mealId}/feedback` 을 폴링한다."
       },
       "MealDeleteResponse": {
         "properties": {
@@ -5346,6 +5097,10 @@
           "isRecalculation": {
             "type": "boolean",
             "title": "Isrecalculation"
+          },
+          "skipped": {
+            "type": "boolean",
+            "title": "Skipped"
           },
           "stage": {
             "$ref": "#/components/schemas/MedicationStage"
@@ -5437,6 +5192,7 @@
           "mealId",
           "status",
           "isRecalculation",
+          "skipped",
           "stage",
           "mealType",
           "eatenAt",
@@ -5913,6 +5669,10 @@
                 "type": "null"
               }
             ]
+          },
+          "skipped": {
+            "type": "boolean",
+            "title": "Skipped"
           }
         },
         "type": "object",
@@ -5923,7 +5683,8 @@
           "stage",
           "displayName",
           "thumbnailUrl",
-          "scores"
+          "scores",
+          "skipped"
         ],
         "title": "MealListItem",
         "description": "GET /meals 목록의 항목 하나."
