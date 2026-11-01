@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from app.main import app
 from app.short_feedback import (
     build_meal_prompt, calculate_targets, cumulative_progress, judge_nutrients,
+    recommendation_priorities,
 )
 from tests.test_short_feedback import _item, _meal
 from tests.test_short_feedback_integration import _transport
@@ -109,6 +110,61 @@ def test_sodium_excess_is_separate_from_protein_progress():
     protein, _, sodium = cumulative_progress(req)
     assert (protein.percent, protein.remaining, protein.excess) == (104.2, 0, None)
     assert (sodium.target, sodium.percent, sodium.remaining, sodium.excess) == (2300, 108.7, 0, 200)
+
+
+def test_recommendation_accounts_for_day_sodium_even_when_current_meal_is_ok():
+    req = _meal(
+        weightKg=80, mealType="LUNCH", previousMeals=[_previous()],
+        items=[_item(proteinG=32, fiberG=9, sodiumMg=400)],
+        dailyNutritionTotals={"proteinG": 60, "fiberG": 15, "sodiumMg": 2500},
+    )
+    judgements = judge_nutrients(req)
+    assert all(j.state == "OK" for j in judgements)
+    assert recommendation_priorities(req, judgements) == ["sodium"]
+
+
+def test_current_shortfall_is_not_prioritized_after_daily_target_reached():
+    req = _meal(
+        weightKg=80, mealType="LUNCH", previousMeals=[_previous()],
+        items=[_item(proteinG=20, fiberG=3, sodiumMg=400)],
+        dailyNutritionTotals={"proteinG": 100, "fiberG": 28, "sodiumMg": 1000},
+    )
+    judgements = judge_nutrients(req)
+    assert [j.name for j in judgements if j.state == "SHORT"] == ["protein", "fiber"]
+    assert recommendation_priorities(req, judgements) == []
+
+
+def test_day_progress_alone_does_not_create_a_time_of_day_deficiency():
+    req = _meal(
+        weightKg=80, mealType="LUNCH", items=[_item(proteinG=32, fiberG=9, sodiumMg=400)],
+        dailyNutritionTotals={"proteinG": 40, "fiberG": 10, "sodiumMg": 700},
+    )
+    assert recommendation_priorities(req, judge_nutrients(req)) == []
+
+
+def test_skipped_meal_recommendation_uses_known_targets_and_cumulative_limit():
+    req = _meal(
+        skipped=True, qqs=_UNKNOWN_QQS, mealType="LUNCH", weightKg=80,
+        previousMeals=[_previous()],
+        dailyNutritionTotals={"proteinG": 100, "fiberG": 5, "sodiumMg": 2500},
+    )
+    assert judge_nutrients(req) == []
+    assert recommendation_priorities(req, []) == ["sodium", "fiber"]
+
+
+def test_unknown_cumulative_values_preserve_current_meal_recommendation():
+    req = _meal(weightKg=80, items=[_item(proteinG=20, fiberG=3, sodiumMg=1000)])
+    assert recommendation_priorities(req, judge_nutrients(req)) == ["sodium", "protein", "fiber"]
+
+
+def test_unknown_weight_does_not_create_a_protein_supplement_priority_after_skipping():
+    req = _meal(skipped=True, qqs=_UNKNOWN_QQS, dailyNutritionTotals={"proteinG": 12, "fiberG": 5})
+    assert recommendation_priorities(req, []) == ["fiber"]
+
+
+def test_dinner_has_no_next_meal_priorities_even_with_gaps():
+    req = _meal(mealType="DINNER", weightKg=80, items=[_item(proteinG=5, fiberG=2, sodiumMg=1000)])
+    assert recommendation_priorities(req, judge_nutrients(req)) == []
 
 
 def test_previous_records_and_untrusted_food_text_reach_prompt():

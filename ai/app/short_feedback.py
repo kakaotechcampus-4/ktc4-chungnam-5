@@ -174,6 +174,35 @@ def cumulative_progress(req: ShortFeedbackRequest) -> list[NutrientProgress]:
     return result
 
 
+def recommendation_priorities(
+    req: ShortFeedbackRequest, judgements: list[NutrientJudgement],
+) -> list[NutrientName]:
+    """현재 끼니와 누적을 함께 본 추천 방향. 새 점수나 시간대별 부족 기준을 만들지 않는다."""
+    if req.meal_type is MealType.DINNER:
+        return []
+    states = {j.name: j.state for j in judgements}
+    progress = {p.name: p for p in cumulative_progress(req)}
+    priorities: list[NutrientName] = []
+    sodium = progress.get("sodium")
+    if states.get("sodium") == "OVER" or (
+        sodium is not None and sodium.excess is not None and sodium.excess > 0
+    ):
+        priorities.append("sodium")
+    for name in ("protein", "fiber"):
+        nutrient = progress.get(name)
+        if nutrient is not None and nutrient.current is not None and nutrient.target is not None:
+            if nutrient.current >= nutrient.target:
+                # 한 끼가 목표 미만이어도 하루 목표에 이미 도달했다면 추가 보충을 우선하지 않는다.
+                continue
+            if req.skipped:
+                # 결식 후 다음 메뉴 방향일 뿐, 현재 시점의 영양 부족 판정은 아니다.
+                priorities.append(name)
+                continue
+        if states.get(name) == "SHORT":
+            priorities.append(name)
+    return priorities
+
+
 # ─────────────────────────── 프롬프트 ───────────────────────────
 # system 에는 매번 같은 것(역할·말투·규칙·예시·출력 형식)을, user 에는 이번 기록만 싣는다.
 # 규칙과 사용자 데이터가 한 덩어리면 데이터가 규칙을 덮어쓰기 쉽다.
@@ -197,18 +226,19 @@ _MEAL_EXAMPLE_BAD: Final = {
 }
 
 _MEAL_EXAMPLE_GOOD: Final = {
-    "body": "참치김밥과 라면에서 확인된 나트륨은 1790mg으로 끼니 한도 766.7mg을 넘었어요. "
-    "식이섬유는 3.1g으로 끼니 목표 8.3g에 못 미쳤고, 110분 만에 허기가 돌아왔어요. "
-    "아침을 포함해 기록된 식이섬유는 8.1g으로 하루 목표 25g의 32.4%예요.",
-    "reasoning": "1순위 나트륨 줄이기(국물·면을 다른 메뉴로), 2순위 식이섬유 채우기(채소 추가).",
+    "body": "점심의 김밥과 라면은 나트륨이 끼니 한도를 넘고 단백질은 목표보다 적었어요. "
+    "아침에는 달걀로 단백질을 챙겼지만 점심은 밥과 면이 겹쳤고, 기록된 나트륨은 하루 한도의 96.1%까지 쌓였어요. "
+    "다음 끼니는 국물 없는 단백질 반찬과 채소를 중심으로 구성을 바꿔 보면 좋아요.",
+    "reasoning": "현재 끼니의 나트륨 초과와 누적 한도 접근을 함께 고려해 짠 국물 줄이기를 우선한다. "
+    "아침 달걀과 점심 밥·면 구성을 이어 보며 다음 식사에는 담백한 단백질 반찬과 채소를 제안한다.",
     "suggestions": [
         {
-            "foodName": "삶은 달걀 2개",
-            "advice": "김밥 먹을 때 라면 대신 곁들이면 국물 없이도 든든하고, 짠맛이 확 줄어요",
+            "foodName": "두부 반 모",
+            "advice": "아침에는 달걀을 먹고 점심에는 밥과 면이 겹쳤으니, 다음 끼니에는 짠 국물 대신 양념을 적게 한 두부를 단백질 반찬으로 곁들이기 좋아요.",
         },
         {
-            "foodName": "오이무침 한 접시",
-            "advice": "이번 끼니에서 적었던 채소를 다음 끼니에 곁들이기 좋아요",
+            "foodName": "찐 브로콜리 한 접시",
+            "advice": "점심의 김밥과 라면에서 적었던 식이섬유를 이어 챙기면서 나트륨 부담을 더하지 않도록, 다음 끼니에는 짠 소스를 덜어 곁들이기 좋아요.",
         },
     ],
 }
@@ -222,18 +252,28 @@ MEAL_SYSTEM_PROMPT: Final = f"""너는 GLP-1 계열 약을 쓰는 사용자의 �
 현재 끼니와 앞선 확정 끼니를 참고해 body 하나를 쓴다. 목표·판정·충족률은 Python 계산 결과다.
 숫자를 새로 계산하거나 QQS를 다시 채점하지 않는다. 모델 호출 한 번으로 아래 필드를 모두 만든다.
 
-## body — 현재 끼니 평가와 누적 흐름 (3~4문장)
-- 현재 끼니의 음식, 영양 판정, 포만감에서 중요한 사실을 골라 해요체로 쓴다
-- 앞선 확정 기록이 없으면 현재 끼니에 집중한다. 누락된 아침·점심을 결식으로 추측하지 않는다
-- 앞선 기록이 있으면 현재 끼니와 연결해 보완·반복된 식사 흐름을 적는다. 과거 목표는 없으니 과거 끼니를 새로 판정하지 않는다
-- 점심은 앞선 기록을 반영하고, 저녁은 현재 시점까지의 하루 흐름을 함께 돌아본다
+## body — 현재 끼니 평가 → 누적 해석 → 다음 식단 방향 (기본 3문장, 최대 4문장)
+- 첫 문장은 현재 끼니에서 중요한 음식 구성과 판정 1~2개만 골라 해요체로 쓴다. 모든 영양소와 점수를 나열하지 않는다
+- 앞선 기록이 있으면 다음 문장에서 '무엇이 반복됐는지 / 무엇을 보완했는지 / 결식 뒤 구성이 어떻게 이어졌는지' 중 근거가 있는 관계 하나를 설명한다
+- 이전 음식명을 언급한 뒤 합계만 붙이는 것으로 누적 해석을 대신하지 않는다. 음식 구성·끼니별 성분·누적 진행 상황을 함께 읽는다
+- 과거 목표는 없으니 과거 끼니를 현재 체중·단계로 다시 판정하거나, 과거에도 부족했다고 추정하지 않는다
+- 마지막 문장은 현재 평가와 누적 해석을 종합한 다음 식단의 구성 방향으로 연결한다. 구체적인 메뉴·분량은 suggestions에 둔다
+- 점심은 앞선 기록을 반영하고, 저녁은 다음 메뉴 제안 대신 현재 시점까지의 하루 흐름을 정리하며 끝낸다
+- 앞선 확정 기록이 없으면 2~3문장으로 현재 끼니와 다음 식단 방향에 집중한다. 아침부터 하루 충족률을 나열하지 않는다
+- 누락된 아침·점심을 결식으로 추측하지 않는다
 - 끼니 피드백과 누적 피드백을 별도 필드나 제목으로 나누지 않는다
+
+## 숫자 선택
+- body 전체의 수치 표현(섭취량·목표량·충족률·점수·시간·분량 등)은 0~2개만 쓴다. 수치 없이 관계를 설명해도 된다
+- 숫자는 추천 방향을 바꾸는 핵심 근거에만 쓴다. 같은 영양소의 섭취량·목표량·퍼센트를 모두 반복하지 않는다
+- 누적 충족률을 세 영양소 모두 나열하지 않는다. 중요한 영양소 한 개를 고르고 나머지는 구성과 흐름으로 설명한다
 - dailyNutritionTotals는 현재 끼니를 포함한 누적 합계다. 현재 끼니를 다시 더하지 않는다
 - 하루 목표 대비 진행률과 남은 양은 제공된 계산값만 쓴다. 하루 도중 목표 미달을 곧바로 부족으로 판정하지 않는다
 - 나트륨은 목표가 아닌 한도다. 남은 한도를 먹어야 할 양으로 권하지 않는다
 - 누적 합계는 결측 성분이 0으로 합산돼 실제보다 작을 수 있다. '기록에서 확인된' 값으로 설명하고 충분·부족을 확정하지 않는다
 - 체중이 없으면 단백질 목표·충족률·부족량을 추정하지 않는다. 지방·탄수화물 목표와 열량 적정 범위도 만들지 않는다
 - 판정할 수 없는 항목과 null인 QQS 축은 평가하지 않는다. 추천 음식이 허기나 증상을 개선한다고 보장하지 않는다
+- '판단할 수 없다', '단정할 수 없지만' 같은 내부 판단 절차를 문장에 옮기지 않는다. 확인된 기록과 다음 구성만 자연스럽게 설명한다
 
 ## 식사 안 함
 - skipped=true는 명시적 결식이다. 현재 끼니의 영양·QQS 판정을 하지 않는다
@@ -241,17 +281,21 @@ MEAL_SYSTEM_PROMPT: Final = f"""너는 GLP-1 계열 약을 쓰는 사용자의 �
 - previousMeals에 없는 끼니는 미입력 또는 확인 전일 수 있다. 결식이나 하루 종료로 단정하지 않는다
 
 ## reasoning — 제안 방향 (한두 문장, 화면에 안 나감)
-- 이번 추천의 목표와 우선순위를 적는다 (예: 1순위 나트륨 줄이기, 2순위 식이섬유 채우기)
+- body의 현재 끼니 평가와 누적 해석을 함께 근거로 추천 우선순위 1~2개를 적는다
+- 현재 한 끼만 목표 미만이어도 누적 기록에서 하루 목표에 이미 도달했다면 추가 보충을 최우선으로 밀지 않는다
+- 누적 나트륨이 한도를 넘었다면 현재 끼니가 한도 안이어도 다음 메뉴에 그 흐름을 반영한다
+- 기록에 없는 부족·초과나 시간대별 목표를 만들지 않는다. 하루 목표까지 남은 양을 다음 한 끼에 모두 채우도록 권하지 않는다
 - 하지 않기로 한 방향이 있으면 그것도 적는다. 챗봇이 다른 음식을 추천할 때 이 목표를 지킨다
 
 ## suggestions — 추천 카드 (1~{MAX_SUGGESTIONS}개, 저녁은 빈 배열)
 - mealType=DINNER면 suggestions는 반드시 []다. 다음 끼니 메뉴를 만들지 않는다
 - 결식이면 이전 기록과 누적 진행 상황을 참고해 다음 끼니에 곁들이기 쉬운 음식으로 제안한다
-- 이번 끼니를 기준으로 "바꾸기" 나 "더하기" 로 제안한다. "저염식" 대신 "라면 대신 삶은 달걀"
+- body와 reasoning의 종합 방향을 구체적인 다음 식단 메뉴로 옮긴다. 현재 끼니의 판정만 보고 추천하지 않는다
+- 이미 먹은 식사를 지금 고치라고 하지 않는다. 다음 끼니에 적용할 바꾸기·곁들이기를 제안한다
 - 편의점·배달·집밥에서 쉽게 구하는 음식으로 고른다
 - foodName 은 일반 음식명과 1회분 표현이다 (예: 두부 반 모, 삶은 달걀 2개)
-- advice 는 한 문장이다. 이번 끼니에서 무엇이 아쉬웠는지와 이 음식이 그걸 어떻게 채우는지를 함께 담는다
-  - "단백질을 채우는 데 도움이 돼요" 대신 "이번 끼니에 단백질 반찬이 빠졌는데, 두부 반 모면 부담 없이 채울 수 있어요"
+- advice는 한 문장이다. body에서 고른 현재·누적 근거와 이 메뉴를 다음에 고르는 이유를 연결한다
+- 앞선 기록이 있으면 적어도 한 카드에는 그 흐름을 반영한다. '아침에도 먹었고'만 덧붙이지 말고 반복·보완·결식 중 실제 관계를 연결한다
 - 원인 음식과 포만감 경과를 advice 에 녹인다. 영양소 이름만 되풀이하지 않는다
 - 화면 위쪽에 영양소 숫자가 이미 나온다. advice 에 숫자를 다시 늘어놓지 않는다
 - 서로 다른 음식으로 고른다
@@ -264,7 +308,7 @@ MEAL_SYSTEM_PROMPT: Final = f"""너는 GLP-1 계열 약을 쓰는 사용자의 �
 쓰지 않는 답 (분석이 얇고, 카드가 이번 끼니와 상관없다):
 {_json(_MEAL_EXAMPLE_BAD)}
 
-좋은 답 (점심 참치김밥+라면, 아침 식이섬유 5g을 포함한 누적 8.1g):
+좋은 답 (아침 채소 계란말이 → 점심 참치김밥+라면, 누적 나트륨 한도 대비 96.1%):
 {_json(_MEAL_EXAMPLE_GOOD)}
 
 예시의 음식과 문장을 베끼지 않는다. 이번 기록에 맞게 새로 쓴다.
@@ -421,6 +465,7 @@ def _satiety_lines(req: ShortFeedbackRequest) -> list[str]:
 def build_meal_prompt(req: ShortFeedbackRequest, judgements: list[NutrientJudgement]) -> str:
     """한 끼(scope=MEAL) user 메시지. 규칙·예시는 `MEAL_SYSTEM_PROMPT` 에 있다."""
     gaps = [j for j in judgements if j.state != "OK"]
+    priorities = recommendation_priorities(req, judgements)
     focus = [g.name for g in gaps]
     lines = [
         f"[투약 단계] {req.stage.value} — {STAGE_RISK[req.stage]}",
@@ -452,11 +497,20 @@ def build_meal_prompt(req: ShortFeedbackRequest, judgements: list[NutrientJudgem
     # 모델이 성분을 모르는 끼니를 "균형 잡힌 식사" 로 칭찬한다.
     if req.meal_type is MealType.DINNER:
         direction = "저녁은 현재 시점까지의 하루 흐름을 body에 담고 suggestions는 []로 반환한다."
+    elif priorities:
+        target = ", ".join(
+            f"{_LABELS[name]} {'줄이기' if name == 'sodium' else '채우기'}" for name in priorities
+        )
+        direction = (
+            f"현재 끼니와 누적을 함께 본 다음 식단 방향: [{target}]. "
+            "body에서 현재 평가와 이전 구성의 관계를 설명한 뒤, reasoning과 추천 카드도 같은 방향으로 연결한다."
+        )
+        if req.skipped:
+            direction += " 결식 뒤 다음 메뉴의 방향이며, 현재 영양 부족 판정이나 남은 목표량을 한 끼에 채우라는 뜻이 아니다."
     elif req.skipped:
-        direction = "거른 끼니와 앞선 기록을 고려해 다음 끼니에 단백질·채소를 곁들이기 쉬운 음식을 제안한다."
+        direction = "거른 끼니와 확인된 누적 기록을 고려해 다음 식사를 이어갈 구성을 제안한다. 영양 부족을 추정하지 않는다."
     elif gaps:
-        target = ", ".join(f"{_LABELS[g.name]} {'줄이기' if g.state == 'OVER' else '채우기'}" for g in gaps)
-        direction = f"다음 끼니 제안은 [{target}]에 맞춘 음식으로 고른다."
+        direction = "현재 끼니의 목표 미달만으로 추가 보충을 우선하지 않는다. 누적에서 이미 채운 부분을 고려해 구성을 이어간다."
     elif judgements:
         checked = "·".join(_LABELS[j.name] for j in judgements)
         direction = (
@@ -469,7 +523,16 @@ def build_meal_prompt(req: ShortFeedbackRequest, judgements: list[NutrientJudgem
             "다음 끼니 제안은 단백질·채소를 곁들이기 쉬운 무난한 음식으로 고른다."
         )
 
-    lines += ["", "[이번 제안 방향]", f"- {direction}"]
+    lines += ["", "[현재·누적을 종합한 다음 식단 방향]", f"- {direction}"]
+    for progress in cumulative_progress(req):
+        if (
+            progress.name != "sodium" and progress.current is not None
+            and progress.target is not None and progress.current >= progress.target
+        ):
+            lines.append(
+                f"- {_LABELS[progress.name]}: 누적 기록에서 하루 목표 도달 확인. "
+                "현재 한 끼가 목표 미만이어도 추가 보충을 최우선으로 권하지 않는다"
+            )
     return "\n".join(lines)
 
 
