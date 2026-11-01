@@ -102,6 +102,7 @@ def _build_today(db: Session, *, user_id: uuid.UUID, day: date) -> HomeToday:
             display_name=display_names.get(meal.id, ""),
             thumbnail_url=_build_thumbnail_url(meal.image_key),
             scores=_build_scores(quantity, quality, satiety),
+            skipped=meal.skipped,
         )
         for meal, quantity, quality, satiety in rows
     ]

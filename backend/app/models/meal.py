@@ -53,6 +53,15 @@ class Meal(Base):
         Boolean, nullable=False, server_default=text("false")
     )
     """사용자가 음식을 고쳐서 다시 분석 중인지. FE 는 최초 분석과 재분석의 문구를 다르게 띄운다."""
+    skipped: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    """"식사 안 함" 으로 기록한 끼니. 사진·음식이 없고 Q/Q/S 도 매기지 않는다.
+
+    등록과 동시에 `EVALUATED` 가 되고 `feedback.meal` 이 들어간다
+    (`services.meal.create_skipped_meal`). **`qqs_evaluations` 행이 없다** — 평균·장기
+    피드백 집계가 그 테이블을 JOIN 하므로 0 점으로 섞이지 않고 저절로 빠진다.
+    고칠 수도 확정할 수도 없다 — 바꾸려면 지우고 다시 등록한다."""
 
     # 한 끼 영양 합계 — AI 입력용 스냅샷이다. 확정(`POST /meals/{mealId}/confirm`)이
     # 음식별 영양성분을 **화면과 같은 규칙**(`services.meal.item_nutrition`: 직접 입력 →
@@ -85,7 +94,7 @@ class Meal(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "image_key IS NOT NULL OR raw_text IS NOT NULL",
+            "image_key IS NOT NULL OR raw_text IS NOT NULL OR skipped",
             name="input_present",
         ),
         # 홈 화면(오늘 끼니)과 기간별 조회가 같은 인덱스를 탄다.

@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
+from app.crud import feedback as feedback_crud
 from app.crud import medication as medication_crud
 from app.crud import meal as meal_crud
 from app.crud.evaluation import NutrientTotals
@@ -115,7 +116,12 @@ def _is_editable(meal: Meal) -> bool:
     둘을 구분하지 않고 `ANALYZING` 을 통째로 막으면 **음식을 하나밖에 못 넣는다** —
     첫 추가가 상태를 `ANALYZING` 으로 바꾸고, 그 상태가 두 번째 추가를 409 로
     막는다. 스스로 문을 잠그는 셈이다.
+
+    **식사 안 함 끼니는 고칠 수 없다** — `EVALUATED` 지만 고칠 음식이 없다. 음식을 더하면
+    "안 먹었다" 와 "먹은 음식" 이 한 끼에 섞인다. 바꾸려면 지우고 다시 등록한다(FE 합의).
     """
+    if meal.skipped:
+        return False
     if meal.status in _EDITABLE_STATUSES:
         return True
     return meal.status is MealStatus.ANALYZING and meal.is_recalculation
@@ -138,7 +144,9 @@ def _editable_meal(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) -> Me
 
     if not _is_editable(meal):
         raise MealNotEditableError(
-            f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
+            "식사 안 함으로 기록한 끼니는 음식을 고칠 수 없습니다. 지우고 다시 등록해 주세요."
+            if meal.skipped
+            else f"{meal.status.value} 상태의 식사는 음식을 고칠 수 없습니다."
         )
     return meal
 
@@ -253,6 +261,7 @@ def list_meals(
             display_name=display_names.get(meal.id, ""),
             thumbnail_url=_build_thumbnail_url(meal.image_key),
             scores=_build_scores(quantity, quality, satiety),
+            skipped=meal.skipped,
         )
         for meal, stage, quantity, quality, satiety in rows
     ]
@@ -317,6 +326,7 @@ def get_calendar(db: Session, *, user_id: uuid.UUID, month: str) -> MealCalendar
             date=row.day.date(),
             count=row.count,
             recorded_meal_types=row.meal_types,
+            skipped_meal_types=row.skipped_meal_types or [],
             stage=stage_by_day[row.day.date()],
         )
         for row in day_rows
@@ -616,8 +626,15 @@ def get_meal_for_detail(db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID) 
     return meal
 
 
-def _resolve_steps(status: MealStatus, is_recalculation: bool) -> list[AnalysisStep]:
-    """상태별 고정 steps. 이 시스템엔 세부 진행상황을 기록하는 컬럼이 없다(RECALCULATION_STEPS 참고)."""
+def _resolve_steps(
+    status: MealStatus, is_recalculation: bool, *, skipped: bool = False
+) -> list[AnalysisStep]:
+    """상태별 고정 steps. 이 시스템엔 세부 진행상황을 기록하는 컬럼이 없다(RECALCULATION_STEPS 참고).
+
+    식사 안 함은 인식·매칭·채점을 하나도 거치지 않는다 — `DONE` 이라 적으면 거짓이라 비운다.
+    """
+    if skipped:
+        return []
     if status is MealStatus.FAILED:
         # FAILED 는 DONE/RUNNING/PENDING 중 어디에도 안 맞는다 — steps 자체가 없다.
         return []
@@ -727,14 +744,18 @@ def build_meal_detail(
     """`get_meal_for_detail` 로 얻은 meal 과 미리 계산된 영양정보 · 제안으로 응답을 조립한다."""
     stage = meal_crud.get_stage(db, meal.medication_snapshot_id)
     items = [_build_item_detail(item, nutrition_by_item.get(item.id)) for item in meal.items]
-    steps = _resolve_steps(meal.status, meal.is_recalculation)
+    steps = _resolve_steps(meal.status, meal.is_recalculation, skipped=meal.skipped)
 
     scores: MealScores | None = None
     nutrients: list[NutrientStatus] = []
     satiety: SatietyDetail | None = None
     feedback: MealFeedbackSummary | None = None
 
-    if meal.status is MealStatus.EVALUATED:
+    if meal.skipped:
+        # 채점하지 않았다 — 세 축 모두 null 이다(0 이 아니다). 음식·포만감도 없다.
+        scores = MealScores(quantity=None, quality=None, satiety=None)
+        feedback = _build_feedback(meal_crud.get_feedback(db, meal.id), suggestions)
+    elif meal.status is MealStatus.EVALUATED:
         evaluation = meal_crud.get_evaluation(db, meal.id)
         if evaluation is not None:
             scores = _build_scores(
@@ -748,6 +769,7 @@ def build_meal_detail(
         meal_id=meal.id,
         status=meal.status,
         is_recalculation=meal.is_recalculation,
+        skipped=meal.skipped,
         stage=stage,
         meal_type=meal.meal_type,
         eaten_at=meal.eaten_at,
@@ -1020,6 +1042,7 @@ def _insert_meal(
     image_key: str | None,
     raw_text: str | None,
     satiety_before_pct: int | None,
+    skipped: bool = False,
 ) -> tuple[Meal, MedicationSnapshot]:
     """끼니 한 행 + 그 시점의 투약 스냅샷 + (있으면) 식전 포만감을 넣는다. 커밋하지 않는다.
 
@@ -1037,6 +1060,7 @@ def _insert_meal(
         eaten_at=eaten_at,
         image_key=image_key,
         raw_text=raw_text,
+        skipped=skipped,
     )
 
     if satiety_before_pct is not None:
@@ -1114,6 +1138,54 @@ def create_meal_from_foods(
         status=meal.status,
         # `GET /meals/{mealId}` 와 같은 steps — 같은 끼니가 화면마다 다르게 보이지 않게.
         steps=_resolve_steps(meal.status, meal.is_recalculation),
+        poll_interval_ms=None,
+        timeout_ms=None,
+    )
+
+
+def create_skipped_meal(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    meal_type: MealType,
+    eaten_at: datetime,
+) -> MealCreateResponse:
+    """"식사 안 함" 끼니를 만든다. **분석도 확인도 없이 곧바로 `EVALUATED` 다.**
+
+    고를 음식도 확인할 화면도 없으므로 확정(`POST /meals/{mealId}/confirm`)을 거치지
+    않는다. 그래서 확정이 하던 일 중 남는 것 — 끼니 피드백 작업 등록 — 을 여기서 같은
+    트랜잭션으로 한다. 워커는 점수 없이 "안 먹은 끼니" 로 문장을 쓴다
+    (`worker/jobs/feedback_meal.py`).
+
+    **`EVALUATED` 로 두는 이유:** 하루 피드백의 "더 늦은 확정 끼니가 있으면 덮지 않는다"
+    (`crud.meal.has_later_evaluated_meal`)와 앞선 끼니 목록
+    (`crud.meal.list_earlier_evaluated_meals`)이 `EVALUATED` 만 센다. 다른 상태면 저녁을
+    건너뛴 날 점심 문장이 하루 피드백을 덮는다.
+
+    **점수 행(`qqs_evaluations`)을 만들지 않는다** — 평균 · 장기 피드백 집계가 그 테이블을
+    JOIN 하므로 0 점으로 섞이지 않고 저절로 빠진다. 영양 합계(`meals.total_*`)도 NULL 로
+    두어 그날 합에서 빠진다(`crud.daily_feedback.day_nutrient_totals`).
+    """
+    meal, _ = _insert_meal(
+        db,
+        user_id=user_id,
+        meal_type=meal_type,
+        eaten_at=eaten_at,
+        image_key=None,
+        raw_text=None,
+        satiety_before_pct=None,
+        skipped=True,
+    )
+    meal_crud.set_status(db, meal, MealStatus.EVALUATED)
+    enqueue(db, feedback_crud.FEEDBACK_TASK_TYPE, {"mealId": str(meal.id)})
+
+    # 끼니와 피드백 작업이 한 트랜잭션 — 끼니만 남고 문장은 영영 PENDING 인 상태가 없다.
+    db.commit()
+
+    return MealCreateResponse(
+        meal_id=meal.id,
+        status=meal.status,
+        steps=_resolve_steps(meal.status, meal.is_recalculation, skipped=True),
         poll_interval_ms=None,
         timeout_ms=None,
     )

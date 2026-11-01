@@ -156,7 +156,13 @@ def _is_confirmable(meal: Meal) -> bool:
 
     🔗 `services/meal.py::_is_editable` 과 같은 모양이다 — 그쪽은 "고칠 수 있는가",
     이쪽은 "확정할 수 있는가" 이고, `ANALYZING` 을 가르는 기준이 같다.
+
+    **식사 안 함 끼니는 확정하지 않는다** — 등록할 때 이미 `EVALUATED` 이고 매길 점수가
+    없다(`services/meal.py::create_skipped_meal`). 허용하면 빈 음식으로 점수 행이 생겨
+    평균에 0 점이 섞인다.
     """
+    if meal.skipped:
+        return False
     if meal.status in _CONFIRMABLE:
         return True
     return meal.status is MealStatus.ANALYZING and meal.is_recalculation
@@ -374,7 +380,9 @@ def confirm(
     meal = _owned_meal(db, user_id, meal_id, for_update=True)
     if not _is_confirmable(meal):
         raise MealNotConfirmableError(
-            f"{meal.status.value} 상태의 식사는 확정할 수 없습니다."
+            "식사 안 함으로 기록한 끼니는 확정하지 않습니다."
+            if meal.skipped
+            else f"{meal.status.value} 상태의 식사는 확정할 수 없습니다."
         )
 
     satiety_crud.set_satiety_after(db, meal_id=meal.id, pct=request.satiety_after_pct)
