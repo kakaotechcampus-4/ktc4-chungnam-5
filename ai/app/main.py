@@ -9,16 +9,21 @@ BE 와는 HTTP 로만 대화한다. 경로·요청·응답 모양은 ai-stub/mai
 from __future__ import annotations
 
 from typing import Any
+import httpx
 
 from fastapi import FastAPI, HTTPException, status
 
 from app.food_analyzer import analyze_food
+from app.short_feedback import generate_short_feedback
+from app.safety_guard import BLOCKED_BODY, is_unsafe
 from app.ai_coach import generate_chat, CoachUnavailable, InvalidCoachResponse
 from app.schemas import (
     ChatRequest,
     ChatResponse,
     AnalyzeMealRequest,
     AnalyzeMealResponse,
+    MealType,
+    Scope,
     SafetyStatus,
     ShortFeedbackRequest,
     ShortFeedbackResponse,
@@ -37,6 +42,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=504, detail="AI coach timed out") from None
     except InvalidCoachResponse:
         raise HTTPException(status_code=502, detail="Invalid AI coach response") from None
+
 
 # 사람이 읽을 수 있는 라벨일 뿐, 실제 모델 식별자가 아니다 — 실제 모델은
 # LLM_VISION_URL(mlapi.run/<UUID>)이 가리키고, 그 UUID는 비밀로 다룬다(config.py).
@@ -70,9 +76,36 @@ async def analyze_meal(req: AnalyzeMealRequest) -> AnalyzeMealResponse:
 
 
 @app.post("/short-feedback", response_model=ShortFeedbackResponse, tags=["feedback"])
-def short_feedback(req: ShortFeedbackRequest) -> ShortFeedbackResponse:
-    # TODO: agents/ 의 Feedback Agent 를 붙인다.
-    raise _not_implemented("short-feedback")
+async def short_feedback(req: ShortFeedbackRequest) -> ShortFeedbackResponse:
+    def blocked() -> ShortFeedbackResponse:
+        return ShortFeedbackResponse(body=BLOCKED_BODY, model_version="reasoning-gateway",
+                                     safety_status=SafetyStatus.BLOCKED)
+
+    input_texts = [item.display_name for item in req.items]
+    for meal in req.previous_meals:
+        input_texts.extend(item.display_name for item in meal.items)
+    input_texts += [meal.summary for meal in req.meals]
+    if req.satiety and req.satiety.user_comment:
+        input_texts.append(req.satiety.user_comment)
+    if any(is_unsafe(text) for text in input_texts):
+        return blocked()
+    try:
+        draft = await generate_short_feedback(req)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="피드백 모델 응답 시간이 초과되었다") from None
+    except (httpx.HTTPError, ValueError):
+        # 게이트웨이 URL·키·사용자 기록을 오류 응답에 노출하지 않는다.
+        raise HTTPException(status_code=502, detail="피드백 모델 응답을 처리하지 못했다") from None
+    output_texts = [draft.body, draft.reasoning or ""]
+    for suggestion in draft.suggestions or []:
+        output_texts.extend([suggestion.food_name, suggestion.advice])
+    if any(is_unsafe(text) for text in output_texts):
+        return blocked()
+    return ShortFeedbackResponse(
+        body=draft.body, reasoning=draft.reasoning,
+        suggestions=[] if req.scope is Scope.MEAL and req.meal_type is MealType.DINNER else draft.suggestions,
+        model_version="reasoning-gateway", safety_status=SafetyStatus.SAFE,
+    )
 
 
 # TODO: 계약 확정 후 schemas 의 LongFeedbackRequest / Response 로 바꾼다.

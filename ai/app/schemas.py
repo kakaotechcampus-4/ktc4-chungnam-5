@@ -1,6 +1,7 @@
 """BE ↔ AI 요청·응답 계약.
 
-`ai-stub/schemas.py` 의 구조·필드명을 그대로 따른다. BE 가 이 모양으로 이미 구현돼 있다.
+MEAL은 2026-11-01 BE↔AI 인터페이스에 체중 전달 합의(`weightKg`)를 더한 계약이다.
+기존 DAILY 요청도 전환 기간 동안 받는다.
 
 JSON 은 camelCase, 파이썬은 snake_case 다. `_Camel` 이 둘을 이어 준다.
 """
@@ -107,18 +108,23 @@ class AnalyzeMealResponse(_Camel):
 class Nutrition(_Camel):
     """BE → AI 방향. AI 가 생성하는 값이 아니다."""
 
-    kcal: float | None = None
-    protein_g: float | None = None
-    fat_g: float | None = None
-    carb_g: float | None = None
-    fiber_g: float | None = None
-    sodium_mg: float | None = None
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    kcal: float | None = Field(default=None, ge=0)
+    protein_g: float | None = Field(default=None, ge=0)
+    fat_g: float | None = Field(default=None, ge=0)
+    carb_g: float | None = Field(default=None, ge=0)
+    fiber_g: float | None = Field(default=None, ge=0)
+    sodium_mg: float | None = Field(default=None, ge=0)
 
 
-class FeedbackItem(_Camel):
+class MealFood(_Camel):
     display_name: str
     amount: float | None  # null 이면 먹은 양을 모른다. 음식을 빼지 않고 보낸다
     unit: str | None
+
+
+class FeedbackItem(MealFood):
     nutrition: Nutrition | None = None  # null 이면 성분을 못 구했다
 
 
@@ -141,6 +147,25 @@ class DailyMealSummary(_Camel):
     qqs: QQS
 
 
+class PreviousMeal(_Camel):
+    """KST 당일 현재 끼니보다 앞선 확정 기록. 목록에 없는 끼니는 결식으로 추측하지 않는다."""
+
+    meal_type: MealType
+    skipped: bool
+    qqs: QQS
+    items: list[MealFood] = Field(default_factory=list)
+    nutrition_totals: Nutrition | None = None
+
+    @model_validator(mode="after")
+    def _skipped_fields(self) -> PreviousMeal:
+        if self.skipped and (
+            self.items or self.nutrition_totals is not None
+            or any(value is not None for value in self.qqs.model_dump().values())
+        ):
+            raise ValueError("식사 안 함 기록은 음식·영양 합계·점수를 포함할 수 없다")
+        return self
+
+
 class ShortFeedbackRequest(_Camel):
     scope: Scope
     user_id: str
@@ -149,8 +174,15 @@ class ShortFeedbackRequest(_Camel):
 
     # scope=MEAL
     meal_id: str | None = None
+    # 이전 BE 요청도 받기 위해 새 필드는 기본값을 둔다. 미전달 mealType을 추정하지 않는다.
+    meal_type: MealType | None = None
+    skipped: bool = False
+    weight_kg: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     items: list[FeedbackItem] = Field(default_factory=list)
     satiety: SatietyContext | None = None
+    previous_meals: list[PreviousMeal] = Field(default_factory=list)
+    # 현재 끼니 포함, 현재 끼니 시점까지의 합계. AI에서 현재 끼니를 다시 더하지 않는다.
+    daily_nutrition_totals: Nutrition | None = None
 
     # scope=DAILY
     date: dt.date | None = None
@@ -160,6 +192,11 @@ class ShortFeedbackRequest(_Camel):
     def _scope_fields(self) -> ShortFeedbackRequest:
         if self.scope is Scope.MEAL and not self.meal_id:
             raise ValueError("scope=MEAL 에는 mealId 가 필요하다")
+        if self.scope is Scope.MEAL and self.skipped and (
+            self.items or self.satiety is not None
+            or any(value is not None for value in self.qqs.model_dump().values())
+        ):
+            raise ValueError("식사 안 함 요청은 음식·포만감·점수를 포함할 수 없다")
         if self.scope is Scope.DAILY and self.date is None:
             raise ValueError("scope=DAILY 에는 date 가 필요하다")
         return self
