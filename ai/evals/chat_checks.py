@@ -1,7 +1,8 @@
 """`/chat` 판정 함수 — 챗봇 답이 `ai-stub` 계약과 안전 규칙을 지켰는가를 판정한다.
 
 모두 순수 함수이고, 예외 없이 `Verdict`(통과?, note)를 돌려준다. 판정에 LLM judge 를 두지 않는다.
-AI 에는 Chat 스키마가 없어 계약은 `ai-stub/schemas.py` 를 파일 경로로 읽는다(`load_contract`, 게이트 1 결정 A).
+계약은 BE ↔ AI 정본인 `ai-stub/schemas.py` 를 파일 경로로 읽는다(`load_contract`, 게이트 1 결정 A).
+앱(`app/schemas.py`)에도 Chat 스키마가 있지만 판정 근거는 stub 계약이다(차이는 `evals/README.md` `/chat` 절).
 import 시점에는 계약을 읽지 않는다 — 판정이 처음 필요할 때 읽는다.
 
 `checks.py` 의 텍스트 판정은 기본으로 MEAL 필드(body · reasoning · suggestions[].advice)를 읽으므로 chat 응답

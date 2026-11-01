@@ -27,9 +27,12 @@ import traceback
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from app.config import _GATEWAY_PREFIX  # 모듈 상수만 읽는다 — `.env` 는 `get_settings()` 를 불러야 읽힌다
+
+if TYPE_CHECKING:
+    from app.config import CoachSettings, Settings
 
 # ─────────────────────────── 타입 ───────────────────────────
 
@@ -140,25 +143,32 @@ def default_post() -> Post:
     return post
 
 
-def has_api_key() -> bool:
-    """`app.config.get_settings()` 로 모델 키가 설정돼 있는지 확인한다.
+def _settings_have_key(load_settings: Callable[[], Settings | CoachSettings]) -> bool:
+    """설정을 읽어 공백 아닌 `LLM_API_KEY` 가 있는지 본다.
 
-    필수 설정(키 · 엔드포인트 URL)이 없으면 `Settings` 가 검증 오류를 낸다 — 그때는 키가 없는 것으로 본다.
+    필수 설정(키 · 엔드포인트 URL)이 없거나 무효면 설정 클래스가 검증 오류를 낸다 — 그때는 키가 없는 것으로 본다.
     """
     from pydantic import ValidationError
 
-    from app.config import get_settings
-
     try:
-        settings = get_settings()
+        settings = load_settings()
     except ValidationError:
         return False
     return bool(settings.LLM_API_KEY.get_secret_value().strip())
 
 
+def has_api_key() -> bool:
+    """`app.config.get_settings()`(vision · reasoning 설정)로 모델 키가 설정돼 있는지 확인한다."""
+    from app import config
+
+    return _settings_have_key(config.get_settings)
+
+
 def has_coach_key() -> bool:
-    """`app.config.get_coach_settings()` 로 coach 모델 키 · URL 이 설정돼 있는지 확인한다."""
-    raise NotImplementedError("has_coach_key 미구현")
+    """`app.config.get_coach_settings()`(coach 설정)로 모델 키가 설정돼 있는지 확인한다 — vision 설정은 보지 않는다."""
+    from app import config
+
+    return _settings_have_key(config.get_coach_settings)
 
 
 # ─────────────────────────── 실행 ───────────────────────────

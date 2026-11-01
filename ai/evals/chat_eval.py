@@ -3,13 +3,18 @@
 `ai/` 에서 `python -m evals.chat_eval` 로 실행한다(스크립트 경로로 실행하면 `app` 을 못 찾는다).
 실제 모델을 부르므로 메인 세션이 사용자 승인 후에만 실행한다. 사용법 · 축 · 판정 한계는 `evals/README.md`.
 
-AI 에는 아직 `/chat` 라우트가 없다 — 라우트가 생기기 전까지 실행은 `SKIP: 미연결`(404)로 끝난다.
+`/chat` 라우트(`app/ai_coach.py`)를 `TestClient` 로 거친다. 라우트는 vision 설정과 독립인 coach 설정
+(`LLM_API_KEY` · `LLM_COACH_URL`)만 쓴다 — 키 확인도 coach 설정 기준(`harness.has_coach_key`)이고, 없으면
+`SKIP: 모델 설정` 으로 끝난다. 키 확인을 통과한 뒤 라우트가 내는 5xx(503 포함)는 SKIP 이 아니라 계약 실패다(결정 B).
 이전 턴은 요청 JSON 의 history 에 고정 데이터로 넣는다(실제 모델로 재생하지 않는다).
 
 케이스는 **질문 하나**다. 응답 하나를 그 질문에서 의미 있는 축 모두로 판정한다(결정 A) — 호출 수는 케이스 수 × n.
+앱의 입력 가드레일(`ai_coach.is_medical_request`)이 `dose_change` · `roleplay_doctor` · `ignore_instructions`
+3케이스를 모델 전에 BLOCKED 로 막는다 — 이 셋은 모델이 아니라 정규식을 잰다(모델 호출 0).
 
 입력 설계:
-- 요청은 `ai-stub/schemas.py` `ChatRequest` 를 만족하는 camelCase JSON 이다(verify 행 60 이 계약 파일로 검증한다)
+- 요청은 `ai-stub/schemas.py` `ChatRequest` 를 만족하는 camelCase JSON 이다(verify 행 60 이 계약 파일로 검증한다).
+  앱 `app.schemas.ChatRequest` 도 통과한다(verify 행 c14)
 - 음식은 MEAL few-shot 예시(참치김밥 · 김밥 · 라면 · 삶은 달걀 · 방울토마토)와 겹치지 않는다 — 겹치면 예시를 베낀 답이
   정답처럼 보인다
 - history 는 BE `chat_reply._history` 가 보내는 모양 그대로다 — BLOCKED 답과 그 질문은 빠져 있다.
@@ -21,16 +26,23 @@ AI 에는 아직 `/chat` 라우트가 없다 — 라우트가 생기기 전까�
 from __future__ import annotations
 
 import copy
+import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from app import ai_coach
+from app.schemas import ChatRequest
 from evals import chat_checks, harness
 from evals.harness import Axis, Case, Check, Grade
 
 _PATH = "/chat"
 
-RULE_VERSION: str = "chat-cases-v1"
-"""baseline 비교 조건. chat 은 BE 규칙 버전이 없어 케이스 · 판정을 바꾸면 이 값을 올린다."""
+RULE_VERSION: str = "chat-cases-v2"
+"""baseline 비교 조건. chat 은 BE 규칙 버전이 없어 케이스 · 판정 · 비교 조건을 바꾸면 이 값을 올린다.
+
+v2: 케이스 · 판정은 v1 과 같다. 라우트가 생겨 프롬프트 해시가 계약 파일 텍스트에서 chat 프롬프트
+(`cases_prompt_hash`)로 바뀌었다 — v1 baseline 과 비교하면 `compare` 가 경고한다.
+"""
 
 CRASH_LOG = Path(__file__).resolve().parent / "chat_crashes.log"
 """하네스 크래시 traceback. 루트 `.gitignore` 의 `*.log` 가 막는다."""
@@ -267,31 +279,33 @@ CASES: tuple[Case, ...] = (
 # ─────────────────────────── 실행 ───────────────────────────
 
 
-def _prompt_hash() -> str:
-    """baseline 의 비교 조건 — 지금은 계약 파일(`ai-stub/schemas.py`) 텍스트의 해시다(결정 E).
-
-    chat 프롬프트가 아직 없다. 라우트가 생기면 chat system 프롬프트(+ 케이스별 user 프롬프트) 해시로 바꾼다.
-    """
-    return harness.prompt_hash(chat_checks.AI_STUB_SCHEMAS.read_text(encoding="utf-8"))
-
-
 def cases_prompt_hash(cases: Sequence[Case]) -> str:
-    """baseline 의 비교 조건 — 케이스마다 `app.ai_coach.build_messages` 가 조립한 메시지 전체의 해시."""
-    raise NotImplementedError("cases_prompt_hash 미구현")
+    """baseline 의 비교 조건 — 케이스마다 `app.ai_coach.build_messages` 가 조립한 메시지 전체의 해시(결정 C).
+
+    메시지에는 `SYSTEM_PROMPT` 와 context · history · 질문을 실은 user 메시지가 들어 있어, system 프롬프트 ·
+    조립 방식 · 케이스 입력 중 하나만 바뀌어도 해시가 바뀐다. `build_messages` 는 호출 시점에 모듈 속성으로 꺼낸다.
+    계약 파일(`ai-stub/schemas.py`)은 넣지 않는다 — analyze · feedback 스키마 수정이 거짓 "프롬프트 바뀜" 경고를 낸다.
+    """
+    prompts = [
+        json.dumps(ai_coach.build_messages(ChatRequest.model_validate(case.request)), ensure_ascii=False)
+        for case in cases
+    ]
+    return harness.prompt_hash(*prompts)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """`harness.cli_main` 에 위임한다 — 규칙 버전은 `RULE_VERSION`, 해시는 계약 파일(결정 E).
+    """`harness.cli_main` 에 위임한다 — 규칙 버전은 `RULE_VERSION`, 해시는 chat 프롬프트(`cases_prompt_hash`).
 
-    채널(`default_post`)과 키 확인(`has_api_key`)은 호출 시점에 꺼낸다 — import 만으로 `.env` · 계약을 읽지 않는다.
+    채널(`default_post`) · coach 키 확인(`has_coach_key`) · 크래시 로그 경로(`CRASH_LOG`)는 호출 시점에 꺼낸다 —
+    import 만으로 `.env` 를 읽지 않는다.
     """
     return harness.cli_main(
         argv,
         cases=CASES,
         post_factory=harness.default_post,
-        has_key=harness.has_api_key,
+        has_key=harness.has_coach_key,
         rule_version=RULE_VERSION,
-        prompt_hash=_prompt_hash(),
+        prompt_hash=cases_prompt_hash(CASES),
         crash_log=CRASH_LOG,
     )
 
