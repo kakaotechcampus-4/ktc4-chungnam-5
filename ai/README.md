@@ -106,7 +106,7 @@ pytest
 
 ## short-feedback 연결 상태
 
-- `short_feedback.py`가 영양 판정 → scope별 system/user 메시지 → reasoning 게이트웨이 호출 → 응답 파싱을 맡는다.
+- `short_feedback.py`가 목표 계산·영양 판정 → scope별 system/user 메시지 → reasoning 게이트웨이 호출 → 응답 파싱을 맡는다.
 - `food_analyzer.py`와 같이 `config.get_settings()`와 `httpx.AsyncClient`를 사용한다.
   `LLM_REASONING_URL` 뒤에 `/v1/chat/completions`를 붙이고 OpenAI 호환 `messages`를 전송한다.
   2026-10-30 선택한 reasoning 엔드포인트에서 실제 끼니 피드백 생성·파싱을 확인했다.
@@ -123,3 +123,42 @@ pytest
 - 자동 테스트는 실제 과금 호출 없이 HTTP 전송을 모킹한다. 실행: `cd ai && python -m pytest -q`.
 - JSON을 편집해 실제 모델의 중간 과정·피드백을 확인하려면 [수동 품질 테스트 도구](manual_feedback/README.md)를 사용한다.
   실험 결과와 `.env`는 커밋하지 않는다.
+
+### 누적 피드백 입력 계약 (2026-11-01)
+
+MEAL 요청은 현재 끼니와 이전 확정 기록을 한 번의 생성 경로에 넣는다.
+`body` 하나에 현재 끼니 평가와 누적 흐름을 담고, 기존 `reasoning`, `suggestions`,
+`modelVersion`, `safetyStatus` 응답 구조를 유지한다. 별도 누적 출력이나 추가 DAILY 호출을 만들지 않는다.
+기존 BE 전환을 위해 DAILY 요청과 새 필드가 없는 MEAL 요청도 계속 받는다.
+
+| 추가 요청 필드 | 의미 |
+| --- | --- |
+| `mealType` | BREAKFAST / LUNCH / DINNER / SNACK. 저녁의 SAFE 응답은 추천을 강제로 `[]`로 반환 |
+| `skipped` | 명시적 결식. true면 items=[], satiety=null, QQS 세 축 모두 null |
+| `weightKg` | 양수 또는 null. 목표 계산에 사용하는 체중 kg. **회의 합의를 반영한 필드로 BE 전달 확인 필요** |
+| `previousMeals` | KST 당일 현재 끼니보다 앞선 확정 기록을 식사 순서로 전달 |
+| `dailyNutritionTotals` | 현재 끼니 포함, **현재 끼니 시점까지**의 영양 합계 또는 null |
+
+`previousMeals[]`는 `mealType`, `skipped`, `qqs`, `items[]`(displayName·amount·unit),
+`nutritionTotals`를 받는다. 이전 피드백 텍스트나 음식별 성분을 요구하지 않는다.
+목록에 없는 끼니를 결식으로 추측하지 않는다. 이전 기록의 명시적 결식은 음식·합계·점수가 없어야 한다.
+
+`dailyNutritionTotals`와 이전 기록의 `nutritionTotals`는 `Nutrition` 구조
+(`kcal`, `proteinG`, `fatG`, `carbG`, `fiberG`, `sodiumMg`)다. AI는 BE 누적 합계에 현재 끼니를
+다시 더하거나, 누적 합계가 null일 때 음식 목록으로 복원하지 않는다.
+현재 끼니 자체의 성분 합계는 기존처럼 `items[].nutrition`에서 계산한다.
+
+목표는 BE v2 기준의 사본으로 Python에서 계산한다. 단백질은 하루 체중×0.91g(PRE_DOSE),
+나머지 단계는 체중×1.2g, 식이섬유는 하루 25g(INITIAL은 25×2/3g), 나트륨 한도는 하루 2300mg이다.
+끼니 기준은 반올림 전 하루 기준÷3이며, 표시·판정용 목표는 Decimal ROUND_HALF_UP으로 소수 한 자리까지 쓴다.
+체중이 없으면 단백질 목표·충족률을 추정하지 않는다. 지방·탄수화물 목표와 열량 적정 범위는 만들지 않는다.
+
+누적은 하루 목표 대비 진행률·남은 양과 나트륨 한도 초과량을 계산한다. 시간대별 부족 기준은 만들지 않는다.
+BE 합계는 결측 성분이 0으로 합산돼 실제보다 작을 수 있으므로 기록에서 확인된 수치로만 설명한다.
+나트륨의 남은 한도를 섭취 권장량으로 해석하지 않는다.
+
+BE 인터페이스 원문의 누적 범위는 늦게 입력한 끼니 뒤의 기록도 포함할 수 있다고 돼 있지만,
+이 구현은 후속 합의인 **현재 끼니 시점까지**를 전제로 한다. 식사 시각이 없는 요청에서는
+AI가 범위를 검증할 수 없으므로 BE가 이 범위를 보장해야 한다.
+체중은 기존 BE 규칙인 식사 시각 이전 마지막 기록, 없으면 가장 최근 기록을 전달한다는 전제다.
+로컬 BE 코드는 이번 작업에서 변경하지 않으며, 실제 BE 전송·합계 범위·체중 선택은 통합 검증 대상이다.

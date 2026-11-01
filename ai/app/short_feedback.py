@@ -3,17 +3,13 @@
 채점(Q/Q/S)은 BE Rule Engine 이 이미 끝냈다. 이 파일은 그 점수를 **문장으로 옮기고**, 부족한
 영양소를 채울 음식을 제안한다. 한 번의 모델 호출로 분석(`body`·`reasoning`)과 제안(`suggestions`)을 같이 받는다.
 
-**끼니 화면에 나가는 AI 문장은 `suggestions` 의 `foodName`·`advice` 뿐이다.** `body`·`reasoning` 은
-화면에 없고 다른 AI 가 읽는 재료다 — `body` 는 하루 피드백(DAILY 요청의 `meals[].summary`)과 AI 챗봇의
-근거가 되고, `reasoning` 은 챗봇이 "다른 추천" 을 할 때 지킬 제안 목표다. 그래서 `body` 는 다듬은
-말투보다 사실의 밀도를, `advice` 는 사용자에게 보이는 유일한 문장으로서 말투를 챙긴다.
+`body` 하나에 현재 끼니 평가와 앞선 끼니를 고려한 누적 흐름을 담는다. 이전 피드백 문장 대신
+`previousMeals`의 확정 기록을 쓰며, `dailyNutritionTotals`는 현재 끼니를 포함한 시점까지의
+BE 합계를 그대로 쓴다. 별도 누적 피드백 필드나 추가 DAILY 모델 호출을 만들지 않는다.
 
-**부족 영양소는 Python 규칙으로 먼저 판정하고, 그 결과를 프롬프트에 넣는다.** 모델에게 숫자
-비교를 맡기면 결과가 흔들린다. 다만 요청에는 체중·평소 열량이 없어서 판정할 수 있는 범위가 좁다.
-
-- 식이섬유·나트륨 — 끼니 기준이 단계만으로 정해진다. 판정한다
-- 단백질 — 목표가 체중에 달려 있어 직접 못 잰다. Quality 점수로 거꾸로 짐작할 수 있을 때만 판정한다
-- Quantity 방향(과식/소식) — 평소 열량을 몰라 판정하지 않는다. 문장에서도 방향을 말하지 않게 막는다
+목표·판정·충족률은 Python에서 계산한다. 단백질은 체중·단계, 식이섬유는 단계,
+나트륨은 공통 한도를 쓴다. 체중이 없으면 단백질 목표를 추정하지 않는다.
+평소 열량은 여전히 없으므로 Quantity 점수로 과식/소식 방향을 추측하지 않는다.
 
 `modelVersion`/`safetyStatus` 로 감싸 `ShortFeedbackResponse` 를 완성하는 건 `main.py` 의 일이다
 (`food_analyzer.py` 와 같은 분담). 이 파일은 본문·근거·제안만 책임진다.
@@ -25,11 +21,15 @@
 from __future__ import annotations
 
 import json
-import httpx
 from dataclasses import dataclass
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Final, Literal
 
-from app.schemas import FeedbackItem, Scope, ShortFeedbackRequest, Stage, Suggestion
+import httpx
+
+from app.schemas import (
+    FeedbackItem, MealFood, MealType, Scope, ShortFeedbackRequest, Stage, Suggestion,
+)
 from app.config import get_settings
 
 # ─────────────────────────── BE 채점 기준 사본 ───────────────────────────
@@ -40,13 +40,13 @@ BE_RULE_VERSION: Final = "v2"
 """아래 숫자를 옮겨 온 BE `STAGE_RULE_VERSION`."""
 
 MEALS_PER_DAY: Final = 3
-_SODIUM_MG_PER_DAY: Final = 2300.0
-_FIBER_G_PER_DAY: Final[dict[Stage, float]] = {
-    Stage.PRE_DOSE: 25.0,
-    Stage.INITIAL: 25.0 * 2 / 3,  # 시작 초기 고섬유 음식 회피 권고
-    Stage.TITRATION: 25.0,
-    Stage.MAINTENANCE: 25.0,
-    Stage.REDUCED: 25.0,
+_SODIUM_MG_PER_DAY: Final = Decimal("2300")
+_FIBER_G_PER_DAY: Final[dict[Stage, Decimal]] = {
+    Stage.PRE_DOSE: Decimal("25"),
+    Stage.INITIAL: Decimal("25") * 2 / 3,
+    Stage.TITRATION: Decimal("25"),
+    Stage.MAINTENANCE: Decimal("25"),
+    Stage.REDUCED: Decimal("25"),
 }
 
 STAGE_RISK: Final[dict[Stage, str]] = {
@@ -71,15 +71,37 @@ _LABELS: Final[dict[NutrientName, str]] = {
     "fiber": "식이섬유",
     "sodium": "나트륨",
 }
+_ATTRS: Final[dict[NutrientName, str]] = {
+    "protein": "protein_g", "fiber": "fiber_g", "sodium": "sodium_mg",
+}
+_UNITS: Final[dict[NutrientName, str]] = {"protein": "g", "fiber": "g", "sodium": "mg"}
 
 
 @dataclass(frozen=True)
 class NutrientJudgement:
     name: NutrientName
     state: NutrientState
-    current: float | None = None
-    target: float | None = None  # 단백질은 체중을 몰라 None
-    inferred: bool = False  # Quality 점수에서 거꾸로 짐작했다
+    current: float
+    target: float
+
+
+def _round(value: Decimal) -> float:
+    return float(value.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
+
+
+def calculate_targets(
+    stage: Stage, weight_kg: float | None, *, per_meal: bool = False,
+) -> dict[NutrientName, float | None]:
+    """BE v2 기준. 중간 반올림 없이 ÷3 후 화면과 같은 소수 한 자리로 반올림한다."""
+    protein = None if weight_kg is None else Decimal(str(weight_kg)) * (
+        Decimal("0.91") if stage is Stage.PRE_DOSE else Decimal("1.2")
+    )
+    divisor = MEALS_PER_DAY if per_meal else 1
+    return {
+        "protein": None if protein is None else _round(protein / divisor),
+        "fiber": _round(_FIBER_G_PER_DAY[stage] / divisor),
+        "sodium": _round(_SODIUM_MG_PER_DAY / divisor),
+    }
 
 
 def _sum_nutrient(items: list[FeedbackItem], attr: str) -> float | None:
@@ -96,7 +118,7 @@ def _sum_nutrient(items: list[FeedbackItem], attr: str) -> float | None:
     values = [getattr(nutrition, attr) for nutrition in counted]
     if any(value is None for value in values):
         return None
-    return sum(values)
+    return float(sum((Decimal(str(value)) for value in values), Decimal(0)))
 
 
 def judge_nutrients(req: ShortFeedbackRequest) -> list[NutrientJudgement]:
@@ -105,36 +127,51 @@ def judge_nutrients(req: ShortFeedbackRequest) -> list[NutrientJudgement]:
     목표는 BE 화면(`nutrients[].state`)처럼 **소수 1자리로 반올림한 값**과 비교한다.
     반올림 전 값과 비교하면 화면에 `8.3 / 8.3` 인데 부족이라고 쓰게 된다.
     """
+    if req.skipped:
+        return []
+    targets = calculate_targets(req.stage, req.weight_kg, per_meal=True)
     judgements: list[NutrientJudgement] = []
-    # 단백질 추론용. BE 채점(rule_engine)은 반올림 전 목표를 쓰므로 그 기준으로 다 채웠는지 본다.
-    fully_met: list[bool] = []
-
-    fiber = _sum_nutrient(req.items, "fiber_g")
-    if fiber is not None:
-        target = _FIBER_G_PER_DAY[req.stage] / MEALS_PER_DAY
-        state: NutrientState = "SHORT" if fiber < round(target, 1) else "OK"
-        judgements.append(NutrientJudgement("fiber", state, fiber, round(target, 1)))
-        fully_met.append(fiber >= target)
-
-    sodium = _sum_nutrient(req.items, "sodium_mg")
-    if sodium is not None:
-        limit = _SODIUM_MG_PER_DAY / MEALS_PER_DAY
-        state = "OVER" if sodium > round(limit, 1) else "OK"
-        judgements.append(NutrientJudgement("sodium", state, sodium, round(limit, 1)))
-        fully_met.append(sodium <= limit)
-
-    # Quality = (단백질·식이섬유·나트륨 충족도의 평균) × 100 이고, 충족도마다 상한이 1이다.
-    # 100 미만인데 나머지를 채점 기준으로 다 채웠으면 깎인 건 단백질뿐이다. 하나라도 못 채웠으면
-    # 단백질도 부족한지는 알 수 없다 — 그때는 판정하지 않는다. 식이섬유 8.3g 은 화면 기준(8.3)으로는
-    # OK 지만 채점 기준(8.33…)으로는 못 채워 Quality 를 깎는다. 화면 state 로 추론하면 단백질을 오판한다.
-    # 단백질 합계를 모르면 짐작하지 않는다 — BE 는 단백질이 없으면 Quality 를 null 로 둔다. 여기서
-    # 모르는데 점수가 왔다면 BE 와 받은 성분이 다른 것이라 추론의 전제가 깨진다.
-    quality = req.qqs.quality
-    protein = _sum_nutrient(req.items, "protein_g")
-    if quality is not None and quality < 100 and protein is not None and all(fully_met):
-        judgements.insert(0, NutrientJudgement("protein", "SHORT", protein, inferred=True))
-
+    for name, target in targets.items():
+        current = _sum_nutrient(req.items, _ATTRS[name])
+        if current is None or target is None:
+            continue
+        state: NutrientState
+        if name == "sodium":
+            state = "OVER" if current > target else "OK"
+        else:
+            state = "SHORT" if current < target else "OK"
+        judgements.append(NutrientJudgement(name, state, current, target))
     return judgements
+
+
+@dataclass(frozen=True)
+class NutrientProgress:
+    """기록된 누적 섭취량과 하루 기준. 시간대별 부족 판정은 하지 않는다."""
+
+    name: NutrientName
+    current: float | None
+    target: float | None
+    percent: float | None
+    remaining: float | None
+    excess: float | None
+
+
+def cumulative_progress(req: ShortFeedbackRequest) -> list[NutrientProgress]:
+    """BE 합계를 그대로 평가한다. 모르는 값은 0으로 채우거나 현재 끼니를 다시 더하지 않는다."""
+    totals = req.daily_nutrition_totals
+    if totals is None:
+        return []
+    result = []
+    for name, target in calculate_targets(req.stage, req.weight_kg).items():
+        current = getattr(totals, _ATTRS[name])
+        percent = remaining = excess = None
+        if current is not None and target is not None and target > 0:
+            amount, goal = Decimal(str(current)), Decimal(str(target))
+            percent = _round(amount / goal * 100)
+            remaining = _round(max(Decimal(0), goal - amount))
+            excess = _round(max(Decimal(0), amount - goal)) if name == "sodium" else None
+        result.append(NutrientProgress(name, current, target, percent, remaining, excess))
+    return result
 
 
 # ─────────────────────────── 프롬프트 ───────────────────────────
@@ -160,11 +197,10 @@ _MEAL_EXAMPLE_BAD: Final = {
 }
 
 _MEAL_EXAMPLE_GOOD: Final = {
-    "body": "참치김밥 1줄과 라면 0.5개. 나트륨 1790mg으로 끼니 한도(766.7mg)의 2배 이상이며 "
-    "라면(900mg)과 김밥(890mg)이 비슷하게 기여함. 식이섬유 3.1g으로 목표 8.3g에 못 미치고 채소 반찬 없음. "
-    "식후 포만감 55%에서 2시간 뒤 25%로 떨어져 110분 만에 다시 배고픔. 양은 유지기 권장 구간 안.",
-    "reasoning": "1순위 나트륨 줄이기(국물·면을 다른 메뉴로), 2순위 식이섬유 채우기(채소 추가). "
-    "양은 적절해서 늘리거나 줄이는 제안은 하지 않음.",
+    "body": "참치김밥과 라면에서 확인된 나트륨은 1790mg으로 끼니 한도 766.7mg을 넘었어요. "
+    "식이섬유는 3.1g으로 끼니 목표 8.3g에 못 미쳤고, 110분 만에 허기가 돌아왔어요. "
+    "아침을 포함해 기록된 식이섬유는 8.1g으로 하루 목표 25g의 32.4%예요.",
+    "reasoning": "1순위 나트륨 줄이기(국물·면을 다른 메뉴로), 2순위 식이섬유 채우기(채소 추가).",
     "suggestions": [
         {
             "foodName": "삶은 달걀 2개",
@@ -172,7 +208,7 @@ _MEAL_EXAMPLE_GOOD: Final = {
         },
         {
             "foodName": "오이무침 한 접시",
-            "advice": "이번 끼니에 빠졌던 채소를 채워서, 2시간 만에 배고파지던 게 덜할 거예요",
+            "advice": "이번 끼니에서 적었던 채소를 다음 끼니에 곁들이기 좋아요",
         },
     ],
 }
@@ -182,24 +218,35 @@ def _json(obj: object) -> str:
     return json.dumps(obj, ensure_ascii=False)
 
 
-MEAL_SYSTEM_PROMPT: Final = f"""너는 GLP-1 계열 약을 쓰는 사용자의 한 끼 기록을 분석하고 다음 끼니 음식을 추천하는 식단 코치다.
-앱 화면에는 네 답 중 추천 카드(suggestions 의 foodName·advice)만 나간다.
-body·reasoning 은 화면에 나가지 않고, 하루 요약과 AI 챗봇이 이 끼니를 이해하는 재료로 쓰인다.
-body 로 먼저 분석하고, reasoning 으로 방향을 정한 뒤, 그 분석에 맞춰 suggestions 를 고른다.
+MEAL_SYSTEM_PROMPT: Final = f"""너는 GLP-1 계열 약을 쓰는 사용자의 식사 기록을 돌아보는 식단 코치다.
+현재 끼니와 앞선 확정 끼니를 참고해 body 하나를 쓴다. 목표·판정·충족률은 Python 계산 결과다.
+숫자를 새로 계산하거나 QQS를 다시 채점하지 않는다. 모델 호출 한 번으로 아래 필드를 모두 만든다.
 
-## body — 끼니 분석 노트 (3~4문장, 화면에 안 나감)
-- 다른 AI 가 이 끼니를 다시 보지 않고도 이해할 수 있게 사실을 빠짐없이 적는다
-- 무엇을 얼마나 먹었는지, 판정 결과, 원인 음식(어느 음식에서 얼마가 왔는지), 포만감 경과, 투약 단계 맥락을 담는다
-- 기록에 있는 숫자는 그대로 쓴다. 기록에 없는 숫자는 쓰지 않는다
-- 판정을 못 한 영양소나 "측정 못 함" 인 축은 "모름" 이라고 적고 짐작하지 않는다
-- 꾸미지 않는다. 짧은 서술형("~함", "~임")으로 쓴다
+## body — 현재 끼니 평가와 누적 흐름 (3~4문장)
+- 현재 끼니의 음식, 영양 판정, 포만감에서 중요한 사실을 골라 해요체로 쓴다
+- 앞선 확정 기록이 없으면 현재 끼니에 집중한다. 누락된 아침·점심을 결식으로 추측하지 않는다
+- 앞선 기록이 있으면 현재 끼니와 연결해 보완·반복된 식사 흐름을 적는다. 과거 목표는 없으니 과거 끼니를 새로 판정하지 않는다
+- 점심은 앞선 기록을 반영하고, 저녁은 현재 시점까지의 하루 흐름을 함께 돌아본다
+- 끼니 피드백과 누적 피드백을 별도 필드나 제목으로 나누지 않는다
+- dailyNutritionTotals는 현재 끼니를 포함한 누적 합계다. 현재 끼니를 다시 더하지 않는다
+- 하루 목표 대비 진행률과 남은 양은 제공된 계산값만 쓴다. 하루 도중 목표 미달을 곧바로 부족으로 판정하지 않는다
+- 나트륨은 목표가 아닌 한도다. 남은 한도를 먹어야 할 양으로 권하지 않는다
+- 누적 합계는 결측 성분이 0으로 합산돼 실제보다 작을 수 있다. '기록에서 확인된' 값으로 설명하고 충분·부족을 확정하지 않는다
+- 체중이 없으면 단백질 목표·충족률·부족량을 추정하지 않는다. 지방·탄수화물 목표와 열량 적정 범위도 만들지 않는다
+- 판정할 수 없는 항목과 null인 QQS 축은 평가하지 않는다. 추천 음식이 허기나 증상을 개선한다고 보장하지 않는다
+
+## 식사 안 함
+- skipped=true는 명시적 결식이다. 현재 끼니의 영양·QQS 판정을 하지 않는다
+- 앞선 확정 기록과 결식 사실을 연결한다. 결식의 영양소를 0g으로 평가하지 않는다
+- previousMeals에 없는 끼니는 미입력 또는 확인 전일 수 있다. 결식이나 하루 종료로 단정하지 않는다
 
 ## reasoning — 제안 방향 (한두 문장, 화면에 안 나감)
 - 이번 추천의 목표와 우선순위를 적는다 (예: 1순위 나트륨 줄이기, 2순위 식이섬유 채우기)
 - 하지 않기로 한 방향이 있으면 그것도 적는다. 챗봇이 다른 음식을 추천할 때 이 목표를 지킨다
 
-## suggestions — 추천 카드 (1~{MAX_SUGGESTIONS}개, 화면에 나감)
-피드백 문장을 보여 줄 칸이 따로 없다. 카드가 이 끼니에 대한 피드백 역할까지 한다.
+## suggestions — 추천 카드 (1~{MAX_SUGGESTIONS}개, 저녁은 빈 배열)
+- mealType=DINNER면 suggestions는 반드시 []다. 다음 끼니 메뉴를 만들지 않는다
+- 결식이면 이전 기록과 누적 진행 상황을 참고해 다음 끼니에 곁들이기 쉬운 음식으로 제안한다
 - 이번 끼니를 기준으로 "바꾸기" 나 "더하기" 로 제안한다. "저염식" 대신 "라면 대신 삶은 달걀"
 - 편의점·배달·집밥에서 쉽게 구하는 음식으로 고른다
 - foodName 은 일반 음식명과 1회분 표현이다 (예: 두부 반 모, 삶은 달걀 2개)
@@ -217,7 +264,7 @@ body 로 먼저 분석하고, reasoning 으로 방향을 정한 뒤, 그 분석�
 쓰지 않는 답 (분석이 얇고, 카드가 이번 끼니와 상관없다):
 {_json(_MEAL_EXAMPLE_BAD)}
 
-좋은 답 (참치김밥+라면, 식이섬유 부족·나트륨 초과, 2시간 만에 배고파진 끼니):
+좋은 답 (점심 참치김밥+라면, 아침 식이섬유 5g을 포함한 누적 8.1g):
 {_json(_MEAL_EXAMPLE_GOOD)}
 
 예시의 음식과 문장을 베끼지 않는다. 이번 기록에 맞게 새로 쓴다.
@@ -272,18 +319,8 @@ def _quantity_note(score: float | None) -> str:
     return " — 권장 구간을 벗어났다. 많이 먹었는지 적게 먹었는지는 모르니 방향을 말하지 않는다"
 
 
-_ATTRS: Final[dict[NutrientName, str]] = {
-    "protein": "protein_g",
-    "fiber": "fiber_g",
-    "sodium": "sodium_mg",
-}
-_UNITS: Final[dict[NutrientName, str]] = {"protein": "g", "fiber": "g", "sodium": "mg"}
-
-
 def _judgement_line(j: NutrientJudgement) -> str:
     label = _LABELS[j.name]
-    if j.inferred:
-        return f"- {label}: 부족했을 수 있음 (Quality 점수로 추정. 목표량을 몰라 단정하지 않는다)"
     state = {"SHORT": "부족", "OK": "충분", "OVER": "초과"}[j.state]
     unit = _UNITS[j.name]
     kind = "한도" if j.name == "sodium" else "목표"
@@ -296,8 +333,7 @@ def _item_line(item: FeedbackItem, focus: list[NutrientName]) -> str:
     모델이 "나트륨이 많았어요" 대신 "라면 국물에서 나트륨이 많이 나왔어요" 처럼 원인 음식을
     짚으려면 어느 음식에서 얼마가 왔는지 알아야 한다. 판정과 무관한 성분은 싣지 않는다.
     """
-    amount = "양 모름" if item.amount is None else f"{item.amount:g}{_escape(item.unit or '')}"
-    line = f"- {_fence('food', item.display_name)} ({amount})"
+    line = _food_line(item)
     if not focus:
         return line
     if item.nutrition is None:
@@ -308,6 +344,61 @@ def _item_line(item: FeedbackItem, focus: list[NutrientName]) -> str:
         if (value := getattr(item.nutrition, _ATTRS[name])) is not None
     ]
     return f"{line} — {', '.join(parts)}" if parts else line
+
+
+def _food_line(item: MealFood) -> str:
+    amount = "양 모름" if item.amount is None else f"{item.amount:g}{_escape(item.unit or '')}"
+    return f"- {_fence('food', item.display_name)} ({amount})"
+
+
+def _previous_meal_lines(req: ShortFeedbackRequest) -> list[str]:
+    lines = ["[앞선 확정 끼니 — BE가 보낸 식사 순서]"]
+    if not req.previous_meals:
+        return [*lines, "- 앞선 확정 기록 없음. 기록에 없는 끼니를 결식으로 판단하지 않는다"]
+    for meal in req.previous_meals:
+        lines.append(f"- {meal.meal_type.value}: {'식사 안 함(명시적 결식)' if meal.skipped else '먹음'}")
+        if meal.skipped:
+            continue
+        lines.extend([
+            _score_line("양(Quantity)", meal.qqs.quantity),
+            _score_line("질(Quality)", meal.qqs.quality),
+            _score_line("포만감(Satiety)", meal.qqs.satiety),
+            *[_food_line(item) for item in meal.items],
+            "- 끼니 영양 합계: " + (
+                "모름" if meal.nutrition_totals is None
+                else _json(meal.nutrition_totals.model_dump(by_alias=True))
+            ),
+        ])
+    return lines
+
+
+def _cumulative_lines(req: ShortFeedbackRequest) -> list[str]:
+    lines = [
+        "[현재 끼니 포함 누적 영양 — 현재 시점까지, 재합산하지 않음]",
+        "- BE 합계는 결측 성분을 0으로 더해 실제보다 작을 수 있다. 기록에서 확인된 수치다",
+    ]
+    if req.daily_nutrition_totals is None:
+        return [*lines, "- 누적 합계 모름. 이전 기록이나 현재 끼니에서 합계를 추정하지 않는다"]
+    lines.append("- 영양 합계: " + _json(req.daily_nutrition_totals.model_dump(by_alias=True)))
+    for progress in cumulative_progress(req):
+        name, unit = _LABELS[progress.name], _UNITS[progress.name]
+        if progress.current is None:
+            lines.append(f"- {name}: 누적 섭취량 모름. 평가하지 않는다")
+        elif progress.target is None or progress.percent is None:
+            lines.append(f"- {name}: 기록상 {progress.current:g}{unit}. 목표 모름 — 목표 대비 평가는 하지 않는다")
+        elif progress.name == "sodium":
+            lines.append(
+                f"- {name}: 기록상 {progress.current:g}{unit} / 하루 한도 {progress.target:g}{unit}, "
+                f"한도 대비 {progress.percent:g}%, 기록상 한도 초과량 {progress.excess:g}{unit}. "
+                "한도 미만이어도 추가 섭취를 권하지 않는다"
+            )
+        else:
+            lines.append(
+                f"- {name}: 기록상 {progress.current:g}{unit} / 하루 목표 {progress.target:g}{unit}, "
+                f"목표 대비 {progress.percent:g}%, 기록상 목표까지 남은 양 {progress.remaining:g}{unit}"
+            )
+    lines.append("- 하루 목표는 현재 끼니까지 반드시 채워야 할 양이 아니다. 시간대별 부족을 단정하지 않는다")
+    return lines
 
 
 def _satiety_lines(req: ShortFeedbackRequest) -> list[str]:
@@ -333,6 +424,8 @@ def build_meal_prompt(req: ShortFeedbackRequest, judgements: list[NutrientJudgem
     focus = [g.name for g in gaps]
     lines = [
         f"[투약 단계] {req.stage.value} — {STAGE_RISK[req.stage]}",
+        f"[현재 끼니] {req.meal_type.value if req.meal_type else '종류 미전달'}",
+        f"[식사 상태] {'식사 안 함(명시적 결식)' if req.skipped else '먹음'}",
         "",
         "[점수] 0~100. 세 축은 따로 본다. 합치거나 평균 내지 않는다",
         _score_line("양(Quantity)", req.qqs.quantity, _quantity_note(req.qqs.quantity)),
@@ -347,17 +440,28 @@ def build_meal_prompt(req: ShortFeedbackRequest, judgements: list[NutrientJudgem
     ]
     if satiety := _satiety_lines(req):
         lines += ["", *satiety]
+    if req.weight_kg is None:
+        lines += ["", "[체중] 모름 — 단백질 목표·부족 여부를 QQS에서 역추정하지 않는다"]
+    if req.skipped:
+        lines += ["", "[결식 처리] 현재 끼니 영양·점수 판정 없음. 앞선 기록과 결식 사실을 반영한다"]
+    elif any(item.nutrition is None for item in req.items):
+        lines += ["", "[성분 누락] 성분을 모르는 음식이 있어 현재 끼니 판정도 확인된 음식 기준이다"]
+    lines += ["", *_previous_meal_lines(req), "", *_cumulative_lines(req)]
 
     # "판정했더니 다 괜찮다" 와 "판정을 못 했다" 를 구분한다. 못 했는데 괜찮다고 쓰면
     # 모델이 성분을 모르는 끼니를 "균형 잡힌 식사" 로 칭찬한다.
-    if gaps:
+    if req.meal_type is MealType.DINNER:
+        direction = "저녁은 현재 시점까지의 하루 흐름을 body에 담고 suggestions는 []로 반환한다."
+    elif req.skipped:
+        direction = "거른 끼니와 앞선 기록을 고려해 다음 끼니에 단백질·채소를 곁들이기 쉬운 음식을 제안한다."
+    elif gaps:
         target = ", ".join(f"{_LABELS[g.name]} {'줄이기' if g.state == 'OVER' else '채우기'}" for g in gaps)
         direction = f"다음 끼니 제안은 [{target}]에 맞춘 음식으로 고른다."
     elif judgements:
         checked = "·".join(_LABELS[j.name] for j in judgements)
         direction = (
-            f"판정한 영양소({checked})는 충분했다. 판정하지 못한 영양소는 언급하지 않는다. "
-            "다음 끼니 제안은 지금 흐름을 이어 가는 음식으로 고른다."
+            f"판정한 영양소({checked})는 충분했다. 현재 끼니에서 판정하지 못한 영양소는 "
+            "현재 끼니에 대해 평가하지 않는다. 누적 진행 상황도 참고해 다음 끼니 음식을 고른다."
         )
     else:
         direction = (

@@ -10,7 +10,7 @@ from scripts.try_short_feedback import evaluate, main, prepare
 from tests.test_short_feedback import _meal
 
 
-@pytest.mark.parametrize('case', ['meal', 'meal_unknown', 'daily'])
+@pytest.mark.parametrize('case', ['meal', 'meal_unknown', 'daily', 'breakfast', 'skipped', 'dinner'])
 def test_example_request_and_dry_run(case):
     path = Path(__file__).resolve().parents[1] / 'manual_feedback' / 'cases' / f'{case}.json'
     req = ShortFeedbackRequest.model_validate_json(path.read_text())
@@ -19,6 +19,12 @@ def test_example_request_and_dry_run(case):
     assert report['modelCalled'] is False
     assert report['userPrompt']
     assert main([str(path), '--dry-run']) == 0
+
+
+def test_manual_report_shows_calculated_cumulative_progress():
+    report = prepare(_meal(weightKg=80, dailyNutritionTotals={'proteinG': 42}))
+    protein = report['cumulativeProgress'][0]
+    assert (protein['current'], protein['target'], protein['percent']) == (42, 96, 43.8)
 
 
 @pytest.mark.parametrize('raw, expected', [

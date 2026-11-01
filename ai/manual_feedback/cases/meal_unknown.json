@@ -3,9 +3,26 @@
   "userId": "manual-user",
   "mealId": "manual-unknown",
   "stage": "INITIAL",
-  "qqs": {"quantity": null, "quality": null, "satiety": 55},
+  "qqs": {
+    "quantity": null,
+    "quality": null,
+    "satiety": 55
+  },
   "items": [
-    {"displayName": "집에서 만든 볶음밥", "amount": null, "unit": null, "nutrition": null}
+    {
+      "displayName": "집에서 만든 볶음밥",
+      "amount": null,
+      "unit": null,
+      "nutrition": null
+    }
   ],
-  "satiety": {"afterPct": 55, "userComment": "재료와 먹은 양은 정확히 모르겠어요."}
+  "satiety": {
+    "afterPct": 55,
+    "userComment": "재료와 먹은 양은 정확히 모르겠어요."
+  },
+  "mealType": "BREAKFAST",
+  "skipped": false,
+  "weightKg": null,
+  "previousMeals": [],
+  "dailyNutritionTotals": null
 }

@@ -35,6 +35,8 @@ def prepare(req: ShortFeedbackRequest) -> dict:
     return {
         "input": req.model_dump(mode="json", by_alias=True),
         "judgements": [asdict(j) for j in judgements],
+        "cumulativeProgress": ([asdict(p) for p in feedback.cumulative_progress(req)]
+                               if req.scope is Scope.MEAL else []),
         "systemPrompt": (feedback.MEAL_SYSTEM_PROMPT if req.scope is Scope.MEAL
                          else feedback.DAILY_SYSTEM_PROMPT),
         "userPrompt": (feedback.build_meal_prompt(req, judgements) if req.scope is Scope.MEAL
@@ -111,7 +113,8 @@ def main(argv: list[str] | None = None) -> int:
             # 예외 원문·traceback은 URL·키를 포함할 수 있으므로 출력하지 않는다.
             report.update(status="failed", errorType=type(exc).__name__)
 
-    sections = [("1. BE 입력", "input"), ("2. Python 영양 판정", "judgements"),
+    sections = [("1. BE 입력", "input"), ("2. Python 끼니 영양 판정", "judgements"),
+                ("2-1. Python 누적 영양 진행률", "cumulativeProgress"),
                 ("3. System 프롬프트", "systemPrompt"), ("4. User 프롬프트", "userPrompt"),
                 ("5. 모델 원본 응답", "rawResponse"), ("6. 최종 API 응답", "finalResponse")]
     for title, key in sections:

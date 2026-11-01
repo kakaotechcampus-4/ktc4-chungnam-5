@@ -19,6 +19,8 @@ from app.safety_guard import BLOCKED_BODY, is_unsafe
 from app.schemas import (
     AnalyzeMealRequest,
     AnalyzeMealResponse,
+    MealType,
+    Scope,
     SafetyStatus,
     ShortFeedbackRequest,
     ShortFeedbackResponse,
@@ -64,6 +66,8 @@ async def short_feedback(req: ShortFeedbackRequest) -> ShortFeedbackResponse:
                                      safety_status=SafetyStatus.BLOCKED)
 
     input_texts = [item.display_name for item in req.items]
+    for meal in req.previous_meals:
+        input_texts.extend(item.display_name for item in meal.items)
     input_texts += [meal.summary for meal in req.meals]
     if req.satiety and req.satiety.user_comment:
         input_texts.append(req.satiety.user_comment)
@@ -82,7 +86,8 @@ async def short_feedback(req: ShortFeedbackRequest) -> ShortFeedbackResponse:
     if any(is_unsafe(text) for text in output_texts):
         return blocked()
     return ShortFeedbackResponse(
-        body=draft.body, reasoning=draft.reasoning, suggestions=draft.suggestions,
+        body=draft.body, reasoning=draft.reasoning,
+        suggestions=[] if req.scope is Scope.MEAL and req.meal_type is MealType.DINNER else draft.suggestions,
         model_version="reasoning-gateway", safety_status=SafetyStatus.SAFE,
     )
 

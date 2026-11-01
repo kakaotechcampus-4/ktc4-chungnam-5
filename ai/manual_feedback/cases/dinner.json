@@ -1,0 +1,90 @@
+{
+  "scope": "MEAL",
+  "userId": "manual-user",
+  "mealId": "manual-dinner",
+  "stage": "MAINTENANCE",
+  "qqs": {
+    "quantity": 100,
+    "quality": 62,
+    "satiety": 68
+  },
+  "items": [
+    {
+      "displayName": "참치김밥",
+      "amount": 1,
+      "unit": "줄",
+      "nutrition": {
+        "kcal": 450,
+        "proteinG": 15,
+        "fatG": 12,
+        "carbG": 70,
+        "fiberG": 2,
+        "sodiumMg": 890
+      }
+    },
+    {
+      "displayName": "라면",
+      "amount": 0.5,
+      "unit": "개",
+      "nutrition": {
+        "kcal": 250,
+        "proteinG": 5,
+        "fatG": 8,
+        "carbG": 40,
+        "fiberG": 1.1,
+        "sodiumMg": 900
+      }
+    }
+  ],
+  "satiety": {
+    "afterPct": 55
+  },
+  "mealType": "DINNER",
+  "skipped": false,
+  "weightKg": 80,
+  "previousMeals": [
+    {
+      "mealType": "BREAKFAST",
+      "skipped": false,
+      "qqs": {
+        "quantity": 100,
+        "quality": 80,
+        "satiety": 65
+      },
+      "items": [
+        {
+          "displayName": "채소 계란말이",
+          "amount": 120,
+          "unit": "g"
+        }
+      ],
+      "nutritionTotals": {
+        "kcal": 180,
+        "proteinG": 12,
+        "fatG": 11,
+        "carbG": 3,
+        "fiberG": 5,
+        "sodiumMg": 420
+      }
+    },
+    {
+      "mealType": "LUNCH",
+      "skipped": true,
+      "qqs": {
+        "quantity": null,
+        "quality": null,
+        "satiety": null
+      },
+      "items": [],
+      "nutritionTotals": null
+    }
+  ],
+  "dailyNutritionTotals": {
+    "kcal": 880,
+    "proteinG": 32,
+    "fatG": 31,
+    "carbG": 113,
+    "fiberG": 8.1,
+    "sodiumMg": 2210
+  }
+}
