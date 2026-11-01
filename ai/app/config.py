@@ -45,3 +45,23 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """`Settings()` 는 매번 `.env`를 다시 읽으므로, 호출부는 이 함수로 캐시된 값을 쓴다."""
     return Settings()
+
+
+class CoachSettings(BaseSettings):
+    """코치는 vision 설정 없이도 실행할 수 있다."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    LLM_API_KEY: SecretStr
+    LLM_COACH_URL: str = Field(repr=False)
+
+    @field_validator("LLM_COACH_URL")
+    @classmethod
+    def _gateway_host_only(cls, value: str) -> str:
+        if not value.startswith(_GATEWAY_PREFIX):
+            raise ValueError("coach 엔드포인트는 mlapi.run HTTPS URL이어야 합니다")
+        return value
+
+
+@lru_cache
+def get_coach_settings() -> CoachSettings:
+    return CoachSettings()
