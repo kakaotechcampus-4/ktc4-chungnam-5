@@ -90,10 +90,29 @@ flutter build apk --release       # 배포용 APK
 
 | 키 | 설명 |
 |---|---|
-| `API_BASE_URL` | BE 공개 API 주소 (`/api/v1` 포함). 주면 phase 주소 대신 쓴다 |
-| `DEMO_KEY` | 데모 서버 접근 키(`X-Demo-Key`). prod 빌드에만 넣는다 |
+| `APP_PHASE` | 붙을 환경: `local`(기본) · `dev` · `staging` · `prod`. 아래 표 참고. 잘못 적으면 앱 시작 때 바로 터진다 |
+| `API_BASE_URL` | BE 공개 API 주소 (`/api/v1` 포함). 주면 phase 주소 대신 쓴다. **`local` · `dev` 에서만** 쓸 수 있다(에뮬레이터 `10.0.2.2`·`adb reverse` 용). `staging` · `prod` 에서 주면 시작 때 터진다 |
+| `DEMO_KEY` | 데모 서버 접근 키(`X-Demo-Key`). `staging` · `prod` 빌드에만 넣고, 그 서버의 키를 넣는다 |
 | `KAKAO_NATIVE_APP_KEY` | 카카오 로그인 |
 | `FCM_SENDER_ID` | 푸시 |
+
+### phase — 서버 주소가 자동으로 정해진다
+
+| phase | 서버 | 키 | 용도 |
+|---|---|---|---|
+| `local` (기본) | `localhost:4010` — `frontend/mock` 의 mock 서버(고정 응답) | 없음 | 서버 없이 화면 보기 |
+| `dev` | `127.0.0.1:8000` — 내 PC Docker BE | 없음 | 실제 BE 로 개발 |
+| `staging` | `https://glp1-staging.duckdns.org/api/v1` — develop 코드, 운영과 DB·사진 분리 | 스테이징 키 | 머지된 변경 확인·시험 데이터 |
+| `prod` | `https://glp1-demo.duckdns.org/api/v1` — main 코드 | 운영 키 | 데모·평가 |
+
+```bash
+flutter run --dart-define=APP_PHASE=dev
+flutter build apk --release --dart-define=APP_PHASE=staging --dart-define=DEMO_KEY=<스테이징 키>
+flutter build apk --release --dart-define=APP_PHASE=prod    --dart-define=DEMO_KEY=<운영 키>
+```
+
+- 스테이징 키로 운영 서버에, 운영 키로 스테이징 서버에 붙으면 403 이다(서버가 키를 나누면 — 인프라 담당).
+- 환경은 헤더가 아니라 **빌드(phase)** 로 나눈다. 키는 환경 구분이 아니라 JWT 전까지 쓰는 임시 접근 장치다.
 
 ---
 

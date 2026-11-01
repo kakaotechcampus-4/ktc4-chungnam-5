@@ -108,6 +108,42 @@ void main() {
     );
   });
 
+  group('phase addresses', () {
+    test('each phase has its own server', () {
+      expect(ApiConfig.baseUrlFor(AppPhase.local), 'http://localhost:4010/api/v1');
+      expect(ApiConfig.baseUrlFor(AppPhase.dev), 'http://127.0.0.1:8000/api/v1');
+      expect(
+        ApiConfig.baseUrlFor(AppPhase.staging),
+        'https://glp1-staging.duckdns.org/api/v1',
+      );
+      expect(
+        ApiConfig.baseUrlFor(AppPhase.prod),
+        'https://glp1-demo.duckdns.org/api/v1',
+      );
+    });
+
+    test('API_BASE_URL overrides only local and dev', () {
+      expect(
+        ApiConfig.baseUrlFor(AppPhase.local, override: 'http://10.0.2.2:4010/api/v1'),
+        'http://10.0.2.2:4010/api/v1',
+      );
+      expect(
+        ApiConfig.baseUrlFor(AppPhase.dev, override: 'http://10.0.2.2:8000/api/v1'),
+        'http://10.0.2.2:8000/api/v1',
+      );
+    });
+
+    test('staging and prod reject API_BASE_URL', () {
+      // 어느 서버에 붙는 앱인지 알 수 없게 되므로 시작 때 터진다.
+      for (final phase in [AppPhase.staging, AppPhase.prod]) {
+        expect(
+          () => ApiConfig.baseUrlFor(phase, override: 'http://10.0.2.2:8000/api/v1'),
+          throwsA(isA<StateError>()),
+        );
+      }
+    });
+  });
+
   test('403 without an envelope says the demo key is wrong', () async {
     // 데모 서버 앞단(Caddy)은 래퍼 없이 막는다.
     final (client, _) = await _client(403, 'Forbidden');

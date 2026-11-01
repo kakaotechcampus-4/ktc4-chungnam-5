@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../state/user_session.dart';
 import 'api_exception.dart';
@@ -8,9 +9,13 @@ import 'api_exception.dart';
 /// - [local]: `frontend/mock` 의 mock 서버. BE 스키마대로 **정해진 응답만**
 ///   돌려준다 — 저장해도 다음 조회 값이 바뀌지 않는다.
 /// - [dev]: 실제 BE + 개발 DB. 지금은 각자 PC 에 Docker 로 띄운 BE 다.
-/// - [prod]: 데모 서버(팀 EC2). 앞단 Caddy 가 `X-Demo-Key` 없는 요청을
-///   403 으로 막으므로 `DEMO_KEY` 를 함께 넣어 빌드한다.
-enum AppPhase { local, dev, prod }
+/// - [staging]: 스테이징 서버(팀 EC2, develop 코드). 운영과 DB·사진이 따로라 시험 데이터를
+///   마음껏 쌓아도 된다. 앞단 Caddy 가 `X-Demo-Key` 없는 요청을 403 으로 막으므로
+///   `DEMO_KEY`(스테이징 키)를 함께 넣어 빌드한다.
+/// - [prod]: 데모 서버(팀 EC2, main 코드). 스테이징과 같은 방식으로 `DEMO_KEY`(운영 키)가 필요하다.
+///
+/// phase 만 정하면 서버 주소가 자동으로 정해진다 — 헤더 등으로 환경을 구분하지 않는다.
+enum AppPhase { local, dev, staging, prod }
 
 /// API 연결 설정. 값은 빌드할 때 `--dart-define` 으로 바꾼다.
 ///
@@ -20,7 +25,8 @@ enum AppPhase { local, dev, prod }
 /// 화면 코드는 phase 를 모른다 — 바뀌는 건 서버 주소뿐이다.
 ///
 /// `API_BASE_URL` 을 주면 phase 주소 대신 쓴다. Android 에뮬레이터에서 PC 의
-/// 서버는 `localhost` 가 아니라 `10.0.2.2` 다.
+/// 서버는 `localhost` 가 아니라 `10.0.2.2` 다. **local · dev 에서만 쓸 수 있다** —
+/// staging · prod 에서 주면 어느 서버에 붙는 앱인지 알 수 없게 되므로 시작 때 바로 터진다.
 class ApiConfig {
   ApiConfig._();
 
@@ -31,8 +37,26 @@ class ApiConfig {
 
   static const _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
 
-  static String get baseUrl {
-    if (_baseUrlOverride.isNotEmpty) return _baseUrlOverride;
+  static String get baseUrl =>
+      baseUrlFor(phase, override: _baseUrlOverride);
+
+  /// phase 와 `API_BASE_URL` 조합이 맞는지 앱 시작 때 확인한다(`main`). 첫 API 호출까지 기다리면
+  /// 잘못 빌드한 앱이 화면이 뜬 뒤에야 알려 준다.
+  static void validate() => baseUrl;
+
+  /// [phase] 의 서버 주소. [override]( `API_BASE_URL` )가 있으면 그걸 쓰되 local · dev 에서만
+  /// 허용한다 — staging · prod 에서는 [StateError] 로 앱 시작 때 바로 터진다.
+  @visibleForTesting
+  static String baseUrlFor(AppPhase phase, {String override = ''}) {
+    if (override.isNotEmpty) {
+      if (phase == AppPhase.staging || phase == AppPhase.prod) {
+        throw StateError(
+          'API_BASE_URL 은 local · dev 에서만 쓸 수 있어요 '
+          '(APP_PHASE=${phase.name}). phase 만 정하면 주소가 정해져요.',
+        );
+      }
+      return override;
+    }
     return switch (phase) {
       AppPhase.local => 'http://localhost:4010/api/v1',
       // TODO: 팀 dev 서버가 생기면 그 주소로 바꾼다.
@@ -41,6 +65,7 @@ class ApiConfig {
       AppPhase.dev => 'http://127.0.0.1:8000/api/v1',
       // 도메인은 비밀값이 아니다. `/api/v1` 까지 적어 둬서 빌드 명령에서
       // 빠뜨릴 일이 없게 한다(빠지면 API 만 전부 404 가 나고 사진은 뜬다).
+      AppPhase.staging => 'https://glp1-staging.duckdns.org/api/v1',
       AppPhase.prod => 'https://glp1-demo.duckdns.org/api/v1',
     };
   }

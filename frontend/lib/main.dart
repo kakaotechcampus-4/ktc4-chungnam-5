@@ -18,6 +18,8 @@ import 'theme/app_theme.dart';
 Future<void> main() async {
   // 첫 화면을 고르려면 저장된 userId 를 먼저 읽어야 한다.
   WidgetsFlutterBinding.ensureInitialized();
+  // phase 와 API_BASE_URL 조합이 틀린 빌드는 여기서 바로 알린다(staging·prod 에 주소 override 금지).
+  ApiConfig.validate();
   final session = await UserSession.load();
   runApp(MyApp(session: session));
 }
