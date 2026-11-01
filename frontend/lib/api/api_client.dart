@@ -27,6 +27,10 @@ enum AppPhase { local, dev, staging, prod }
 /// `API_BASE_URL` 을 주면 phase 주소 대신 쓴다. Android 에뮬레이터에서 PC 의
 /// 서버는 `localhost` 가 아니라 `10.0.2.2` 다. **local · dev 에서만 쓸 수 있다** —
 /// staging · prod 에서 주면 어느 서버에 붙는 앱인지 알 수 없게 되므로 시작 때 바로 터진다.
+///
+/// **웹 릴리스 빌드(평가용 창구)는 phase·`API_BASE_URL` 과 무관하다.** 웹 파일을
+/// 내려받은 도메인이 곧 API 서버라(`/web/` 와 `/api/v1` 이 같은 서버) 그 주소를 쓴다.
+/// 키는 빌드에 넣지 않고 평가자 링크(`?k=`)로 받는다 — [runtimeDemoKey].
 class ApiConfig {
   ApiConfig._();
 
@@ -37,8 +41,15 @@ class ApiConfig {
 
   static const _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
 
-  static String get baseUrl =>
-      baseUrlFor(phase, override: _baseUrlOverride);
+  /// 웹 릴리스 빌드인지. 디버그 실행(`flutter run -d chrome`)은 앱처럼 phase 주소를 써서
+  /// 개발 서버·mock 에 붙을 수 있게 둔다 — 그때 웹 파일을 내려주는 쪽은 flutter 개발 서버라
+  /// API 가 없다.
+  static const _servedWithApi = kIsWeb && kReleaseMode;
+
+  static String get baseUrl {
+    if (_servedWithApi) return '${Uri.base.origin}/api/v1';
+    return baseUrlFor(phase, override: _baseUrlOverride);
+  }
 
   /// phase 와 `API_BASE_URL` 조합이 맞는지 앱 시작 때 확인한다(`main`). 첫 API 호출까지 기다리면
   /// 잘못 빌드한 앱이 화면이 뜬 뒤에야 알려 준다.
@@ -70,12 +81,24 @@ class ApiConfig {
     };
   }
 
-  /// 데모 서버 접근 키(`--dart-define=DEMO_KEY`). 비밀값이라 소스에 두지 않는다.
-  /// 비어 있으면 헤더를 붙이지 않는다 — local · dev 는 키가 필요 없다.
-  static const demoKey = String.fromEnvironment('DEMO_KEY');
+  static const _buildDemoKey = String.fromEnvironment('DEMO_KEY');
+
+  /// 웹에서 평가자 링크(`/web/?k=<키>`)로 받아 기기(localStorage)에 저장해 둔 키.
+  /// 앱에서는 늘 비어 있다. 웹 시작 때 `setupWebDemoKey` 가 채운다.
+  ///
+  /// **웹 빌드에 `DEMO_KEY` 를 넣지 않는다** — 웹 파일은 키 없이 내려받을 수 있어서,
+  /// 빌드에 박으면 도메인을 아는 누구나 JS 에서 키를 꺼낸다.
+  static String runtimeDemoKey = '';
+
+  /// 데모 서버 접근 키. 앱은 빌드할 때(`--dart-define=DEMO_KEY`), 웹은 링크로 받은 값이다.
+  /// 비밀값이라 소스에 두지 않는다. 비어 있으면 헤더를 붙이지 않는다 — local · dev 는
+  /// 키가 필요 없다.
+  static String get demoKey =>
+      _buildDemoKey.isNotEmpty ? _buildDemoKey : runtimeDemoKey;
 
   /// dio 를 거치지 않는 요청(`Image.network`)에 붙일 헤더. 사진도 같은
   /// Caddy 를 지나므로 키가 빠지면 사진만 403 이 난다 — 사진은 [ApiImage] 로 그린다.
+  /// 웹의 `Image.network` 도 이 헤더를 실제로 붙인다(Flutter 3.44 에서 확인).
   static Map<String, String>? get demoKeyHeaders =>
       demoKey.isEmpty ? null : {'X-Demo-Key': demoKey};
 
@@ -121,7 +144,7 @@ class ApiClient {
   ApiClient({
     required UserSession session,
     Dio? dio,
-    String demoKey = ApiConfig.demoKey,
+    String? demoKey,
   }) : _session = session,
        _dio =
            dio ??
@@ -138,7 +161,9 @@ class ApiClient {
         onRequest: (options, handler) {
           final userId = session.userId;
           if (userId != null) options.headers['X-User-Id'] = userId;
-          if (demoKey.isNotEmpty) options.headers['X-Demo-Key'] = demoKey;
+          // 웹은 시작 뒤에 키가 정해질 수 있어 요청 때마다 읽는다.
+          final key = demoKey ?? ApiConfig.demoKey;
+          if (key.isNotEmpty) options.headers['X-Demo-Key'] = key;
           handler.next(options);
         },
       ),
@@ -248,9 +273,10 @@ class ApiClient {
       // 래퍼 없는 403 은 BE 가 아니라 데모 서버 앞단(Caddy)이 막은 것이다 —
       // 데모 키가 빠졌거나 틀렸다. 현장에서 원인을 바로 알 수 있게 따로 말한다.
       if (response.statusCode == 403) {
-        return const ApiException(
+        return ApiException(
           code: ApiException.unexpectedResponse,
-          message: '서버 접속 키가 맞지 않아요',
+          // 웹은 키를 링크로 받는다 — 링크 없이 열었거나 키가 바뀐 것이다.
+          message: kIsWeb ? '평가용 링크로 접속해 주세요' : '서버 접속 키가 맞지 않아요',
           statusCode: 403,
         );
       }
