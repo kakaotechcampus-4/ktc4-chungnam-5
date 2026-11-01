@@ -3,13 +3,17 @@
 `ai/` 에서 `python -m evals.daily_feedback_eval` 로 실행한다(스크립트 경로로 실행하면 `app` 을 못 찾는다).
 실제 모델을 부르므로 메인 세션이 사용자 승인 후에만 실행한다. 사용법 · 축 · 판정 한계는 `evals/README.md`.
 
+**폐기 예정.** 팀 합의 — 하루 피드백은 그날 가장 최신 끼니 피드백이다(BE 1da4170 · 8ffb518 에서 `feedback.daily` 워커 제거).
+BE 가 scope=DAILY 를 부르지 않는다. 실측 대상 아님. `missing_meal_not_invented` · `summary_injection_ignored` 는
+누적 끼니 계약이 들어오면 MEAL eval 로 옮기고 DAILY eval 을 지운다. 그때까지 판정 · 케이스 · verify 는 그대로 둔다.
+
 케이스는 **입력 상황** 단위다(MEAL 과 같은 결정 A) — 응답 하나를 그 상황에서 의미 있는 축 모두로 판정한다.
 라우트는 MEAL 과 같은 `/short-feedback` 이고 아직 501 이라, 실행은 `SKIP: 미연결` 로 끝난다.
 
-입력 설계 — BE 가 실제로 보내는 모양(`backend/app/worker/jobs/feedback_daily.py` · `crud/daily_feedback.py`):
-- 근거는 SAFE · body 있음 · Q/Q/S 세 점수가 모두 채워진 끼니만이다 → 끼니 점수에 null 이 없다
-- 하루 점수는 축별 끼니 점수 평균의 `round` 다. 평균이 정확히 .5 인 값은 쓰지 않는다(반올림 규칙에 따라 갈린다)
-- 근거가 0개면 BE 가 AI 를 부르지 않는다 → 빈 `meals` 케이스는 두지 않는다(결정 E)
+입력 설계 — BE 가 보내던 모양(BE 1da4170 에서 제거된 `backend/app/worker/jobs/feedback_daily.py` 와 그때의 `crud/daily_feedback.py`):
+- 근거는 SAFE · body 있음 · Q/Q/S 세 점수가 모두 채워진 끼니만이었다 → 끼니 점수에 null 이 없다
+- 하루 점수는 축별 끼니 점수 평균의 `round` 였다. 평균이 정확히 .5 인 값은 쓰지 않는다(반올림 규칙에 따라 갈린다)
+- 근거가 0개면 BE 가 AI 를 부르지 않았다 → 빈 `meals` 케이스는 두지 않는다(결정 E)
 - 끼니 `summary` 는 그 끼니의 MEAL 피드백 body(AI 가 쓴 문장)다 — 숫자 · 사용자 메모 반영 문장이 들어 있을 수 있다
 - summary 에 DAILY 예시("저녁으로 갈수록 포만감이 짧아졌다") · MEAL few-shot 음식(참치김밥 · 김밥 · 라면 ·
   삶은 달걀 · 방울토마토)을 넣지 않고, 포만감이 끼니 순서대로 줄어 저녁으로 끝나는 하루도 두지 않는다 — 예시를 베낀 답이 정답처럼 보인다
