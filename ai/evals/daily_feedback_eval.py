@@ -8,7 +8,8 @@ BE 가 scope=DAILY 를 부르지 않는다. 실측 대상 아님. `missing_meal_
 누적 끼니 계약이 들어오면 MEAL eval 로 옮기고 DAILY eval 을 지운다. 그때까지 판정 · 케이스 · verify 는 그대로 둔다.
 
 케이스는 **입력 상황** 단위다(MEAL 과 같은 결정 A) — 응답 하나를 그 상황에서 의미 있는 축 모두로 판정한다.
-라우트는 MEAL 과 같은 `/short-feedback` 이고 아직 501 이라, 실행은 `SKIP: 미연결` 로 끝난다.
+라우트는 MEAL 과 같은 `/short-feedback` 이고 연결돼 있다 — 키가 있으면 실행이 실제 호출이 된다(크레딧 사용).
+실측 대상이 아니므로 돌리지 않는다(다음 사이클 삭제 예정).
 
 입력 설계 — BE 가 보내던 모양(BE 1da4170 에서 제거된 `backend/app/worker/jobs/feedback_daily.py` 와 그때의 `crud/daily_feedback.py`):
 - 근거는 SAFE · body 있음 · Q/Q/S 세 점수가 모두 채워진 끼니만이었다 → 끼니 점수에 null 이 없다
