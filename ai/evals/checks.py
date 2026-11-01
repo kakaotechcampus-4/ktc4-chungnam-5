@@ -256,7 +256,7 @@ def _allowed_numbers(model: ShortFeedbackRequest) -> dict[str, set[float]]:
         if unit in allowed:
             allowed[unit].add(value)
 
-    # 끼니 합계 — 프롬프트가 음식별로만 보여준 값(추정 단백질 · g 단위 음식 양)의 합.
+    # 끼니 합계 — 프롬프트가 음식별로만 보여준 값(SHORT · OVER 영양소의 음식별 값 · g 단위 음식 양)의 합.
     # 성분 합계는 `judge_nutrients` 가 이미 낸 `current` 다(BE 와 같은 합계 규칙 — 사본을 두지 않는다).
     # OK 영양소는 음식별 값을 싣지 않으므로(`_item_line` 의 focus) 대상이 아니다
     for j in judgements:
@@ -468,7 +468,7 @@ def no_contradict_rule(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     영양소 이름 대신 근연어로 쓴 단정("채소가 부족했어요", "국물이 짰어요")도 같은 단정이다 —
     `gap_addressed` 가 근연어를 "다뤘다" 로 보는 것과 맞춘다.
     """
-    ok_names = {j.name for j in judge_nutrients(model) if j.state == "OK" and not j.inferred}
+    ok_names = {j.name for j in judge_nutrients(model) if j.state == "OK"}
     found: list[str] = []
     for field, clause in _meal_clauses(resp):
         for name, before, after in _nutrient_segments(clause, _RELATED_PATTERNS):
@@ -490,7 +490,7 @@ def no_contradict_rule(resp: dict, model: ShortFeedbackRequest) -> Verdict:
 def unjudged_nutrient_silent(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     """판정하지 못한 영양소를 단정하지 않았는가.
 
-    판정 목록에 없는 영양소(성분이 비어 합계를 못 낸 것 · 추정 조건이 안 된 단백질)에 대해 충분 ·
+    판정 목록에 없는 영양소(성분이 비어 합계를 못 낸 것 · 체중이 없어 판정하지 않은 단백질)에 대해 충분 ·
     부족 · 초과를 쓰면 실패다. 아무것도 판정하지 못한 끼니면 "영양이 충분" 같은 총평도 실패다.
     "기록이 없어 알 수 없어요" 같은 거절문은 통과한다.
     """
@@ -724,8 +724,8 @@ def suggestions_shape(resp: dict, req: dict) -> Verdict:
 def gap_addressed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     """SHORT · OVER 영양소를 body 나 제안이 다뤘는가.
 
-    대상은 state 가 OK 가 아닌 판정 전부다 — 추정 단백질 부족(inferred)도 프롬프트의 제안 방향이
-    "단백질 채우기" 로 지시하므로 포함한다. 다뤘다고 볼 어휘는 영양소 이름 · 근연어 · 짠맛 표현
+    대상은 state 가 OK 가 아닌 판정 전부다 — 단백질은 체중이 있을 때만 판정되고, 그때 부족이면 프롬프트의
+    제안 방향이 "단백질 채우기" 로 지시하므로 포함한다. 다뤘다고 볼 어휘는 영양소 이름 · 근연어 · 짠맛 표현
     (`_mentions` — `no_contradict_rule` 과 같은 목록)이다.
     """
     gaps: list[NutrientJudgement] = [j for j in judge_nutrients(model) if j.state != "OK"]
@@ -776,18 +776,39 @@ def no_cliche(resp: dict, req: dict) -> Verdict:
     return _verdict("상투구", found)
 
 
+# `_example_foods` 의 헤더 파싱 · 검사용 (규칙은 그 docstring)
+_MEALS = "아침|점심|저녁|간식"
+_MEAL_WORD = re.compile(_MEALS)
+_MEAL_PREFIX = re.compile(rf"^(?:{_MEALS})\s+")
+_FOOD_NAME = re.compile(r"[가-힣](?:[가-힣\s]*[가-힣])?")
+
+
 def _example_foods(
     *, prompt: str = MEAL_SYSTEM_PROMPT, good: Mapping[str, Any] = _MEAL_EXAMPLE_GOOD
 ) -> list[str]:
-    """few-shot 예시 음식 — 예시 끼니("참치김밥+라면")와 예시 제안의 음식 부분("삶은 달걀")."""
-    m = re.search(r"좋은 답 \(([^,)]+)", MEAL_SYSTEM_PROMPT)
+    """few-shot 예시 음식 — 예시 헤더의 끼니 음식과 예시 제안의 음식 부분.
+
+    헤더 "좋은 답 (아침 채소 계란말이 → 점심 참치김밥+라면, …)" 의 첫 덩어리를 `→` 로 끼니별로 나누고,
+    끼니 접두(아침 · 점심 · 저녁 · 간식)를 뗀 뒤 `+` 로 음식을 나눈다 → "채소 계란말이" · "참치김밥" · "라면".
+    옛 헤더("좋은 답 (참치김밥+라면, …)" — 화살표 · 접두 없음)도 같은 규칙으로 읽힌다.
+    제안 foodName 은 1회분 표현을 뗀다: "두부 반 모" → "두부", "찐 브로콜리 한 접시" → "찐 브로콜리".
+
+    헤더가 없거나, 빈 조각이 있거나, 음식 이름에 한글 · 공백 외 문자(모르는 구분자 "⇒" 등)나
+    끼니 낱말이 남으면 RuntimeError — 파싱이 조용히 어긋나면 example_no_leak 가 예시 음식을 놓친다.
+    """
+    m = re.search(r"좋은 답 \(([^,)]*)", prompt)
     if m is None:
         raise RuntimeError("MEAL_SYSTEM_PROMPT 에서 예시 끼니를 찾지 못했다 — example_no_leak 를 고친다")
-    foods = [f.strip() for f in m.group(1).split("+")]
-    for s in _MEAL_EXAMPLE_GOOD["suggestions"]:
-        # 1회분 표현을 뗀다: "삶은 달걀 2개" → "삶은 달걀", "방울토마토 한 줌" → "방울토마토"
+    foods: list[str] = []
+    for meal in m.group(1).split("→"):
+        meal = _MEAL_PREFIX.sub("", meal.strip())
+        foods += [f.strip() for f in meal.split("+")]
+    for s in good["suggestions"]:
         foods.append(re.sub(r"\s+(?:\d+|한|두|세|네|반)\s*\S*$", "", s["foodName"]).strip())
-    return [f for f in foods if f]
+    bad = [f for f in foods if not _FOOD_NAME.fullmatch(f) or _MEAL_WORD.search(f)]
+    if bad:
+        raise RuntimeError(f"예시 헤더 · 제안에서 음식을 읽지 못했다 ({bad}) — _example_foods 를 프롬프트 모양에 맞춘다")
+    return foods
 
 
 def _example_sentences() -> list[str]:
