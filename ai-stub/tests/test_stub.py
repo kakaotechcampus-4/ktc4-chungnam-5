@@ -108,6 +108,40 @@ def test_daily_scope_omits_suggestions_and_reasoning():
     assert body["body"]
 
 
+def test_dinner_meal_feedback_has_no_suggestions():
+    """저녁은 다음 끼니 추천이 없다 — null 이 아니라 빈 배열이다."""
+    body = client.post("/short-feedback", json={**SHORT_MEAL, "mealType": "DINNER"}).json()
+
+    assert body["suggestions"] == []
+    assert body["body"]
+
+
+def test_skipped_meal_feedback_accepts_null_scores_and_previous_meals():
+    """식사 안 함은 점수가 모두 null 이고 음식이 없다. 앞선 끼니는 음식 · 점수로 온다."""
+    payload = {
+        **SHORT_MEAL,
+        "mealType": "LUNCH",
+        "skipped": True,
+        "qqs": {"quantity": None, "quality": None, "satiety": None},
+        "previousMeals": [
+            {
+                "mealType": "BREAKFAST",
+                "skipped": False,
+                "qqs": {"quantity": 75, "quality": None, "satiety": 60},
+                "items": [{"displayName": "계란말이", "amount": 120, "unit": "g"}],
+                "nutritionTotals": {"kcal": 180, "proteinG": 12},
+            }
+        ],
+        "dailyNutritionTotals": {"kcal": 180, "proteinG": 12},
+    }
+
+    res = client.post("/short-feedback", json=payload)
+
+    assert res.status_code == 200, res.text
+    assert res.json()["body"]
+    assert len(res.json()["suggestions"]) == 1
+
+
 def test_long_feedback_has_no_chart_data():
     """chartData 는 BE 가 qqs_evaluations 를 집계해 채운다."""
     assert "chartData" not in client.post("/long-feedback", json=LONG).json()
