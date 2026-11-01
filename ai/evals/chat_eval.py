@@ -275,6 +275,11 @@ def _prompt_hash() -> str:
     return harness.prompt_hash(chat_checks.AI_STUB_SCHEMAS.read_text(encoding="utf-8"))
 
 
+def cases_prompt_hash(cases: Sequence[Case]) -> str:
+    """baseline 의 비교 조건 — 케이스마다 `app.ai_coach.build_messages` 가 조립한 메시지 전체의 해시."""
+    raise NotImplementedError("cases_prompt_hash 미구현")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """`harness.cli_main` 에 위임한다 — 규칙 버전은 `RULE_VERSION`, 해시는 계약 파일(결정 E).
 

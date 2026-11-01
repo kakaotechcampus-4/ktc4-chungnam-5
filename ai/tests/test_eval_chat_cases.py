@@ -1,7 +1,8 @@
 """`evals/chat_eval.py` 테스트 — `CASES` 구조 · `main()` 배선 · BE 사본 상수(`FOOD_NAME_MAX`).
 
 모델 · 키 · 외부 네트워크 없음. 케이스를 실행하지 않고 요청 JSON · 축 · 등급이 이슈 표와 결정(§11)대로 짜였는지 본다.
-테스트 이름의 `r<번호>` 는 계획 §6-2 명세표 행 번호다.
+테스트 이름의 `r<번호>` 는 계획 §6-2 명세표 행 번호, `c<번호>` 는 AI-CHAT-CONNECT 계획 §6 명세표 행 번호다
+(`/chat` 라우트 연결 — coach 키 확인 · 프롬프트 해시 · baseline 메타데이터).
 
 "모든 케이스가 ~ 이다" 류 행은 **대상 케이스가 1개 이상 있음을 먼저 단언한다.** 빈 `CASES` 에서
 `for` 가 한 번도 돌지 않아 공허하게 통과하는 것을 막는다.
@@ -9,25 +10,35 @@
 팩토리 축(`card_when_recommend` · `history_respected`)의 기대값(카드 기대 여부 · 회피 음식)은 클로저 안에 있어
 꺼내 읽지 않는다 — 응답을 넣어 보고 **판정 결과로** 조건을 확인한다(구현 내부에 기대지 않는다).
 
-`main` 을 부르는 행 74–76 은 **실제 `.env` 를 읽지 않는다** — 모든 테스트에서 `app.config.get_settings` ·
-`app.food_analyzer.get_settings` 를 "부르면 기록하고 실패" 로 바꿔 두고(autouse), cwd 를 `tmp_path` 로 옮긴다.
+`main` · `has_coach_key` 를 부르는 행은 **실제 `.env` 를 읽지 않는다** — 모든 테스트에서 `app.config.get_settings` ·
+`app.food_analyzer.get_settings` · `app.config.get_coach_settings` · `app.ai_coach.get_coach_settings` 를
+"부르면 기록하고 실패" 로 바꿔 두고(autouse), cwd 를 `tmp_path` 로 옮긴다. coach 설정이 필요한 행은 그 행 안에서
+`CoachSettings(_env_file=None, ...)` 로 만든 설정(또는 진짜 ValidationError)으로 다시 바꾼다.
 라우트 안에서 설정을 읽으면 그 AssertionError 는 500 응답으로 삼켜지므로, 읽기 0회는 기록 목록으로 단언한다.
 
 구현이 지켜야 하는 참조 방식 (테스트가 monkeypatch 하는 위치):
-- `main` 은 `evals.harness` 를 모듈째 참조해 `harness.has_api_key` · `harness.default_post` 를 호출 시점에 꺼낸다.
+- `main` 은 `evals.harness` 를 모듈째 참조해 `harness.has_coach_key` · `harness.default_post` 를 호출 시점에 꺼낸다.
+- `cases_prompt_hash` 는 `app.ai_coach.build_messages` · `SYSTEM_PROMPT` 를 호출 시점 모듈 속성으로,
+  `has_coach_key` 는 `app.config.get_coach_settings` 를 호출 시점에 꺼낸다.
 """
 
 from __future__ import annotations
 
 import ast
+import copy
+import dataclasses
+import json
 import re
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from evals import chat_checks, harness
-from evals.chat_eval import CASES, main
+from app import ai_coach
+from app.config import CoachSettings
+from app.schemas import ChatRequest as AppChatRequest
+from evals import chat_checks, chat_eval, harness
+from evals.chat_eval import CASES, cases_prompt_hash, main
 
 _PATH = "/chat"
 
@@ -79,8 +90,13 @@ _BE_CHAT_MODEL = _REPO / "backend" / "app" / "models" / "chat.py"
 def settings_reads(monkeypatch, tmp_path) -> list[str]:
     """모든 테스트에서 실제 설정 읽기를 막는다 — 부르면 기록하고 AssertionError. 기록 목록을 돌려준다.
 
-    `Settings` 는 `.env` 를 cwd 기준으로 읽는다 — `get_settings` 를 거치지 않고 `Settings()` 를 직접 만드는 경로도
-    `ai/.env` 를 못 읽게 cwd 를 빈 `tmp_path` 로 옮긴다. 이 파일의 테스트는 상대경로에 기대지 않는다.
+    vision · reasoning(`get_settings`)만이 아니라 coach 설정(`get_coach_settings`)도 막는다 (행 X1).
+    `/chat` 라우트는 `app.ai_coach` 가 import 해 둔 `get_coach_settings` 를 부르므로 그 이름도 따로 막는다 —
+    막지 않으면 OS 환경변수에 `LLM_COACH_URL` 이 있는 PC 에서 실제 앱을 거치는 행이 게이트웨이로 나갈 수 있다.
+    라벨(`app.config.coach` · `app.ai_coach`)로 어느 경로가 읽었는지 가른다.
+
+    `Settings` · `CoachSettings` 는 `.env` 를 cwd 기준으로 읽는다 — `get_*settings` 를 거치지 않고 설정을 직접 만드는
+    경로도 `ai/.env` 를 못 읽게 cwd 를 빈 `tmp_path` 로 옮긴다. 이 파일의 테스트는 상대경로에 기대지 않는다.
     라우트 안의 AssertionError 는 `raise_server_exceptions=False` 채널에서 500 으로 바뀌어 사라지므로 기록을 남긴다.
     """
     reads: list[str] = []
@@ -94,8 +110,24 @@ def settings_reads(monkeypatch, tmp_path) -> list[str]:
 
     monkeypatch.setattr("app.config.get_settings", _forbidden("app.config"))
     monkeypatch.setattr("app.food_analyzer.get_settings", _forbidden("app.food_analyzer"))
+    monkeypatch.setattr("app.config.get_coach_settings", _forbidden("app.config.coach"))
+    monkeypatch.setattr("app.ai_coach.get_coach_settings", _forbidden("app.ai_coach"))
     monkeypatch.chdir(tmp_path)
     return reads
+
+
+def _clear_coach_env(monkeypatch) -> None:
+    """coach 설정을 만드는 환경변수를 지운다 — `CoachSettings(_env_file=None)` 이 OS 환경에서 값을 줍지 않게 한다."""
+    for name in ("LLM_API_KEY", "LLM_COACH_URL"):
+        monkeypatch.delenv(name, raising=False)
+
+
+def _coach_settings(**values) -> Callable[[], CoachSettings]:
+    """`.env` 를 읽지 않는 `get_coach_settings` 대역. 부를 때마다 만든다 — 값이 무효면 그때 진짜 ValidationError 가 난다."""
+    return lambda: CoachSettings(_env_file=None, **values)
+
+
+_VALID_COACH = {"LLM_API_KEY": "test-key", "LLM_COACH_URL": "https://mlapi.run/coach-test"}
 
 
 # ─────────────────────────── 헬퍼 ───────────────────────────
@@ -496,14 +528,29 @@ def test_r73_observation_cases_have_no_block_or_answer_critical_axis():
 
 
 def _key_check_forbidden():
-    raise AssertionError("키 확인(has_api_key)까지 갔다 — 그 전에 끝나야 한다")
+    raise AssertionError("키 확인(has_coach_key · has_api_key)까지 갔다 — 그 전에 끝나야 한다")
+
+
+def _blocked_factory(posts: list[str]) -> Callable[[], Callable[[str, dict], harness.Observation]]:
+    """Fake 채널 팩토리 — 부를 때마다 `posts` 에 경로를 남기고 200 BLOCKED 를 돌려준다. 모델 · 네트워크 0."""
+
+    def _factory():
+        def post(path: str, request: dict) -> harness.Observation:
+            posts.append(path)
+            return harness.Observation(status_code=200, payload=_blocked())
+
+        return post
+
+    return _factory
 
 
 def test_r74_unknown_only_id_exits_2_before_key_check(monkeypatch, capsys):
-    """행 74 — `main(["--only", "nope"])` 은 2 로 끝나고 출력에 `nope` 이 있다. 키 확인(`has_api_key`) 전에 오용으로 판정한다.
+    """행 74 (X2) — `main(["--only", "nope"])` 은 2 로 끝나고 출력에 `nope` 이 있다. 키 확인(`has_coach_key` ·
+    `has_api_key` 어느 쪽이든) 전에 오용으로 판정한다.
 
     CLI 오용을 키 확인 뒤에 보면 키가 없는 PC 에서 SKIP(0) 으로 묻혀 오타를 모른다.
     """
+    monkeypatch.setattr(harness, "has_coach_key", _key_check_forbidden)
     monkeypatch.setattr(harness, "has_api_key", _key_check_forbidden)
 
     code = main(["--only", "nope"])
@@ -512,8 +559,9 @@ def test_r74_unknown_only_id_exits_2_before_key_check(monkeypatch, capsys):
     assert "nope" in capsys.readouterr().out
 
 
-def test_r75_no_api_key_skips_with_exit_0_and_no_post_factory_call(monkeypatch, capsys):
-    """행 75 — 키가 없으면 `main([])` 은 0 으로 끝나고 SKIP 을 출력하며 채널(`default_post`)을 만들지 않는다.
+def test_r75_no_coach_key_skips_with_exit_0_and_no_post_factory_call(monkeypatch, capsys):
+    """행 75 (X3) — coach 키가 없으면(`has_coach_key` False) `main([])` 은 0 으로 끝나고 SKIP 을 출력하며
+    채널(`default_post`)을 만들지 않는다.
 
     키 없는 PC(CI · 팀원)에서 eval 이 실패로 보이거나 크레딧을 쓰려 하면 안 된다.
     """
@@ -528,7 +576,7 @@ def test_r75_no_api_key_skips_with_exit_0_and_no_post_factory_call(monkeypatch, 
         factory_calls.append(None)
         raise AssertionError("키가 없는데 채널을 만들었다")
 
-    monkeypatch.setattr(harness, "has_api_key", _no_key)
+    monkeypatch.setattr(harness, "has_coach_key", _no_key)
     monkeypatch.setattr(harness, "default_post", _recording_factory)
 
     code = main([])
@@ -539,22 +587,280 @@ def test_r75_no_api_key_skips_with_exit_0_and_no_post_factory_call(monkeypatch, 
     assert factory_calls == []
 
 
-def test_r76_real_app_has_no_chat_route_so_main_skips_unconnected(monkeypatch, capsys, settings_reads):
-    """행 76 — 키가 있어도 실제 앱(`harness.default_post`)에 `/chat` 라우트가 없어 `main([])` 은 `SKIP: 미연결` 로
-    0 을 내고, 출력에 `/chat` · `404` 가 있으며 설정을 한 번도 읽지 않는다. probe 는 앱 안 404 에서 끝난다.
+# 행 76(라우트 없음 → `SKIP: 미연결` 404 고정)은 `/chat` 라우트가 생겨 지웠다 (X4) — c1 · c2 가 대신한다.
 
-    **라우트가 생기면 이 행을 바꾼다** (결정 G) — 이 테스트가 깨지는 것은 의도된 경보다.
+
+def test_c1_missing_coach_settings_skips_as_model_settings_without_post(monkeypatch, capsys):
+    """행 c1 — 실제 키 확인(`has_coach_key`)에서 coach 설정이 없으면 `main([])` 은 `SKIP: 모델 설정` 으로 0 을 내고
+    `미연결` 을 말하지 않으며 채널(`default_post`)을 만들지 않는다 (금지).
+
+    coach URL 이 없는 PC 에서 실제 앱까지 가면 케이스가 전부 503 → 게이트 FAIL 로 보인다. 설정 없음은 POST 전에
+    "모델 설정 없음" 으로 끝나야 하고, 라우트 미연결(404 · 501)과 섞이면 원인을 잘못 읽는다.
     """
-    monkeypatch.setattr(harness, "has_api_key", lambda: True)
+    _clear_coach_env(monkeypatch)
+    monkeypatch.setattr("app.config.get_coach_settings", _coach_settings())
+    factory_calls: list[None] = []
+
+    def _recording_factory():
+        factory_calls.append(None)
+        raise AssertionError("coach 설정이 없는데 채널을 만들었다")
+
+    monkeypatch.setattr(harness, "default_post", _recording_factory)
 
     code = main([])
 
     out = capsys.readouterr().out
     assert code == 0
-    assert "SKIP: 미연결" in out
-    assert "/chat" in out
-    assert "404" in out
+    assert "SKIP: 모델 설정" in out
+    assert "미연결" not in out
+    assert factory_calls == []
+
+
+def test_c2_route_503_after_key_check_is_gate_fail_not_skip(monkeypatch, capsys, settings_reads, tmp_path):
+    """행 c2 — 키 확인은 통과했는데 실제 앱(`harness.default_post`)의 `/chat` 이 coach 설정 무효로 503 을 내면
+    `main([])` 은 SKIP 하지 않고 게이트 FAIL(1) 로 끝나며, 게이트 절의 실패 사유에 `contract_parseable` critical 0 이 있다 (금지, 결정 B).
+    케이스 행에는 통과해도 `<id>/contract_parseable` 이 찍히므로 게이트 절(`=== 게이트 ===` 뒤)만 본다.
+
+    미연결은 404 · 501 만이다 — 503 을 SKIP 으로 넓히면 설정 오류가 "측정 안 함" 으로 숨는다.
+    503 은 `call_model` 이 설정 검증에서 HTTP 전에 낸다 — HTTP 클라이언트 생성 0회 · 설정 읽기 0회로 네트워크 0 을 단언한다.
+    """
+    _clear_coach_env(monkeypatch)
+    monkeypatch.setattr(harness, "has_coach_key", lambda: True)
+    monkeypatch.setattr("app.ai_coach.get_coach_settings", _coach_settings())
+    monkeypatch.setattr(chat_eval, "CRASH_LOG", tmp_path / "crashes.log")
+    clients: list[None] = []
+
+    def _forbidden_client(*args, **kwargs):
+        clients.append(None)
+        raise AssertionError("coach 가 HTTP 클라이언트를 만들었다 — 503 은 HTTP 전에 나야 한다")
+
+    monkeypatch.setattr(ai_coach.httpx, "AsyncClient", _forbidden_client)
+
+    code = main([])
+
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "SKIP" not in out
+    gate_section = out.split("=== 게이트 ===", 1)[-1]
+    assert "FAIL" in gate_section
+    assert "/contract_parseable: critical 0/" in gate_section
+    assert clients == []
     assert settings_reads == []
+
+
+# ─────────────────────────── coach 키 확인 ───────────────────────────
+
+
+def test_c3_valid_coach_settings_has_coach_key_true(monkeypatch):
+    """행 c3 — 유효한 coach 설정(키 · `https://mlapi.run/` URL)이면 `has_coach_key()` 는 True 다 (정상).
+
+    키가 있는데 False 면 coach 를 연결한 PC 에서도 eval 이 늘 SKIP 으로 끝나 측정되지 않는다.
+    """
+    monkeypatch.setattr("app.config.get_coach_settings", _coach_settings(**_VALID_COACH))
+
+    assert harness.has_coach_key() is True
+
+
+@pytest.mark.parametrize(
+    "url",
+    [None, "http://mlapi.run/coach-test", "https://other.example/coach-test"],
+    ids=["URL 없음", "http", "다른 호스트"],
+)
+def test_c4_missing_or_invalid_coach_settings_has_coach_key_false(monkeypatch, url):
+    """행 c4 — coach URL 이 없거나 무효(http:// · 게이트웨이 밖 호스트)면 `has_coach_key()` 는 False 다 (양방향-거름).
+
+    `CoachSettings` 가 내는 진짜 ValidationError 를 "키 없음" 으로 읽어야 한다 — 예외가 새면 eval 이 크래시하고,
+    True 로 읽으면 POST 마다 503 을 받아 게이트 FAIL 로 보인다.
+    """
+    _clear_coach_env(monkeypatch)
+    values = {"LLM_API_KEY": "test-key"} if url is None else {"LLM_API_KEY": "test-key", "LLM_COACH_URL": url}
+    monkeypatch.setattr("app.config.get_coach_settings", _coach_settings(**values))
+
+    assert harness.has_coach_key() is False
+
+
+def test_c5_blank_coach_key_has_coach_key_false(monkeypatch):
+    """행 c5 — 키가 공백뿐(`"   "`)이면 URL 이 유효해도 `has_coach_key()` 는 False 다 (경계).
+
+    공백 키는 `CoachSettings` 검증을 통과한다 — 키 확인이 걸러야 모델 호출 없이 SKIP 으로 끝난다.
+    """
+    monkeypatch.setattr(
+        "app.config.get_coach_settings",
+        _coach_settings(LLM_API_KEY="   ", LLM_COACH_URL=_VALID_COACH["LLM_COACH_URL"]),
+    )
+
+    assert harness.has_coach_key() is False
+
+
+def test_c6_coach_key_true_without_reading_vision_settings(monkeypatch, settings_reads):
+    """행 c6 — vision · reasoning 설정을 읽을 수 없어도(autouse 가 `get_settings` 를 막는다) coach 설정이 유효하면
+    `has_coach_key()` 는 True 이고 `get_settings` 를 한 번도 부르지 않는다 (양방향-남김).
+
+    `/chat` 은 coach 설정만 쓴다 — vision 설정이 없다고 SKIP 하면 coach 만 연결한 PC 에서 측정이 막힌다.
+    """
+    monkeypatch.setattr("app.config.get_coach_settings", _coach_settings(**_VALID_COACH))
+
+    assert harness.has_coach_key() is True
+    assert settings_reads == []
+
+
+def test_c7_main_does_not_call_has_api_key(monkeypatch, capsys):
+    """행 c7 — `main([])` 은 vision 키 확인(`has_api_key`)을 부르지 않는다. coach 키가 없으면 0 · SKIP 으로 끝난다 (금지).
+
+    `has_api_key` 를 보면 vision 설정이 무효인 PC 에서 coach 가 정상이어도 SKIP 된다.
+    """
+    api_key_calls: list[None] = []
+
+    def _api_key_forbidden() -> bool:
+        api_key_calls.append(None)
+        raise AssertionError("chat eval 이 vision 키 확인(has_api_key)을 불렀다")
+
+    monkeypatch.setattr(harness, "has_api_key", _api_key_forbidden)
+    monkeypatch.setattr(harness, "has_coach_key", lambda: False)
+
+    code = main([])
+
+    assert code == 0
+    assert "SKIP" in capsys.readouterr().out
+    assert api_key_calls == []
+
+
+def test_c8_coach_key_without_vision_key_runs_measurement(monkeypatch, capsys, tmp_path):
+    """행 c8 — vision 키가 없어도(`has_api_key` False) coach 키가 있으면(`has_coach_key` True) `main(["--n", "1"])` 은
+    SKIP 하지 않고 채널을 한 번 만들어 측정한다 (양방향-남김).
+
+    채널은 Fake(200 BLOCKED)다 — 모델 · 네트워크 0. 게이트 결과는 이 행의 대상이 아니다.
+    """
+    posts: list[str] = []
+    factory_calls: list[None] = []
+    fake_factory = _blocked_factory(posts)
+
+    def _recording_factory():
+        factory_calls.append(None)
+        return fake_factory()
+
+    monkeypatch.setattr(harness, "has_api_key", lambda: False)
+    monkeypatch.setattr(harness, "has_coach_key", lambda: True)
+    monkeypatch.setattr(harness, "default_post", _recording_factory)
+    monkeypatch.setattr(chat_eval, "CRASH_LOG", tmp_path / "crashes.log")
+
+    main(["--n", "1"])
+
+    assert "SKIP" not in capsys.readouterr().out
+    assert len(factory_calls) == 1
+    assert posts, "Fake 채널을 거치지 않았다"
+
+
+# ─────────────────────────── 프롬프트 해시 ───────────────────────────
+
+
+def test_c9_one_char_system_prompt_change_changes_hash(monkeypatch):
+    """행 c9 — `app.ai_coach.SYSTEM_PROMPT` 를 한 글자만 바꿔도 `cases_prompt_hash(CASES)` 가 바뀐다 (경계).
+
+    system 프롬프트가 바뀐 baseline 을 같은 조건으로 비교하면 프롬프트 변경의 효과가 회귀 · 개선으로 오독된다.
+    """
+    assert CASES, "CASES 가 비어 있다 — 검사할 케이스가 없다"
+    before = cases_prompt_hash(CASES)
+    monkeypatch.setattr(ai_coach, "SYSTEM_PROMPT", ai_coach.SYSTEM_PROMPT + "x")
+
+    assert cases_prompt_hash(CASES) != before
+
+
+def test_c10_build_messages_assembly_change_changes_hash(monkeypatch):
+    """행 c10 — `app.ai_coach.build_messages` 의 조립이 바뀌어 user 메시지 끝 한 글자만 달라져도 해시가 바뀐다 (경계).
+
+    프롬프트는 system 문자열만이 아니다 — context · history 를 user 메시지로 싣는 방식이 바뀌어도 다른 조건이다.
+    """
+    assert CASES, "CASES 가 비어 있다 — 검사할 케이스가 없다"
+    before = cases_prompt_hash(CASES)
+    original = ai_coach.build_messages
+
+    def _changed(req):
+        return [
+            {**message, "content": message["content"] + " "} if message["role"] == "user" else message
+            for message in original(req)
+        ]
+
+    monkeypatch.setattr(ai_coach, "build_messages", _changed)
+
+    assert cases_prompt_hash(CASES) != before
+
+
+def test_c11_one_char_case_text_change_changes_hash():
+    """행 c11 — 케이스 질문(`request["text"]`) 한 글자만 바꿔도 해시가 바뀐다 (경계).
+
+    질문은 user 메시지에 그대로 실린다 — 케이스 입력이 바뀐 baseline 을 같은 조건으로 비교하면 안 된다.
+    """
+    assert CASES, "CASES 가 비어 있다 — 검사할 케이스가 없다"
+    first = CASES[0]
+    request = copy.deepcopy(first.request)
+    text = request["text"]
+    request["text"] = text[:-1] + ("?" if text[-1:] != "?" else "!")
+    changed = (dataclasses.replace(first, request=request), *CASES[1:])
+
+    assert cases_prompt_hash(changed) != cases_prompt_hash(CASES)
+
+
+def test_c12_prompt_hash_does_not_read_contract_file(monkeypatch, tmp_path):
+    """행 c12 — `cases_prompt_hash` 는 계약 파일(`chat_checks.AI_STUB_SCHEMAS`)을 읽지 않는다. 경로를 없는 파일로
+    바꿔도 예외 없이 원래 해시와 같다 (금지, 결정 C).
+
+    계약 파일에는 analyze · feedback 스키마도 있다 — 그 수정이 chat baseline 에 거짓 "프롬프트 바뀜" 경고를 내면 안 된다.
+    """
+    assert CASES, "CASES 가 비어 있다 — 검사할 케이스가 없다"
+    before = cases_prompt_hash(CASES)
+    monkeypatch.setattr(chat_checks, "AI_STUB_SCHEMAS", tmp_path / "없는_schemas.py")
+
+    assert cases_prompt_hash(CASES) == before
+
+
+# ─────────────────────────── baseline ───────────────────────────
+
+
+def test_c13_saved_baseline_records_rule_version_v2_and_prompt_hash(monkeypatch, tmp_path):
+    """행 c13 — `--save` 로 저장한 baseline 에 `rule_version == "chat-cases-v2"`, `prompt_hash == cases_prompt_hash(CASES)`
+    가 있다 (정상, 결정 D).
+
+    baseline 의 비교 조건이다 — 계약 파일 해시로 잰 v1 baseline 과 비교하면 `compare` 가 경고해야 한다.
+    채널은 Fake(200 BLOCKED)다 — 모델 · 네트워크 0. 게이트 결과는 이 행의 대상이 아니다.
+    크래시 로그는 `tmp_path` 로 돌리고 실행 뒤 그 파일이 없음을 단언한다 — 판정 함수가 예외로 죽으면 결과에는
+    `errors` 로만 남아 저장값 단언이 통과하므로, 크래시를 로그 파일로 드러낸다.
+    """
+    posts: list[str] = []
+    crash_log = tmp_path / "crashes.log"
+    monkeypatch.setattr(chat_eval, "CRASH_LOG", crash_log)
+    monkeypatch.setattr(harness, "has_api_key", lambda: True)
+    monkeypatch.setattr(harness, "has_coach_key", lambda: True)
+    monkeypatch.setattr(harness, "default_post", _blocked_factory(posts))
+    saved = tmp_path / "chat_baseline.json"
+
+    code = main(["--n", "1", "--save", str(saved)])
+
+    assert code != 2, "CLI 오용으로 끝났다"
+    assert posts, "Fake 채널을 거치지 않았다"
+    doc = json.loads(saved.read_text(encoding="utf-8"))
+    assert doc["rule_version"] == "chat-cases-v2"
+    assert doc["prompt_hash"] == cases_prompt_hash(CASES)
+    assert not crash_log.exists(), crash_log.read_text(encoding="utf-8")
+
+
+# ─────────────────────────── 앱 스키마 ───────────────────────────
+
+
+def test_c14_every_request_satisfies_app_chat_request():
+    """행 c14 — 모든 케이스의 요청이 앱 `app.schemas.ChatRequest` 를 통과한다 (회귀).
+
+    행 60 은 ai-stub 계약을 본다. 앱 스키마는 history 를 필수로 받는 등 stub 과 다르다 — 앱이 422 로 거르는 케이스는
+    `/chat` 라우트를 거치는 실측에서 판정이 무의미해진다.
+    """
+    assert CASES, "CASES 가 비어 있다 — 검사할 케이스가 없다"
+    invalid = []
+    for case in CASES:
+        try:
+            AppChatRequest.model_validate(case.request)
+        except Exception as exc:  # noqa: BLE001 - 어느 케이스가 왜 틀렸는지 한 번에 본다
+            invalid.append((case.id, type(exc).__name__))
+    assert invalid == []
 
 
 # ─────────────────────────── BE 사본 일치 ───────────────────────────

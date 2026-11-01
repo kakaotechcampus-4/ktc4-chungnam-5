@@ -156,6 +156,11 @@ def has_api_key() -> bool:
     return bool(settings.LLM_API_KEY.get_secret_value().strip())
 
 
+def has_coach_key() -> bool:
+    """`app.config.get_coach_settings()` 로 coach 모델 키 · URL 이 설정돼 있는지 확인한다."""
+    raise NotImplementedError("has_coach_key 미구현")
+
+
 # ─────────────────────────── 실행 ───────────────────────────
 
 
