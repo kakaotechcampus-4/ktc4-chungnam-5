@@ -8,6 +8,7 @@ import '../theme/app_colors.dart';
 import 'daily_condition_popup.dart';
 import 'feedback_branch_popup.dart';
 import 'meal_delete_confirm_popup.dart';
+import 'meal_skip_confirm_popup.dart';
 import 'review_leave_popup.dart';
 import 'satiety_checkin_popup.dart';
 import 'suggestion_replace_popup.dart';
@@ -22,6 +23,9 @@ enum AppPopup {
 
   /// 확정 전에 음식 확인 화면을 나갈 때의 확인. 방금 누른 뒤로가기에 대한 답이다.
   reviewLeave(0),
+
+  /// "이번 끼니 안 먹었어요" 기록 확인. 방금 누른 버튼에 대한 답이다.
+  mealSkipConfirm(0),
 
   /// 챗봇 카드 "이걸로 바꾸기" 확인. 방금 누른 버튼에 대한 답이다.
   suggestionReplace(0),
@@ -98,6 +102,20 @@ class PopupGate {
       id: mealId,
       show: (c) =>
           _showDialog(c, MealDeleteConfirmPopup(description: description)),
+    );
+  }
+
+  /// "이번 끼니 안 먹었어요" 기록 확인. 기록하기를 골랐으면 `true`.
+  /// 버튼을 연달아 눌러도 확인창은 하나만 뜬다.
+  Future<bool> confirmMealSkip(
+    BuildContext context, {
+    required String description,
+  }) {
+    return _request(
+      context,
+      AppPopup.mealSkipConfirm,
+      show: (c) =>
+          _showDialog(c, MealSkipConfirmPopup(description: description)),
     );
   }
 

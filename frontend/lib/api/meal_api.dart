@@ -132,12 +132,16 @@ class MealDetail {
     required this.eatenAt,
     required this.eatenAtInstant,
     required this.items,
+    this.skipped = false,
     this.imageUrl,
     this.clarifyQuestion,
     this.satietyAfterPct,
   });
 
   final String mealId;
+
+  /// "식사 안 함" 으로 기록한 끼니. 등록과 함께 `EVALUATED` 이고 음식·점수가 없다.
+  final bool skipped;
 
   /// `ANALYZING` · `REVIEW_REQUIRED` · `EVALUATED` · `FAILED`.
   final String status;
@@ -169,6 +173,7 @@ class MealDetail {
     mealId: json['mealId'] as String,
     status: json['status'] as String,
     isRecalculation: json['isRecalculation'] as bool? ?? false,
+    skipped: json['skipped'] as bool? ?? false,
     mealType: json['mealType'] as String,
     eatenAt: parseApiDateTime(json['eatenAt'] as String),
     eatenAtInstant: DateTime.parse(json['eatenAt'] as String),
@@ -416,6 +421,26 @@ class MealApiService {
             {'foodRefId': f.foodRefId, 'amount': f.amountG, 'unit': 'g'},
         ],
         'satietyBeforePct': ?satietyBeforePct,
+      },
+    );
+    return MealCreated.fromJson(result.dataMap);
+  }
+
+  /// `POST /meals` — "식사 안 함"(JSON `skipped: true`).
+  ///
+  /// 음식 분석도 확인 화면도 없이 곧바로 `EVALUATED` 로 등록되고(201) 끼니 피드백
+  /// 작업이 함께 들어간다. 확정(`POST /confirm`)은 부르지 않는다(409) — 응답을 받으면
+  /// 곧바로 `GET /meals/{mealId}/feedback` 을 묻는다. 음식·식전 포만감은 보낼 수 없다(422).
+  Future<MealCreated> createSkipped({
+    required String mealType,
+    required DateTime eatenAt,
+  }) async {
+    final result = await _client.post(
+      '/meals',
+      body: {
+        'mealType': mealType,
+        'eatenAt': formatApiDateTime(eatenAt),
+        'skipped': true,
       },
     );
     return MealCreated.fromJson(result.dataMap);

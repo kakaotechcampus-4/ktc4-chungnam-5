@@ -700,6 +700,82 @@ void main() {
       expect(adapter.requests.single.data, isNot(contains('rawText')));
     });
 
+    test('a skipped meal goes as skipped:true without foods', () async {
+      final (client, adapter) = await _client(
+        (_) => (
+          201,
+          _ok({
+            'mealId': 'm1',
+            'status': 'EVALUATED',
+            'steps': [],
+            'pollIntervalMs': null,
+            'timeoutMs': null,
+          }),
+        ),
+      );
+      final created = await MealApiService(client).createSkipped(
+        mealType: 'DINNER',
+        eatenAt: DateTime.utc(2026, 10, 4, 10, 0),
+      );
+      expect(created.mealId, 'm1');
+      // 분석도 확인 화면도 없다 — 곧바로 끼니 피드백을 묻는다.
+      expect(created.needsAnalysis, isFalse);
+      // items·satietyBeforePct 를 함께 보내면 422 라 아예 싣지 않는다.
+      expect(adapter.requests.single.data, {
+        'mealType': 'DINNER',
+        'eatenAt': '2026-10-04T19:00:00+09:00',
+        'skipped': true,
+      });
+    });
+
+    test('skipped is read from meals, home and the calendar (default false)', () {
+      final meal = MealDetail.fromJson({
+        'mealId': 'm1',
+        'status': 'EVALUATED',
+        'skipped': true,
+        'mealType': 'DINNER',
+        'eatenAt': '2026-10-04T19:00:00+09:00',
+        'items': <Object?>[],
+      });
+      expect(meal.skipped, isTrue);
+      // 필드가 없는 옛 응답은 안 먹은 끼니가 아니다.
+      final old = MealDetail.fromJson({
+        'mealId': 'm1',
+        'status': 'EVALUATED',
+        'mealType': 'LUNCH',
+        'eatenAt': '2026-10-04T12:00:00+09:00',
+        'items': <Object?>[],
+      });
+      expect(old.skipped, isFalse);
+
+      final listed = HistoryMeal.fromJson({
+        'mealId': 'm2',
+        'mealType': 'DINNER',
+        'eatenAt': '2026-10-04T19:00:00+09:00',
+        'displayName': '',
+        'skipped': true,
+        'scores': null,
+      });
+      expect(listed.skipped, isTrue);
+      expect(listed.scores, isNull);
+
+      final day = CalendarDay.fromJson({
+        'date': '2026-10-04',
+        'count': 2,
+        'recordedMealTypes': ['LUNCH', 'DINNER'],
+        'skippedMealTypes': ['DINNER'],
+      });
+      expect(day.skippedMealTypes, ['DINNER']);
+      expect(
+        CalendarDay.fromJson({
+          'date': '2026-10-04',
+          'count': 1,
+          'recordedMealTypes': ['LUNCH'],
+        }).skippedMealTypes,
+        isEmpty,
+      );
+    });
+
     test('photo meal still waits for the analysis', () async {
       final (client, _) = await _client(
         (_) => (

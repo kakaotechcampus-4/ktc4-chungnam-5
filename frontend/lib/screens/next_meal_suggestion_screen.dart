@@ -31,16 +31,25 @@ import 'shared_meal_widgets.dart';
 /// - 저녁: 피드백 문장만. 다음 끼니 제안과 챗봇 버튼이 없다.
 ///
 /// 제안을 저장하거나 다시 받는 API 는 아직 없어 그 버튼은 두지 않는다.
+///
+/// **식사 안 함([skipped])** 은 점수도 영양소도 없다 — 확정을 거치지 않아 평가 조회가
+/// 409 라서 [evaluation] 을 받지 않는다. Q·Q·S 와 영양소 상태 대신 "이번 끼니는 거르셨어요"
+/// 안내를 보이고, 피드백 문장은 같은 방식으로 폴링한다. 문장 생성이 실패해도 "다시 만들기"는
+/// 없다(재확정이 없다) — 기록 탭에서 다시 볼 수 있다는 안내만 보인다.
 class NextMealSuggestionScreen extends StatefulWidget {
   final String mealId;
 
   /// 평가 화면에서 받은 확정 결과. 없으면(다른 곳에서 열면) 서버에서 받는다.
   final MealEvaluation? evaluation;
 
+  /// "식사 안 함" 으로 기록한 끼니인지. 홈·기록 카드의 `skipped` 와 등록 직후 흐름이 안다.
+  final bool skipped;
+
   const NextMealSuggestionScreen({
     super.key,
     required this.mealId,
     this.evaluation,
+    this.skipped = false,
   });
 
   @override
@@ -84,6 +93,15 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
   }
 
   Future<void> _load() async {
+    if (widget.skipped) {
+      // 점수가 없어 평가를 받지 않는다(받으면 409). 끼니 종류와 피드백만 불러온다.
+      setState(() {
+        isLoading = false;
+        errorMessage = null;
+      });
+      _loadByMealType();
+      return;
+    }
     setState(() {
       isLoading = evaluation == null;
       errorMessage = null;
@@ -239,6 +257,8 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
         body: SafeArea(
           child: isLoading
               ? const Center(child: CircularProgressIndicator())
+              : widget.skipped
+              ? _buildSkippedContent()
               : evaluation == null
               ? Center(
                   child: RetryBlock(
@@ -271,6 +291,35 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
               const SizedBox(height: 14),
               // 피드백 문장은 모든 끼니에 보이고, 제안 · 챗봇 버튼은 저녁이 아닐 때만 보인다.
               // 끼니 종류를 알기 전에는 자리만 둔다.
+              if (mealType == null)
+                const SkeletonBox(width: double.infinity, height: 72)
+              else
+                ..._buildFeedbackSection(),
+              const SizedBox(height: 14),
+              const _DoctorNotice(),
+            ],
+          ),
+        ),
+        _buildHomeButton(),
+      ],
+    );
+  }
+
+  /// 식사 안 함 — 점수·영양소 대신 안내 한 장과 피드백 문장(아침·점심은 제안·챗봇 버튼도).
+  Widget _buildSkippedContent() {
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              AppSpacing.md,
+              AppSpacing.screenHorizontal,
+              AppSpacing.lg,
+            ),
+            children: [
+              const _SkippedCard(),
+              const SizedBox(height: 14),
               if (mealType == null)
                 const SkeletonBox(width: double.infinity, height: 72)
               else
@@ -437,6 +486,37 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
           ),
           child: Text('홈으로', style: AppTypography.buttonLabel),
         ),
+      ),
+    );
+  }
+}
+
+/// 식사 안 함 안내 — 점수 칸 자리에 보인다. 점수를 0 으로 채우면 "0점짜리 식사"로 읽힌다.
+class _SkippedCard extends StatelessWidget {
+  const _SkippedCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: AppRadius.xlRadius,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('이번 끼니', style: AppTypography.cardTitle.copyWith(fontSize: 12)),
+          const SizedBox(height: 10),
+          Text(
+            '이번 끼니는 거르셨어요',
+            style: AppTypography.cardTitle.copyWith(fontSize: 15),
+          ),
+          const SizedBox(height: 4),
+          Text('다음 식사를 챙겨 주세요.', style: AppTypography.bodySecondary),
+        ],
       ),
     );
   }

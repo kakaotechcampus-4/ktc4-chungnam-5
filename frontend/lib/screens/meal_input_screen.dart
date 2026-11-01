@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../api/meal_api.dart';
+import '../common/api_format.dart';
+import '../popups/popup_gate.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -13,6 +15,7 @@ import '../theme/app_typography.dart';
 import 'food_search_screen.dart';
 import 'meal_analysis_screen.dart';
 import 'meal_review_screen.dart';
+import 'next_meal_suggestion_screen.dart';
 
 const List<String> _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -247,6 +250,36 @@ class _MealInputScreenState extends State<MealInputScreen> {
     }
   }
 
+  /// "이번 끼니 안 먹었어요" — 확인을 받고 선택한 끼니·시각으로 식사 안 함을 등록한 뒤
+  /// 끼니 피드백(7번)으로 교체 이동한다. 음식 분석도 확인 화면도 없다. 등록하면 서버가 곧바로
+  /// 평가 완료로 두므로 확정을 부르지 않고 7번이 피드백 문장을 기다린다.
+  Future<void> _skipMeal() async {
+    final mealType = _mealTypes[_selectedMealType];
+    final confirmed = await context.read<PopupGate>().confirmMealSkip(
+      context,
+      description: '${mealTypeLabel(mealType)} · ${_formatTime(_eatenAt)}',
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _submitting = true);
+    try {
+      final created = await _api.createSkipped(
+        mealType: mealType,
+        eatenAt: _eatenAt,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              NextMealSuggestionScreen(mealId: created.mealId, skipped: true),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showError('기록하지 못했어요: $e');
+      setState(() => _submitting = false);
+    }
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
@@ -381,6 +414,21 @@ class _MealInputScreenState extends State<MealInputScreen> {
                           ),
                         )
                       : Text('분석 시작', style: AppTypography.buttonLabel),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // 식사 안 함 — 위에서 고른 끼니·시각으로 곧바로 기록한다(확인창을 거친다).
+              Center(
+                child: TextButton(
+                  onPressed: _submitting ? null : _skipMeal,
+                  child: Text(
+                    '이번 끼니 안 먹었어요',
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.textSecondary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
