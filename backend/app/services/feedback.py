@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -254,6 +255,21 @@ def add_checkin(
     )
 
 
+def _content_changed_at(db: Session, meal: Meal) -> datetime | None:
+    """끼니 내용이 마지막으로 바뀐 시각 — 이보다 먼저 만든 카드는 낡았다. 기준이 없으면 None.
+
+    - 식사 안 함: **등록 시각.** 점수 행을 만들지 않고(`services/meal.py::create_skipped_meal`)
+      고칠 수도 다시 확정할 수도 없어 내용이 바뀌지 않는다. 점수 행을 기준으로 삼으면 늘
+      "기준 없음" 이라 바꾸기가 항상 409 였다.
+    - 그 밖: 점수 행의 `computed_at` — 음식을 고치면 행이 지워지고 다음 확정이 새로 넣는다.
+      확정된 끼니에는 행이 항상 있지만, 없으면 비교할 기준이 없으므로 None 이다(막는다).
+    """
+    if meal.skipped:
+        return meal.created_at
+    evaluation = evaluation_crud.get_by_meal(db, meal.id)
+    return None if evaluation is None else evaluation.computed_at
+
+
 def replace_suggestion(
     db: Session,
     *,
@@ -286,8 +302,8 @@ def replace_suggestion(
     같은 값 재확정(upsert)에서는 그대로다. 음식을 고치면 `crud/meal.py::mark_recalculating`
     이 점수 행을 지우므로 다음 확정에서 새 시각이 된다 — 즉 "끼니 내용이 마지막으로 바뀐
     확정 시각" 이다. 카드는 메시지 `created_at`(`clock_timestamp()`)이 그보다 앞이면
-    고치기 전 끼니를 보고 만든 것이다. 확정된 끼니에는 점수 행이 항상 있지만, 없으면 비교할
-    기준이 없으므로 막는다.
+    고치기 전 끼니를 보고 만든 것이다. 기준 시각은 `_content_changed_at` 이 정한다 — 식사 안
+    함 끼니는 점수 행이 없어 등록 시각을 쓴다.
 
     점수 행 시각만으로는 **포만감만 고친 재확정**을 못 잡는다 — upsert 라 시각이 그대로인데,
     `services/evaluation::_is_stale_feedback` 은 점수가 바뀌었다고 피드백을 비우고 추천을 다시
@@ -307,11 +323,11 @@ def replace_suggestion(
         raise FoodCardNotFoundError(f"food card {food_card_id} 를 찾을 수 없습니다.")
     card, card_created_at = found
 
-    evaluation = evaluation_crud.get_by_meal(db, meal.id)
+    changed_at = _content_changed_at(db, meal)
     regenerated_at = feedback_crud.latest_task_created_at(db, meal.id)
     if (
-        evaluation is None
-        or card_created_at < evaluation.computed_at
+        changed_at is None
+        or card_created_at < changed_at
         or (regenerated_at is not None and card_created_at < regenerated_at)
     ):
         raise SuggestionConflictError("끼니가 바뀌어 이 추천은 쓸 수 없습니다.")

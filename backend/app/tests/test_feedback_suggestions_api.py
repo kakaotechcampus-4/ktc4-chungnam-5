@@ -497,3 +497,46 @@ def test_card_of_unshowable_message_is_404(
     db.flush()
 
     _assert_error(_put(client, user.id, meal.id, card.id), 404, "NOT_FOUND")
+
+
+# ── 식사 안 함 끼니 ──────────────────────────────────────────
+
+
+def _skipped_meal(db: Session, user_id, *, suggestions: list[dict] | None = None):
+    """식사 안 함 끼니 — 등록이 남기는 모양(EVALUATED · skipped · **점수 행 없음**)과 SAFE 피드백."""
+    meal = make_meal(db, user_id=user_id, status=MealStatus.EVALUATED)
+    meal.skipped = True
+    meal.raw_text = None
+    make_meal_feedback(
+        db, user_id=user_id, meal_id=meal.id,
+        body="점심을 건너뛰었어요.", safety_status=SafetyStatus.SAFE, suggestions=suggestions,
+    )
+    db.flush()
+    return meal
+
+
+def test_skipped_meal_suggestion_can_be_replaced(client: TestClient, db: Session) -> None:
+    """식사 안 함은 점수 행이 없다 — 그걸 "기준 없음" 으로 보고 막으면 바꾸기가 항상 409 다.
+
+    리뷰 재현: 아침 등록 → 점심 식사 안 함 → 챗봇 카드로 바꾸기 → 409.
+    """
+    user = make_user(db)
+    meal = _skipped_meal(db, user.id, suggestions=[_TOFU])
+    card = _card(db, user_id=user.id, meal_id=meal.id, food_ref_id=None)
+
+    res = _put(client, user.id, meal.id, card.id)
+
+    assert res.status_code == 200, res.text
+    assert [s["foodName"] for s in res.json()["data"]["suggestions"]] == ["쌈채소 한 접시"]
+
+
+def test_skipped_meal_card_older_than_its_feedback_task_is_conflict(
+    client: TestClient, db: Session
+) -> None:
+    """식사 안 함도 "카드보다 늦게 추천을 다시 만들었으면 낡은 카드" 규칙은 그대로다."""
+    user = make_user(db)
+    meal = _skipped_meal(db, user.id, suggestions=[_TOFU])
+    card = _card(db, user_id=user.id, meal_id=meal.id, food_ref_id=None)
+    _add_feedback_task(db, meal, after_card=card)
+
+    _assert_error(_put(client, user.id, meal.id, card.id), 409, "CONFLICT")
