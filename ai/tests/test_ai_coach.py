@@ -275,6 +275,81 @@ def test_normal_model_answer_with_yak_words_is_not_turned_into_blocked():
     assert result.food_cards[0].food_name == "두부"
 
 
+def _cards(*names):
+    return [{"foodName": n, "advice": f"{n} 이유"} for n in names]
+
+
+def _parse(cards, **extra):
+    return ai_coach.parse_response({"safetyStatus": "SAFE", "text": "답변", "foodCards": cards, **extra})
+
+
+@pytest.mark.parametrize("count,expected", [(0, 0), (1, 1), (3, 3), (4, 3), (10, 3)])
+def test_food_cards_are_capped_at_three(count, expected):
+    names = [f"음식{i}" for i in range(count)]
+    result = _parse(_cards(*names))
+    assert len(result.food_cards) == expected
+    assert [c.food_name for c in result.food_cards] == names[:3]  # 앞에서부터 남긴다
+
+
+def test_overlong_card_list_is_trimmed_not_discarded():
+    result = _parse(_cards(*[f"음식{i}" for i in range(6)]))
+    assert result.safety_status.value == "SAFE" and result.text == "답변"
+
+
+def test_duplicate_food_names_keep_the_first_and_do_not_use_up_slots():
+    # 공백·전각 차이는 같은 음식이다. 중복이 상한 자리를 차지하지 않는다.
+    result = _parse(_cards("두부", " 두부 ", "두 부", "오이무침", "콩나물무침", "시금치나물"))
+    assert [c.food_name for c in result.food_cards] == ["두부", "오이무침", "콩나물무침"]
+
+
+def test_duplicate_name_check_ignores_width_and_case():
+    result = _parse(_cards("Tofu", "ＴＯＦＵ", "tofu"))
+    assert [c.food_name for c in result.food_cards] == ["Tofu"]
+
+
+@pytest.mark.parametrize("recommend,kept", [(False, 0), (True, 2), (None, 2), ("false", 2), (0, 2), ("no", 2)])
+def test_recommend_false_drops_cards_and_other_values_keep_them(recommend, kept):
+    extra = {} if recommend is None else {"recommend": recommend}
+    result = _parse(_cards("오이무침", "두부"), **extra)
+    assert len(result.food_cards) == kept
+    assert result.text == "답변" and result.safety_status.value == "SAFE"
+
+
+def test_missing_recommend_field_keeps_current_behaviour():
+    result = ai_coach.parse_response({"safetyStatus": "SAFE", "text": "답변",
+                                      "foodCards": _cards("오이무침")})
+    assert [c.food_name for c in result.food_cards] == ["오이무침"]
+
+
+def test_dangerous_card_still_blocks_even_when_recommend_is_false():
+    cards = _cards("오이무침") + [{"foodName": "두부", "advice": "약 용량을 늘려보세요"}]
+    result = _parse(cards, recommend=False)
+    assert result.safety_status.value == "BLOCKED"
+    assert result.text is None and result.food_cards == []
+
+
+def test_dangerous_card_beyond_the_cap_still_blocks():
+    cards = _cards("가", "나", "다") + [{"foodName": "라", "advice": "약 용량을 늘려보세요"}]
+    assert _parse(cards).safety_status.value == "BLOCKED"
+
+
+def test_chat_endpoint_returns_at_most_three_cards(monkeypatch):
+    async def fake(messages):
+        return {"safetyStatus": "SAFE", "text": "추천해요", "foodCards": _cards("가", "나", "다", "라", "마")}
+    monkeypatch.setattr(ai_coach, "call_model", fake)
+    body = client.post("/chat", json=REQUEST).json()
+    assert [c["foodName"] for c in body["foodCards"]] == ["가", "나", "다"]
+
+
+def test_card_trimming_log_does_not_contain_user_or_food_text(monkeypatch, caplog):
+    import logging
+    secret_name = "비밀음식이름"
+    with caplog.at_level(logging.INFO, logger="app.ai_coach"):
+        _parse(_cards(secret_name, secret_name, "나", "다", "라"))
+    assert secret_name not in caplog.text
+    assert "dropped" in caplog.text or "trimmed" in caplog.text
+
+
 def test_history_is_not_rechecked_by_input_guard(monkeypatch):
     calls = []
     async def fake(messages):
