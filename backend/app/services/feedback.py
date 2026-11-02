@@ -16,6 +16,7 @@ from app.crud import evaluation as evaluation_crud
 from app.crud import feedback as feedback_crud
 from app.crud import meal as meal_crud
 from app.crud import satiety as satiety_crud
+from app.infra.queue import enqueue
 from app.models.enums import MealStatus, TaskStatus
 from app.models.meal import Meal
 from app.schemas.feedback import (
@@ -154,8 +155,10 @@ def get_feedback(
 
     `FAILED` 는 보여 줄 문장이 없는데 가장 최근 `feedback.meal` 작업이 격리됐거나
     끝났을 때다 — 어느 쪽이든 기다려도 문장이 오지 않는다.
-    재시도 진입점은 재확정이다 — `confirm` 은 문장이 없으면 작업을 다시 넣고, 그러면
-    가장 최근 작업이 PENDING 이 되어 여기서도 PENDING 으로 돌아간다.
+    재시도 진입점은 `retry_feedback`(`POST /meals/{mealId}/feedback/retry`)이다 — 식사 안 함
+    끼니는 확정을 부를 수 없어 이 길뿐이다. 일반 끼니는 재확정으로도 된다(`confirm` 은 문장이
+    없으면 작업을 다시 넣는다). 어느 쪽이든 가장 최근 작업이 PENDING 이 되어 여기서도
+    PENDING 으로 돌아간다.
     `GENERATING` 은 가장 최근 작업을 워커가 집어 처리 중(`TaskStatus.PROCESSING`)일
     때다. 워커가 집는 순간 커밋하므로(`infra/queue.py::claim`) 다른 세션인 여기서도
     보인다. 재시도 대기(backoff) 중인 작업은 PENDING 으로 돌아가 있어 PENDING 이다.
@@ -210,6 +213,43 @@ def get_feedback(
         suggestions=_build_suggestions(db, row.suggestions),
         expected=_expected_satiety(db, meal.id),
     )
+
+
+def retry_feedback(
+    db: Session, *, user_id: uuid.UUID, meal_id: uuid.UUID
+) -> MealFeedbackResponse:
+    """끼니 피드백 문장을 다시 만들어 달라고 한다. 커밋까지 한다.
+
+    `FAILED` 에서 벗어나는 길이다. 일반 끼니는 같은 포만감으로 재확정해도 되지만
+    (`services/evaluation::confirm` 이 문장이 없으면 작업을 다시 넣는다), **식사 안 함
+    끼니는 확정이 막혀 있어**(채점할 음식이 없다) 이 길밖에 없다. 점수 · 포만감 · 영양
+    합계는 건드리지 않고 `feedback.meal` 만 다시 넣는다.
+
+    작업을 넣는 건 **보여 줄 문장이 없고 진행 중인 작업도 없을 때뿐이다.** 그 밖에는 아무것도
+    하지 않고 지금 상태를 돌려준다 — 더블탭이 AI 를 두 번 부르지 않고, 멀쩡한 문장 · 챗봇으로
+    바꾼 추천을 지우지도 않는다. 판정은 `get_feedback` 과 같다 — 본문이 비었으면 없는 것이다.
+
+    **끼니 행을 `FOR UPDATE` 로 잠근다.** 동시에 두 번 오면 둘 다 "진행 중 작업 없음" 을
+    보고 작업을 둘 넣는다. 확정 · 워커와 같은 순서(`meals` 먼저)라 교착은 없다.
+
+    응답은 `get_feedback` 과 같은 모양이다. 작업을 넣었으면 `PENDING` — FE 는 이어서
+    `GET /meals/{mealId}/feedback` 을 폴링한다.
+    """
+    meal = meal_crud.get_owned_meal(db, user_id=user_id, meal_id=meal_id, for_update=True)
+    if meal is None:
+        raise MealNotFoundError(f"meal {meal_id} 를 찾을 수 없습니다.")
+    # 확정 전 끼니는 문장을 만들 근거(확정된 음식 · 점수)가 없다. 워커도 건너뛴다.
+    if meal.status is not MealStatus.EVALUATED:
+        raise MealNotConfirmedError(f"meal {meal_id} 는 아직 확정되지 않았습니다.")
+
+    row = feedback_crud.get_by_meal(db, meal.id)
+    has_text = row is not None and bool((row.body or "").strip())
+    task_status = feedback_crud.latest_task_status(db, meal.id)
+    if not has_text and not (task_status is not None and task_status.is_in_flight):
+        enqueue(db, feedback_crud.FEEDBACK_TASK_TYPE, {"mealId": str(meal.id)})
+    db.commit()
+
+    return get_feedback(db, user_id=user_id, meal_id=meal_id)
 
 
 def add_checkin(
