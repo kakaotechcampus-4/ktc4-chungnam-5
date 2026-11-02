@@ -237,6 +237,44 @@ def test_food_questions_are_not_blocked_by_keyword_guard(text):
     assert not ai_coach.is_medical_request(text)
 
 
+# "약" 이 다른 낱말(약간·요약·절약…)의 일부이거나, "그만"·"끊" 이 다른 낱말(그만큼·끊임없이)의
+# 일부일 때 약물 중단으로 오인하면 정상 식사 질문이 상담 안내로 바뀐다.
+@pytest.mark.parametrize("text", [
+    "약간 배고픈데 간식 그만 먹을까요?",
+    "약간 허기지는데 저녁 뭐 먹지? 그만큼 든든한 걸로",
+    "요약해서 오늘 식사 어땠는지 알려줘, 끊임없이 배고파",
+    "오늘 식비 절약할 수 있는 반찬 추천해줘",
+    "예약해 둔 식당에서 뭘 시킬까? 그만큼 먹어도 될까",
+    "약속이 있어서 외식하는데 그만 먹어야 할 타이밍이 궁금해",
+    "주사위 모양 두부 추천해줘",
+    "약을 먹는 중인데 간식 그만 먹을까요?",
+])
+def test_ordinary_food_questions_with_yak_or_geuman_are_not_blocked(text):
+    assert not ai_coach.is_medical_request(text)
+
+
+@pytest.mark.parametrize("text", [
+    "약 끊어도 돼?",
+    "약을 그만 먹어도 돼요?",
+    "약은 이제 그만 먹어도 될까요",
+    "위고비 중단해도 되나요?",
+    "위고비를 끊을까 해요",
+    "마운자로 그만 맞아도 돼?",
+    "주사 두 배로 맞아도 돼?",
+    "삭센다를 중단하고 싶어요",
+])
+def test_real_drug_stop_requests_are_still_blocked(text):
+    assert ai_coach.is_medical_request(text)
+
+
+def test_normal_model_answer_with_yak_words_is_not_turned_into_blocked():
+    raw = {"safetyStatus": "SAFE", "text": "약간 허기질 땐 두부가 좋아요. 요약하면 단백질 반찬이 그만큼 든든해요.",
+           "foodCards": [{"foodName": "두부", "advice": "약간 짭짤해서 간식으로 그만이에요"}]}
+    result = ai_coach.parse_response(raw)
+    assert result.safety_status.value == "SAFE"
+    assert result.food_cards[0].food_name == "두부"
+
+
 def test_history_is_not_rechecked_by_input_guard(monkeypatch):
     calls = []
     async def fake(messages):
