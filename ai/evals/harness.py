@@ -27,9 +27,12 @@ import traceback
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from app.config import _GATEWAY_PREFIX  # 모듈 상수만 읽는다 — `.env` 는 `get_settings()` 를 불러야 읽힌다
+
+if TYPE_CHECKING:
+    from app.config import CoachSettings, Settings
 
 # ─────────────────────────── 타입 ───────────────────────────
 
@@ -43,6 +46,23 @@ ContractCheck = Callable[[int, object], Verdict]
 """(status_code, payload) -> Verdict."""
 
 Grade = Literal["critical", "non_critical", "ambiguous"]
+
+
+class FactoryCheck:
+    """팩토리가 인자를 묶어 만드는 Check 의 공용 기반 — 같은 팩토리 · 같은 인자면 `==` 로 같은 값이다.
+
+    클로저는 호출마다 새 함수라 같은 라벨로 만든 `Case` 끼리도 `==` 가 거짓이 된다. 그래서 팩토리는 값을 돌려준다.
+    서브클래스는 판정 모듈에 `@dataclass(frozen=True)` 로 두고
+    - 판정에 쓰는 인자를 불변 필드(tuple · frozenset)로 받는다 — 팩토리가 생성 시점에 복사 · 정규화해 넘긴다
+    - `__name__` 을 클래스 속성으로 팩토리 이름에 맞춘다 — 빌더가 `check.__name__` 을 축 id 로 읽는다
+    - `__call__(resp, req) -> Verdict` 를 구현한다
+
+    `==` 는 dataclass 규칙대로 클래스가 같고 필드가 모두 같을 때만 참이다 — 다른 팩토리끼리는 인자가 같아도 다르다.
+    `__module__` 은 서브클래스를 정의한 판정 모듈이다. 해시는 요구하지 않는다(`Case.request` 가 dict 라 `Case` 도 해시 불가).
+    """
+
+    def __call__(self, resp: dict, req: dict) -> Verdict:
+        raise NotImplementedError(f"{type(self).__qualname__}.__call__ 미구현")
 
 
 @dataclass(frozen=True)
@@ -123,20 +143,32 @@ def default_post() -> Post:
     return post
 
 
-def has_api_key() -> bool:
-    """`app.config.get_settings()` 로 모델 키가 설정돼 있는지 확인한다.
+def _settings_have_key(load_settings: Callable[[], Settings | CoachSettings]) -> bool:
+    """설정을 읽어 공백 아닌 `LLM_API_KEY` 가 있는지 본다.
 
-    필수 설정(키 · 엔드포인트 URL)이 없으면 `Settings` 가 검증 오류를 낸다 — 그때는 키가 없는 것으로 본다.
+    필수 설정(키 · 엔드포인트 URL)이 없거나 무효면 설정 클래스가 검증 오류를 낸다 — 그때는 키가 없는 것으로 본다.
     """
     from pydantic import ValidationError
 
-    from app.config import get_settings
-
     try:
-        settings = get_settings()
+        settings = load_settings()
     except ValidationError:
         return False
     return bool(settings.LLM_API_KEY.get_secret_value().strip())
+
+
+def has_api_key() -> bool:
+    """`app.config.get_settings()`(vision · reasoning 설정)로 모델 키가 설정돼 있는지 확인한다."""
+    from app import config
+
+    return _settings_have_key(config.get_settings)
+
+
+def has_coach_key() -> bool:
+    """`app.config.get_coach_settings()`(coach 설정)로 모델 키가 설정돼 있는지 확인한다 — vision 설정은 보지 않는다."""
+    from app import config
+
+    return _settings_have_key(config.get_coach_settings)
 
 
 # ─────────────────────────── 실행 ───────────────────────────
@@ -489,12 +521,18 @@ def cli_main(
     prompt_hash: str,
     crash_log: Path | None = None,
 ) -> int:
-    """CLI 진입점. 게이트 PASS 0 / FAIL 1 / 오용 2 / 키 없음 · 미연결 SKIP 0.
+    """CLI 진입점. 게이트 PASS 0 / FAIL 1 / 오용 · 케이스 0개 2 / 키 없음 · 미연결 SKIP 0.
 
     옵션: `--n` · `--pass-ratio` · `--save` · `--baseline` · `--max-errors` · `--only`.
-    순서: 오용 검사 → 키 확인 → 미연결 probe → 실행 → 비교 → 게이트 → 저장.
+    순서: 인자 해석(`--help` 는 여기서 0) → 케이스 0개 검사 → 오용 검사 → 키 확인 → 미연결 probe → 실행 → 비교 → 게이트 → 저장.
+    케이스 0개는 키 확인 · post 생성 전에 2 로 끝낸다 — 그대로 돌리면 0/0 으로 게이트 PASS 가 찍히고
+    `--save` 가 빈 baseline 을 만든다. 키 확인 뒤에 막으면 키 없는 PC 에서 SKIP(0) 으로 묻힌다.
+    `--only` 검사보다 먼저라 0개 문제가 "알 수 없는 case id" 로 보이지 않는다.
     """
     args = _parser().parse_args(argv)
+    if not cases:
+        print("측정할 케이스가 없다 — 0/0 으로 게이트 PASS 를 찍거나 빈 baseline 을 저장하지 않는다. 실행하지 않는다.")
+        return 2
     if args.n is not None and args.n < 1:
         print(f"--n 은 1 이상이어야 한다 (받은 값 {args.n}).")
         return 2

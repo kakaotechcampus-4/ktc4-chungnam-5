@@ -607,3 +607,41 @@ def test_r33_gram_units_match_be_to_grams_units():
     be = _be_gram_units(_read(_BE_MEAL))
     assert be, "BE 단위 집합이 비었다 — 판독기를 의심한다"
     assert GRAM_UNITS == be
+
+
+# ─────────────────────────── 팩토리 축 — 값 비교 ───────────────────────────
+
+# 팩토리마다 (인자 a 를 매번 새로 만드는 함수, a 와 다른 인자 b)
+_FACTORY_ARGS = [
+    (no_phantom_food, lambda: ["그릇", "젓가락"], ["쟁반"]),
+    (no_missing_food, lambda: [["밥", "쌀밥"], ["배추김치"]], [["밥", "쌀밥"], ["된장찌개"]]),
+    (standard_name, lambda: ["빙그레", "CJ"], ["청정원"]),
+]
+_FACTORY_IDS = [factory.__name__ for factory, _, _ in _FACTORY_ARGS]
+
+
+@pytest.mark.parametrize(("factory", "make_a", "b"), _FACTORY_ARGS, ids=_FACTORY_IDS)
+def test_s20_factory_called_twice_with_same_argument_gives_equal_checks(factory, make_a, b):
+    """행 s20 — 같은 내용의 인자(서로 다른 새 리스트)로 두 번 만든 팩토리 축은 `==` 로 같다 (양방향-남김).
+
+    `CASES == build_cases(LABELS)` 처럼 케이스를 값으로 비교하려면 축도 값으로 같아야 한다 —
+    호출마다 새 클로저면 같은 라벨끼리도 다르다고 나온다.
+    """
+    assert factory(make_a()) == factory(make_a())
+
+
+@pytest.mark.parametrize(("factory", "make_a", "b"), _FACTORY_ARGS, ids=_FACTORY_IDS)
+def test_s21_factory_with_different_argument_gives_unequal_checks(factory, make_a, b):
+    """행 s21 — 인자가 다르면 같은 팩토리의 축이라도 `!=` 다 (양방향-거름, 행 s20 의 짝).
+
+    인자를 무시하고 늘 같다고 하는 `__eq__` 면 라벨 값이 엉뚱하게 묶인 케이스를 행 50 이 놓친다.
+    """
+    assert factory(make_a()) != factory(b)
+
+
+def test_s22_different_factories_with_same_argument_are_unequal():
+    """행 s22 — 같은 모양의 인자를 받는 다른 팩토리끼리는 인자가 같아도 `!=` 다 (경계).
+
+    인자만 비교하는 범용 값이면 비음식 축과 금지어 축이 같은 라벨 단어로 같다고 나온다 — 축이 뒤바뀐 케이스를 놓친다.
+    """
+    assert no_phantom_food(["그릇"]) != standard_name(["그릇"])

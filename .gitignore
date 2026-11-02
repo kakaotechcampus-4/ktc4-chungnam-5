@@ -91,3 +91,8 @@ target/
 *.sqlite3
 *.db
 .terraform/
+
+# 로컬 Short Feedback 수동 실험 파일
+/ai/manual_feedback/
+/ai/scripts/try_short_feedback.py
+/ai/tests/test_manual_feedback.py

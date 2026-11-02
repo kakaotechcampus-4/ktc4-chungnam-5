@@ -5,8 +5,8 @@
 chat · DAILY 사이클이 `checks.py` 를 고치므로 공유 파일 충돌을 줄이려 별도 모듈에 둔다.
 
 사진별 기대값(주요 음식 · 비음식 · 금지어)은 요청 JSON 에 실을 수 없어(BE 계약 밖 필드)
-팩토리가 라벨을 클로저로 묶은 Check 를 만든다 (`checks.memo_injection_ignored` 선례).
-팩토리가 만든 Check 의 이름은 팩토리 이름과 같다 — 축 id 가 된다.
+팩토리가 라벨을 묶은 값 Check(`harness.FactoryCheck`)를 만든다 (`checks.memo_injection_ignored` 선례).
+같은 라벨로 만든 Check 는 `==` 로 같다. 팩토리가 만든 Check 의 이름은 팩토리 이름과 같다 — 축 id 가 된다.
 
 모양이 틀린 응답(items 가 list 가 아님 · 항목이 dict 가 아님 · 필드 타입 오류)은 판정 축에서 실패,
 관측 축에서 통과다 — 하네스가 크래시로 세지 않는다.
@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import unicodedata
 from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 
 from pydantic import ValidationError
 
 from app.schemas import AnalyzeMealResponse
-from evals.harness import Check, Verdict
+from evals.harness import Check, FactoryCheck, Verdict
 
 GRAM_UNITS: frozenset[str] = frozenset({"g", "G", "그램", "ml", "mL", "ML", "밀리리터"})
 """BE `to_grams` 가 환산하는 단위 — `backend/app/services/meal.py` 의 `_GRAM_UNITS | _MILLILITRE_UNITS` 사본.
@@ -125,26 +126,46 @@ def non_food_empty(resp: dict, req: dict) -> Verdict:
     return _verdict("음식 없는 사진에 항목을 냈다", [_name_of(item) for item in items])
 
 
+@dataclass(frozen=True)
+class _NoPhantomFood(FactoryCheck):
+    __name__ = "no_phantom_food"
+    words: frozenset[str]
+
+    def __call__(self, resp: dict, req: dict) -> Verdict:
+        if not self.words:
+            return _EMPTY_LABEL
+        names = _names(resp)
+        if names is None:
+            return _MALFORMED
+        return _verdict("비음식을 음식으로 냈다", [name for name in names if not self.words.isdisjoint(name.split())])
+
+
 def no_phantom_food(non_foods: Sequence[str]) -> Check:
     """그릇 · 수저 · 장식(`non_foods`)을 음식 항목으로 내지 않았는가를 판정하는 Check 를 만든다.
 
     이름을 공백으로 나눈 **낱말**이 라벨과 같을 때만 실패다 — "쟁반짜장" · "공기밥" 은 음식명이라 통과한다.
     """
-    words = frozenset(non_foods)
-
-    def no_phantom_food(resp: dict, req: dict) -> Verdict:
-        if not words:
-            return _EMPTY_LABEL
-        names = _names(resp)
-        if names is None:
-            return _MALFORMED
-        return _verdict("비음식을 음식으로 냈다", [name for name in names if not words.isdisjoint(name.split())])
-
-    return no_phantom_food
+    return _NoPhantomFood(frozenset(non_foods))
 
 
 def _no_space(text: str) -> str:
     return "".join(text.split())
+
+
+@dataclass(frozen=True)
+class _NoMissingFood(FactoryCheck):
+    __name__ = "no_missing_food"
+    groups: tuple[tuple[str, ...], ...]
+
+    def __call__(self, resp: dict, req: dict) -> Verdict:
+        if not self.groups or not all(self.groups):
+            return _EMPTY_LABEL
+        names = _names(resp)
+        if names is None:
+            return _MALFORMED
+        given = {_no_space(name) for name in names}
+        missing = [group[0] for group in self.groups if given.isdisjoint(map(_no_space, group))]
+        return _verdict("빠진 주요 음식", missing)
 
 
 def no_missing_food(required: Sequence[Sequence[str]]) -> Check:
@@ -153,19 +174,7 @@ def no_missing_food(required: Sequence[Sequence[str]]) -> Check:
     공백을 지운 이름이 공백을 지운 동의어와 **완전히** 같아야 묶음을 채운다 — "김치볶음밥" 은 밥 묶음을 채우지 않는다.
     note 에는 빠진 묶음의 대표명(첫 이름)만 적는다.
     """
-    groups = [list(group) for group in required]
-
-    def no_missing_food(resp: dict, req: dict) -> Verdict:
-        if not groups or not all(groups):
-            return _EMPTY_LABEL
-        names = _names(resp)
-        if names is None:
-            return _MALFORMED
-        given = {_no_space(name) for name in names}
-        missing = [group[0] for group in groups if given.isdisjoint(map(_no_space, group))]
-        return _verdict("빠진 주요 음식", missing)
-
-    return no_missing_food
+    return _NoMissingFood(tuple(tuple(group) for group in required))
 
 
 def _fold(text: str) -> str:
@@ -173,22 +182,27 @@ def _fold(text: str) -> str:
     return unicodedata.normalize("NFKC", text).casefold()
 
 
+@dataclass(frozen=True)
+class _StandardName(FactoryCheck):
+    __name__ = "standard_name"
+    keys: tuple[str, ...]
+    """`_fold` 한 금지어."""
+
+    def __call__(self, resp: dict, req: dict) -> Verdict:
+        if not self.keys:
+            return _EMPTY_LABEL
+        names = _names(resp)
+        if names is None:
+            return _MALFORMED
+        return _verdict("브랜드 · 수식어가 남았다", [name for name in names if any(k in _fold(name) for k in self.keys)])
+
+
 def standard_name(forbidden_words: Sequence[str]) -> Check:
     """음식명에서 브랜드명 · 수식어(`forbidden_words`)를 뺐는가를 판정하는 Check 를 만든다.
 
     붙여 쓴 브랜드("빙그레바나나우유")도 food_refs 매칭이 빗나가므로 낱말이 아니라 부분 문자열로 본다.
     """
-    keys = [_fold(word) for word in forbidden_words]
-
-    def standard_name(resp: dict, req: dict) -> Verdict:
-        if not keys:
-            return _EMPTY_LABEL
-        names = _names(resp)
-        if names is None:
-            return _MALFORMED
-        return _verdict("브랜드 · 수식어가 남았다", [name for name in names if any(k in _fold(name) for k in keys)])
-
-    return standard_name
+    return _StandardName(tuple(_fold(word) for word in forbidden_words))
 
 
 # ─────────────────────────── 관측 ───────────────────────────

@@ -50,3 +50,9 @@ def test_rejects_non_gateway_host(field):
 def test_rejects_non_https(field):
     with pytest.raises(ValidationError):
         Settings(**{**_VALID_KWARGS, field: "http://mlapi.run/vision-uuid"})
+
+
+def test_feedback_settings_allow_empty_vision_url():
+    settings = Settings(LLM_API_KEY="test", LLM_REASONING_URL="https://mlapi.run/reasoning",
+                        LLM_VISION_URL="", _env_file=None)
+    assert settings.LLM_VISION_URL == ""

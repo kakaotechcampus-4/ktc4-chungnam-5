@@ -1,6 +1,7 @@
 """BE ↔ AI 요청·응답 계약.
 
-`ai-stub/schemas.py` 의 구조·필드명을 그대로 따른다. BE 가 이 모양으로 이미 구현돼 있다.
+MEAL은 2026-11-01 BE↔AI 인터페이스에 체중 전달 합의(`weightKg`)를 더한 계약이다.
+기존 DAILY 요청도 전환 기간 동안 받는다.
 
 JSON 은 camelCase, 파이썬은 snake_case 다. `_Camel` 이 둘을 이어 준다.
 """
@@ -107,18 +108,23 @@ class AnalyzeMealResponse(_Camel):
 class Nutrition(_Camel):
     """BE → AI 방향. AI 가 생성하는 값이 아니다."""
 
-    kcal: float | None = None
-    protein_g: float | None = None
-    fat_g: float | None = None
-    carb_g: float | None = None
-    fiber_g: float | None = None
-    sodium_mg: float | None = None
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    kcal: float | None = Field(default=None, ge=0)
+    protein_g: float | None = Field(default=None, ge=0)
+    fat_g: float | None = Field(default=None, ge=0)
+    carb_g: float | None = Field(default=None, ge=0)
+    fiber_g: float | None = Field(default=None, ge=0)
+    sodium_mg: float | None = Field(default=None, ge=0)
 
 
-class FeedbackItem(_Camel):
+class MealFood(_Camel):
     display_name: str
     amount: float | None  # null 이면 먹은 양을 모른다. 음식을 빼지 않고 보낸다
     unit: str | None
+
+
+class FeedbackItem(MealFood):
     nutrition: Nutrition | None = None  # null 이면 성분을 못 구했다
 
 
@@ -141,6 +147,25 @@ class DailyMealSummary(_Camel):
     qqs: QQS
 
 
+class PreviousMeal(_Camel):
+    """KST 당일 현재 끼니보다 앞선 확정 기록. 목록에 없는 끼니는 결식으로 추측하지 않는다."""
+
+    meal_type: MealType
+    skipped: bool
+    qqs: QQS
+    items: list[MealFood] = Field(default_factory=list)
+    nutrition_totals: Nutrition | None = None
+
+    @model_validator(mode="after")
+    def _skipped_fields(self) -> PreviousMeal:
+        if self.skipped and (
+            self.items or self.nutrition_totals is not None
+            or any(value is not None for value in self.qqs.model_dump().values())
+        ):
+            raise ValueError("식사 안 함 기록은 음식·영양 합계·점수를 포함할 수 없다")
+        return self
+
+
 class ShortFeedbackRequest(_Camel):
     scope: Scope
     user_id: str
@@ -149,8 +174,15 @@ class ShortFeedbackRequest(_Camel):
 
     # scope=MEAL
     meal_id: str | None = None
+    # 이전 BE 요청도 받기 위해 새 필드는 기본값을 둔다. 미전달 mealType을 추정하지 않는다.
+    meal_type: MealType | None = None
+    skipped: bool = False
+    weight_kg: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     items: list[FeedbackItem] = Field(default_factory=list)
     satiety: SatietyContext | None = None
+    previous_meals: list[PreviousMeal] = Field(default_factory=list)
+    # 현재 끼니 포함, 현재 끼니 시점까지의 합계. AI에서 현재 끼니를 다시 더하지 않는다.
+    daily_nutrition_totals: Nutrition | None = None
 
     # scope=DAILY
     date: dt.date | None = None
@@ -160,6 +192,11 @@ class ShortFeedbackRequest(_Camel):
     def _scope_fields(self) -> ShortFeedbackRequest:
         if self.scope is Scope.MEAL and not self.meal_id:
             raise ValueError("scope=MEAL 에는 mealId 가 필요하다")
+        if self.scope is Scope.MEAL and self.skipped and (
+            self.items or self.satiety is not None
+            or any(value is not None for value in self.qqs.model_dump().values())
+        ):
+            raise ValueError("식사 안 함 요청은 음식·포만감·점수를 포함할 수 없다")
         if self.scope is Scope.DAILY and self.date is None:
             raise ValueError("scope=DAILY 에는 date 가 필요하다")
         return self
@@ -187,3 +224,107 @@ class ShortFeedbackResponse(_Camel):
 
 # ─────────────────────────── /long-feedback ───────────────────────────
 # TODO: 계약 미확정. 확정되면 ai-stub/schemas.py 구조를 기준으로 작성한다.
+
+
+# ─────────────────────────── /chat ───────────────────────────
+
+
+class PeriodType(str, Enum):
+    WEEKLY = "WEEKLY"
+    MONTHLY = "MONTHLY"
+    ALL = "ALL"
+
+
+class ChatRole(str, Enum):
+    USER = "USER"
+    ASSISTANT = "ASSISTANT"
+
+
+class ChatTurn(_Camel):
+    """지난 대화 한 줄. BE가 필터링한 이력. 연속 USER와 FAILED 질문도 올 수 있다."""
+
+    role: ChatRole
+    text: str
+
+
+class Medication(_Camel):
+    drug_name: str
+    dose_mg: float
+
+
+class TodayMeal(_Camel):
+    """오늘(KST) 확정된 끼니 하나. 점수는 BE Rule Engine 이 매겼다."""
+
+    meal_type: MealType
+    foods: list[str] = Field(default_factory=list)
+    qqs: QQS | None = None  # 평가 행이 없으면 null
+
+
+class TodayContext(_Camel):
+    date: dt.date
+    meals: list[TodayMeal] = Field(default_factory=list)
+
+
+class BaseMealSuggestion(_Camel):
+    food_name: str
+    advice: str
+
+
+class BaseMeal(_Camel):
+    """대화의 기준 끼니. `suggestions` 는 사용자가 지금 보고 있는 "현재 추천" 이다."""
+
+    meal_id: str
+    meal_type: MealType
+    qqs: QQS | None = None
+    suggestions: list[BaseMealSuggestion] = Field(default_factory=list)
+
+
+class LongTermContext(_Camel):
+    period_type: PeriodType
+    trend_summary: str
+    recommendation: str | None = None
+
+
+class ChatContext(_Camel):
+    """BE 가 매 메시지마다 선주입하는 사용자 정보. AI 가 tool 로 다시 묻지 않게 한다."""
+
+    stage: Stage
+    medication: Medication | None = None
+    today: TodayContext
+    base_meal: BaseMeal | None = None
+    long_term: LongTermContext | None = None
+
+
+class ChatRequest(_Camel):
+    user_id: str
+    conversation_id: str
+    text: str = Field(min_length=1)
+    history: list[ChatTurn]
+    context: ChatContext
+
+
+class ChatFoodCard(_Camel):
+    """nutrients 는 여기 없다 — BE 가 food_refs 에서 채운다."""
+
+    food_name: str = Field(min_length=1, max_length=255)
+    advice: str = Field(min_length=1)
+    candidate_food_ref_id: str | None = None
+
+
+class ChatResponse(_Camel):
+    """BLOCKED 면 `text` 는 null, `foodCards` 는 [] 다 (입력 · 출력 가드레일 모두)."""
+
+    text: str | None
+    model_version: str
+    safety_status: SafetyStatus
+    food_cards: list[ChatFoodCard] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _safety_contract(self) -> ChatResponse:
+        if self.safety_status is SafetyStatus.SAFE:
+            if not self.text or not self.text.strip():
+                raise ValueError("SAFE 응답에는 공백 아닌 text가 필요하다")
+        else:
+            self.text = None
+            self.food_cards = []
+        return self

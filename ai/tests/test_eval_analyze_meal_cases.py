@@ -3,8 +3,8 @@
 모델 · 키 · 외부 네트워크 없음. 테스트 이름의 `r<번호>` 는 계획 §14 명세표 행 번호다.
 
 - 행 44–49 는 `build_cases` 에 **테스트 안에서 만든 라벨**을 넘긴다(실제 `LABELS` 와 무관).
-- 행 50–52 는 실제 `LABELS` · `CASES` · `FIXTURE_DIR` 를 쓴다. 행 51 · 52 는 `LABELS` 가 비면 공허 통과한다 —
-  의도다. 팀원이 첫 사진과 함께 "LABELS 비지 않음" 가드를 추가한다(ⓒ-2 첫 RED).
+- 행 50–52 는 실제 `LABELS` · `CASES` · `FIXTURE_DIR` 를 쓴다. 행 51 · 52 는 `LABELS` 를 돌며 검사하므로
+  `LABELS` 가 비면 공허 통과한다 — 행 51a 가 `LABELS` 가 비지 않음을 막는다.
 - 행 54–59 는 `main()` 을 부른다. **실제 `.env` 를 읽지 않는다** — 모든 테스트에서 `app.config.get_settings` ·
   `app.food_analyzer.get_settings` 를 "부르면 실패" 로 바꿔 두고(autouse), 필요한 테스트만 가짜 설정으로 덮는다.
   같은 autouse 가 작업 디렉터리를 `tmp_path` 로 옮긴다 — `Settings()` 를 직접 만들어도 cwd 기준 `ai/.env` 를 못 읽는다.
@@ -566,15 +566,51 @@ def test_r50_empty_labels_give_no_cases_and_cases_follow_labels():
     """행 50 — `build_cases({})` 는 빈 튜플이고, 모듈의 `CASES` 는 `build_cases(LABELS)` 와 같다.
 
     `CASES` 를 손으로 따로 두면 라벨을 고쳐도 케이스가 바뀌지 않는다 — 라벨이 유일한 입력이어야 한다.
+    팩토리 축은 같은 인자면 `==` 로 같은 값이라 `Case` 를 그대로 비교한다(행 50b · 50c 가 그 양방향).
     """
     assert build_cases({}) == ()
     assert analyze_meal_eval.CASES == build_cases(analyze_meal_eval.LABELS)
 
 
+# 행 50b — `_HANSANG_LABEL` 에서 팩토리 라벨 값 하나만 바꾼 변형
+_R50B_VARIANTS = [
+    ("r50b-required", "required", [["밥", "쌀밥", "흰쌀밥"], ["김치찌개"]]),
+    ("r50b-non-foods", "non_foods", ["그릇", "젓가락"]),
+    ("r50b-forbidden", "forbidden", ["청정원"]),
+]
+
+
+@pytest.mark.parametrize(
+    ("key", "value"), [(k, v) for _, k, v in _R50B_VARIANTS], ids=[i for i, _, _ in _R50B_VARIANTS]
+)
+def test_r50b_cases_differing_only_in_one_factory_label_value_are_not_equal(key, value):
+    """행 50b — 팩토리 라벨 값(`required` · `non_foods` · `forbidden`) 하나만 다른 라벨로 만든 케이스는 `!=` 다.
+
+    id · 요청 · 축 id · 등급은 같으므로 차이는 팩토리 축의 인자에서만 나와야 한다 — 축 id 만 비교하면
+    라벨 값이 엉뚱하게 묶인 `CASES` 를 행 50 이 놓친다.
+    """
+    original = build_cases({"hansang.jpg": _HANSANG_LABEL})
+    changed = build_cases({"hansang.jpg": {**_HANSANG_LABEL, key: value}})
+
+    # 전제 — 축 구성이 같아야 `!=` 가 팩토리 인자에서 나온 것이다(변형이 축을 빼거나 더하면 공허 통과)
+    assert [[(a.id, a.grade) for a in c.axes] for c in original] == [[(a.id, a.grade) for a in c.axes] for c in changed]
+    assert original != changed
+
+
+def test_r50c_cases_built_twice_from_same_label_are_equal():
+    """행 50c — 같은 라벨로 두 번 만든 케이스는 `==` 다 — 행 50b 의 짝.
+
+    호출마다 새 클로저면 같은 라벨끼리도 다르다고 나와 행 50 이 고칠 수 없는 빨강이 된다.
+    """
+    labels = {"hansang.jpg": _HANSANG_LABEL}
+
+    assert build_cases(labels) == build_cases(labels)
+
+
 def test_r51_every_labelled_fixture_exists_without_problems():
     """행 51 — `LABELS` 의 모든 파일이 `FIXTURE_DIR` 에 있고 `fixture_problems` 가 비어 있다 (없음 · 크기 · EXIF · 형식).
 
-    지금은 `LABELS` 가 비어 공허 통과한다 — 의도다. 팀원이 첫 사진과 함께 "LABELS 비지 않음" 가드를 추가한다.
+    `LABELS` 를 돌며 검사하므로 `LABELS` 가 비면 공허 통과한다 — 행 51a 가 `LABELS` 가 비지 않음을 막는다.
     """
     problems = [
         problem
@@ -585,12 +621,20 @@ def test_r51_every_labelled_fixture_exists_without_problems():
     assert problems == []
 
 
+def test_r51a_labels_are_not_empty():
+    """행 51a — 사진 라벨(`LABELS`)이 하나 이상 있다.
+
+    행 51(사진 존재 · 파일 검사) · 52(few-shot 겹침)는 `LABELS` 를 돌며 검사한다 — 라벨이 비면 아무것도 보지 않고 통과한다.
+    """
+    assert len(analyze_meal_eval.LABELS) >= 1
+
+
 def test_r52_required_synonyms_avoid_meal_few_shot_foods():
     """행 52 — `LABELS` 의 `required` 동의어에 MEAL few-shot 예시 음식(참치김밥 · 김밥 · 라면 · 삶은 달걀 · 방울토마토)이 없다.
 
     겹치면 예시를 베낀 답이 정답처럼 보인다. 금지어는 **단어 첫머리에서만** 찾는다(`test_eval_meal_cases.py` 와 같은 규칙) —
     매칭 규칙 자체를 먼저 확인한다(이 자기 검사는 지금도 실제로 돈다).
-    지금은 `LABELS` 가 비어 본 검사는 공허 통과한다 — 의도다. 팀원이 첫 사진과 함께 "LABELS 비지 않음" 가드를 추가한다.
+    본 검사는 `LABELS` 를 돌므로 `LABELS` 가 비면 공허 통과한다 — 행 51a 가 `LABELS` 가 비지 않음을 막는다.
     """
     # 매칭 규칙 자기 검사 — 단어 첫머리의 예시 음식은 잡고, 낱말 안쪽 · 다른 음식은 잡지 않는다
     assert _example_hits("라면") == ["라면"]
@@ -716,6 +760,74 @@ def test_r56_fixture_problem_exits_2_before_key_check_and_model_call(
 
     assert code == 2
     assert name in capsys.readouterr().out
+    assert model_posts == []
+
+
+def test_r56b_no_cases_exits_2_with_message(monkeypatch, capsys, valid_fixture, model_posts):
+    """행 56b — 케이스가 0개면(`CASES == ()`) 키가 있어도 `main([])` 은 문제를 출력하고 2(오용)로 끝난다.
+
+    0개로 돌리면 `0/0` 으로 게이트 PASS 가 찍힌다 — 아무것도 재지 않았는데 통과로 보인다.
+    문구는 단언하지 않는다(무엇이 문제인지 출력했는가만 본다).
+    """
+    _use_cases(monkeypatch, valid_fixture.dir)
+    monkeypatch.setattr(harness, "has_api_key", lambda: True)
+
+    code = main([])
+
+    assert code == 2
+    assert capsys.readouterr().out.strip() != ""
+
+
+def test_r56c_no_cases_save_does_not_write_baseline(monkeypatch, valid_fixture, model_posts, tmp_path):
+    """행 56c — 케이스가 0개면 `main(["--save", 경로])` 는 2 로 끝나고 baseline 파일을 만들지 않는다.
+
+    빈 baseline 이 저장되면 다음 비교가 "비교할 케이스 없음" 으로 조용히 통과한다.
+    """
+    _use_cases(monkeypatch, valid_fixture.dir)
+    monkeypatch.setattr(harness, "has_api_key", lambda: True)
+    saved = tmp_path / "b.json"
+
+    code = main(["--save", str(saved)])
+
+    assert code == 2
+    assert not saved.exists(), "케이스 0개인데 baseline 이 저장됐다"
+
+
+def _serve_forbidden(directory):
+    raise AssertionError("fixture 서버를 띄웠다 — 케이스 0개면 그 전에 끝나야 한다")
+
+
+@pytest.mark.parametrize("argv", [[], ["--only", "nope"]], ids=["r56d-no-args", "r56d-only-nope"])
+def test_r56d_no_cases_exits_before_key_check_and_server(monkeypatch, valid_fixture, model_posts, argv):
+    """행 56d — 케이스가 0개면 인자와 무관하게 키 확인 · 서버 기동 · 모델 POST 전에 2 로 끝난다.
+
+    0개 판정 · 사유 출력 · 2 는 `harness.cli_main` 이 한다(인자 해석 뒤, 키 확인 전). `main` 은 0개면 서버를 띄우지 않고 위임한다.
+    키 확인 · 서버 기동은 "불리면 AssertionError" 대역으로 바꾼다. 키 확인 뒤에 막으면 키 없는 PC 에서 SKIP(0) 으로 묻힌다.
+    구현은 `harness.has_api_key` · `fixture_server.serve_fixtures` 를 호출 시점에 모듈 속성으로 참조해야 한다.
+    """
+    _use_cases(monkeypatch, valid_fixture.dir)
+    monkeypatch.setattr(harness, "has_api_key", _key_check_forbidden)
+    monkeypatch.setattr(fixture_server, "serve_fixtures", _serve_forbidden)
+
+    code = main(argv)
+
+    assert code == 2
+    assert model_posts == []
+
+
+def test_s18_no_cases_help_exits_0(monkeypatch, valid_fixture, model_posts):
+    """행 s18 — 케이스가 0개여도 `main(["--help"])` 는 도움말을 내고 0 으로 끝난다. 키 확인 · 서버 기동은 하지 않는다.
+
+    0개 검사가 인자 해석 전에 있으면 케이스가 비었을 때 사용법조차 볼 수 없다(`--help` 도 2).
+    """
+    _use_cases(monkeypatch, valid_fixture.dir)
+    monkeypatch.setattr(harness, "has_api_key", _key_check_forbidden)
+    monkeypatch.setattr(fixture_server, "serve_fixtures", _serve_forbidden)
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--help"])
+
+    assert exc_info.value.code == 0
     assert model_posts == []
 
 

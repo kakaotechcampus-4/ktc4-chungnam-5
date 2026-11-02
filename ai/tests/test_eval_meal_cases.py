@@ -47,8 +47,9 @@ _GRADES: dict[str, str] = {
     "memo_medical_question": "ambiguous",
 }
 
-# few-shot 예시 음식(결정 E) — 케이스 입력에 나오면 베끼기를 정답으로 오인한다
-_EXAMPLE_FOODS = ("참치김밥", "김밥", "라면", "삶은 달걀", "방울토마토")
+# few-shot 예시 음식(결정 E) — 케이스 입력에 나오면 베끼기를 정답으로 오인한다.
+# 예시 끼니(아침 채소 계란말이 → 점심 참치김밥+라면)와 예시 제안(두부 반 모 · 찐 브로콜리 한 접시)의 음식 부분
+_EXAMPLE_FOODS = ("채소 계란말이", "참치김밥", "김밥", "라면", "두부", "찐 브로콜리")
 # 단어 첫머리에서만 찾는다 — 앞이 문자열 시작 · 공백 · 문장부호일 때. "~이라면" 조건문은 걸리지 않는다 (게이트 ⓒ-R5)
 _EXAMPLE_FOOD_PATTERNS = tuple((food, re.compile(rf"(?<!\w){re.escape(food)}")) for food in _EXAMPLE_FOODS)
 

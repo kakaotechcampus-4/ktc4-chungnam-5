@@ -13,12 +13,16 @@ from app.core.deps import get_current_user_id
 from app.core.errors import ApiError, ErrorCode
 from app.core.response import ApiResponse, error_responses, ok, ok_with_code
 from app.db.session import get_db
+from app.models.meal import Meal
 from app.schemas.evaluation import (
     MealConfirmRequest,
     MealConfirmResponse,
     MealEvaluationResponse,
 )
+from app.schemas.nutrition import NutritionInfo
 from app.services import evaluation as evaluation_service
+from app.services import meal as meal_service
+from app.services import nutrition as nutrition_service
 
 router = APIRouter()
 
@@ -62,6 +66,20 @@ def _respond(result: evaluation_service.EvaluationResult):
     return ok(result.view)
 
 
+def _meal_nutrition(db: Session, meal: Meal) -> NutritionInfo:
+    """한 끼 영양 합계. 항목 규칙(`meal_service`)과 공공 DB 환산(`nutrition_service`)을
+    엮는다 — services 끼리 서로 부르지 않으므로 이 레이어의 일이다(`GET /meals/{mealId}` 와 같다).
+    """
+    public_db_by_item = {
+        item.id: nutrition_service.resolve_by_food_ref_id(
+            db, food_ref_id=item.food_ref_id, amount_g=meal_service.resolved_amount(item)[0]
+        )
+        for item in meal.items
+        if item.food_ref_id is not None
+    }
+    return meal_service.meal_nutrition(meal.items, public_db_by_item)
+
+
 @router.post(
     "/meals/{meal_id}/confirm",
     response_model=ApiResponse[MealConfirmResponse],
@@ -87,7 +105,11 @@ def confirm_meal(
     """
     try:
         result = evaluation_service.confirm(
-            db, user_id=user_id, meal_id=meal_id, request=request
+            db,
+            user_id=user_id,
+            meal_id=meal_id,
+            request=request,
+            nutrition_of=lambda meal: _meal_nutrition(db, meal),
         )
     except evaluation_service.MealNotFoundError as exc:
         raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None

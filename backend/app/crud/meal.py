@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import Row, and_, distinct, func, or_, select
+from sqlalchemy import Row, and_, distinct, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
@@ -411,10 +411,41 @@ def mark_recalculating(db: Session, meal: Meal) -> None:
     목록 화면을 실제로 열어 봐야 보인다.
 
     확정 전 수정에서는 지울 행이 없어 0 행 `DELETE` 다.
+
+    **영양 합계(`meals.total_*`)도 같은 이유로 비운다** — 확정이 쓴 스냅샷이라 음식이
+    바뀌면 낡는다. 다시 확정하면 새로 채워진다.
     """
     meal.status = MealStatus.ANALYZING
     meal.is_recalculation = True
+    set_nutrient_totals(
+        db, meal=meal, kcal=None, protein_g=None, fat_g=None,
+        carb_g=None, fiber_g=None, sodium_mg=None,
+    )
     evaluation_crud.delete_by_meal(db, meal.id)
+
+
+def set_nutrient_totals(
+    db: Session,
+    *,
+    meal: Meal,
+    kcal: Decimal | None,
+    protein_g: Decimal | None,
+    fat_g: Decimal | None,
+    carb_g: Decimal | None,
+    fiber_g: Decimal | None,
+    sodium_mg: Decimal | None,
+) -> None:
+    """한 끼 영양 합계를 쓴다. 커밋하지 않는다.
+
+    `db` 를 받지만 쓰지 않는다 — `mark_recalculating` 과 같은 이유다. 여섯 값을 각각
+    받는 건 `set_item_manual_nutrition` 과 같은 이유다(`crud/` 는 `schemas/` 를 모른다).
+    """
+    meal.total_kcal = kcal
+    meal.total_protein_g = protein_g
+    meal.total_fat_g = fat_g
+    meal.total_carb_g = carb_g
+    meal.total_fiber_g = fiber_g
+    meal.total_sodium_mg = sodium_mg
 
 
 def get_items_by_ids(
@@ -591,6 +622,29 @@ def has_new_meals_since(
             Meal.eaten_at >= range_start,
             Meal.eaten_at < range_end,
             Meal.created_at > since,
+        )
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
+def has_later_evaluated_meal(db: Session, *, meal: Meal, range_end: datetime) -> bool:
+    """같은 사용자의 [meal.eaten_at, range_end) 안에 이 식사보다 늦게 먹은 확정 식사가 있는지.
+
+    하루 피드백 문장은 그날 가장 늦게 먹은 끼니의 것이어야 한다(`worker/jobs/feedback_meal.py`).
+    앞 끼니를 뒤늦게 입력·재확정했을 때 그 문장이 저녁 문장을 덮지 않게 쓴다.
+
+    `EVALUATED` 만 센다 — 확인 화면에서 멈춘 끼니까지 세면 이른 끼니가 갱신을 건너뛰는데
+    그 끼니는 확정되지 않아 하루 피드백이 영영 안 바뀐다. `eaten_at` 이 같으면 id 로 정한다.
+    """
+    stmt = (
+        select(Meal.id)
+        .where(
+            Meal.user_id == meal.user_id,
+            Meal.deleted_at.is_(None),
+            Meal.status == MealStatus.EVALUATED,
+            Meal.eaten_at < range_end,
+            tuple_(Meal.eaten_at, Meal.id) > tuple_(meal.eaten_at, meal.id),
         )
         .limit(1)
     )
