@@ -601,6 +601,20 @@ class MealApiService {
     return MealFeedback.fromJson(result.dataMap);
   }
 
+  /// `POST /meals/{mealId}/feedback/retry` — 끼니 피드백을 다시 만든다(본문 없음).
+  ///
+  /// 식사 안 함 끼니는 확정(`confirm`)이 409 라 재확정으로 다시 만들 수 없어 이 API 를
+  /// 쓴다. 보여 줄 문장도 생성 중인 작업도 없을 때만 작업을 다시 넣고 `PENDING` 을
+  /// 돌려준다. 그 밖에는 지금 상태를 그대로 돌려준다(더블탭해도 작업은 하나).
+  /// 점수·포만감은 건드리지 않는다. 응답은 [fetchFeedback] 과 같은 모양이다.
+  ///
+  /// - 404 `NOT_FOUND`: 끼니가 없거나 남의 것이거나 삭제됐다.
+  /// - 409 `NOT_CONFIRMED`: 확정 전이다.
+  Future<MealFeedback> retryFeedback(String mealId) async {
+    final result = await _client.post('/meals/$mealId/feedback/retry');
+    return MealFeedback.fromJson(result.dataMap);
+  }
+
   /// `PUT /meals/{mealId}/feedback/suggestions` — 챗봇 카드 한 장으로 이 끼니의
   /// 다음 끼니 추천을 **통째로** 바꾼다(본문·점수는 그대로).
   ///

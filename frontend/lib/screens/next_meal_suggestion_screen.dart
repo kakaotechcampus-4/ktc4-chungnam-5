@@ -160,20 +160,33 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
     });
   }
 
-  /// 제안 생성이 실패했을 때 "다시 만들기". 서버의 재시도 진입점은 재확정이다 —
-  /// 문장이 없으면 생성 작업을 다시 건다(BE `services/feedback.py`). 확정 때와
-  /// 같은 식후 포만감을 보내므로 점수는 바뀌지 않는다.
+  /// "다시 만들기" 를 보일 수 있는 상태인지. 일반 끼니는 재확정에 식후 포만감이
+  /// 필요하고, 식사 안 함은 포만감이 없어 실패(`FAILED`)만 보고 정한다.
+  bool get _canRegenerate =>
+      feedbackFailed && (widget.skipped || satietyAfterPct != null);
+
+  /// 제안 생성이 실패했을 때 "다시 만들기".
+  /// - 일반 끼니: 서버의 재시도 진입점은 재확정이다 — 문장이 없으면 생성 작업을 다시
+  ///   건다(BE `services/feedback.py`). 확정 때와 같은 식후 포만감을 보내므로 점수는
+  ///   바뀌지 않는다.
+  /// - 식사 안 함: 확정이 409 라 전용 `POST /meals/{id}/feedback/retry` 를 부른다.
   Future<void> _regenerateFeedback() async {
     final pct = satietyAfterPct;
-    if (pct == null) return;
+    if (!widget.skipped && pct == null) return;
     setState(() {
       feedbackFailed = false;
       feedback = null;
     });
     try {
-      final result = await _api.confirm(widget.mealId, satietyAfterPct: pct);
-      if (!mounted) return;
-      setState(() => evaluation = result);
+      if (widget.skipped) {
+        final result = await _api.retryFeedback(widget.mealId);
+        if (!mounted) return;
+        setState(() => feedback = result);
+      } else {
+        final result = await _api.confirm(widget.mealId, satietyAfterPct: pct!);
+        if (!mounted) return;
+        setState(() => evaluation = result);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => feedbackFailed = true);
@@ -452,7 +465,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
       ];
     }
     if (feedbackFailed || feedback?.isPending == false) {
-      final canRegenerate = feedbackFailed && satietyAfterPct != null;
+      final canRegenerate = _canRegenerate;
       return [
         WaitNotice(
           message: canRegenerate

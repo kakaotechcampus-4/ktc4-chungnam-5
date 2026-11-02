@@ -1347,6 +1347,82 @@ void main() {
     expect(find.text('두부 반 모'), findsOneWidget);
   });
 
+  testWidgets('a failed skipped-meal feedback is retried with the retry API, not confirm', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    var retried = false;
+    final api = FakeApi()
+      ..on(
+        'GET /meals/{meal_id}',
+        (_) => (
+          200,
+          fakeOk({
+            'mealId': 'm9',
+            'status': 'EVALUATED',
+            'skipped': true,
+            'mealType': 'LUNCH',
+            'eatenAt': '2026-11-01T12:00:00+09:00',
+            'items': <Object?>[],
+            'steps': <Object?>[],
+            'nutrients': <Object?>[],
+            'scores': {'quantity': null, 'quality': null, 'satiety': null},
+          }),
+        ),
+      )
+      ..on(
+        'GET /meals/{meal_id}/feedback',
+        (_) => (
+          200,
+          fakeOk({
+            'feedbackStatus': retried ? 'READY' : 'FAILED',
+            'summary': retried ? '이번 끼니를 건너뛰었어요.' : null,
+            'reasoning': null,
+            'suggestions': <Object?>[],
+            'safetyStatus': 'SAFE',
+          }),
+        ),
+      );
+    await tester.pumpWidget(
+      Provider(
+        create: (_) => ApiClient(session: session, dio: api.dio),
+        child: MaterialApp(
+          home: NextMealSuggestionScreen(mealId: 'm9', skipped: true),
+        ),
+      ),
+    );
+    await _settle(tester);
+    // 식후 포만감이 없는 식사 안 함도 실패면 "다시 만들기" 가 보인다.
+    expect(find.text('지금은 피드백을 만들지 못했어요.'), findsOneWidget);
+
+    api.on('POST /meals/{meal_id}/feedback/retry', (_) {
+      retried = true;
+      return (
+        200,
+        fakeOk({
+          'feedbackStatus': 'PENDING',
+          'summary': null,
+          'reasoning': null,
+          'suggestions': <Object?>[],
+          'safetyStatus': 'SAFE',
+        }),
+      );
+    });
+    await tester.ensureVisible(find.text('다시 만들기'));
+    await tester.tap(find.text('다시 만들기'));
+    await _settle(tester);
+
+    // 확정(409)은 부르지 않고 전용 API 를 본문 없이 부른다. 응답이 PENDING 이라 폴링해 문장을 받는다.
+    expect(api.requests.where((r) => r.path.endsWith('/confirm')), isEmpty);
+    final post = api.requests.singleWhere(
+      (r) => r.path.endsWith('/feedback/retry'),
+    );
+    expect(post.data, isNull);
+    expect(find.text('이번 끼니를 건너뛰었어요.'), findsOneWidget);
+  });
+
   testWidgets('a slow analysis can be checked again or left for later', (
     WidgetTester tester,
   ) async {
@@ -1791,11 +1867,15 @@ void main() {
     _useDesignSize(tester);
     final list = fakeExample('GET /api/v1/meals');
     final data = list['data'] as Map<String, dynamic>;
+    // 고정 날짜면 날이 지나 기록 화면이 보여 주는 기간 밖으로 밀린다 — 오늘로 둔다.
+    final now = DateTime.now();
+    final today =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     data['items'] = [
       {
         'mealId': 'm9',
         'mealType': 'DINNER',
-        'eatenAt': '2026-11-01T19:00:00+09:00',
+        'eatenAt': '${today}T19:00:00+09:00',
         'stage': 'MAINTENANCE',
         'displayName': '',
         'thumbnailUrl': null,
