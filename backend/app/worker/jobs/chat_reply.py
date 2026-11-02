@@ -130,6 +130,9 @@ def _base_meal(db: Session, conversation: ChatConversation) -> dict[str, Any] | 
     return {
         "mealId": str(meal.id),
         "mealType": meal.meal_type.value,
+        # 식사 안 함은 점수 · 음식이 비어 있다. 비었다는 것만으로 "안 먹었다" 를 추론하게
+        # 두지 않고 명시한다 — 끼니 피드백(/short-feedback)과 같은 필드다.
+        "skipped": meal.skipped,
         "qqs": _qqs(evaluation_crud.get_by_meal(db, meal.id)),
         "suggestions": [{"foodName": s.food_name, "advice": s.advice} for s in suggestions],
     }
@@ -151,6 +154,7 @@ def _context(db: Session, conversation: ChatConversation) -> dict[str, Any]:
             "meals": [
                 {
                     "mealType": meal.meal_type.value,
+                    "skipped": meal.skipped,
                     "foods": [item.display_name for item in meal.items],
                     "qqs": _qqs(evaluation_crud.get_by_meal(db, meal.id)),
                 }

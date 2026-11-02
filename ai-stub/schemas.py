@@ -271,6 +271,8 @@ class TodayMeal(_Camel):
     """오늘(KST) 확정된 끼니 하나. 점수는 BE Rule Engine 이 매겼다."""
 
     meal_type: MealType
+    # true 면 "식사 안 함" 끼니 — foods 가 비고 qqs 가 null 이다. 비었다고 추론하지 말고 이 값을 본다
+    skipped: bool = False
     foods: list[str] = Field(default_factory=list)
     qqs: QQS | None = None  # 평가 행이 없으면 null
 
@@ -290,6 +292,7 @@ class BaseMeal(_Camel):
 
     meal_id: str
     meal_type: MealType
+    skipped: bool = False  # true 면 "식사 안 함" 끼니 — qqs 가 null 이다
     qqs: QQS | None = None
     suggestions: list[BaseMealSuggestion] = Field(default_factory=list)
 
