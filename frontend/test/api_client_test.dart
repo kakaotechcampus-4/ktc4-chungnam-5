@@ -48,7 +48,8 @@ Future<(ApiClient, _FakeAdapter)> _client(
   Object? body, {
   bool fail = false,
   String? userId = 'user-1',
-  String demoKey = '',
+  // 기본은 빈 값(헤더 없음). null 을 주면 ApiClient 가 ApiConfig 의 키를 쓴다.
+  String? demoKey = '',
 }) async {
   SharedPreferences.setMockInitialValues(
     userId == null ? {} : {'session.userId': userId},
@@ -142,6 +143,26 @@ void main() {
         );
       }
     });
+  });
+
+  test('uses the key the web link provided, read at each request', () async {
+    // 웹은 시작한 뒤에 링크로 키를 받는다 — 클라이언트를 만든 뒤에 정해져도 붙어야 한다.
+    addTearDown(() => ApiConfig.runtimeDemoKey = '');
+    final (client, adapter) = await _client(200, {
+      'success': true,
+      'data': {},
+      'error': null,
+    }, demoKey: null);
+
+    await client.get('/home');
+    expect(adapter.lastRequest!.headers.containsKey('X-Demo-Key'), isFalse);
+    expect(ApiConfig.demoKeyHeaders, isNull);
+
+    ApiConfig.runtimeDemoKey = 'from-link';
+    await client.get('/home');
+    expect(adapter.lastRequest!.headers['X-Demo-Key'], 'from-link');
+    // 사진(`Image.network`)도 같은 키를 쓴다.
+    expect(ApiConfig.demoKeyHeaders, {'X-Demo-Key': 'from-link'});
   });
 
   test('403 without an envelope says the demo key is wrong', () async {
