@@ -8,10 +8,10 @@ import 'food_entry_editor.dart';
 
 /// 음식 확인 화면의 "＋ 음식 추가" 가 여는 바텀시트(Figma 화면 5 · 음식 추가 a-2 · a-3).
 ///
-/// 이름 · 양 · 단위를 적어 목록에 쌓고 "추가하기" 로 한 번에 돌려준다. 서버에는
-/// 보내지 않는다 — 호출한 화면이 보낸다. 닫거나 바깥을 누르면 null.
-Future<List<FoodEntry>?> showMealAddSheet(BuildContext context) {
-  return showModalBottomSheet<List<FoodEntry>>(
+/// 이름 · 양(g)을 적고 "추가하기" 로 음식 한 줄을 돌려준다. 서버에는 보내지
+/// 않는다 — 호출한 화면이 보낸다. 닫거나 바깥을 누르면 null.
+Future<FoodEntry?> showMealAddSheet(BuildContext context) {
+  return showModalBottomSheet<FoodEntry>(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.surface,
@@ -37,8 +37,8 @@ class _MealAddSheetState extends State<_MealAddSheet> {
   }
 
   void _submit() {
-    final entries = _controller.collect();
-    if (entries != null) Navigator.of(context).pop(entries);
+    final entry = _controller.collect();
+    if (entry != null) Navigator.of(context).pop(entry);
   }
 
   @override

@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../api/meal_api.dart';
+import '../popups/popup_gate.dart';
+import '../popups/review_leave_popup.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -197,41 +199,29 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     }
   }
 
-  /// "＋ 음식 추가" — 시트에서 목록으로 받은 음식을 하나씩 서버에 보낸다.
-  /// 일부만 실패해도 들어간 것은 남으므로, 끝나면 식사를 다시 받아 서버 기준으로 맞춘다.
+  /// "＋ 음식 추가" — 시트에서 받은 음식 한 줄을 서버에 보낸다.
   Future<void> _addItem() async {
-    final entries = await showMealAddSheet(context);
-    if (entries == null || entries.isEmpty || !mounted) return;
+    final entry = await showMealAddSheet(context);
+    if (entry == null || !mounted) return;
     try {
       await _flushAmounts();
     } catch (_) {
       return; // _sendAmounts 가 이미 알렸다.
     }
-    var failed = 0;
-    Object? lastError;
-    for (final entry in entries) {
-      try {
-        await _api.addItem(
-          widget.mealId,
-          displayName: entry.name,
-          amount: entry.amount,
-          unit: entry.unit,
-        );
-      } catch (e) {
-        failed++;
-        lastError = e;
-      }
+    try {
+      await _api.addItem(
+        widget.mealId,
+        displayName: entry.name,
+        amount: entry.amount,
+        unit: entry.unit,
+      );
+    } catch (e) {
+      if (mounted) _showError('추가하지 못했어요: $e');
+      return;
     }
     if (!mounted) return;
     // 응답에 이름·양이 없어 다시 받는다.
     await _loadMeal();
-    if (failed > 0 && mounted) {
-      _showError(
-        failed == entries.length
-            ? '추가하지 못했어요: $lastError'
-            : '$failed개는 추가하지 못했어요: $lastError',
-      );
-    }
   }
 
   // ── 음식 수정 ──
@@ -304,6 +294,54 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     }
   }
 
+  // ── 나가기 ──
+
+  /// 뒤로가기. 확정 전 끼니는 계속·나중에·삭제를 묻는다 — 그냥 나가면 점수 없는
+  /// 끼니가 홈·기록에 "기록됨"으로 남기 때문이다. 아직 못 불러왔거나 이미 평가된
+  /// 끼니는 지울 일이 없어 바로 나간다.
+  Future<void> _requestLeave() async {
+    if (_leaving) return;
+    final meal = _meal;
+    if (_state != LoadState.ready || meal == null || meal.status == 'EVALUATED') {
+      Navigator.of(context).pop();
+      return;
+    }
+    final choice = await context.read<PopupGate>().confirmReviewLeave(
+      context,
+      mealId: widget.mealId,
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case ReviewLeaveChoice.discard:
+        await _discardMeal();
+      case ReviewLeaveChoice.later:
+        try {
+          await _flushAmounts();
+        } catch (_) {
+          return; // _sendAmounts 가 이미 알렸다. 못 보낸 채로 나가지 않는다.
+        }
+        if (mounted) Navigator.of(context).pop();
+      case ReviewLeaveChoice.keepEditing || null:
+        break;
+    }
+  }
+
+  /// 기록을 지우고 나간다. 지우지 못하면 화면에 남아 알린다.
+  Future<void> _discardMeal() async {
+    setState(() => _leaving = true);
+    _patchTimer?.cancel();
+    try {
+      await _api.deleteMeal(widget.mealId);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _leaving = false);
+        _showError('삭제하지 못했어요: $e');
+      }
+      return;
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
   // ── 다음 ──
 
   /// 고친 걸 다 보낸 뒤 평가 화면(6번)으로 교체 이동한다. 확정은 그 화면이
@@ -329,26 +367,35 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: switch (_state) {
-          LoadState.loading => const Center(child: CircularProgressIndicator()),
-          LoadState.failed => Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Center(
-                  child: RetryBlock(
-                    message: _errorMessage ?? '잠시 후 다시 시도해 주세요',
-                    onRetry: _loadMeal,
+    return PopScope(
+      // 뒤로가기(시스템·화면 버튼 모두)는 _requestLeave 가 받는다.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _requestLeave();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: switch (_state) {
+            LoadState.loading => const Center(
+              child: CircularProgressIndicator(),
+            ),
+            LoadState.failed => Column(
+              children: [
+                _buildHeader(),
+                Expanded(
+                  child: Center(
+                    child: RetryBlock(
+                      message: _errorMessage ?? '잠시 후 다시 시도해 주세요',
+                      onRetry: _loadMeal,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          LoadState.ready => _buildContent(_meal!),
-        },
+              ],
+            ),
+            LoadState.ready => _buildContent(_meal!),
+          },
+        ),
       ),
     );
   }
@@ -391,7 +438,7 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.chevron_left),
-            onPressed: () => Navigator.pop(context),
+            onPressed: _requestLeave,
           ),
           Expanded(
             child: Text(
