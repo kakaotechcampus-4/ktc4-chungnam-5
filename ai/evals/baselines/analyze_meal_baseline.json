@@ -1,6 +1,6 @@
 {
   "rule_version": "analyze-meal-labels-v1",
-  "prompt_hash": "e0c2b76d78c8664b81f9b44256c2eb47941a0edc080424bcd2a2159596da9446",
+  "prompt_hash": "dd369a53088e5975543f8280782f874adcc2339d57d758522a6708228b109589",
   "results": {
     "piece_of_pizza/contract_parseable": {
       "passed": 3,
@@ -30,15 +30,15 @@
       "samples": [
         {
           "passed": true,
-          "note": "포테이토 피자 100.0 g",
+          "note": "포테이토피자 110.0 g",
           "response": {
             "mealId": "eval-piece_of_pizza",
             "modelVersion": "gemini-flash-gateway",
             "safetyStatus": "SAFE",
             "items": [
               {
-                "originalFoodName": "포테이토 피자",
-                "estimatedAmount": 100.0,
+                "originalFoodName": "포테이토피자",
+                "estimatedAmount": 110.0,
                 "unit": "g",
                 "confidence": 0.92,
                 "candidateFoodRefId": null,
@@ -59,7 +59,7 @@
                 "originalFoodName": "포테이토피자",
                 "estimatedAmount": 110.0,
                 "unit": "g",
-                "confidence": 0.92,
+                "confidence": 0.9,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -97,25 +97,6 @@
       "samples": [
         {
           "passed": true,
-          "note": "포테이토 피자 0.92",
-          "response": {
-            "mealId": "eval-piece_of_pizza",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "포테이토 피자",
-                "estimatedAmount": 100.0,
-                "unit": "g",
-                "confidence": 0.92,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
           "note": "포테이토피자 0.92",
           "response": {
             "mealId": "eval-piece_of_pizza",
@@ -127,6 +108,25 @@
                 "estimatedAmount": 110.0,
                 "unit": "g",
                 "confidence": 0.92,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "포테이토피자 0.9",
+          "response": {
+            "mealId": "eval-piece_of_pizza",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "포테이토피자",
+                "estimatedAmount": 110.0,
+                "unit": "g",
+                "confidence": 0.9,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -191,7 +191,7 @@
       "samples": [
         {
           "passed": true,
-          "note": "치즈케이크 1.0 개",
+          "note": "치즈케이크 1.0 판",
           "response": {
             "mealId": "eval-whole_cake",
             "modelVersion": "gemini-flash-gateway",
@@ -200,7 +200,7 @@
               {
                 "originalFoodName": "치즈케이크",
                 "estimatedAmount": 1.0,
-                "unit": "개",
+                "unit": "판",
                 "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
@@ -267,7 +267,7 @@
               {
                 "originalFoodName": "치즈케이크",
                 "estimatedAmount": 1.0,
-                "unit": "개",
+                "unit": "판",
                 "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
@@ -343,7 +343,50 @@
       "samples": [
         {
           "passed": true,
-          "note": "부시맨브레드 100.0 g, 양송이크림스프 200.0 g, 망고스프레드 15.0 g, 초콜릿시럽 15.0 g, 블루치즈드레싱 15.0 g",
+          "note": "부시맨브레드 100.0 g, 양송이크림스프 200.0 g, 망고스프레드 20.0 g, 초콜릿시럽 20.0 g",
+          "response": {
+            "mealId": "eval-food_and_notfood",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "부시맨브레드",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "양송이크림스프",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "망고스프레드",
+                "estimatedAmount": 20.0,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "초콜릿시럽",
+                "estimatedAmount": 20.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "부시맨브레드 100.0 g, 양송이크림스프 200.0 g, 망고스프레드 15.0 g, 초콜릿소스 20.0 g, 블루치즈소스 20.0 g",
           "response": {
             "mealId": "eval-food_and_notfood",
             "modelVersion": "gemini-flash-gateway",
@@ -374,101 +417,7 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "초콜릿시럽",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "블루치즈드레싱",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.8,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "호밀빵 100.0 g, 양송이 크림스프 200.0 g, 망고스프레드 15.0 g, 초콜릿 소스 15.0 g, 블루치즈 소스 15.0 g",
-          "response": {
-            "mealId": "eval-food_and_notfood",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "호밀빵",
-                "estimatedAmount": 100.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "양송이 크림스프",
-                "estimatedAmount": 200.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "망고스프레드",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "초콜릿 소스",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "블루치즈 소스",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.8,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "부시맨 브레드 100.0 g, 양송이 크림스프 200.0 g, 망고 스프레드 20.0 g, 초콜릿 소스 15.0 g, 블루치즈 드레싱 15.0 g",
-          "response": {
-            "mealId": "eval-food_and_notfood",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "부시맨 브레드",
-                "estimatedAmount": 100.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "양송이 크림스프",
-                "estimatedAmount": 200.0,
-                "unit": "g",
-                "confidence": 0.9,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "망고 스프레드",
+                "originalFoodName": "초콜릿소스",
                 "estimatedAmount": 20.0,
                 "unit": "g",
                 "confidence": 0.85,
@@ -476,16 +425,59 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "초콜릿 소스",
-                "estimatedAmount": 15.0,
+                "originalFoodName": "블루치즈소스",
+                "estimatedAmount": 20.0,
                 "unit": "g",
-                "confidence": 0.8,
+                "confidence": 0.75,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "부시맨브레드 100.0 g, 양송이크림스프 200.0 g, 망고스프레드 20.0 g, 초콜릿시럽 20.0 g, 블루치즈드레싱 20.0 g",
+          "response": {
+            "mealId": "eval-food_and_notfood",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "부시맨브레드",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "블루치즈 드레싱",
-                "estimatedAmount": 15.0,
+                "originalFoodName": "양송이크림스프",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "망고스프레드",
+                "estimatedAmount": 20.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "초콜릿시럽",
+                "estimatedAmount": 20.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "블루치즈드레싱",
+                "estimatedAmount": 20.0,
                 "unit": "g",
                 "confidence": 0.75,
                 "candidateFoodRefId": null,
@@ -506,7 +498,50 @@
       "samples": [
         {
           "passed": true,
-          "note": "부시맨브레드 0.95, 양송이크림스프 0.9, 망고스프레드 0.85, 초콜릿시럽 0.85, 블루치즈드레싱 0.8",
+          "note": "부시맨브레드 0.95, 양송이크림스프 0.9, 망고스프레드 0.8, 초콜릿시럽 0.85",
+          "response": {
+            "mealId": "eval-food_and_notfood",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "부시맨브레드",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "양송이크림스프",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "망고스프레드",
+                "estimatedAmount": 20.0,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "초콜릿시럽",
+                "estimatedAmount": 20.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "부시맨브레드 0.95, 양송이크림스프 0.9, 망고스프레드 0.85, 초콜릿소스 0.85, 블루치즈소스 0.75",
           "response": {
             "mealId": "eval-food_and_notfood",
             "modelVersion": "gemini-flash-gateway",
@@ -537,101 +572,7 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "초콜릿시럽",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "블루치즈드레싱",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.8,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "호밀빵 0.95, 양송이 크림스프 0.95, 망고스프레드 0.85, 초콜릿 소스 0.85, 블루치즈 소스 0.8",
-          "response": {
-            "mealId": "eval-food_and_notfood",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "호밀빵",
-                "estimatedAmount": 100.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "양송이 크림스프",
-                "estimatedAmount": 200.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "망고스프레드",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "초콜릿 소스",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "블루치즈 소스",
-                "estimatedAmount": 15.0,
-                "unit": "g",
-                "confidence": 0.8,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "부시맨 브레드 0.95, 양송이 크림스프 0.9, 망고 스프레드 0.85, 초콜릿 소스 0.8, 블루치즈 드레싱 0.75",
-          "response": {
-            "mealId": "eval-food_and_notfood",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "부시맨 브레드",
-                "estimatedAmount": 100.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "양송이 크림스프",
-                "estimatedAmount": 200.0,
-                "unit": "g",
-                "confidence": 0.9,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "망고 스프레드",
+                "originalFoodName": "초콜릿소스",
                 "estimatedAmount": 20.0,
                 "unit": "g",
                 "confidence": 0.85,
@@ -639,16 +580,59 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "초콜릿 소스",
-                "estimatedAmount": 15.0,
+                "originalFoodName": "블루치즈소스",
+                "estimatedAmount": 20.0,
                 "unit": "g",
-                "confidence": 0.8,
+                "confidence": 0.75,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "부시맨브레드 0.95, 양송이크림스프 0.9, 망고스프레드 0.85, 초콜릿시럽 0.85, 블루치즈드레싱 0.75",
+          "response": {
+            "mealId": "eval-food_and_notfood",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "부시맨브레드",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "블루치즈 드레싱",
-                "estimatedAmount": 15.0,
+                "originalFoodName": "양송이크림스프",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "망고스프레드",
+                "estimatedAmount": 20.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "초콜릿시럽",
+                "estimatedAmount": 20.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "블루치즈드레싱",
+                "estimatedAmount": 20.0,
                 "unit": "g",
                 "confidence": 0.75,
                 "candidateFoodRefId": null,
@@ -687,7 +671,7 @@
       "samples": [
         {
           "passed": true,
-          "note": "불고기비빔밥 800.0 g, 쌀밥 400.0 g, 콩나물국 450.0 g, 잡채 80.0 g, 배추김치 50.0 g, 브로콜리두부무침 50.0 g, 양념두부 80.0 g, 채소샐러드 70.0 g, 더덕무침 50.0 g, 미역초무침 50.0 g, 무피클 40.0 g",
+          "note": "불고기비빔밥 350.0 g, 쌀밥 200.0 g, 콩나물국 200.0 g, 잡채 80.0 g, 두부양념조림 70.0 g, 브로콜리두부무침 60.0 g, 배추김치 50.0 g, 양배추샐러드 70.0 g, 미역초무침 40.0 g, 무피클 40.0 g, 오징어초무침 60.0 g",
           "response": {
             "mealId": "eval-manybanchan",
             "modelVersion": "gemini-flash-gateway",
@@ -695,25 +679,25 @@
             "items": [
               {
                 "originalFoodName": "불고기비빔밥",
-                "estimatedAmount": 800.0,
+                "estimatedAmount": 350.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.92,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "쌀밥",
-                "estimatedAmount": 400.0,
+                "estimatedAmount": 200.0,
                 "unit": "g",
-                "confidence": 0.9,
+                "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "콩나물국",
-                "estimatedAmount": 450.0,
+                "estimatedAmount": 200.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.92,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
@@ -721,7 +705,23 @@
                 "originalFoodName": "잡채",
                 "estimatedAmount": 80.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "두부양념조림",
+                "estimatedAmount": 70.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "브로콜리두부무침",
+                "estimatedAmount": 60.0,
+                "unit": "g",
+                "confidence": 0.85,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
@@ -729,45 +729,21 @@
                 "originalFoodName": "배추김치",
                 "estimatedAmount": 50.0,
                 "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "브로콜리두부무침",
-                "estimatedAmount": 50.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "양념두부",
-                "estimatedAmount": 80.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "채소샐러드",
-                "estimatedAmount": 70.0,
-                "unit": "g",
                 "confidence": 0.9,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "더덕무침",
-                "estimatedAmount": 50.0,
+                "originalFoodName": "양배추샐러드",
+                "estimatedAmount": 70.0,
                 "unit": "g",
-                "confidence": 0.75,
+                "confidence": 0.85,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "미역초무침",
-                "estimatedAmount": 50.0,
+                "estimatedAmount": 40.0,
                 "unit": "g",
                 "confidence": 0.85,
                 "candidateFoodRefId": null,
@@ -777,7 +753,15 @@
                 "originalFoodName": "무피클",
                 "estimatedAmount": 40.0,
                 "unit": "g",
-                "confidence": 0.9,
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "오징어초무침",
+                "estimatedAmount": 60.0,
+                "unit": "g",
+                "confidence": 0.7,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -786,7 +770,7 @@
         },
         {
           "passed": true,
-          "note": "불고기비빔밥 700.0 g, 콩나물국 400.0 g, 공깃밥 400.0 g, 잡채 80.0 g, 브로콜리두부무침 50.0 g, 배추김치 40.0 g, 양념게장 60.0 g, 두부 80.0 g, 양배추샐러드 60.0 g, 미역초무침 40.0 g, 무피클 40.0 g",
+          "note": "불고기비빔밥 700.0 g, 쌀밥 400.0 g, 콩나물국 400.0 g, 잡채 80.0 g, 두부부침 80.0 g, 브로콜리두부무침 60.0 g, 양배추샐러드 70.0 g, 배추김치 50.0 g, 미역초무침 50.0 g, 무피클 40.0 g, 무말랭이무침 50.0 g",
           "response": {
             "mealId": "eval-manybanchan",
             "modelVersion": "gemini-flash-gateway",
@@ -796,12 +780,12 @@
                 "originalFoodName": "불고기비빔밥",
                 "estimatedAmount": 700.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.92,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "콩나물국",
+                "originalFoodName": "쌀밥",
                 "estimatedAmount": 400.0,
                 "unit": "g",
                 "confidence": 0.95,
@@ -809,7 +793,7 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "공깃밥",
+                "originalFoodName": "콩나물국",
                 "estimatedAmount": 400.0,
                 "unit": "g",
                 "confidence": 0.9,
@@ -820,36 +804,12 @@
                 "originalFoodName": "잡채",
                 "estimatedAmount": 80.0,
                 "unit": "g",
-                "confidence": 0.92,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "브로콜리두부무침",
-                "estimatedAmount": 50.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "배추김치",
-                "estimatedAmount": 40.0,
-                "unit": "g",
                 "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "양념게장",
-                "estimatedAmount": 60.0,
-                "unit": "g",
-                "confidence": 0.8,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "두부",
+                "originalFoodName": "두부부침",
                 "estimatedAmount": 80.0,
                 "unit": "g",
                 "confidence": 0.85,
@@ -857,18 +817,34 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "양배추샐러드",
+                "originalFoodName": "브로콜리두부무침",
                 "estimatedAmount": 60.0,
                 "unit": "g",
-                "confidence": 0.9,
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "양배추샐러드",
+                "estimatedAmount": 70.0,
+                "unit": "g",
+                "confidence": 0.88,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "배추김치",
+                "estimatedAmount": 50.0,
+                "unit": "g",
+                "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "미역초무침",
-                "estimatedAmount": 40.0,
+                "estimatedAmount": 50.0,
                 "unit": "g",
-                "confidence": 0.88,
+                "confidence": 0.82,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
@@ -876,7 +852,15 @@
                 "originalFoodName": "무피클",
                 "estimatedAmount": 40.0,
                 "unit": "g",
-                "confidence": 0.9,
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "무말랭이무침",
+                "estimatedAmount": 50.0,
+                "unit": "g",
+                "confidence": 0.75,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -885,15 +869,15 @@
         },
         {
           "passed": true,
-          "note": "불고기비빔밥 800.0 g, 쌀밥 420.0 g, 콩나물국 400.0 g, 잡채 80.0 g, 배추김치 40.0 g, 양배추샐러드 60.0 g, 브로콜리두부무침 50.0 g, 연두부 60.0 g, 미역초무침 40.0 g, 무피클 30.0 g, 더덕구이 50.0 g",
+          "note": "소불고기비빔밥 400.0 g, 쌀밥 200.0 g, 콩나물국 200.0 g, 잡채 70.0 g, 양념두부 60.0 g, 브로콜리두부무침 40.0 g, 양배추샐러드 50.0 g, 배추김치 40.0 g, 미역초무침 40.0 g, 무피클 40.0 g, 양념게장 50.0 g",
           "response": {
             "mealId": "eval-manybanchan",
             "modelVersion": "gemini-flash-gateway",
             "safetyStatus": "SAFE",
             "items": [
               {
-                "originalFoodName": "불고기비빔밥",
-                "estimatedAmount": 800.0,
+                "originalFoodName": "소불고기비빔밥",
+                "estimatedAmount": 400.0,
                 "unit": "g",
                 "confidence": 0.92,
                 "candidateFoodRefId": null,
@@ -901,25 +885,49 @@
               },
               {
                 "originalFoodName": "쌀밥",
-                "estimatedAmount": 420.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "콩나물국",
-                "estimatedAmount": 400.0,
+                "estimatedAmount": 200.0,
                 "unit": "g",
                 "confidence": 0.9,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "잡채",
-                "estimatedAmount": 80.0,
+                "originalFoodName": "콩나물국",
+                "estimatedAmount": 200.0,
                 "unit": "g",
                 "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "잡채",
+                "estimatedAmount": 70.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "양념두부",
+                "estimatedAmount": 60.0,
+                "unit": "g",
+                "confidence": 0.88,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "브로콜리두부무침",
+                "estimatedAmount": 40.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "양배추샐러드",
+                "estimatedAmount": 50.0,
+                "unit": "g",
+                "confidence": 0.9,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
@@ -932,50 +940,26 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "양배추샐러드",
-                "estimatedAmount": 60.0,
-                "unit": "g",
-                "confidence": 0.88,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "브로콜리두부무침",
-                "estimatedAmount": 50.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "연두부",
-                "estimatedAmount": 60.0,
-                "unit": "g",
-                "confidence": 0.88,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
                 "originalFoodName": "미역초무침",
                 "estimatedAmount": 40.0,
                 "unit": "g",
-                "confidence": 0.87,
+                "confidence": 0.85,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "무피클",
-                "estimatedAmount": 30.0,
+                "estimatedAmount": 40.0,
                 "unit": "g",
                 "confidence": 0.85,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "더덕구이",
+                "originalFoodName": "양념게장",
                 "estimatedAmount": 50.0,
                 "unit": "g",
-                "confidence": 0.75,
+                "confidence": 0.7,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -994,7 +978,7 @@
       "samples": [
         {
           "passed": true,
-          "note": "불고기비빔밥 0.95, 쌀밥 0.9, 콩나물국 0.95, 잡채 0.95, 배추김치 0.95, 브로콜리두부무침 0.85, 양념두부 0.85, 채소샐러드 0.9, 더덕무침 0.75, 미역초무침 0.85, 무피클 0.9",
+          "note": "불고기비빔밥 0.92, 쌀밥 0.95, 콩나물국 0.92, 잡채 0.9, 두부양념조림 0.85, 브로콜리두부무침 0.85, 배추김치 0.9, 양배추샐러드 0.85, 미역초무침 0.85, 무피클 0.85, 오징어초무침 0.7",
           "response": {
             "mealId": "eval-manybanchan",
             "modelVersion": "gemini-flash-gateway",
@@ -1002,25 +986,25 @@
             "items": [
               {
                 "originalFoodName": "불고기비빔밥",
-                "estimatedAmount": 800.0,
+                "estimatedAmount": 350.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.92,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "쌀밥",
-                "estimatedAmount": 400.0,
+                "estimatedAmount": 200.0,
                 "unit": "g",
-                "confidence": 0.9,
+                "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "콩나물국",
-                "estimatedAmount": 450.0,
+                "estimatedAmount": 200.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.92,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
@@ -1028,7 +1012,23 @@
                 "originalFoodName": "잡채",
                 "estimatedAmount": 80.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "두부양념조림",
+                "estimatedAmount": 70.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "브로콜리두부무침",
+                "estimatedAmount": 60.0,
+                "unit": "g",
+                "confidence": 0.85,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
@@ -1036,45 +1036,21 @@
                 "originalFoodName": "배추김치",
                 "estimatedAmount": 50.0,
                 "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "브로콜리두부무침",
-                "estimatedAmount": 50.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "양념두부",
-                "estimatedAmount": 80.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "채소샐러드",
-                "estimatedAmount": 70.0,
-                "unit": "g",
                 "confidence": 0.9,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "더덕무침",
-                "estimatedAmount": 50.0,
+                "originalFoodName": "양배추샐러드",
+                "estimatedAmount": 70.0,
                 "unit": "g",
-                "confidence": 0.75,
+                "confidence": 0.85,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "미역초무침",
-                "estimatedAmount": 50.0,
+                "estimatedAmount": 40.0,
                 "unit": "g",
                 "confidence": 0.85,
                 "candidateFoodRefId": null,
@@ -1084,7 +1060,15 @@
                 "originalFoodName": "무피클",
                 "estimatedAmount": 40.0,
                 "unit": "g",
-                "confidence": 0.9,
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "오징어초무침",
+                "estimatedAmount": 60.0,
+                "unit": "g",
+                "confidence": 0.7,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -1093,7 +1077,7 @@
         },
         {
           "passed": true,
-          "note": "불고기비빔밥 0.95, 콩나물국 0.95, 공깃밥 0.9, 잡채 0.92, 브로콜리두부무침 0.85, 배추김치 0.95, 양념게장 0.8, 두부 0.85, 양배추샐러드 0.9, 미역초무침 0.88, 무피클 0.9",
+          "note": "불고기비빔밥 0.92, 쌀밥 0.95, 콩나물국 0.9, 잡채 0.95, 두부부침 0.85, 브로콜리두부무침 0.8, 양배추샐러드 0.88, 배추김치 0.95, 미역초무침 0.82, 무피클 0.85, 무말랭이무침 0.75",
           "response": {
             "mealId": "eval-manybanchan",
             "modelVersion": "gemini-flash-gateway",
@@ -1103,12 +1087,12 @@
                 "originalFoodName": "불고기비빔밥",
                 "estimatedAmount": 700.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.92,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "콩나물국",
+                "originalFoodName": "쌀밥",
                 "estimatedAmount": 400.0,
                 "unit": "g",
                 "confidence": 0.95,
@@ -1116,7 +1100,7 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "공깃밥",
+                "originalFoodName": "콩나물국",
                 "estimatedAmount": 400.0,
                 "unit": "g",
                 "confidence": 0.9,
@@ -1127,36 +1111,12 @@
                 "originalFoodName": "잡채",
                 "estimatedAmount": 80.0,
                 "unit": "g",
-                "confidence": 0.92,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "브로콜리두부무침",
-                "estimatedAmount": 50.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "배추김치",
-                "estimatedAmount": 40.0,
-                "unit": "g",
                 "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "양념게장",
-                "estimatedAmount": 60.0,
-                "unit": "g",
-                "confidence": 0.8,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "두부",
+                "originalFoodName": "두부부침",
                 "estimatedAmount": 80.0,
                 "unit": "g",
                 "confidence": 0.85,
@@ -1164,18 +1124,34 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "양배추샐러드",
+                "originalFoodName": "브로콜리두부무침",
                 "estimatedAmount": 60.0,
                 "unit": "g",
-                "confidence": 0.9,
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "양배추샐러드",
+                "estimatedAmount": 70.0,
+                "unit": "g",
+                "confidence": 0.88,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "배추김치",
+                "estimatedAmount": 50.0,
+                "unit": "g",
+                "confidence": 0.95,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "미역초무침",
-                "estimatedAmount": 40.0,
+                "estimatedAmount": 50.0,
                 "unit": "g",
-                "confidence": 0.88,
+                "confidence": 0.82,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
@@ -1183,7 +1159,15 @@
                 "originalFoodName": "무피클",
                 "estimatedAmount": 40.0,
                 "unit": "g",
-                "confidence": 0.9,
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "무말랭이무침",
+                "estimatedAmount": 50.0,
+                "unit": "g",
+                "confidence": 0.75,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -1192,15 +1176,15 @@
         },
         {
           "passed": true,
-          "note": "불고기비빔밥 0.92, 쌀밥 0.95, 콩나물국 0.9, 잡채 0.95, 배추김치 0.95, 양배추샐러드 0.88, 브로콜리두부무침 0.85, 연두부 0.88, 미역초무침 0.87, 무피클 0.85, 더덕구이 0.75",
+          "note": "소불고기비빔밥 0.92, 쌀밥 0.9, 콩나물국 0.95, 잡채 0.95, 양념두부 0.88, 브로콜리두부무침 0.85, 양배추샐러드 0.9, 배추김치 0.95, 미역초무침 0.85, 무피클 0.85, 양념게장 0.7",
           "response": {
             "mealId": "eval-manybanchan",
             "modelVersion": "gemini-flash-gateway",
             "safetyStatus": "SAFE",
             "items": [
               {
-                "originalFoodName": "불고기비빔밥",
-                "estimatedAmount": 800.0,
+                "originalFoodName": "소불고기비빔밥",
+                "estimatedAmount": 400.0,
                 "unit": "g",
                 "confidence": 0.92,
                 "candidateFoodRefId": null,
@@ -1208,25 +1192,49 @@
               },
               {
                 "originalFoodName": "쌀밥",
-                "estimatedAmount": 420.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "콩나물국",
-                "estimatedAmount": 400.0,
+                "estimatedAmount": 200.0,
                 "unit": "g",
                 "confidence": 0.9,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "잡채",
-                "estimatedAmount": 80.0,
+                "originalFoodName": "콩나물국",
+                "estimatedAmount": 200.0,
                 "unit": "g",
                 "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "잡채",
+                "estimatedAmount": 70.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "양념두부",
+                "estimatedAmount": 60.0,
+                "unit": "g",
+                "confidence": 0.88,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "브로콜리두부무침",
+                "estimatedAmount": 40.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "양배추샐러드",
+                "estimatedAmount": 50.0,
+                "unit": "g",
+                "confidence": 0.9,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
@@ -1239,50 +1247,26 @@
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "양배추샐러드",
-                "estimatedAmount": 60.0,
-                "unit": "g",
-                "confidence": 0.88,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "브로콜리두부무침",
-                "estimatedAmount": 50.0,
-                "unit": "g",
-                "confidence": 0.85,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "연두부",
-                "estimatedAmount": 60.0,
-                "unit": "g",
-                "confidence": 0.88,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
                 "originalFoodName": "미역초무침",
                 "estimatedAmount": 40.0,
                 "unit": "g",
-                "confidence": 0.87,
+                "confidence": 0.85,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "무피클",
-                "estimatedAmount": 30.0,
+                "estimatedAmount": 40.0,
                 "unit": "g",
                 "confidence": 0.85,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
-                "originalFoodName": "더덕구이",
+                "originalFoodName": "양념게장",
                 "estimatedAmount": 50.0,
                 "unit": "g",
-                "confidence": 0.75,
+                "confidence": 0.7,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -1319,6 +1303,76 @@
       "samples": [
         {
           "passed": true,
+          "note": "망고주스 320.0 g, 리치주스 320.0 g, 복숭아주스 320.0 g",
+          "response": {
+            "mealId": "eval-branded_drinks",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "리치주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "복숭아주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.93,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "망고주스 320.0 g, 복숭아주스 320.0 g, 리치주스 320.0 g",
+          "response": {
+            "mealId": "eval-branded_drinks",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "복숭아주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "리치주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
           "note": "망고 주스 320.0 g, 리치 주스 320.0 g, 복숭아 주스 320.0 g",
           "response": {
             "mealId": "eval-branded_drinks",
@@ -1337,82 +1391,12 @@
                 "originalFoodName": "리치 주스",
                 "estimatedAmount": 320.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.92,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "복숭아 주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.92,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "망고주스 320.0 g, 리치주스 320.0 g, 복숭아주스 320.0 g",
-          "response": {
-            "mealId": "eval-branded_drinks",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "망고주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "리치주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "복숭아주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "망고주스 320.0 g, 리치주스 320.0 g, 복숭아주스 320.0 g",
-          "response": {
-            "mealId": "eval-branded_drinks",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "망고주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "리치주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.9,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "복숭아주스",
                 "estimatedAmount": 320.0,
                 "unit": "g",
                 "confidence": 0.9,
@@ -1434,7 +1418,77 @@
       "samples": [
         {
           "passed": true,
-          "note": "망고 주스 0.95, 리치 주스 0.95, 복숭아 주스 0.92",
+          "note": "망고주스 0.95, 리치주스 0.95, 복숭아주스 0.93",
+          "response": {
+            "mealId": "eval-branded_drinks",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "리치주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "복숭아주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.93,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "망고주스 0.95, 복숭아주스 0.95, 리치주스 0.9",
+          "response": {
+            "mealId": "eval-branded_drinks",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "복숭아주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              },
+              {
+                "originalFoodName": "리치주스",
+                "estimatedAmount": 320.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "망고 주스 0.95, 리치 주스 0.92, 복숭아 주스 0.9",
           "response": {
             "mealId": "eval-branded_drinks",
             "modelVersion": "gemini-flash-gateway",
@@ -1452,82 +1506,12 @@
                 "originalFoodName": "리치 주스",
                 "estimatedAmount": 320.0,
                 "unit": "g",
-                "confidence": 0.95,
+                "confidence": 0.92,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               },
               {
                 "originalFoodName": "복숭아 주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.92,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "망고주스 0.95, 리치주스 0.95, 복숭아주스 0.95",
-          "response": {
-            "mealId": "eval-branded_drinks",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "망고주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "리치주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "복숭아주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "망고주스 0.95, 리치주스 0.9, 복숭아주스 0.9",
-          "response": {
-            "mealId": "eval-branded_drinks",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "망고주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.95,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "리치주스",
-                "estimatedAmount": 320.0,
-                "unit": "g",
-                "confidence": 0.9,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              },
-              {
-                "originalFoodName": "복숭아주스",
                 "estimatedAmount": 320.0,
                 "unit": "g",
                 "confidence": 0.9,
@@ -1603,7 +1587,7 @@
       "samples": [
         {
           "passed": true,
-          "note": "즉석떡볶이 300.0 g",
+          "note": "즉석떡볶이 150.0 g",
           "response": {
             "mealId": "eval-occludedfood",
             "modelVersion": "gemini-flash-gateway",
@@ -1611,28 +1595,9 @@
             "items": [
               {
                 "originalFoodName": "즉석떡볶이",
-                "estimatedAmount": 300.0,
-                "unit": "g",
-                "confidence": 0.75,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "국물떡볶이 150.0 g",
-          "response": {
-            "mealId": "eval-occludedfood",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "국물떡볶이",
                 "estimatedAmount": 150.0,
                 "unit": "g",
-                "confidence": 0.65,
+                "confidence": 0.55,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -1641,7 +1606,7 @@
         },
         {
           "passed": true,
-          "note": "즉석떡볶이 250.0 g",
+          "note": "즉석떡볶이 150.0 g",
           "response": {
             "mealId": "eval-occludedfood",
             "modelVersion": "gemini-flash-gateway",
@@ -1649,9 +1614,28 @@
             "items": [
               {
                 "originalFoodName": "즉석떡볶이",
-                "estimatedAmount": 250.0,
+                "estimatedAmount": 150.0,
                 "unit": "g",
-                "confidence": 0.72,
+                "confidence": 0.45,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "전골 200.0 g",
+          "response": {
+            "mealId": "eval-occludedfood",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "전골",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.45,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -1670,7 +1654,7 @@
       "samples": [
         {
           "passed": true,
-          "note": "즉석떡볶이 0.75",
+          "note": "즉석떡볶이 0.55",
           "response": {
             "mealId": "eval-occludedfood",
             "modelVersion": "gemini-flash-gateway",
@@ -1678,28 +1662,9 @@
             "items": [
               {
                 "originalFoodName": "즉석떡볶이",
-                "estimatedAmount": 300.0,
-                "unit": "g",
-                "confidence": 0.75,
-                "candidateFoodRefId": null,
-                "clarifyQuestion": null
-              }
-            ]
-          }
-        },
-        {
-          "passed": true,
-          "note": "국물떡볶이 0.65",
-          "response": {
-            "mealId": "eval-occludedfood",
-            "modelVersion": "gemini-flash-gateway",
-            "safetyStatus": "SAFE",
-            "items": [
-              {
-                "originalFoodName": "국물떡볶이",
                 "estimatedAmount": 150.0,
                 "unit": "g",
-                "confidence": 0.65,
+                "confidence": 0.55,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
@@ -1708,7 +1673,7 @@
         },
         {
           "passed": true,
-          "note": "즉석떡볶이 0.72",
+          "note": "즉석떡볶이 0.45",
           "response": {
             "mealId": "eval-occludedfood",
             "modelVersion": "gemini-flash-gateway",
@@ -1716,9 +1681,28 @@
             "items": [
               {
                 "originalFoodName": "즉석떡볶이",
-                "estimatedAmount": 250.0,
+                "estimatedAmount": 150.0,
                 "unit": "g",
-                "confidence": 0.72,
+                "confidence": 0.45,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "전골 0.45",
+          "response": {
+            "mealId": "eval-occludedfood",
+            "modelVersion": "gemini-flash-gateway",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "전골",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.45,
                 "candidateFoodRefId": null,
                 "clarifyQuestion": null
               }
