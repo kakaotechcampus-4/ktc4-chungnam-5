@@ -39,8 +39,14 @@ x-be-env: &be-env
 # api · worker 는 같은 이미지다. 빌드 인자는 deploy.sh · deploy-staging.sh 가 git 에서 읽어
 # export 한다(H3) — 운영은 릴리스 태그와 전체 SHA, 스테이징은 SHA 만. 직접 compose 를 부르면
 # 둘 다 비어 /health 가 null 을 낸다.
+#
+# target release 는 평가용 웹(/web)을 함께 굽는다. 웹 빌드에 frontend 폴더가 필요해 추가
+# 컨텍스트로 넘긴다 — BE 빌드 컨텍스트는 그대로 ../backend 다. 스테이징도 이 앵커를 쓴다.
 x-be-build: &be-build
   context: ../backend
+  target: release
+  additional_contexts:
+    frontend: ../frontend
   args:
     GIT_SHA: ${GIT_SHA:-}
     APP_VERSION: ${APP_VERSION:-}

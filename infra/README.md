@@ -131,7 +131,7 @@ PENDING          1  2026-09-20 10:15:40+00:00
 ### 접근 규칙 (Caddyfile, 위에서부터)
 
 1. `/internal/*` → 404. AI 가 BE 를 다시 부르는 경로라 compose 내부 네트워크로만 닿는다
-2. `/health` → 통과
+2. `/health` → 통과. `/web/*`(평가용 웹 파일)도 통과하고, `/web` 은 `/web/` 로 보낸다 — 아래 "평가용 웹"
 3. `X-Demo-Key` 헤더가 `DEMO_KEY` 와 같거나, 접속 IP 가 `ALLOWED_IPS` 안이면 → api.
    팀원 IP 는 경로 제한 없이 **전체 API** 를 키 없이 통과한다 — Swagger 의 "Try it out" 요청에는
    키 헤더가 붙지 않아 `/docs` 만 열면 쓸 수 없다. 그래서 공용망 IP 는 넣지 않는다
@@ -250,6 +250,52 @@ AI_SERVICE_BASE_URL=http://ai-stub:8000
 ```bash
 docker rm -f glp1-prod-ai-stub
 ```
+
+### 평가용 웹
+
+평가자가 앱 설치 없이 **링크 하나로** 접속하게 하는 창구다. 이 프로젝트는 앱 서비스이고 웹은 이 용도뿐이다.
+
+```
+https://<도메인>/web/?k=<데모 키>
+```
+
+- 웹 파일은 api 이미지 안(`/srv/web`)에 들어가고 api 가 `/web` 에서 내려준다. API 와 같은 도메인이라
+  CORS 가 없고, Blue/Green 전환 · 롤백 때 웹도 API 와 같은 버전으로 함께 바뀐다.
+- 이미지는 `backend/Dockerfile` 의 `release` 단계다. `web` 단계가 Flutter 공식 저장소의 릴리스 태그를 받아
+  `flutter build web --release --base-href /web/` 를 돌린다. 로컬 BE 개발(`docker-compose.be.yml`)은
+  웹이 없는 `app` 단계를 써서 Flutter 를 받지 않는다.
+- Flutter 버전은 Dockerfile 의 `FLUTTER_VERSION` 으로 고정한다. **FE 가 쓰는 버전과 같아야 한다** —
+  `pubspec.lock` 과 맞지 않으면 `flutter pub get --enforce-lockfile` 에서 빌드가 멈춘다.
+- `frontend/` 가 바뀌지 않은 배포에서는 웹 빌드가 캐시로 넘어간다. 첫 빌드는 Flutter SDK(수 GB)를 받는다.
+
+**키는 웹 빌드가 아니라 링크에 담는다.** 브라우저는 처음 페이지를 열 때 헤더를 붙일 수 없어서 웹 파일은 키
+없이 받을 수 있어야 한다. 빌드에 키를 넣으면 도메인을 아는 누구나 JS 에서 꺼낸다(DuckDNS 도메인은 인증서
+공개 기록에 남아 스캐너가 찾아온다). 그래서 Caddy 는 `/web/*` 만 키 없이 통과시키고, 웹은 링크의 `k` 를
+브라우저에 저장한 뒤 주소창에서 지운다. 이후 API · 사진 요청에 `X-Demo-Key` 를 붙인다. 키 없이 열면 화면은
+뜨지만 API 가 403 이다.
+
+웹 응답은 `Cache-Control: no-cache` 다. Flutter web 은 `main.dart.js` 파일명에 해시가 없어서 캐시를 두면
+배포 뒤에도 옛 화면이 남는다. 안 바뀐 파일은 ETag 재검증으로 304 라 다시 받지 않는다.
+
+**링크 만들기 · 공유**
+
+```bash
+grep '^DEMO_KEY=' /opt/glp1/infra/.env.prod | cut -d= -f2-   # 링크의 k 값
+```
+
+- **링크 = 키다.** 평가자에게만 직접 전한다(메일, 제출 양식의 비공개 칸). 공개 채널 · README · PR ·
+  발표 자료에는 올리지 않는다.
+- 브라우저마다 사용자가 따로 생긴다(`userId` 가 브라우저 저장소에 남는다). 평가자 한 명당 브라우저 하나.
+- 링크가 새면 `DEMO_KEY` 를 바꾸고(caddy 재생성) APK 를 다시 빌드한다. 웹은 다시 빌드하지 않고 새 링크만 전한다.
+
+| 증상 | 원인 |
+| --- | --- |
+| `/web/` 가 403 | Caddy 가 옛 Caddyfile 이다. 스테이징 사이트도 운영 Caddy 가 읽으므로 운영 배포 전에는 스테이징 `/web/` 도 403 |
+| `/web/` 가 404 | 이미지에 `/srv/web` 이 없다 (`release` 단계로 빌드했는지) |
+| 흰 화면 | `--base-href /web/` 없이 빌드해 JS 를 `/main.dart.js` 에서 찾는다 |
+| 화면은 뜨는데 API 403 | 링크에 `k` 가 없었거나 틀렸다. 브라우저 저장소를 지우고 링크로 다시 연다 |
+| 배포 뒤에도 옛 화면 | `Cache-Control: no-cache` 가 빠졌다. 강력 새로고침으로 임시 확인 |
+| 빌드 중 서버가 느려지거나 OOM | Flutter 빌드 메모리. 스테이징을 잠시 내리고(`docker compose -p glp1-staging stop`) 다시 배포 |
 
 ### 스테이징
 

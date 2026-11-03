@@ -33,6 +33,8 @@ services:
   api:
     build:
       context: ../backend
+      # 웹(/web) 없는 BE 만. 웹은 운영 · 스테이징 이미지(release)에만 굽는다 — backend/Dockerfile
+      target: app
     image: glp1-be
     container_name: glp1-api
     ports:
@@ -58,6 +60,8 @@ services:
   worker:
     build:
       context: ../backend
+      # 웹(/web) 없는 BE 만. 웹은 운영 · 스테이징 이미지(release)에만 굽는다 — backend/Dockerfile
+      target: app
     image: glp1-be
     container_name: glp1-worker
     # API 와 같은 이미지, 다른 진입점

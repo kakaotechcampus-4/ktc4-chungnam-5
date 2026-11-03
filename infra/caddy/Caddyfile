@@ -30,6 +30,12 @@
 		# 2. 상태 확인은 키 없이 통과
 		reverse_proxy /health {args[0]}
 
+		# 평가용 웹 파일도 키 없이 통과. 브라우저는 처음 페이지를 열 때 헤더를 붙일 수 없다.
+		# 웹 파일에는 키가 없고, 웹이 부르는 API · 사진은 아래 3 에서 키를 확인한다.
+		# /web 은 여기서 /web/ 로 보낸다 — api 가 하면 http:// 로 보내 한 번 더 돌아온다.
+		redir /web /web/ 308
+		reverse_proxy /web/* {args[0]}
+
 		# 3. 데모 키가 맞거나 팀원 IP 이면 통과
 		@demo header X-Demo-Key {args[1]}
 		reverse_proxy @demo {args[0]}
