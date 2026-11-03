@@ -132,7 +132,7 @@ PENDING          1  2026-09-20 10:15:40+00:00
 
 1. `/internal/*` → 404. AI 가 BE 를 다시 부르는 경로라 compose 내부 네트워크로만 닿는다
 2. `/health` → 통과
-3. `X-Demo-Key` 헤더가 `DEMO_KEY` 와 같거나, 접속 IP 가 `ALLOWED_IPS` 안이면 → api.
+3. `X-Demo-Key` 헤더가 그 사이트의 키(운영 `DEMO_KEY`, 스테이징 `STAGING_DEMO_KEY`)와 같거나, 접속 IP 가 `ALLOWED_IPS` 안이면 → api.
    팀원 IP 는 경로 제한 없이 **전체 API** 를 키 없이 통과한다 — Swagger 의 "Try it out" 요청에는
    키 헤더가 붙지 않아 `/docs` 만 열면 쓸 수 없다. 그래서 공용망 IP 는 넣지 않는다
 4. 나머지 → 403
@@ -266,7 +266,7 @@ glp1-staging.duckdns.org ┘   (80/443 하나)     └─▶ glp1-staging-api-{b
 - 스테이징도 같은 Blue/Green 으로 올라간다. 롤백은 `/opt/glp1-staging/infra/bg-switch.sh staging`
 
 - 80/443 은 운영 Caddy 하나가 맡고 도메인으로 나눈다. 스테이징 api 에는 외부 네트워크 `glp1-edge` 로 닿는다
-- DB·사진·큐는 볼륨이 따로라(`glp1-staging_*`) 운영 데이터와 섞이지 않는다. 데모 키는 운영과 같다
+- DB·사진·큐는 볼륨이 따로라(`glp1-staging_*`) 운영 데이터와 섞이지 않는다. 데모 키는 따로다(`STAGING_DEMO_KEY`, 운영 `.env.prod` 에 둔다). 스테이징 APK 는 이 키로 빌드한다
 - 스테이징 컨테이너에는 `mem_limit`(쓸 수 있는 양, 합 약 1.8GiB)과 `oom_score_adj: 500`(서버 메모리가 모자랄 때 OOM killer 가 운영 대신 스테이징을 먼저 고름)이 있다
 - `deploy.sh` 와 `deploy-staging.sh` 는 같은 잠금(`/tmp/glp1-deploy.lock`)을 써서 한 번에 하나씩 돈다
 - 운영 `.env.prod` 에 `STAGING_DOMAIN` 이 **반드시** 있어야 한다 (비면 운영 배포가 기동 전에 멈춘다)
