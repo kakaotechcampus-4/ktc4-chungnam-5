@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -32,11 +32,44 @@ def mount_media(app: FastAPI, settings: StorageSettings) -> None:
     )
 
 
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+"""평가용 웹 빌드 위치 — 이미지 안에서는 `/srv/web`. `backend/Dockerfile` 의 `release` 단계가 넣는다."""
+
+
+class _NoCacheStaticFiles(StaticFiles):
+    """매번 서버에 확인하게 한다(`Cache-Control: no-cache`).
+
+    Flutter web 은 `main.dart.js` 파일명에 해시가 없어서, 캐시를 두면 배포 · 롤백 뒤에도
+    옛 화면이 남는다. 안 바뀐 파일은 ETag 재검증으로 304 라 다시 받지 않는다.
+    """
+
+    def file_response(self, *args: Any, **kwargs: Any) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+def mount_web(app: FastAPI, directory: Path) -> None:
+    """평가용 웹을 `/web` 으로 서빙한다. **웹 빌드가 있을 때만.**
+
+    웹은 평가자가 링크 하나로 접속하게 하는 창구다. API 와 같은 이미지 · 같은 도메인이라
+    CORS 가 없고, Blue/Green 전환 · 롤백도 API 와 함께 된다. 웹 파일에는 데모 키가 없어서
+    Caddy 가 `/web` 만 키 없이 통과시킨다 — 키는 평가자에게 주는 링크(`?k=`)에 담긴다.
+
+    로컬 BE 개발 · 테스트 이미지(`app` 단계)에는 웹 빌드가 없어 mount 하지 않는다.
+    다른 경로를 가리지 않게 라우터 · `/media` 다음에 부른다.
+    """
+    if not directory.is_dir():
+        return
+    app.mount("/web", _NoCacheStaticFiles(directory=directory, html=True), name="web")
+
+
 app = FastAPI(title="GLP-1 Meal Coach API", version="0.1.0")
 
 register_exception_handlers(app)
 app.include_router(api_router)
 mount_media(app, StorageSettings())
+mount_web(app, WEB_DIR)
 
 
 def custom_openapi() -> dict[str, Any]:

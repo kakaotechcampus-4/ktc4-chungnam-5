@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'api/api_client.dart';
 import 'api/medication_api.dart';
 import 'api/user_api.dart';
+import 'api/web_demo_key.dart';
 import 'navigation/root_shell.dart';
 import 'popups/popup_gate.dart';
 import 'screens/profile_input_screen.dart';
@@ -18,6 +19,10 @@ import 'theme/app_theme.dart';
 Future<void> main() async {
   // 첫 화면을 고르려면 저장된 userId 를 먼저 읽어야 한다.
   WidgetsFlutterBinding.ensureInitialized();
+  // phase 와 API_BASE_URL 조합이 틀린 빌드는 여기서 바로 알린다(staging·prod 에 주소 override 금지).
+  ApiConfig.validate();
+  // 웹 평가용 창구는 링크(`?k=`)로 데모 키를 받는다. 앱은 아무것도 하지 않는다.
+  await setupWebDemoKey();
   final session = await UserSession.load();
   runApp(MyApp(session: session));
 }

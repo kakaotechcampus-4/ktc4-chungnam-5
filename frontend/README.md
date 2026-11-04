@@ -84,16 +84,59 @@ flutter run                       # 디버그
 flutter build apk --release       # 배포용 APK
 ```
 
+## 웹 (평가용 창구)
+
+이 프로젝트는 앱 서비스이고, 웹은 **평가자가 링크 하나로 바로 접속하게 하는 창구**일 뿐이다.
+웹 파일은 BE 이미지 안에 들어가 `https://<도메인>/web/` 에서 내려가고, API(`/api/v1`)와 같은
+도메인이라 CORS가 없다.
+
+```bash
+flutter build web --release --base-href /web/
+```
+
+- **웹 빌드에 `DEMO_KEY`를 넣지 않는다.** 웹 파일은 키 없이 받을 수 있어서, 빌드에 박으면 도메인을 아는
+  누구나 JS에서 키를 꺼낸다. 키는 평가자에게 주는 링크에 담는다:
+  `https://<도메인>/web/?k=<데모 키>`.
+- 링크를 열면 앱이 `k`를 브라우저(localStorage)에 저장하고 **주소창에서 지운다**. 이후에는 `/web/`만
+  열어도 저장된 키를 쓴다. 키가 없거나 틀리면 API가 403이고 화면은 "평가용 링크로 접속해 주세요"를 띄운다.
+  구현: `lib/api/web_demo_key*.dart` (앱 빌드는 빈 함수).
+- 웹 릴리스 빌드의 API 주소는 웹을 내려받은 도메인(`Uri.base.origin` + `/api/v1`)이다. phase와
+  `API_BASE_URL`은 무시한다. **디버그 실행**(`flutter run -d chrome`)은 앱처럼 phase 주소를 쓴다.
+- 사진(`Image.network`)도 웹에서 `X-Demo-Key` 헤더가 실제로 붙는다(Flutter 3.44 에서 확인).
+- 웹은 브라우저마다 사용자가 따로 생긴다(`userId`가 localStorage에 저장). 평가자 한 명당 브라우저 하나.
+- **Windows Git Bash에서는** `--base-href /web/` 의 `/web/`을 경로(`C:/Program Files/Git/web/`)로 바꿔 버려
+  빌드가 실패한다. `MSYS_NO_PATHCONV=1 flutter build web ...` 로 실행하거나 PowerShell을 쓴다.
+- 링크는 평가자에게만 직접 전달한다(= 키). 공개 채널·README·PR에 올리지 않는다.
+
 ## 환경변수
 
 `--dart-define` 또는 `.env`(gitignore됨)로 주입한다. **키를 소스에 하드코딩하지 않는다.**
 
 | 키 | 설명 |
 |---|---|
-| `API_BASE_URL` | BE 공개 API 주소 (`/api/v1` 포함). 주면 phase 주소 대신 쓴다 |
-| `DEMO_KEY` | 데모 서버 접근 키(`X-Demo-Key`). prod 빌드에만 넣는다 |
+| `APP_PHASE` | 붙을 환경: `local`(기본) · `dev` · `staging` · `prod`. 아래 표 참고. 잘못 적으면 앱 시작 때 바로 터진다 |
+| `API_BASE_URL` | BE 공개 API 주소 (`/api/v1` 포함). 주면 phase 주소 대신 쓴다. **`local` · `dev` 에서만** 쓸 수 있다(에뮬레이터 `10.0.2.2`·`adb reverse` 용). `staging` · `prod` 에서 주면 시작 때 터진다 |
+| `DEMO_KEY` | 데모 서버 접근 키(`X-Demo-Key`). `staging` · `prod` **앱** 빌드에만 넣고, 그 서버의 키를 넣는다. **웹 빌드에는 넣지 않는다**(위 "웹" 참고) |
 | `KAKAO_NATIVE_APP_KEY` | 카카오 로그인 |
 | `FCM_SENDER_ID` | 푸시 |
+
+### phase — 서버 주소가 자동으로 정해진다
+
+| phase | 서버 | 키 | 용도 |
+|---|---|---|---|
+| `local` (기본) | `localhost:4010` — `frontend/mock` 의 mock 서버(고정 응답) | 없음 | 서버 없이 화면 보기 |
+| `dev` | `127.0.0.1:8000` — 내 PC Docker BE | 없음 | 실제 BE 로 개발 |
+| `staging` | `https://glp1-staging.duckdns.org/api/v1` — develop 코드, 운영과 DB·사진 분리 | 스테이징 키 | 머지된 변경 확인·시험 데이터 |
+| `prod` | `https://glp1-demo.duckdns.org/api/v1` — main 코드 | 운영 키 | 데모·평가 |
+
+```bash
+flutter run --dart-define=APP_PHASE=dev
+flutter build apk --release --dart-define=APP_PHASE=staging --dart-define=DEMO_KEY=<스테이징 키>
+flutter build apk --release --dart-define=APP_PHASE=prod    --dart-define=DEMO_KEY=<운영 키>
+```
+
+- 스테이징 키로 운영 서버에, 운영 키로 스테이징 서버에 붙으면 403 이다(서버가 키를 나누면 — 인프라 담당).
+- 환경은 헤더가 아니라 **빌드(phase)** 로 나눈다. 키는 환경 구분이 아니라 JWT 전까지 쓰는 임시 접근 장치다.
 
 ---
 

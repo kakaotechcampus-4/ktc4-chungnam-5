@@ -1,0 +1,30 @@
+# 운영 · 스테이징 이미지의 웹 빌드(backend/Dockerfile 의 web 단계)가 이 폴더를 컨텍스트로 받는다.
+# 웹 빌드에 필요 없거나 로컬 환경이 섞이는 것을 뺀다. flutter run · 앱 빌드에는 영향이 없다.
+
+# 로컬 빌드 결과물 — 이미지 안에서 새로 빌드한다
+build/
+
+# 로컬 패키지 설정 — 이 컴퓨터의 경로가 적혀 있어 이미지 안의 pub get 과 꼬인다
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# 웹 빌드에 쓰지 않는 플랫폼
+android/
+ios/
+linux/
+macos/
+windows/
+
+# 편집기 · OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# 로컬 설정
+.env
+.env.*
