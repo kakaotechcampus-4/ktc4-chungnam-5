@@ -160,7 +160,8 @@
               "LUNCH",
               "DINNER"
             ],
-            "stage": "MAINTENANCE"
+            "stage": "MAINTENANCE",
+            "skippedMealTypes": []
           },
           {
             "date": "{{today-1}}",
@@ -168,7 +169,8 @@
             "recordedMealTypes": [
               "LUNCH"
             ],
-            "stage": "MAINTENANCE"
+            "stage": "MAINTENANCE",
+            "skippedMealTypes": []
           },
           {
             "date": "{{today}}",
@@ -177,7 +179,8 @@
               "BREAKFAST",
               "LUNCH"
             ],
-            "stage": "MAINTENANCE"
+            "stage": "MAINTENANCE",
+            "skippedMealTypes": []
           }
         ],
         "summary": {
@@ -208,7 +211,8 @@
               "quantity": 76,
               "quality": 80,
               "satiety": 68
-            }
+            },
+            "skipped": false
           },
           {
             "mealId": "00000000-0000-0000-0000-000000000450",
@@ -221,7 +225,8 @@
               "quantity": 74,
               "quality": 90,
               "satiety": 80
-            }
+            },
+            "skipped": false
           }
         ],
         "nextCursor": null,
@@ -425,7 +430,8 @@
         "scores": null,
         "nutrients": [],
         "satiety": null,
-        "feedback": null
+        "feedback": null,
+        "skipped": false
       },
       "error": null
     }
@@ -740,7 +746,8 @@
                 "quantity": 74,
                 "quality": 90,
                 "satiety": 80
-              }
+              },
+              "skipped": false
             },
             {
               "mealId": "00000000-0000-0000-0000-000000000456",
@@ -752,7 +759,8 @@
                 "quantity": 76,
                 "quality": 80,
                 "satiety": 68
-              }
+              },
+              "skipped": false
             }
           ],
           "missingMealTypes": [
@@ -806,40 +814,6 @@
         "stageReason": "약효가 줄고 식욕이 돌아오는 구간",
         "stageChanged": false,
         "ruleVersion": "v1"
-      },
-      "error": null
-    }
-  },
-  "GET /api/v1/insights/daily": {
-    "200": {
-      "success": true,
-      "data": {
-        "dailyFeedbackId": "00000000-0000-0000-0000-0000000000f1",
-        "feedbackDate": "{{today}}",
-        "feedbackStatus": "READY",
-        "summary": "단백질이 고르게 들어간 하루였어요. 저녁만 포만감이 짧게 끝났어요.",
-        "scores": {
-          "quantity": 75,
-          "quality": 85,
-          "satiety": 74
-        },
-        "sourceMealIds": [
-          "00000000-0000-0000-0000-000000000456"
-        ],
-        "safetyStatus": "SAFE",
-        "generatedAt": "{{today}}T21:00:00+09:00",
-        "stale": false,
-        "staleReason": null
-      },
-      "error": null
-    }
-  },
-  "POST /api/v1/insights/daily/refresh": {
-    "202": {
-      "success": true,
-      "data": {
-        "feedbackStatus": "GENERATING",
-        "pollIntervalMs": 1500
       },
       "error": null
     }

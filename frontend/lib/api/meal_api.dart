@@ -132,12 +132,16 @@ class MealDetail {
     required this.eatenAt,
     required this.eatenAtInstant,
     required this.items,
+    this.skipped = false,
     this.imageUrl,
     this.clarifyQuestion,
     this.satietyAfterPct,
   });
 
   final String mealId;
+
+  /// "식사 안 함" 으로 기록한 끼니. 등록과 함께 `EVALUATED` 이고 음식·점수가 없다.
+  final bool skipped;
 
   /// `ANALYZING` · `REVIEW_REQUIRED` · `EVALUATED` · `FAILED`.
   final String status;
@@ -169,6 +173,7 @@ class MealDetail {
     mealId: json['mealId'] as String,
     status: json['status'] as String,
     isRecalculation: json['isRecalculation'] as bool? ?? false,
+    skipped: json['skipped'] as bool? ?? false,
     mealType: json['mealType'] as String,
     eatenAt: parseApiDateTime(json['eatenAt'] as String),
     eatenAtInstant: DateTime.parse(json['eatenAt'] as String),
@@ -421,6 +426,26 @@ class MealApiService {
     return MealCreated.fromJson(result.dataMap);
   }
 
+  /// `POST /meals` — "식사 안 함"(JSON `skipped: true`).
+  ///
+  /// 음식 분석도 확인 화면도 없이 곧바로 `EVALUATED` 로 등록되고(201) 끼니 피드백
+  /// 작업이 함께 들어간다. 확정(`POST /confirm`)은 부르지 않는다(409) — 응답을 받으면
+  /// 곧바로 `GET /meals/{mealId}/feedback` 을 묻는다. 음식·식전 포만감은 보낼 수 없다(422).
+  Future<MealCreated> createSkipped({
+    required String mealType,
+    required DateTime eatenAt,
+  }) async {
+    final result = await _client.post(
+      '/meals',
+      body: {
+        'mealType': mealType,
+        'eatenAt': formatApiDateTime(eatenAt),
+        'skipped': true,
+      },
+    );
+    return MealCreated.fromJson(result.dataMap);
+  }
+
   /// `POST /meals` — 사진 입력(multipart).
   Future<MealCreated> createWithPhoto({
     required String mealType,
@@ -573,6 +598,20 @@ class MealApiService {
   /// (`POST /confirm`)이 건다.
   Future<MealFeedback> fetchFeedback(String mealId) async {
     final result = await _client.get('/meals/$mealId/feedback');
+    return MealFeedback.fromJson(result.dataMap);
+  }
+
+  /// `POST /meals/{mealId}/feedback/retry` — 끼니 피드백을 다시 만든다(본문 없음).
+  ///
+  /// 식사 안 함 끼니는 확정(`confirm`)이 409 라 재확정으로 다시 만들 수 없어 이 API 를
+  /// 쓴다. 보여 줄 문장도 생성 중인 작업도 없을 때만 작업을 다시 넣고 `PENDING` 을
+  /// 돌려준다. 그 밖에는 지금 상태를 그대로 돌려준다(더블탭해도 작업은 하나).
+  /// 점수·포만감은 건드리지 않는다. 응답은 [fetchFeedback] 과 같은 모양이다.
+  ///
+  /// - 404 `NOT_FOUND`: 끼니가 없거나 남의 것이거나 삭제됐다.
+  /// - 409 `NOT_CONFIRMED`: 확정 전이다.
+  Future<MealFeedback> retryFeedback(String mealId) async {
+    final result = await _client.post('/meals/$mealId/feedback/retry');
     return MealFeedback.fromJson(result.dataMap);
   }
 

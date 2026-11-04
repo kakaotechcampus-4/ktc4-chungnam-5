@@ -129,6 +129,7 @@ class MealCard extends StatelessWidget {
     required this.quantityLabel,
     required this.quality,
     required this.satiety,
+    this.skipped = false,
     this.thumbnailUrl,
     this.onTap,
     this.showChevron = false,
@@ -136,6 +137,10 @@ class MealCard extends StatelessWidget {
 
   /// `아침` · `점심` · `저녁` · `간식`.
   final String mealTypeLabel;
+
+  /// "식사 안 함" 으로 기록한 끼니. 음식 이름 대신 `식사 안 함` 을, 점수 대신
+  /// `안 먹었어요` 배지를 보인다 — 점수가 없다고 `평가 전` 으로 읽히면 안 된다.
+  final bool skipped;
 
   /// `08:20`.
   final String time;
@@ -191,13 +196,19 @@ class MealCard extends StatelessWidget {
                     Text('$mealTypeLabel · $time', style: AppTypography.caption),
                     const SizedBox(height: 2),
                     Text(
-                      foodNames,
+                      skipped ? '식사 안 함' : foodNames,
                       style: AppTypography.cardTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    if (satiety case final s?)
+                    if (skipped)
+                      const _Badge(
+                        text: '안 먹었어요',
+                        background: AppColors.surfaceMuted,
+                        foreground: AppColors.textSecondary,
+                      )
+                    else if (satiety case final s?)
                       QqsBadgeRow(
                         quantityLabel: quantityLabel,
                         quality: quality,
