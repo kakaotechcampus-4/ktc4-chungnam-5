@@ -31,7 +31,13 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.schemas import SafetyStatus, ShortFeedbackRequest, ShortFeedbackResponse, Stage
+from app.schemas import (
+    MealType,
+    SafetyStatus,
+    ShortFeedbackRequest,
+    ShortFeedbackResponse,
+    Stage,
+)
 from app.short_feedback import (
     _FORBIDDEN,
     _LABELS,
@@ -42,6 +48,7 @@ from app.short_feedback import (
     NutrientJudgement,
     _text,
     build_meal_prompt,
+    cumulative_progress,
     judge_nutrients,
 )
 from evals.harness import Check, FactoryCheck, Verdict
@@ -916,3 +923,102 @@ def stage_linked_reasoning(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     if any(_squash(term) in squashed for term in _stage_terms(model.stage)):
         return True, ""
     return False, f"reasoning 이 {model.stage.value} 단계와 이어지지 않는다"
+
+
+# ─────────────────────────── 실제 요청 모양 축 — 누적 · 저녁 · 식사 안 함 ───────────────────────────
+# BE 요청의 `dailyNutritionTotals` · `mealType` · `skipped` 가 있을 때만 무언가를 잰다.
+# 기준은 `MEAL_SYSTEM_PROMPT` 의 reasoning · suggestions · "식사 안 함" 규칙이다.
+
+# 채우라고 미는 말 — "단백질을 더 챙기면", "식이섬유를 보충하기 좋아요", "단백질 반찬을 곁들이면"
+_PUSH = re.compile(r"채우|채워|챙기|챙겨|보충|더하|더해|늘리|늘려|보태|곁들")
+# 이미 채운 사실 · 부정 · 다른 방향으로 돌림 — "이미 충분히 채웠어요", "더 챙기지 않아도 돼요",
+# "단백질 반찬을 더하기보다 채소를", "단백질을 채우는 대신"
+_PUSH_EXEMPT = re.compile(r"이미|않|없|굳이|충분|(?:기|는)\s*(?:보다|대신)")
+
+
+@_with_request
+def met_daily_not_pushed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """누적 기록에서 하루 목표에 이미 도달한 영양소를 다음 끼니에 더 채우라고 하지 않았는가.
+
+    대상은 누적 합계(`dailyNutritionTotals`)로 하루 목표 이상인 단백질 · 식이섬유다. 화면에 나가는 body ·
+    advice 의 과거형이 아닌 절에서, 그 영양소 이름을 서술하는 구간(`_nutrient_segments` — 다음 영양소 이름
+    앞까지)에 채우기 동사가 있으면 실패다. "단백질 부담은 가볍게 하면서 식이섬유를 더하는" 의 "더하" 는
+    식이섬유 구간이라 단백질을 민 것이 아니다. reasoning 은 "보충은 우선하지 않는다" 처럼 하지 않을 방향을
+    적는 자리라 보지 않는다.
+    """
+    met = [
+        p.name for p in cumulative_progress(model)
+        if p.name != "sodium" and p.current is not None and p.target is not None and p.current >= p.target
+    ]
+    if not met:
+        return True, "대상 아님 (하루 목표에 도달한 영양소 없음)"
+    found = [
+        f"{_LABELS[name]} '{clause}'({field})"
+        for field, text in _texts(resp, ("body", "advice"))
+        for clause in _clauses(text)
+        if not _is_past(clause) and not _UNCERTAIN.search(clause)
+        for name, _before, after in _nutrient_segments(clause)
+        if name in met and _PUSH.search(after) and not _PUSH_EXEMPT.search(after)
+    ]
+    return _verdict("하루 목표에 도달한 영양소를 더 채우라고 했다", found)
+
+
+@_with_request
+def daily_excess_addressed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """누적 나트륨이 하루 한도를 넘었으면 body 나 advice 가 다뤘는가.
+
+    현재 끼니가 한도 안이어도 다음 메뉴에 그 흐름을 반영해야 한다(프롬프트 reasoning 규칙). 다뤘다고 볼
+    어휘는 `gap_addressed` 와 같다(`_mentions` — 이름 · 근연어 · 짠맛 표현).
+    """
+    sodium = next((p for p in cumulative_progress(model) if p.name == "sodium"), None)
+    if sodium is None or not sodium.excess:
+        return True, "대상 아님 (누적 나트륨 한도 안)"
+    text = " ".join(_field_texts(resp, "body", "advice"))
+    if _mentions("sodium", text):
+        return True, ""
+    return False, f"누적 {_LABELS['sodium']} 한도 초과를 다루지 않았다"
+
+
+# 다음 끼니 · 내일 메뉴를 가리키는 말 — 저녁 body 는 하루 흐름을 정리하며 끝낸다
+_NEXT_MEAL = re.compile(r"다음\s*(?:끼니|식사|식단|메뉴|번)|내일")
+
+
+@_with_request
+def dinner_no_next_meal(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """저녁이면 제안을 비우고 body 가 다음 끼니 메뉴를 제안하지 않았는가.
+
+    `main.py` 가 저녁 제안을 비운다. 제안이 있으면 그 회귀다. body 는 "다음 끼니 · 내일" 을 말하지 않는다.
+    """
+    if model.meal_type is not MealType.DINNER:
+        return True, "대상 아님 (저녁이 아님)"
+    found: list[str] = []
+    if _suggestions(resp):
+        found.append(f"제안 {len(_suggestions(resp))}개")
+    found += [f"'{m.group(0)}'(body)" for text in _field_texts(resp, "body") if (m := _NEXT_MEAL.search(text))]
+    return _verdict("저녁에 다음 끼니를 제안", found)
+
+
+# 결식을 가리키는 말
+_SKIP_WORDS = re.compile(r"거르|걸러|거른|건너뛰|건너뛴|결식|안\s*드신|드시지\s*않|식사\s*안\s*함|식사를\s*안")
+# 결식을 0 으로 잰 숫자 — "0g", "0 mg"
+_ZERO_AMOUNT = re.compile(r"(?<![\d.])0(?:\.0+)?\s*(?:g|mg|kcal|그램|칼로리)(?![a-z])", re.IGNORECASE)
+# 결식을 영양 부족으로 단정하는 말. `_SHORT` 의 "적은 · 낮은" 은 "부담이 적은" 처럼 영양이 아닌 말도 꾸며서 뺀다
+_SHORTFALL = re.compile(r"부족|모자라|모자랐|모자란|결핍|비었|비어|못\s*(?:채|미)")
+
+
+@_with_request
+def skipped_not_scored(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """식사 안 함 끼니의 영양을 0 이나 부족으로 평가하지 않았는가.
+
+    "결식의 영양소를 0g으로 평가하지 않는다" · "현재 끼니의 영양 · QQS 판정을 하지 않는다"(프롬프트).
+    0g · 0mg 같은 숫자, 또는 결식을 말한 절에서 부족 · 못 미침을 단정하면 실패다. 불확실 표현 절은 통과한다.
+    """
+    if not model.skipped:
+        return True, "대상 아님 (먹은 끼니)"
+    found: list[str] = []
+    for field, clause in _all_clauses(resp):
+        if _UNCERTAIN.search(clause):
+            continue
+        if _ZERO_AMOUNT.search(clause) or (_SKIP_WORDS.search(clause) and _SHORTFALL.search(clause)):
+            found.append(f"'{clause}'({field})")
+    return _verdict("결식을 영양 평가", found)
