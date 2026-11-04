@@ -424,9 +424,12 @@ python -X utf8 -m evals.analyze_meal_eval --only hotdog --n 1                   
 | `required` | 동의어 묶음 목록 — 묶음마다 하나는 나와야 한다 | `no_missing_food` |
 | `non_foods` | 사진에 보이는 음식 아닌 것 — **원소마다 한 낱말**(공백 없음. `"나무 젓가락"` 대신 `"젓가락"`) | `no_phantom_food` |
 | `forbidden` | 이름에 남으면 안 되는 브랜드 · 수식어 | `standard_name` |
+| `amount_ranges` | `(동의어 묶음, 최소g, 최대g)` 목록 — **실제 기준치가 있는 음식만** 넣는다(2026-11-04 추가) | `amount_in_range` |
+| `confidence_band` | `(최소, 최대)` 쌍 — 사진 전체 난이도가 뚜렷할 때만(가려짐 · 모호함 → 낮은 범위, 선명함 → 높은 범위, 2026-11-04 추가) | `confidence_in_range` |
 | `empty` | `True` 만 — 음식 없는 사진. 다른 음식 키와 함께 쓸 수 없다 | `non_food_empty` |
 
-음식 사진(`empty` 아님)에는 관측 2축(`amount_accuracy` · `confidence_calibration`)이 늘 붙는다.
+음식 사진(`empty` 아님)에는 관측 2축(`amount_accuracy` · `confidence_calibration`)이 늘 붙는다 — `amount_ranges` · `confidence_band`
+를 더해도 안 빠진다. 전자는 pass/fail 로 채점되는 **일부** 음식만 보고, 관측 2축은 전체 항목의 note 를 사람이 계속 읽을 수 있게 남긴다.
 판정 축이 하나도 없는 라벨(관측만 남는 라벨)은 거부한다 — 측정하는 척만 하는 케이스가 된다.
 
 ```python
@@ -447,7 +450,7 @@ LABELS: dict[str, dict] = {
 (비음식은 낱말 단위로 판정해서 공백이 든 라벨은 어떤 이름과도 같아질 수 없다). `forbidden` · `required` 의 띄어 쓴 이름은 받는다.
 요청의 `eatenAt` · `stage` 는 고정값이다(analyze-meal 프롬프트는 stage 를 쓰지 않는다).
 
-### 판정 축 (9개)
+### 판정 축 (11개)
 
 | 축 | 검사 | 등급 |
 | --- | --- | --- |
@@ -458,6 +461,8 @@ LABELS: dict[str, dict] = {
 | `no_missing_food` | 동의어 묶음마다, 공백을 지운 이름이 공백을 지운 동의어와 **완전히 같은** 항목이 있어야 통과 | non-critical |
 | `non_food_empty` | 음식 없는 사진에 `items` 가 빈 목록 | non-critical |
 | `standard_name` | NFKC + 대소문자 무시 후 금지어가 이름에 **부분 문자열**로 있으면 실패(붙여 쓴 "빙그레바나나우유" 도 실패) | non-critical |
+| `amount_in_range` | `amount_ranges` 라벨의 동의어 묶음과 일치하는 그램 단위 항목만, 그램이 기준 범위 안인지(2026-11-04 추가) | non-critical |
+| `confidence_in_range` | `confidence_band` 라벨이 있으면, 사진의 모든 항목 confidence 가 그 범위 안인지(2026-11-04 추가) | non-critical |
 | `amount_accuracy` | 항상 통과 — note 에 이름 · 양 · 단위 | 관측 |
 | `confidence_calibration` | 항상 통과 — note 에 확신도 | 관측 |
 
@@ -473,6 +478,9 @@ LABELS: dict[str, dict] = {
 - `no_missing_food` 는 완전 일치라 라벨에 없는 동의어("흰밥")는 누락으로 센다 — 동의어 묶음을 넉넉히 적는다. 라벨 밖 음식이 더 나오는 것은 벌하지 않는다.
 - 팩토리 축은 라벨 **마지막 원소**만 어긴 응답으로 검증했다 — 라벨 일부만 묶는 구현을 테스트가 다 잡지는 못한다.
 - 모양이 틀린 응답 처리는 축마다 다르다(이름이 틀리고 단위만 g 인 응답을 `gram_unit_default` 는 통과시킨다). 하네스는 계약을 통과한 회차만 판정 축에 넘기므로 실제 eval 에는 도달하지 않는다.
+- `amount_ranges` 기준치는 공식 기관(식약처) 수치가 거의 없다 — 밥 210g 은 한국영양학회 1인 1회 분량, 국/찌개/탕 250~400g 은 2021 가정간편식 실측 평균, 비빔밥 300~500g 은 상업 칼로리 DB 교차 확인, 피자 한 조각 80~160g · 반찬/빵/만두/고기 수치는 출처 없는 상식적 추정이다 — 실제로 저울에 잰 값이 아니다.
+- `amount_in_range` 는 이름 · 단위 필드 타입이 틀린 항목(모양이 깨진 응답)을 "판정 대상 아님"으로 건너뛰어 **통과**시킨다(다른 축처럼 실패로 세지 않는다) — 이름을 못 읽으면 동의어 묶음과 못 맞추고, 단위를 못 읽으면 그램인지 확인할 수 없기 때문이다(`test_eval_analyze_meal_checks.py` 행 27g).
+- `confidence_band` 는 사진 전체에 한 범위를 적용한다 — 여러 음식의 난이도가 섞인 사진(예: `manybanchan`)에는 라벨을 달지 않는다. 명확한 난이도 판단이 설 때만 쓴다.
 - fixture 검사는 JPEG APP1 의 `Exif` 헤더만 본다(XMP 는 보지 않는다). Windows 에서는 디스크 이름이 `MEAL.JPG` 면 어떤 표기로 요청해도 404 — 소문자 확장자 규칙을 지키면 생기지 않는다.
 - 서버 요청 로그를 꺼서, 실행 중 fixture 누락과 모델 실패는 둘 다 `status 500` 으로 보인다 — 그래서 `main()` 이 실행 전에 fixture 를 검사한다.
 
@@ -480,6 +488,8 @@ LABELS: dict[str, dict] = {
 
 1. 단위 두 축의 note — g 가 아닌 단위가 실제로 무엇으로 나오는지("개" · "조각" · "그람"), 덩어리 음식에 g 를 지어내는지
 2. `amount_accuracy` · `confidence_calibration` samples — 정답 g 를 잴 수 있게 되면 범위 판정으로 올릴지 정한다
+   (2026-11-04: 외부 1인분 기준치가 있는 일부 음식만 `amount_in_range` · `confidence_in_range`(둘 다 non-critical)로 먼저 올렸다 —
+   저울 실측은 아직 없고, 공개 통계치를 기준으로 삼은 잠정 범위다. 기준 없는 음식·사진은 여전히 관측 2축만 본다)
 3. `contract_parseable` 실패는 모델 출력 파싱 실패(코드펜스 · 스키마)인지 게이트웨이 오류인지 크래시 로그 · note 로 가른다
 4. 프롬프트 결함 후보는 `ai/app` 을 고치지 말고 기록해 담당자에게 넘긴다. 이미 알려진 것: `RecognizedItem` docstring("양도 g 가 아니라 자연 단위로 준다", `app/schemas.py`)과 프롬프트("기본은 그램")가 서로 다르다
 5. 안정되면 `--save evals/baselines/analyze_meal_baseline.json` 으로 baseline 을 커밋한다
