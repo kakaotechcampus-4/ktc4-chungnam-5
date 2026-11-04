@@ -205,6 +205,68 @@ def standard_name(forbidden_words: Sequence[str]) -> Check:
     return _StandardName(tuple(_fold(word) for word in forbidden_words))
 
 
+# ─────────────────────────── 보정된 관측(실제 기준 있는 음식만) ───────────────────────────
+
+
+@dataclass(frozen=True)
+class _AmountInRange(FactoryCheck):
+    __name__ = "amount_in_range"
+    ranges: tuple[tuple[tuple[str, ...], float, float], ...]
+    """(동의어 묶음, 최소 g, 최대 g). `no_missing_food` 와 같은 동의어 매칭이지만 누락이 아니라 그램 범위를 본다."""
+
+    def __call__(self, resp: dict, req: dict) -> Verdict:
+        if not self.ranges:
+            return _EMPTY_LABEL
+        items = _items(resp)
+        if items is None:
+            return _MALFORMED
+        violations: list[str] = []
+        for item in items:
+            if _in_gram_units(item) is not True:
+                continue  # 그램 기준이 없는 자연 단위 항목은 이 축 대상이 아니다 — natural_unit_allowed 가 본다
+            name = _no_space(_name_of(item))
+            for group, lo, hi in self.ranges:
+                if name not in map(_no_space, group):
+                    continue
+                amount = item.get("estimatedAmount")
+                if not isinstance(amount, (int, float)) or not (lo <= amount <= hi):
+                    violations.append(f"{_name_of(item)} {amount}g (기준 {lo}~{hi}g)")
+                break
+        return _verdict("그램 추정이 기준 범위를 벗어났다", violations)
+
+
+def amount_in_range(ranges: Sequence[tuple[Sequence[str], float, float]]) -> Check:
+    """실제 기준치가 있는 음식만 그램 범위로 판정하는 Check 를 만든다 — 기준 없는 음식은 손대지 않는다(과욕 금지).
+
+    라벨에 없는 음식은 이 축에서 보지 않는다 — `amount_accuracy`(관측)가 전체를 계속 note 로 남긴다.
+    """
+    return _AmountInRange(tuple((tuple(group), lo, hi) for group, lo, hi in ranges))
+
+
+@dataclass(frozen=True)
+class _ConfidenceInRange(FactoryCheck):
+    __name__ = "confidence_in_range"
+    band: tuple[float, float]
+
+    def __call__(self, resp: dict, req: dict) -> Verdict:
+        items = _items(resp)
+        if items is None:
+            return _MALFORMED
+        lo, hi = self.band
+        violations = []
+        for item in items:
+            confidence = item.get("confidence")
+            if not isinstance(confidence, (int, float)) or not (lo <= confidence <= hi):
+                violations.append(f"{_name_of(item)} {confidence}")
+        return _verdict(f"confidence 가 기준 범위({lo}~{hi})를 벗어났다", violations)
+
+
+def confidence_in_range(band: tuple[float, float]) -> Check:
+    """사진 전체 난이도가 뚜렷한 라벨(예: 가려짐 → 낮은 범위, 선명함 → 높은 범위)에만 쓴다 — 사진의 모든 항목에 같은 범위를 적용한다."""
+    lo, hi = band
+    return _ConfidenceInRange((lo, hi))
+
+
 # ─────────────────────────── 관측 ───────────────────────────
 
 

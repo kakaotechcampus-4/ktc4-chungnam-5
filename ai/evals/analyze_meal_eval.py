@@ -27,12 +27,29 @@ FIXTURE_DIR: Path = Path(__file__).resolve().parent / "fixtures" / "analyze_meal
 RULE_VERSION: str = "analyze-meal-labels-v1"
 """baseline 비교 조건. analyze-meal 은 BE 규칙 버전이 없어 라벨 · 판정을 바꾸면 이 값을 올린다."""
 
+#  2026-11-04 리뷰 반영(①): 관측 축(amount_accuracy/confidence_calibration)에 실제 기준이 있는 항목만
+#  골라 pass/fail 이 나오는 축(amount_in_range/confidence_in_range)을 추가했다. 1인분 기준치 출처(참고용 — 공식
+#  기관 수치가 거의 없어 상업 DB·조사 평균을 쓴다. 다음에 1인분 사진을 더할 때 재사용):
+#  - 밥 1공기 150~270g(중심 210g) — 한국영양학회 1인 1회 분량 기준
+#  - 비빔밥 300~500g — 지니어트/FatSecret/편의점 비빔밥 제품(355~450g) 교차 확인(공식 기관 기준 아님, 상업 DB 평균)
+#  - 국/찌개/탕 250~400g — 2021 가정간편식 실측 평균(국류 325g·찌개류 305g·탕류 368g)
+#  - 피자 한 조각 80~160g — 일반적인 피자 한 조각 무게 범위(출처 없는 상식적 추정)
+#  라벨에 없는 음식·사진은 그대로 amount_accuracy(관측)만 note 로 남긴다 — 기준 없는 음식까지 억지로 범위를 만들지 않는다.
+#  ⚠️ 1인분 기준이므로 **1인분임이 분명한 사진에만** 쓴다 — `manybanchan.jpg` 는 2인 겸상이라 못 쓴다(아래 라벨 주석).
+_PIZZA_SLICE = (["피자", "포테이토피자", "바비큐치킨피자"], 80, 160)
+
 LABELS: dict[str, dict] = {
-    "piece_of_pizza.jpg": {"meal_type": "DINNER", "unit": "gram"},
+    "piece_of_pizza.jpg": {
+        "meal_type": "DINNER",
+        "unit": "gram",
+        "amount_ranges": [_PIZZA_SLICE],
+        "confidence_band": (0.8, 1.0),  # 조명 좋고 단일 음식이라 또렷하게 보임
+    },
     "whole_cake.jpg": {
         "meal_type": "SNACK",
         "unit": "natural",
         "forbidden": ["투레쥬르", "tous les jours"],
+        "confidence_band": (0.8, 1.0),  # 단일 음식, 또렷하게 보임(자연 단위라 amount_ranges 대상 아님)
     },
     "food_and_notfood.jpg": {
         "meal_type": "DINNER",
@@ -50,11 +67,24 @@ LABELS: dict[str, dict] = {
             ["잡채"],
             ["무피클", "깍두기", "무김치"],
         ],
+        # amount_ranges 는 안 둔다 — 2026-11-04 실측으로 확인: 이 사진은 1인분이 아니라 **2인 겸상**이다
+        # (사진에 비빔밥 그릇 2개 · 국 그릇 2개가 보인다). 모델이 낸 "비빔밥 700g·쌀밥 420g·콩나물국 600g" 은
+        # 1인분 기준(비빔밥 300~500g·밥 150~270g·국 250~400g) 의 거의 정확히 2배라, 2인분을 합쳐 낸 것으로 보인다 —
+        # 모델이 틀린 게 아니라 이 사진에 1인분 기준을 대는 라벨이 틀린 것. 1인분 사진이 아니면 amount_ranges 를 달지 않는다.
+        # confidence_band 도 안 둔다 — 10개 넘는 항목이 섞여 난이도가 고르지 않다(명확한 반찬도, 헷갈리는 반찬도 있음).
     },
-    "branded_drinks.jpg": {"meal_type": "SNACK", "forbidden": ["모구모구", "mogu"]},
+    "branded_drinks.jpg": {
+        "meal_type": "SNACK",
+        "forbidden": ["모구모구", "mogu"],
+        "confidence_band": (0.8, 1.0),  # 라벨이 선명히 보이는 병 음료 3개
+    },
     "nonfood.jpg": {"meal_type": "LUNCH", "empty": True},
     "blurry.jpg": {"meal_type": "LUNCH", "empty": True},
-    "occludedfood.jpg": {"meal_type": "SNACK", "unit": "gram"},
+    "occludedfood.jpg": {
+        "meal_type": "SNACK",
+        "unit": "gram",
+        "confidence_band": (0.3, 0.7),  # 손으로 가려 음식 정체를 장담할 수 없는 사진
+    },
 }
 """사진별 라벨. 키 = fixture 파일 이름. 팀원이 채운다 — 형식은 `evals/README.md`."""
 
@@ -69,7 +99,9 @@ _STAGE = "MAINTENANCE"
 
 _MEAL_TYPES = frozenset(meal_type.value for meal_type in MealType)
 _UNITS = ("gram", "natural")
-_FOOD_KEYS = frozenset({"unit", "required", "non_foods", "forbidden"})  # 음식이 있다고 보는 키 — empty 와 함께 쓸 수 없다
+_FOOD_KEYS = frozenset(
+    {"unit", "required", "non_foods", "forbidden", "amount_ranges", "confidence_band"}
+)  # 음식이 있다고 보는 키 — empty 와 함께 쓸 수 없다
 _KEYS = frozenset({"meal_type", "empty", *_FOOD_KEYS})
 
 # 파일 이름 문자 집합 — `with_image_base` 는 이름을 quote 하지 않고 서버는 unquote 하므로 `#` · `?` · `%` 가 깨진다.
@@ -120,6 +152,21 @@ def _check_label(name: str, label: Mapping) -> None:
 
     if "unit" in label and label["unit"] not in _UNITS:
         raise ValueError(f"{name}: unit 은 {list(_UNITS)} 중 하나다 — {label['unit']!r}")
+    if "amount_ranges" in label:
+        ranges = label["amount_ranges"]
+        if not isinstance(ranges, (list, tuple)) or not ranges:
+            raise ValueError(f"{name}: amount_ranges 는 (동의어 묶음, 최소g, 최대g) 의 비어 있지 않은 목록이다 — {ranges!r}")
+        for group, lo, hi in ranges:
+            _check_words(name, "amount_ranges 의 동의어 묶음", group)
+            if not (isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and 0 <= lo <= hi):
+                raise ValueError(f"{name}: amount_ranges 범위가 잘못됐다 — ({lo}, {hi})")
+    if "confidence_band" in label:
+        band = label["confidence_band"]
+        if not isinstance(band, (list, tuple)) or len(band) != 2:
+            raise ValueError(f"{name}: confidence_band 는 (최소, 최대) 쌍이다 — {band!r}")
+        lo, hi = band
+        if not (isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and 0 <= lo <= hi <= 1):
+            raise ValueError(f"{name}: confidence_band 는 0~1 범위의 (최소, 최대) 다 — {band!r}")
     if "required" in label:
         groups = label["required"]
         if not isinstance(groups, (list, tuple)) or not groups:
@@ -167,6 +214,10 @@ def _axes(label: Mapping) -> tuple[Axis, ...]:
         axes.append(_axis(amc.no_phantom_food(label["non_foods"]), "non_critical"))
     if "forbidden" in label:
         axes.append(_axis(amc.standard_name(label["forbidden"]), "non_critical"))
+    if "amount_ranges" in label:
+        axes.append(_axis(amc.amount_in_range(label["amount_ranges"]), "non_critical"))
+    if "confidence_band" in label:
+        axes.append(_axis(amc.confidence_in_range(label["confidence_band"]), "non_critical"))
     return (*axes, *_OBSERVATIONS)
 
 

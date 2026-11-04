@@ -19,7 +19,9 @@ from app.schemas import AnalyzeMealRequest
 from evals.analyze_meal_checks import (
     GRAM_UNITS,
     amount_accuracy,
+    amount_in_range,
     confidence_calibration,
+    confidence_in_range,
     contract_parseable,
     gram_unit_default,
     natural_unit_allowed,
@@ -460,6 +462,98 @@ def test_r27_standard_name_fails_on_empty_label():
     assert ok is False
 
 
+# ─────────────────────────── amount_in_range ───────────────────────────
+
+_AMOUNT_RANGES = [(["밥", "쌀밥"], 150, 270), (["비빔밥"], 300, 500)]
+
+
+def test_r27a_amount_in_range_passes_when_within_bounds():
+    """실제 기준이 있는 음식의 그램이 범위 안이면 통과한다(밥 150~270g · 비빔밥 300~500g)."""
+    check = amount_in_range(_AMOUNT_RANGES)
+    resp = _resp(_item("쌀밥", amount=210, unit="g"), _item("비빔밥", amount=400, unit="g"))
+    ok, _ = check(resp, _req())
+    assert ok is True
+
+
+def test_r27b_amount_in_range_fails_and_names_out_of_range_item():
+    """범위를 벗어나면 실패하고 note 에 이름 · 실제 양 · 기준 범위를 남긴다. 범위 안인 항목은 note 에 없다."""
+    check = amount_in_range(_AMOUNT_RANGES)
+    resp = _resp(_item("쌀밥", amount=420, unit="g"), _item("비빔밥", amount=400, unit="g"))
+    ok, note = check(resp, _req())
+    assert ok is False
+    assert "쌀밥" in note and "420" in note
+    assert "비빔밥" not in note
+
+
+def test_r27c_amount_in_range_ignores_items_without_a_range_label():
+    """라벨에 없는 음식(동의어 묶음 밖)은 그램이 얼마든 이 축 대상이 아니다 — 기준 없는 음식까지 억지로 재지 않는다."""
+    check = amount_in_range(_AMOUNT_RANGES)
+    ok, _ = check(_resp(_item("계란말이", amount=5000, unit="g")), _req())
+    assert ok is True
+
+
+def test_r27d_amount_in_range_ignores_natural_unit_items():
+    """자연 단위(개 · 판 등)로 낸 항목은 그램 기준 대상이 아니다 — `natural_unit_allowed` 가 단위 자체는 따로 본다."""
+    check = amount_in_range(_AMOUNT_RANGES)
+    ok, _ = check(_resp(_item("쌀밥", amount=3, unit="공기")), _req())
+    assert ok is True
+
+
+def test_r27e_amount_in_range_fails_on_empty_label():
+    """라벨이 비면 실패한다 — 라벨 없이 만든 축이 늘 통과하면 판정한 것처럼 보인다(행 22 · 27 의 짝)."""
+    check = amount_in_range([])
+    ok, _ = check(_resp(_item("쌀밥", amount=210, unit="g")), _req())
+    assert ok is False
+
+
+@pytest.mark.parametrize(
+    "resp",
+    [
+        pytest.param({}, id="no-items"),
+        pytest.param({"items": None}, id="items-none"),
+        pytest.param({"items": "쌀밥"}, id="items-str"),
+        pytest.param({"items": [None]}, id="item-none"),
+    ],
+)
+def test_r27f_amount_in_range_fails_when_items_shape_is_broken(resp):
+    """`items` 자체가 목록이 아니거나 항목이 dict 가 아니면 실패한다 — r31 공용 목록과 같은 셋이다."""
+    check = amount_in_range(_AMOUNT_RANGES)
+    ok, _ = check(resp, _req())
+    assert ok is False
+
+
+def test_r27g_amount_in_range_passes_when_item_fields_have_wrong_type():
+    """받아들인 한계: 이름 · 단위 필드 타입이 틀린 항목(originalFoodName 이 숫자 등)은 "판정 대상 아님"으로 건너뛰어
+    통과한다 — 이름을 못 읽으면 어떤 동의어 묶음과도 못 맞추고, 단위를 못 읽으면 그램 단위인지 확인할 수 없기 때문이다.
+    `_JUDGED_FACTORIES` 공용 목록에 넣지 않은 이유가 바로 이 예외다(위 참고 주석).
+    """
+    check = amount_in_range(_AMOUNT_RANGES)
+    resp = {"items": [{"originalFoodName": 3, "unit": ["g"], "confidence": "높음"}]}
+    ok, _ = check(resp, _req())
+    assert ok is True
+
+
+# ─────────────────────────── confidence_in_range ───────────────────────────
+
+
+def test_r28a_confidence_in_range_passes_when_within_band():
+    """모든 항목의 confidence 가 기준 범위 안이면 통과한다. 경계값(최소 · 최대)도 통과한다."""
+    check = confidence_in_range((0.3, 0.7))
+    resp = _resp(_item("떡볶이", confidence=0.3), _item("순대", confidence=0.7))
+    ok, _ = check(resp, _req())
+    assert ok is True
+
+
+def test_r28b_confidence_in_range_fails_and_names_out_of_band_item():
+    """범위를 벗어난 confidence 가 있으면 실패하고 note 에 이름 · confidence 를 남긴다. 범위 안인 항목은 note 에 없다."""
+    check = confidence_in_range((0.3, 0.7))
+    resp = _resp(_item("떡볶이", confidence=0.9), _item("순대", confidence=0.5))
+    ok, note = check(resp, _req())
+    assert ok is False
+    assert "떡볶이" in note and "0.9" in note
+    assert "순대" not in note
+
+
 # ─────────────────────────── 관측 ───────────────────────────
 
 
@@ -493,12 +587,15 @@ _JUDGED_FACTORIES = [
     pytest.param(no_phantom_food, _NON_FOODS, id="no_phantom_food"),
     pytest.param(no_missing_food, _REQUIRED, id="no_missing_food"),
     pytest.param(standard_name, _FORBIDDEN, id="standard_name"),
+    # amount_in_range 는 빠진다 — 이름 · 단위가 모양이 틀린 항목은 "판정 대상 아님"으로 건너뛰어 통과한다
+    # (아래 test_r31b 가 이 예외를 직접 본다). 모양이 틀린 항목 자체가 없는 셋(`items` 가 list 가 아닌 경우)은 그대로 실패한다.
+    pytest.param(confidence_in_range, (0.3, 0.7), id="confidence_in_range"),
 ]
 _OBSERVED_CHECKS = [
     pytest.param(amount_accuracy, id="amount_accuracy"),
     pytest.param(confidence_calibration, id="confidence_calibration"),
 ]
-_FACTORIES = {"no_phantom_food", "no_missing_food", "standard_name"}
+_FACTORIES = {"no_phantom_food", "no_missing_food", "standard_name", "amount_in_range", "confidence_in_range"}
 
 _MALFORMED = [
     pytest.param({}, id="no-items"),
@@ -542,8 +639,14 @@ def test_r31_observed_checks_pass_on_malformed_response(check, resp):
 
 @pytest.mark.parametrize(
     ("factory", "label"),
-    [(no_phantom_food, _NON_FOODS), (no_missing_food, _REQUIRED), (standard_name, _FORBIDDEN)],
-    ids=["no_phantom_food", "no_missing_food", "standard_name"],
+    [
+        (no_phantom_food, _NON_FOODS),
+        (no_missing_food, _REQUIRED),
+        (standard_name, _FORBIDDEN),
+        (amount_in_range, _AMOUNT_RANGES),
+        (confidence_in_range, (0.3, 0.7)),
+    ],
+    ids=["no_phantom_food", "no_missing_food", "standard_name", "amount_in_range", "confidence_in_range"],
 )
 def test_r32_factory_check_name_is_axis_id(factory, label):
     """행 32 — 팩토리가 만든 Check 의 `__name__` 이 팩토리 이름(= 축 id)과 같다. 축 id 가 결과 키 · baseline 키가 된다."""
@@ -616,6 +719,8 @@ _FACTORY_ARGS = [
     (no_phantom_food, lambda: ["그릇", "젓가락"], ["쟁반"]),
     (no_missing_food, lambda: [["밥", "쌀밥"], ["배추김치"]], [["밥", "쌀밥"], ["된장찌개"]]),
     (standard_name, lambda: ["빙그레", "CJ"], ["청정원"]),
+    (amount_in_range, lambda: [(["밥", "쌀밥"], 150, 270)], [(["밥", "쌀밥"], 100, 200)]),
+    (confidence_in_range, lambda: (0.3, 0.7), (0.5, 0.9)),
 ]
 _FACTORY_IDS = [factory.__name__ for factory, _, _ in _FACTORY_ARGS]
 
