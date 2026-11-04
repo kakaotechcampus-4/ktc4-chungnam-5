@@ -72,6 +72,22 @@ def get_latest_weight_before(
     return db.execute(stmt).scalar_one_or_none()
 
 
+def get_weight_at(db: Session, *, user_id: uuid.UUID, at: datetime) -> Decimal | None:
+    """at 시점의 체중 — at 이전 마지막 기록, 없으면 가장 최근 기록. 둘 다 없으면 None.
+
+    끼니 채점(`services/evaluation::_weight_at`)과 끼니 피드백 AI 요청
+    (`worker/jobs/feedback_meal.py`)이 같은 값을 써야 해서 규칙을 여기 한 곳에 둔다 —
+    AI 가 Quality 점수의 근거와 다른 체중을 보고 문장을 쓰면 안 된다.
+
+    대신하는 경우는 가입 직후 과거 시각으로 식사를 적었을 때다 — 그때 체중이 없다고
+    비우면 온보딩에서 받은 체중이 있는데도 쓰지 못한다.
+    """
+    weight = get_latest_weight_before(db, user_id=user_id, before=at)
+    if weight is None:
+        weight = get_latest_weight(db, user_id)
+    return weight
+
+
 def get_latest(db: Session, *, user_id: uuid.UUID) -> UserState | None:
     """recorded_at 이 가장 늦은 내 기록 1건. 없으면 None.
 

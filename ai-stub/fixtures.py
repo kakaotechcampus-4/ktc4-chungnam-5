@@ -1,6 +1,7 @@
 """더미 응답. 전부 고정값이다.
 
-입력을 보고 내용을 바꾸지 않는다 — 되돌려주는 건 `mealId` 뿐이다.
+입력을 거의 보지 않는다 — 되돌려주는 건 `mealId` 뿐이고, 끼니 피드백만 저녁(추천 없음)과
+식사 안 함(다른 문장)을 가른다.
 BE 가 응답을 파싱하고 DB 에 넣는 코드를 짜는 데는 이걸로 충분하다.
 """
 
@@ -11,9 +12,11 @@ from schemas import (
     ChatFoodCard,
     ChatResponse,
     LongFeedbackResponse,
+    MealType,
     RecognizedItem,
     SafetyStatus,
     Scope,
+    ShortFeedbackRequest,
     ShortFeedbackResponse,
     Suggestion,
 )
@@ -56,8 +59,8 @@ def analyze_meal_blocked(meal_id: str) -> AnalyzeMealResponse:
     )
 
 
-def short_feedback(scope: Scope) -> ShortFeedbackResponse:
-    if scope is Scope.DAILY:
+def short_feedback(req: ShortFeedbackRequest) -> ShortFeedbackResponse:
+    if req.scope is Scope.DAILY:
         # daily_feedbacks 에는 summary 컬럼뿐이라 reasoning · suggestions 를 비운다
         return ShortFeedbackResponse(
             body="단백질이 고르게 들어간 하루였어요. 저녁만 포만감이 짧게 끝났어요.",
@@ -65,10 +68,31 @@ def short_feedback(scope: Scope) -> ShortFeedbackResponse:
             safety_status=SafetyStatus.SAFE,
         )
 
+    # 저녁은 다음 끼니 추천이 없다. 식사 안 함은 영양 판정 없이 다음 끼니를 챙기라는 문장이다.
+    is_dinner = req.meal_type is MealType.DINNER
+    if req.skipped:
+        return ShortFeedbackResponse(
+            body="이번 끼니를 건너뛰었어요. 다음 식사에서 단백질과 채소를 챙겨 주세요.",
+            reasoning="한 끼를 거르면 하루 영양이 부족해지기 쉬워요.",
+            suggestions=[]
+            if is_dinner
+            else [
+                Suggestion(
+                    food_name="두부 반 모",
+                    advice="다음 끼니에 단백질을 더하기 쉬워요",
+                    candidate_food_ref_id="D004512",
+                ),
+            ],
+            model_version="stub-short-0",
+            safety_status=SafetyStatus.SAFE,
+        )
+
     return ShortFeedbackResponse(
         body="유지기 기준으로 보면 포만감이 부족한 식사예요.",
         reasoning="지금은 포만감 유지가 중요한데 단백질 비중이 낮았어요.",
-        suggestions=[
+        suggestions=[]
+        if is_dinner
+        else [
             Suggestion(
                 food_name="두부 반 모",
                 advice="단백질을 조금 더 채우는 쪽이에요",

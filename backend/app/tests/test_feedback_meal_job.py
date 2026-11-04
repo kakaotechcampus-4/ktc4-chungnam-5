@@ -26,7 +26,7 @@ from sqlalchemy import delete, select, update
 
 from app.crud import satiety as satiety_crud
 from app.infra.queue import ClaimedTask
-from app.models.enums import MealStatus, MedicationStage, SafetyStatus
+from app.models.enums import MealStatus, MealType, MedicationStage, SafetyStatus
 from app.models.evaluation import QQSEvaluation
 from app.models.feedback import DailyFeedback, DailyFeedbackSource, MealFeedback
 from app.models.meal import Meal, SatietyLog
@@ -39,6 +39,7 @@ from app.tests.factories import (
     make_meal_item,
     make_qqs_evaluation,
     make_user,
+    make_weight,
 )
 from app.worker.dispatch import get_job
 from app.worker.jobs import feedback_meal
@@ -1151,3 +1152,287 @@ def test_load_hands_over_plain_data_not_orm_objects(db):
     assert ctx.meal_id == meal.id
     assert not any(isinstance(value, Base) for value in vars(ctx).values())
     assert ctx.request["scope"] == "MEAL"
+
+
+# ─────────────────────────── 식사 안 함 · 끼니 종류 · 앞선 끼니 ───────────────────────────
+
+
+def _skipped_meal(
+    db,
+    user,
+    *,
+    eaten_at: datetime = LUNCH_AT,
+    meal_type: MealType = MealType.LUNCH,
+    meal_stage: MedicationStage = MedicationStage.MAINTENANCE,
+) -> Meal:
+    """식사 안 함 끼니 — 등록이 남기는 모양(EVALUATED · skipped · 점수 행 없음)."""
+    meal = make_meal(
+        db,
+        user_id=user.id,
+        stage=meal_stage,
+        status=MealStatus.EVALUATED,
+        eaten_at=eaten_at,
+        meal_type=meal_type,
+    )
+    meal.skipped = True
+    meal.raw_text = None
+    db.flush()
+    return meal
+
+
+def test_skipped_meal_is_written_without_a_score_row(db):
+    """점수 행이 없어도 "채점이 아직" 으로 재시도하지 않고 문장을 쓴다."""
+    user = make_user(db)
+    meal = _skipped_meal(db, user)
+    ai = FakeAi(body="점심을 건너뛰었어요.")
+
+    run(db, _task(meal.id), ai)
+
+    assert _only_row(db, meal.id).body == "점심을 건너뛰었어요."
+
+
+def test_skipped_meal_request_has_null_scores_and_no_food(db):
+    """AI 가 "안 먹은 끼니" 임을 알게 한다 — skipped · 점수 모두 null · 음식 없음."""
+    user = make_user(db)
+    meal = _skipped_meal(db, user, meal_stage=MedicationStage.TITRATION)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    payload = ai.calls[0]
+    assert payload["skipped"] is True
+    assert payload["qqs"] == {"quantity": None, "quality": None, "satiety": None}
+    assert payload["items"] == []
+    assert payload["satiety"] is None
+    # 채점 단계가 없어 먹을 때의 스냅샷 단계를 쓴다.
+    assert payload["stage"] == "TITRATION"
+
+
+def test_skipped_meal_updates_the_daily_summary_without_scores(db):
+    """그날 유일한 끼니가 식사 안 함이면 하루 피드백 문장은 그 문장이고 점수는 비어 있다."""
+    user = make_user(db)
+    meal = _skipped_meal(db, user)
+
+    run(db, _task(meal.id), FakeAi(body="점심을 건너뛰었어요."))
+
+    daily = _only_daily(db, user.id)
+    assert daily.summary == "점심을 건너뛰었어요."
+    assert (daily.quantity_score, daily.quality_score, daily.satiety_score) == (None, None, None)
+
+
+def test_skipped_meal_is_left_out_of_the_day_average(db):
+    """식사 안 함이 0 점으로 섞이면 "안 먹은 날" 이 점수 낮은 날로 보인다."""
+    user = make_user(db)
+    _evaluated_meal(db, user, scores=(80, 70, 60), eaten_at=BREAKFAST_AT)
+    meal = _skipped_meal(db, user, eaten_at=LUNCH_AT)
+
+    run(db, _task(meal.id), FakeAi())
+
+    daily = _only_daily(db, user.id)
+    assert (daily.quantity_score, daily.quality_score, daily.satiety_score) == (80, 70, 60)
+
+
+def test_later_skipped_meal_keeps_an_earlier_meal_from_overwriting_the_summary(db):
+    """식사 안 함도 확정 끼니다 — 저녁을 건너뛴 날 점심 문장이 하루 피드백을 덮지 않는다."""
+    user = make_user(db)
+    lunch = _evaluated_meal(db, user, eaten_at=LUNCH_AT)
+    make_daily_feedback(
+        db, user_id=user.id, feedback_date=date(2026, 8, 22), summary="저녁을 건너뛰었어요."
+    )
+    _skipped_meal(db, user, eaten_at=DINNER_AT, meal_type=MealType.DINNER)
+
+    run(db, _task(lunch.id), FakeAi(body="점심 문장"))
+
+    assert _only_daily(db, user.id).summary == "저녁을 건너뛰었어요."
+
+
+def test_request_carries_meal_type(db):
+    user = make_user(db)
+    meal = make_meal(
+        db, user_id=user.id, status=MealStatus.EVALUATED, eaten_at=BREAKFAST_AT,
+        meal_type=MealType.BREAKFAST,
+    )
+    make_qqs_evaluation(db, meal_id=meal.id)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["mealType"] == "BREAKFAST"
+    assert ai.calls[0]["skipped"] is False
+
+
+@pytest.mark.parametrize("skipped", [False, True])
+def test_dinner_suggestions_are_not_stored(db, skipped):
+    """저녁은 다음 끼니 추천이 없다 — AI 가 주더라도 빈 배열로 저장한다."""
+    user = make_user(db)
+    if skipped:
+        meal = _skipped_meal(db, user, eaten_at=DINNER_AT, meal_type=MealType.DINNER)
+    else:
+        meal = make_meal(
+            db, user_id=user.id, status=MealStatus.EVALUATED, eaten_at=DINNER_AT,
+            meal_type=MealType.DINNER,
+        )
+        make_qqs_evaluation(db, meal_id=meal.id)
+
+    run(db, _task(meal.id), FakeAi())
+
+    assert _only_row(db, meal.id).suggestions == []
+
+
+@pytest.mark.parametrize("meal_type", [MealType.BREAKFAST, MealType.LUNCH, MealType.SNACK])
+def test_non_dinner_suggestions_are_stored(db, meal_type):
+    user = make_user(db)
+    meal = make_meal(
+        db, user_id=user.id, status=MealStatus.EVALUATED, eaten_at=LUNCH_AT, meal_type=meal_type
+    )
+    make_qqs_evaluation(db, meal_id=meal.id)
+
+    run(db, _task(meal.id), FakeAi())
+
+    assert len(_only_row(db, meal.id).suggestions) == 1
+
+
+def test_previous_meals_are_the_earlier_confirmed_meals_of_the_day(db):
+    """그날 앞선 확정 끼니를 먹은 순서로, 음식 · 점수 · 합계로 싣는다.
+
+    뺄 것: 확인 전 끼니 · 지운 끼니 · 더 늦은 끼니 · 전날 끼니 · 남의 끼니.
+    """
+    user = make_user(db)
+    other = make_user(db, nickname="다른 사람")
+    make_food_ref(db, food_ref_id="D000123", name="계란말이")
+
+    breakfast = make_meal(
+        db, user_id=user.id, status=MealStatus.EVALUATED, eaten_at=BREAKFAST_AT,
+        meal_type=MealType.BREAKFAST,
+    )
+    make_qqs_evaluation(
+        db, meal_id=breakfast.id, quantity_score=80, quality_score=None, satiety_score=60
+    )
+    make_meal_item(db, meal_id=breakfast.id, display_name="계란말이", food_ref_id="D000123")
+    breakfast.total_kcal = Decimal("180")
+    breakfast.total_protein_g = Decimal("12.5")
+    lunch = _skipped_meal(db, user, eaten_at=LUNCH_AT)
+
+    # 빠져야 하는 끼니들 (KST 2026-08-22 아침 이후 · 저녁 이전)
+    make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED, eaten_at=LUNCH_AT)
+    deleted = _evaluated_meal(db, user, eaten_at=LUNCH_AT)
+    _soft_delete(db, deleted.id)
+    _evaluated_meal(db, user, eaten_at=datetime(2026, 8, 21, 3, 0, tzinfo=UTC))  # 전날 정오
+    _evaluated_meal(db, other, eaten_at=LUNCH_AT)
+
+    dinner = _evaluated_meal(db, user, eaten_at=DINNER_AT)
+    _evaluated_meal(db, user, eaten_at=datetime(2026, 8, 22, 13, 0, tzinfo=UTC))  # 22:00 야식
+    ai = FakeAi()
+
+    run(db, _task(dinner.id), ai)
+
+    previous = ai.calls[0]["previousMeals"]
+    assert [p["mealType"] for p in previous] == ["BREAKFAST", "LUNCH"]
+
+    first, second = previous
+    assert first["skipped"] is False
+    assert first["qqs"] == {"quantity": 80.0, "quality": None, "satiety": 60.0}
+    assert [item["displayName"] for item in first["items"]] == ["계란말이"]
+    assert first["nutritionTotals"]["kcal"] == 180.0
+    assert first["nutritionTotals"]["proteinG"] == 12.5
+    assert first["nutritionTotals"]["fatG"] is None
+
+    assert second == {
+        "mealType": "LUNCH",
+        "skipped": True,
+        "qqs": {"quantity": None, "quality": None, "satiety": None},
+        "items": [],
+        "nutritionTotals": None,
+    }
+    assert lunch.id  # 위 기대값의 출처
+
+
+def test_first_meal_of_the_day_has_no_previous_meals(db):
+    user = make_user(db)
+    meal = _evaluated_meal(db, user, eaten_at=BREAKFAST_AT)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["previousMeals"] == []
+
+
+def _set_kcal_protein(meal: Meal, kcal: str, protein_g: str) -> None:
+    meal.total_kcal = Decimal(kcal)
+    meal.total_protein_g = Decimal(protein_g)
+
+
+def test_daily_nutrition_totals_include_this_meal(db):
+    """그날 합은 daily_feedbacks.total_* 에 남을 값과 같다 — 방금 확정한 이 끼니도 들어간다.
+
+    행에는 이 끼니가 빠진 옛 합이 있어도(아직 apply 전) 요청은 그 값을 쓰지 않는다.
+    """
+    user = make_user(db)
+    breakfast = _evaluated_meal(db, user, eaten_at=BREAKFAST_AT)
+    _set_kcal_protein(breakfast, "300", "10")
+    _skipped_meal(db, user, eaten_at=LUNCH_AT)
+    dinner = _evaluated_meal(db, user, eaten_at=DINNER_AT)
+    _set_kcal_protein(dinner, "500", "25.5")
+    other_day = _evaluated_meal(db, user, eaten_at=datetime(2026, 8, 21, 3, 0, tzinfo=UTC))
+    _set_kcal_protein(other_day, "999", "99")
+    db.flush()
+    ai = FakeAi()
+
+    run(db, _task(dinner.id), ai)
+
+    totals = ai.calls[0]["dailyNutritionTotals"]
+    assert totals["kcal"] == 800.0
+    assert totals["proteinG"] == 35.5
+    assert totals["fatG"] is None
+    # 요청과 apply 후 행이 같은 값이다.
+    daily = _only_daily(db, user.id)
+    assert (daily.total_kcal, daily.total_protein_g) == (Decimal("800"), Decimal("35.5"))
+
+
+def test_daily_nutrition_totals_are_null_without_any_totals(db):
+    """식사 안 함뿐인 날은 더할 합계가 없다 — 0 이 아니라 null 이다."""
+    user = make_user(db)
+    meal = _skipped_meal(db, user)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["dailyNutritionTotals"] is None
+
+
+def test_weight_is_the_one_at_eating_time(db):
+    """먹을 때의 체중을 보낸다 — Quality 채점이 쓴 값과 같아야 한다. 먹은 뒤의 기록은 아니다."""
+    user = make_user(db)
+    make_weight(db, user_id=user.id, weight_kg=Decimal("82.40"),
+                recorded_at=datetime(2026, 8, 20, 0, 0, tzinfo=UTC))
+    make_weight(db, user_id=user.id, weight_kg=Decimal("80.10"),
+                recorded_at=datetime(2026, 8, 30, 0, 0, tzinfo=UTC))
+    meal = _evaluated_meal(db, user)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["weightKg"] == 82.4
+
+
+def test_weight_falls_back_to_the_latest_record(db):
+    """먹기 전 기록이 없으면(가입 직후 과거 시각 식사) 가장 최근 체중으로 대신한다."""
+    user = make_user(db)
+    make_weight(db, user_id=user.id, weight_kg=Decimal("80.10"),
+                recorded_at=datetime(2026, 8, 30, 0, 0, tzinfo=UTC))
+    meal = _skipped_meal(db, user)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["weightKg"] == 80.1
+
+
+def test_weight_is_null_without_any_record(db):
+    user = make_user(db)
+    meal = _evaluated_meal(db, user)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["weightKg"] is None

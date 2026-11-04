@@ -156,7 +156,13 @@ def _is_confirmable(meal: Meal) -> bool:
 
     🔗 `services/meal.py::_is_editable` 과 같은 모양이다 — 그쪽은 "고칠 수 있는가",
     이쪽은 "확정할 수 있는가" 이고, `ANALYZING` 을 가르는 기준이 같다.
+
+    **식사 안 함 끼니는 확정하지 않는다** — 등록할 때 이미 `EVALUATED` 이고 매길 점수가
+    없다(`services/meal.py::create_skipped_meal`). 허용하면 빈 음식으로 점수 행이 생겨
+    평균에 0 점이 섞인다.
     """
+    if meal.skipped:
+        return False
     if meal.status in _CONFIRMABLE:
         return True
     return meal.status is MealStatus.ANALYZING and meal.is_recalculation
@@ -181,12 +187,8 @@ def _weight_at(db: Session, meal: Meal) -> Decimal | None:
     경우는 가입 직후 과거 시각으로 식사를 적었을 때다 — 그때 체중이 없다고 Quality 를
     비우면, 온보딩에서 받은 체중이 있는데도 점수가 안 나온다.
     """
-    weight = user_state_crud.get_latest_weight_before(
-        db, user_id=meal.user_id, before=meal.eaten_at
-    )
-    if weight is None:
-        weight = user_state_crud.get_latest_weight(db, meal.user_id)
-    return weight
+    # 규칙은 crud 한 곳에 있다 — 끼니 피드백 AI 요청도 같은 체중을 보낸다.
+    return user_state_crud.get_weight_at(db, user_id=meal.user_id, at=meal.eaten_at)
 
 
 def _targets(
@@ -374,7 +376,9 @@ def confirm(
     meal = _owned_meal(db, user_id, meal_id, for_update=True)
     if not _is_confirmable(meal):
         raise MealNotConfirmableError(
-            f"{meal.status.value} 상태의 식사는 확정할 수 없습니다."
+            "식사 안 함으로 기록한 끼니는 확정하지 않습니다."
+            if meal.skipped
+            else f"{meal.status.value} 상태의 식사는 확정할 수 없습니다."
         )
 
     satiety_crud.set_satiety_after(db, meal_id=meal.id, pct=request.satiety_after_pct)
