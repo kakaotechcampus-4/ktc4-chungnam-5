@@ -15,11 +15,11 @@ def test_every_stage_has_a_profile() -> None:
 @pytest.mark.parametrize(
     "stage, band",
     [
-        (S.PRE_DOSE, ("85", "105", "30", "30")),
-        (S.INITIAL, ("70", "100", "15", "30")),
-        (S.TITRATION, ("60", "90", "15", "30")),
-        (S.MAINTENANCE, ("60", "85", "30", "30")),
-        (S.REDUCED, ("65", "90", "30", "15")),
+        (S.PRE_DOSE, ("85", "105", "2", "2")),
+        (S.INITIAL, ("70", "100", "4", "2")),
+        (S.TITRATION, ("60", "90", "4", "2")),
+        (S.MAINTENANCE, ("60", "85", "2", "2")),
+        (S.REDUCED, ("65", "90", "2", "4")),
     ],
 )
 def test_quantity_bands_match_spec(stage, band) -> None:

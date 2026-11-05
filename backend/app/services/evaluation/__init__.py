@@ -89,11 +89,13 @@ class EvaluationResult(NamedTuple):
 
 
 DB_SOURCE: Final = "식품안전나라 식품영양성분DB"
-STAGE_RULE_VERSION: Final = "v2"
-WEIGHT_PROFILE_VERSION: Final = "v2"
+STAGE_RULE_VERSION: Final = "v3"
+WEIGHT_PROFILE_VERSION: Final = "v3"
 """명세 `evidence` 의 상수들. 채점 기준선(`stage_profile`)을 바꾸면 올린다.
 
 v2: Quantity · Quality 채점 도입 (`docs/be-qqs-scoring-rule.md`).
+v3: Quantity 구간 밖 감점을 비율의 k 제곱으로, Quality 를 가중 평균(0.5 · 0.2 · 0.3)으로,
+    나트륨을 (한도 ÷ 먹은 양)² 으로 바꿨다. 0점이 쉽게 나오지 않는다.
 """
 
 _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATED})

@@ -24,6 +24,22 @@ MEALS_PER_DAY: Final = 3
 """하루 기준량을 끼니 목표로 나누는 수. 하루 세 끼 가정이다."""
 
 
+class QualityWeights(NamedTuple):
+    """Quality 의 영양소별 가중치. 합이 1 이다."""
+
+    protein: Decimal
+    fiber: Decimal
+    sodium: Decimal
+
+
+QUALITY_WEIGHTS: Final = QualityWeights(
+    protein=Decimal("0.5"), fiber=Decimal("0.2"), sodium=Decimal("0.3")
+)
+"""단백질을 가장 무겁게 본다 — 투약 중 근손실 방지가 이 앱의 핵심이다. 나트륨은 한도를
+넘기면 바로 깎이는 제한 영양소라 식이섬유보다 무겁게, 식이섬유는 공공 DB 에 빈 값이 많고
+시작기에는 목표를 낮춰 둔 영양소라 가장 가볍게 둔다 (제품 결정)."""
+
+
 class Scores(NamedTuple):
     """명세 응답의 `scores`. 0~100 정수이고, 근거가 없으면 None.
 
@@ -36,16 +52,16 @@ class Scores(NamedTuple):
 
 
 class QuantityBand(NamedTuple):
-    """평소 대비 섭취 비율(%)의 적정 구간과 허용폭(%p).
+    """평소 대비 섭취 비율(%)의 적정 구간과 구간 밖 감점 지수 k.
 
-    허용폭은 구간을 벗어난 뒤 몇 %p 를 더 벗어나야 0점이 되는지다. **작을수록 엄격하다.**
+    구간 밖 점수는 구간 끝과의 비율을 k 제곱한 값이다. **k 가 클수록 엄격하다.**
     부족 쪽과 초과 쪽을 나눈 건 단계마다 위험한 방향이 달라서다.
     """
 
     lo: Decimal
     hi: Decimal
-    tol_under: Decimal
-    tol_over: Decimal
+    k_under: Decimal
+    k_over: Decimal
 
 
 class DailyTargets(NamedTuple):
@@ -101,13 +117,18 @@ def intake_ratio_pct(
 
 
 def score_quantity(ratio_pct: Decimal | None, band: QuantityBand) -> int | None:
-    """구간 안이면 100, 벗어나면 그 쪽 허용폭에 비례해 선형으로 깎는다."""
+    """구간 안이면 100, 벗어나면 구간 끝과의 비율을 그 쪽 k 로 제곱한다.
+
+    차이(%p)가 아니라 배수로 본다 — 상한의 2배와 하한의 절반이 같은 무게다. 0점은
+    아무것도 먹지 않았을 때(0kcal)뿐이다. 많이 벗어날수록 계속 낮아지므로 2배와 3배가
+    같은 점수로 뭉개지지 않는다.
+    """
     if ratio_pct is None:
         return None
     if ratio_pct < band.lo:
-        return _as_score(_ONE - (band.lo - ratio_pct) / band.tol_under)
+        return _as_score((ratio_pct / band.lo) ** band.k_under)
     if ratio_pct > band.hi:
-        return _as_score(_ONE - (ratio_pct - band.hi) / band.tol_over)
+        return _as_score((band.hi / ratio_pct) ** band.k_over)
     return 100
 
 
@@ -132,24 +153,25 @@ def score_quality(
     sodium_mg: Decimal | None,
     targets: MealTargets,
 ) -> int | None:
-    """NRF 방식: 권장 영양소는 목표 대비 충족도(상한 1), 제한 영양소는 초과만큼 감점.
+    """NRF 방식: 권장 영양소는 목표 대비 충족도(상한 1), 제한 영양소는 한도 대비 감점.
 
     **단백질은 필수다.** 없으면 None — 투약 중 근손실 방지의 핵심이라 빼고 매기면
-    점수가 의미를 잃는다. 식이섬유 · 나트륨은 값이 없으면 **빼고** 평균한다.
-    0 으로 채우면 식이섬유는 부당하게 깎이고 나트륨은 짠 음식이 만점을 받는다.
+    점수가 의미를 잃는다. 식이섬유 · 나트륨은 값이 없으면 **빼고**, 남은 가중치로
+    다시 나눈다. 0 으로 채우면 식이섬유는 부당하게 깎이고 나트륨은 짠 음식이 만점을 받는다.
 
-    영양소별 가중치는 없다 — 단순 평균이다 (NRF9.3 도 가중치 없이 합산한다).
+    가중 평균이다 — 단백질 0.5 · 식이섬유 0.2 · 나트륨 0.3 (`QUALITY_WEIGHTS`).
+    나트륨은 (한도 ÷ 먹은 양)² 이라 2배에서 0.25, 3배에서 0.11 이다. 0 이 되지 않는다.
     """
     if protein_g is None or targets.protein_g is None:
         return None
-    subs = [min(_ONE, protein_g / targets.protein_g)]
+    subs = [(QUALITY_WEIGHTS.protein, min(_ONE, protein_g / targets.protein_g))]
     if fiber_g is not None:
-        subs.append(min(_ONE, fiber_g / targets.fiber_g))
+        subs.append((QUALITY_WEIGHTS.fiber, min(_ONE, fiber_g / targets.fiber_g)))
     if sodium_mg is not None:
-        over = max(_ZERO, sodium_mg - targets.sodium_mg)
-        # 한도의 2배에서 0 이다 (제품 결정).
-        subs.append(max(_ZERO, _ONE - over / targets.sodium_mg))
-    return _as_score(sum(subs, _ZERO) / len(subs))
+        sodium = _ONE if sodium_mg <= targets.sodium_mg else (targets.sodium_mg / sodium_mg) ** 2
+        subs.append((QUALITY_WEIGHTS.sodium, sodium))
+    total_weight = sum((w for w, _ in subs), _ZERO)
+    return _as_score(sum((w * v for w, v in subs), _ZERO) / total_weight)
 
 
 def evaluate(
