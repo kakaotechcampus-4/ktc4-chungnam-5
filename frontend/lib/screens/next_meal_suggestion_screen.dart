@@ -425,7 +425,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
     final summary = f?.summary;
     if (summary != null) {
       return [
-        _CommentCard(summary: summary, reasoning: f?.reasoning),
+        _CommentCard(summary: summary),
         const SizedBox(height: AppSpacing.md),
       ];
     }
@@ -535,16 +535,14 @@ class _SkippedCard extends StatelessWidget {
   }
 }
 
-/// AI 가 쓴 피드백 문장(`summary`)과 그렇게 본 이유(`reasoning`).
+/// AI 가 쓴 피드백 문장(`summary`). 판단 근거(`reasoning`)는 화면에 보이지 않는다.
 class _CommentCard extends StatelessWidget {
-  const _CommentCard({required this.summary, this.reasoning});
+  const _CommentCard({required this.summary});
 
   final String summary;
-  final String? reasoning;
 
   @override
   Widget build(BuildContext context) {
-    final reason = reasoning;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -553,16 +551,7 @@ class _CommentCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         borderRadius: AppRadius.lgRadius,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(summary, style: AppTypography.body),
-          if (reason != null && reason.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(reason, style: AppTypography.bodySecondary),
-          ],
-        ],
-      ),
+      child: Text(summary, style: AppTypography.body),
     );
   }
 }
