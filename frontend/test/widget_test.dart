@@ -1152,7 +1152,8 @@ void main() {
     // 아침·점심과 같은 화면: 끼니 피드백 문장이 보인다.
     await tester.scrollUntilVisible(find.text('저녁 피드백 문장'), 200);
     expect(find.text('저녁 피드백 문장'), findsOneWidget);
-    expect(find.text('유지기에는 한 끼에 채소가 들어가야 해요.'), findsOneWidget);
+    // 판단 근거(reasoning)는 받아도 그리지 않는다.
+    expect(find.text('유지기에는 한 끼에 채소가 들어가야 해요.'), findsNothing);
     // 저녁은 다음 끼니 제안과 챗봇 버튼이 없다(BE 가 제안을 줘도 그리지 않는다).
     expect(find.text('이런 음식은 어때요?'), findsNothing);
     expect(find.text('두부 반 모'), findsNothing);

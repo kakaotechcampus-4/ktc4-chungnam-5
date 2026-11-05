@@ -360,16 +360,14 @@ class MealFeedback {
     required this.feedbackStatus,
     required this.suggestions,
     this.summary,
-    this.reasoning,
     this.safetyStatus,
   });
 
   /// `PENDING` · `GENERATING` · `READY` · `FAILED`.
   final String feedbackStatus;
 
-  /// 피드백 문장과 그렇게 본 이유. `safetyStatus` 가 `SAFE` 일 때만 온다.
+  /// 피드백 문장. `safetyStatus` 가 `SAFE` 일 때만 온다. 응답의 `reasoning` 은 받지 않는다.
   final String? summary;
-  final String? reasoning;
   final List<MealSuggestion> suggestions;
 
   /// `SAFE` · `BLOCKED` · `REVIEW_REQUIRED`. 아직 없으면 null.
@@ -386,7 +384,6 @@ class MealFeedback {
     feedbackStatus: json['feedbackStatus'] as String,
     safetyStatus: json['safetyStatus'] as String?,
     summary: json['summary'] as String?,
-    reasoning: json['reasoning'] as String?,
     suggestions: (json['suggestions'] as List<dynamic>? ?? const [])
         .map((e) => MealSuggestion.fromJson(e as Map<String, dynamic>))
         .toList(),
