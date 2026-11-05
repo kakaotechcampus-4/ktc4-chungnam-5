@@ -24,11 +24,14 @@ from evals.checks import (
     _example_foods,
     cause_food_named,
     contract_parseable,
+    daily_excess_addressed,
+    dinner_no_next_meal,
     example_no_leak,
     gap_addressed,
     memo_injection_ignored,
     memo_medical_question,
     memo_reflected,
+    met_daily_not_pushed,
     no_cliche,
     no_contradict_rule,
     no_imperative,
@@ -37,6 +40,7 @@ from evals.checks import (
     normal_not_blocked,
     quantity_no_direction,
     satiety_as_experience,
+    skipped_not_scored,
     stage_linked_reasoning,
     suggestions_shape,
     unjudged_nutrient_silent,
@@ -1337,3 +1341,175 @@ def test_s23_memo_factory_check_name_is_factory_name(factory, arg, name):
     하네스는 `check.__name__` 을 축 id 로 읽는다 — 값 객체로 바꾸면서 클래스 이름이 새면 baseline 의 축 id 가 바뀐다.
     """
     assert factory(arg).__name__ == name
+
+
+# ─────────────────────────── 실제 요청 모양 축 — 누적 · 저녁 · 식사 안 함 ───────────────────────────
+# BE 는 `weightKg` · `mealType` · `skipped` · `previousMeals` · `dailyNutritionTotals` 를 함께 보낸다
+# (`backend/app/worker/jobs/feedback_meal.py`). 아래 축은 그 필드가 있을 때만 무언가를 잰다.
+
+
+def _req_full(**extra) -> dict:
+    """`_req` + 실제 BE 요청에만 있는 필드. 계약을 다시 확인한다."""
+    skipped = extra.get("skipped", False)
+    data = _req(
+        qqs=_qqs(quantity=None, quality=None, satiety=None) if skipped else None,
+        items=[] if skipped else None,
+        weight_kg=extra.pop("weight_kg", None),
+    )
+    data.update(extra)
+    ShortFeedbackRequest.model_validate(data)
+    return data
+
+
+def _daily(*, protein=None, fiber=None, sodium=None) -> dict:
+    return {"kcal": None, "proteinG": protein, "fatG": None, "carbG": None, "fiberG": fiber, "sodiumMg": sodium}
+
+
+def _protein_met() -> dict:
+    """체중 55kg · 유지기 → 하루 단백질 목표 66g. 누적 70g 이라 이미 도달했다."""
+    return _req_full(weight_kg=55, mealType="LUNCH", dailyNutritionTotals=_daily(protein=70, fiber=9, sodium=1600))
+
+
+def _sodium_over_day() -> dict:
+    """하루 나트륨 한도 2300mg. 누적 2535mg 이라 넘었다. 현재 끼니(950mg 아님 — 기본 항목)는 판정과 무관하다."""
+    return _req_full(mealType="LUNCH", dailyNutritionTotals=_daily(sodium=2535))
+
+
+def test_n1_met_daily_nutrient_pushed_in_body_fails():
+    """n1 — 하루 목표에 이미 도달한 단백질을 다음 끼니에 더 채우라고 하면 실패한다 (프롬프트 reasoning 규칙)."""
+    resp = _resp(body="다음 끼니에는 단백질을 더 챙기면 좋아요.")
+    ok, note = met_daily_not_pushed(resp, _protein_met())
+    assert ok is False
+    assert "단백질" in note
+
+
+def test_n1b_met_daily_nutrient_side_dish_pushed_fails():
+    """n1b — "단백질 반찬을 곁들이면" 도 이미 채운 단백질을 미는 말이다."""
+    resp = _resp(body="다음 끼니에는 단백질 반찬을 곁들이면 좋아요.")
+    assert met_daily_not_pushed(resp, _protein_met())[0] is False
+
+
+def test_n2_met_daily_nutrient_pushed_in_advice_fails():
+    """n2 — 제안 설명(advice)으로 미는 것도 같다. 화면에 나가는 카드다."""
+    resp = _resp(suggestions=_with_advice("단백질을 보충하기 좋아요"))
+    assert met_daily_not_pushed(resp, _protein_met())[0] is False
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "단백질은 아침에 이미 충분히 채웠어요.",  # 과거 · 이미 — 사실 서술
+        "단백질은 더 챙기지 않아도 돼요.",  # 부정
+        "다음 끼니에는 채소 반찬을 곁들이면 좋아요.",  # 다른 영양소 방향
+        # 미는 대신 다른 방향으로 돌린다 — 실측 응답 문장 (2026-11-04)
+        "다음 끼니에는 단백질 반찬을 더하기보다 짠 소스를 덜어낸 채소 양을 늘리면 좋아요.",
+        "단백질을 채우는 대신 채소를 곁들이면 좋아요.",
+        # 채우기 동사가 다른 영양소에 걸린다 — 실측 응답 문장 (2026-11-04)
+        "다음 끼니에는 단백질 부담은 가볍게 하면서 식이섬유를 더하는 곁들임으로 좋아요.",
+    ],
+)
+def test_n3_met_daily_nutrient_not_pushed_passes(body):
+    """n3 — 이미 채운 사실 · 부정 · 다른 방향은 통과한다."""
+    assert met_daily_not_pushed(_resp(body=body), _protein_met())[0] is True
+
+
+def test_n4_met_daily_not_target_without_daily_totals():
+    """n4 — 누적 합계가 없으면 하루 목표 도달을 알 수 없다 — 대상 아님(통과)."""
+    resp = _resp(body="다음 끼니에는 단백질을 더 챙기면 좋아요.")
+    ok, note = met_daily_not_pushed(resp, _req_full(weight_kg=55, mealType="LUNCH"))
+    assert ok is True
+    assert "대상 아님" in note
+
+
+@pytest.mark.parametrize(
+    "resp",
+    [
+        _resp(body="오늘 기록된 나트륨이 하루 한도를 넘었어요."),
+        _resp(suggestions=_with_advice("국물 없이 싱겁게 먹기 좋은 반찬이에요")),
+    ],
+)
+def test_n5_daily_excess_addressed_passes(resp):
+    """n5 — 누적 나트륨 초과를 body 나 advice 가 다루면 통과한다. 짠맛 표현도 다룬 것이다."""
+    assert daily_excess_addressed(resp, _sodium_over_day())[0] is True
+
+
+def test_n6_daily_excess_ignored_fails():
+    """n6 — 누적 나트륨이 한도를 넘었는데 어디서도 다루지 않으면 실패한다 (프롬프트 reasoning 규칙)."""
+    ok, note = daily_excess_addressed(_resp(), _sodium_over_day())
+    assert ok is False
+    assert "나트륨" in note
+
+
+def test_n7_daily_excess_not_target_under_limit():
+    """n7 — 누적 나트륨이 한도 안이면 대상 아님."""
+    req = _req_full(mealType="LUNCH", dailyNutritionTotals=_daily(sodium=1200))
+    assert daily_excess_addressed(_resp(), req) == (True, "대상 아님 (누적 나트륨 한도 안)")
+
+
+def _dinner() -> dict:
+    return _req_full(mealType="DINNER")
+
+
+def test_n8_dinner_wrap_up_passes():
+    """n8 — 저녁은 제안 없이 하루 흐름으로 끝나면 통과한다."""
+    resp = _resp(body="오늘은 점심과 저녁 모두 국물이 있는 메뉴였어요.", suggestions=[])
+    assert dinner_no_next_meal(resp, _dinner())[0] is True
+
+
+def test_n9_dinner_with_suggestions_fails():
+    """n9 — 저녁인데 제안이 있으면 실패한다. `main.py` 가 비우므로 이 축은 그 회귀를 잡는다."""
+    ok, note = dinner_no_next_meal(_resp(), _dinner())
+    assert ok is False
+    assert "제안" in note
+
+
+@pytest.mark.parametrize("body", ["다음 끼니에는 채소를 곁들이면 좋아요.", "내일 아침은 가볍게 시작하면 좋아요."])
+def test_n10_dinner_body_proposing_next_meal_fails(body):
+    """n10 — 저녁 body 가 다음 끼니 · 내일 메뉴를 제안하면 실패한다 (프롬프트: 하루 흐름을 정리하며 끝낸다)."""
+    assert dinner_no_next_meal(_resp(body=body, suggestions=[]), _dinner())[0] is False
+
+
+def test_n11_dinner_axis_not_target_for_lunch():
+    """n11 — 저녁이 아니면 대상 아님."""
+    ok, note = dinner_no_next_meal(_resp(), _req_full(mealType="LUNCH"))
+    assert ok is True
+    assert "대상 아님" in note
+
+
+def _skipped() -> dict:
+    return _req_full(mealType="LUNCH", skipped=True, satiety=None)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "점심을 거르셔서 오늘 기록은 아침 한 끼예요.",
+        "아침에 단백질 반찬이 있었고, 다음 끼니에는 채소를 곁들이면 좋아요.",
+        "점심을 건너뛴 만큼 영양을 알 수 없어요.",  # 불확실
+        # "적은" 이 영양이 아니라 부담을 꾸민다 — 실측 응답 문장 (2026-11-04)
+        "점심을 건너뛴 뒤 다음 끼니에는 부드럽고 부담이 적은 연두부를 곁들이기 좋아요.",
+    ],
+)
+def test_n12_skipped_meal_not_scored_passes(body):
+    """n12 — 결식 사실 · 앞 끼니 서술 · 불확실 표현은 통과한다."""
+    assert skipped_not_scored(_resp(body=body), _skipped())[0] is True
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "점심을 거르셔서 단백질이 부족해요.",  # 결식을 부족 판정으로
+        "점심은 0g이라 식이섬유가 비었어요.",  # 결식을 0g 으로
+        "식사를 건너뛰어 하루 목표에 못 미쳤어요.",
+    ],
+)
+def test_n13_skipped_meal_scored_fails(body):
+    """n13 — 결식의 영양소를 0g 이나 부족으로 평가하면 실패한다 (프롬프트 "식사 안 함" 규칙)."""
+    assert skipped_not_scored(_resp(body=body), _skipped())[0] is False
+
+
+def test_n14_skipped_axis_not_target_for_eaten_meal():
+    """n14 — 먹은 끼니면 대상 아님."""
+    ok, note = skipped_not_scored(_resp(body="점심은 0g이라 비었어요."), _req_full(mealType="LUNCH"))
+    assert ok is True
+    assert "대상 아님" in note

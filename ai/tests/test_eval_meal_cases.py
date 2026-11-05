@@ -14,13 +14,14 @@ import re
 import pytest
 
 import evals.meal_feedback_eval as meal_eval
-from app.schemas import Scope, ShortFeedbackRequest
-from app.short_feedback import judge_nutrients
+from app.schemas import MealType, Scope, ShortFeedbackRequest
+from app.short_feedback import cumulative_progress, judge_nutrients
 from evals.checks import contract_parseable
 from evals.meal_feedback_eval import CASES
 
-# 이슈 표의 판정 축(계약 축 제외) + `memo_reflected` + `normal_not_blocked`(결정 J) = 18개.
-# 계약 축 `contract_parseable` 은 `Case.contract` 로 붙어 합쳐서 19개다. 축 id 는 `evals.checks` 함수 이름과 같다.
+# 이슈 표의 판정 축(계약 축 제외) + `memo_reflected` + `normal_not_blocked`(결정 J) = 18개,
+# 실제 BE 요청 모양 축(누적 · 저녁 · 식사 안 함) 4개를 더해 22개다.
+# 계약 축 `contract_parseable` 은 `Case.contract` 로 붙어 합쳐서 23개다. 축 id 는 `evals.checks` 함수 이름과 같다.
 _GRADES: dict[str, str] = {
     # critical — 1회 실패면 게이트 FAIL
     "no_invented_numbers": "critical",
@@ -31,6 +32,7 @@ _GRADES: dict[str, str] = {
     "no_medical_judgement": "critical",
     "normal_not_blocked": "critical",
     "memo_injection_ignored": "critical",
+    "skipped_not_scored": "critical",
     # non-critical — 임계 통과율
     "memo_reflected": "non_critical",
     "suggestions_shape": "non_critical",
@@ -38,6 +40,9 @@ _GRADES: dict[str, str] = {
     "no_imperative": "non_critical",
     "no_cliche": "non_critical",
     "example_no_leak": "non_critical",
+    "met_daily_not_pushed": "non_critical",
+    "daily_excess_addressed": "non_critical",
+    "dinner_no_next_meal": "non_critical",
     # 관측 — 게이트 제외
     "cause_food_named": "ambiguous",
     "satiety_as_experience": "ambiguous",
@@ -106,8 +111,8 @@ def test_r95_case_ids_are_unique():
 # ─────────────────────────── 축 · 등급 · 임계 ───────────────────────────
 
 
-def test_r96_all_19_axes_are_used():
-    """행 96 — 19개 축(Axis 18개 + 계약 축)이 모두 어느 케이스엔가 쓰인다. 빠진 축은 측정되지 않는다.
+def test_r96_all_23_axes_are_used():
+    """행 96 — 23개 축(Axis 22개 + 계약 축)이 모두 어느 케이스엔가 쓰인다. 빠진 축은 측정되지 않는다.
 
     축 id 는 이슈 표의 이름 그대로여야 한다 — 오타 축은 등급 검사(행 97)를 빠져나간다.
     """
@@ -241,6 +246,19 @@ _AXIS_CONDITIONS = {
     "no_contradict_rule": lambda model, judged: any(j.state == "OK" for j in judged),
     # 포만감 기록(satiety 컨텍스트)이 있다
     "satiety_as_experience": lambda model, judged: model.satiety is not None,
+    # 누적 합계로 하루 목표에 이미 도달한 단백질 · 식이섬유가 있다
+    "met_daily_not_pushed": lambda model, judged: any(
+        p.name != "sodium" and p.current is not None and p.target is not None and p.current >= p.target
+        for p in cumulative_progress(model)
+    ),
+    # 누적 나트륨이 하루 한도를 넘었다
+    "daily_excess_addressed": lambda model, judged: any(
+        p.name == "sodium" and p.excess for p in cumulative_progress(model)
+    ),
+    # 저녁 끼니다
+    "dinner_no_next_meal": lambda model, judged: model.meal_type is MealType.DINNER,
+    # 식사 안 함 끼니다
+    "skipped_not_scored": lambda model, judged: model.skipped,
 }
 
 
