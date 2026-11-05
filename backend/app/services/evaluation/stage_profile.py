@@ -26,34 +26,40 @@ _PROTEIN_ON_DRUG: Final = Decimal("1.2")
 """공동 권고(Mozaffarian 2025) 감량 중 1.2–1.6 g/kg/일의 하한. 단계별 기준은 권고에 없다."""
 
 
-def _band(lo: str, hi: str, under: str, over: str) -> QuantityBand:
-    return QuantityBand(Decimal(lo), Decimal(hi), Decimal(under), Decimal(over))
+_K: Final = Decimal("2")
+"""Quantity 구간 밖 감점 지수 기본값. 구간 끝의 1.5배(또는 2/3)에서 44점, 2배(또는 절반)에서 25점."""
+_K_STRICT: Final = Decimal("4")
+"""그 단계에서 위험한 쪽의 지수. 1.5배(또는 2/3)에서 20점, 2배(또는 절반)에서 6점."""
+
+
+def _band(lo: str, hi: str, k_under: Decimal, k_over: Decimal) -> QuantityBand:
+    return QuantityBand(Decimal(lo), Decimal(hi), k_under, k_over)
 
 
 STAGE_PROFILES: Final[dict[MedicationStage, StageProfile]] = {
     # 위험 없음 → 전부 기본값. 단백질은 KDRI 2025 권장섭취량 기준.
     MedicationStage.PRE_DOSE: StageProfile(
-        _band("85", "105", "30", "30"),
+        _band("85", "105", _K, _K),
         DailyTargets(Decimal("0.91"), _FIBER_G_PER_DAY, _SODIUM_MG_PER_DAY),
     ),
     # 부족 쪽 엄격 — 부작용으로 너무 적게 먹는다. 시작 며칠 고섬유 회피 → 식이섬유 2/3.
     MedicationStage.INITIAL: StageProfile(
-        _band("70", "100", "15", "30"),
+        _band("70", "100", _K_STRICT, _K),
         DailyTargets(_PROTEIN_ON_DRUG, _FIBER_G_PER_DAY * 2 / 3, _SODIUM_MG_PER_DAY),
     ),
     # 부족 쪽 엄격 — 올릴 때마다 섭취가 줄어든다 (1.0mg 에서 −24%).
     MedicationStage.TITRATION: StageProfile(
-        _band("60", "90", "15", "30"),
+        _band("60", "90", _K_STRICT, _K),
         DailyTargets(_PROTEIN_ON_DRUG, _FIBER_G_PER_DAY, _SODIUM_MG_PER_DAY),
     ),
     # 공동 권고의 섭취 감소 16–39% → 평소의 61–84%. Quantity 는 위험 방향 없음.
     MedicationStage.MAINTENANCE: StageProfile(
-        _band("60", "85", "30", "30"),
+        _band("60", "85", _K, _K),
         DailyTargets(_PROTEIN_ON_DRUG, _FIBER_G_PER_DAY, _SODIUM_MG_PER_DAY),
     ),
     # 초과 쪽 엄격 — 용량을 내리면 식욕이 돌아온다 (간접 근거, Seier 2025).
     MedicationStage.REDUCED: StageProfile(
-        _band("65", "90", "30", "15"),
+        _band("65", "90", _K, _K_STRICT),
         DailyTargets(_PROTEIN_ON_DRUG, _FIBER_G_PER_DAY, _SODIUM_MG_PER_DAY),
     ),
 }
