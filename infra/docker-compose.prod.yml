@@ -168,6 +168,8 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:?}
       LLM_VISION_URL: ${LLM_VISION_URL:?}
       LLM_REASONING_URL: ${LLM_REASONING_URL:?}
+      # 챗봇 코치 (ai/app/config.py CoachSettings). 없으면 /chat 이 503 이다.
+      LLM_COACH_URL: ${LLM_COACH_URL:?}
       LLM_TIMEOUT_SEC: ${LLM_TIMEOUT_SEC:-45}
       LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
       TOOL_CALL_LIMIT: ${TOOL_CALL_LIMIT:-3}

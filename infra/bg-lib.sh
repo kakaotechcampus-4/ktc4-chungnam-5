@@ -13,8 +13,8 @@ export GLP1_BG_DIR=$BG_DIR
 CADDY=glp1-prod-caddy
 
 case "$ENV" in
-  prod) COMPOSE=(docker compose -f docker-compose.prod.yml --env-file .env.prod) ;;
-  staging) COMPOSE=(docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml --env-file .env.staging) ;;
+  prod) ENV_FILE=.env.prod; COMPOSE=(docker compose -f docker-compose.prod.yml --env-file "$ENV_FILE") ;;
+  staging) ENV_FILE=.env.staging; COMPOSE=(docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml --env-file "$ENV_FILE") ;;
   *) echo "환경은 prod 또는 staging 이다: $ENV" >&2; exit 1 ;;
 esac
 STATE=$BG_DIR/$ENV.env
