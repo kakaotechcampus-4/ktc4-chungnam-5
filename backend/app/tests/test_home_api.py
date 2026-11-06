@@ -290,6 +290,7 @@ def test_02_key_sets_match_spec_exactly(client, db):
         "displayName",
         "thumbnailUrl",
         "scores",
+        "skipped",  # FE 식사 안 함 명세 — 명세 §7 밖이지만 FE 가 요청했다
     }
     assert set(data["today"]["meals"][0]["scores"]) == {"quantity", "quality", "satiety"}
 

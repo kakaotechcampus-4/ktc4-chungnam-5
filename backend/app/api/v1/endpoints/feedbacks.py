@@ -109,6 +109,46 @@ def replace_meal_suggestion(
 
 
 @router.post(
+    "/meals/{meal_id}/feedback/retry",
+    response_model=ApiResponse[MealFeedbackResponse],
+    summary="끼니 피드백 다시 만들기",
+    responses=error_responses(401, 404, 409, 422),
+)
+def retry_meal_feedback(
+    meal_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse[MealFeedbackResponse]:
+    """`feedbackStatus: FAILED` 인 끼니 피드백을 다시 만든다.
+
+    식사 안 함 끼니는 확정(`POST /meals/{mealId}/confirm`)을 부를 수 없어 이게 유일한
+    재시도 길이다. 일반 끼니에도 쓸 수 있다. 점수 · 포만감은 바꾸지 않는다.
+
+    보여 줄 문장이 없고 생성 중인 작업도 없을 때만 새로 만든다. 그 밖에는 아무것도 하지 않고
+    지금 상태를 돌려준다 — 여러 번 눌러도 안전하다. 응답은 `GET /meals/{mealId}/feedback`
+    과 같은 모양이고, 새로 만들기 시작했으면 `PENDING` 이다. FE 는 이어서 그 GET 을 폴링한다.
+
+    - 404 `NOT_FOUND`: 끼니가 없음 · 남의 것 · 삭제됨
+    - 409 `NOT_CONFIRMED`: 끼니가 확정 상태가 아니다
+    """
+    try:
+        view = feedback_service.retry_feedback(db, user_id=user_id, meal_id=meal_id)
+    except feedback_service.MealNotFoundError as exc:
+        raise ApiError(ErrorCode.NOT_FOUND, str(exc), 404) from None
+    except feedback_service.MealNotConfirmedError as exc:
+        raise ApiError(ErrorCode.NOT_CONFIRMED, str(exc), 409) from None
+
+    # 문장이 이미 있으면 그 문장을 돌려준다 — GET 과 같은 분기다.
+    if view.safety_status is SafetyStatus.BLOCKED:
+        return ok_with_code(
+            view,
+            ErrorCode.MEDICAL_QUESTION_DETECTED,
+            "의료 판단이 필요한 내용이라 피드백 대신 상담을 안내해요.",
+        )
+    return ok(view)
+
+
+@router.post(
     "/meals/{meal_id}/satiety-checkins",
     response_model=ApiResponse[SatietyCheckinResponse],
     status_code=status.HTTP_201_CREATED,

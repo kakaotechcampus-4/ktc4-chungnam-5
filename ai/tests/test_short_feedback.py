@@ -20,7 +20,7 @@ from app.short_feedback import (
 from app.schemas import Scope, ShortFeedbackRequest, Stage
 
 
-def _meal(*, stage="MAINTENANCE", qqs=None, items=None, satiety=None) -> ShortFeedbackRequest:
+def _meal(*, stage="MAINTENANCE", qqs=None, items=None, satiety=None, **context) -> ShortFeedbackRequest:
     return ShortFeedbackRequest.model_validate(
         {
             "scope": "MEAL",
@@ -30,6 +30,7 @@ def _meal(*, stage="MAINTENANCE", qqs=None, items=None, satiety=None) -> ShortFe
             "mealId": "m1",
             "items": items or [],
             "satiety": satiety,
+            **context,
         }
     )
 
@@ -71,12 +72,9 @@ def test_protein_not_inferred_when_other_nutrient_is_off():
     assert "protein" not in _states(req)
 
 
-def test_protein_inferred_when_others_ok_and_quality_below_100():
+def test_protein_not_inferred_without_weight_even_when_quality_is_low():
     req = _meal(items=[_item(proteinG=10, fiberG=9, sodiumMg=500)])
-    judgements = judge_nutrients(req)
-    assert judgements[0].name == "protein"
-    assert judgements[0].state == "SHORT"
-    assert judgements[0].inferred is True
+    assert _states(req) == {"fiber": "OK", "sodium": "OK"}
 
 
 def test_protein_not_inferred_when_quality_is_full_or_unscored():
@@ -117,9 +115,9 @@ def test_missing_nutrient_in_any_item_skips_judgement():
     assert _states(req) == {"sodium": "OK"}
 
 
-def test_protein_inferred_when_fiber_unknown():
-    """식이섬유가 비면 BE 도 그 항목을 Quality 평균에서 뺀다. 나트륨이 OK 면 깎인 건 단백질이다."""
-    req = _meal(items=[_item(proteinG=10, sodiumMg=300), _item("국", proteinG=3, fiberG=2, sodiumMg=400)])
+def test_protein_compared_directly_when_fiber_unknown():
+    """체중으로 목표를 계산하므로 다른 영양소가 없어도 단백질을 직접 판정한다."""
+    req = _meal(weightKg=80, items=[_item(proteinG=10, sodiumMg=300), _item("국", proteinG=3, fiberG=2, sodiumMg=400)])
     assert _states(req) == {"protein": "SHORT", "sodium": "OK"}
 
 
@@ -212,6 +210,12 @@ def test_system_prompts_carry_rules_and_user_prompt_does_not():
         assert "<memo>" in system
     req = _meal(items=[_item(fiberG=5)])
     assert "균형 잡힌 식사" not in build_meal_prompt(req, judge_nutrients(req))
+
+
+def test_meal_system_prompt_combines_current_and_cumulative_feedback():
+    assert "현재 끼니와 앞선 확정 끼니를 참고해 body 하나" in MEAL_SYSTEM_PROMPT
+    assert "별도 필드나 제목으로 나누지 않는다" in MEAL_SYSTEM_PROMPT
+    assert "하루 도중 목표 미달을 곧바로 부족으로 판정하지 않는다" in MEAL_SYSTEM_PROMPT
 
 
 def test_good_example_in_system_prompt_passes_our_own_parser():

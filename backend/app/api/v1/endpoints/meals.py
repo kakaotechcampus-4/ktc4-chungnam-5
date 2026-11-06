@@ -56,9 +56,10 @@ def _has_known_image_signature(data: bytes) -> bool:
 
 @dataclass
 class _ParsedMealInput:
-    """멀티파트(사진)·JSON(고른 음식) 두 형식을 같은 모양으로 정리한 결과.
+    """멀티파트(사진)·JSON(고른 음식 · 식사 안 함) 형식을 같은 모양으로 정리한 결과.
 
-    `image_bytes` · `items` 중 정확히 하나만 차 있다.
+    `skipped` 가 True 면 `image_bytes` · `items` 가 둘 다 비어 있고, 아니면 정확히 하나만
+    차 있다.
     """
 
     meal_type: MealType
@@ -67,6 +68,7 @@ class _ParsedMealInput:
     image_filename: str | None
     satiety_before_pct: int | None
     items: list[MealCreateFoodItem] | None
+    skipped: bool = False
 
 
 def _parse_meal_type(value: object) -> MealType:
@@ -160,7 +162,9 @@ def _parse_items(value: object) -> list[MealCreateFoodItem]:
 
 
 async def _parse_json_input(request: Request) -> _ParsedMealInput:
-    """JSON 입력 — 검색 탭에서 사용자가 고른 공공 DB 음식(`items[]`).
+    """JSON 입력 — 검색 탭에서 사용자가 고른 공공 DB 음식(`items[]`) 또는 식사 안 함.
+
+    `skipped: true` 면 음식 없이 받는다(`items` · `satietyBeforePct` 가 오면 422).
 
     예전에는 고른 목록을 `rawText`(`"계란말이 120g, 바나나 100g"`)로 이어 붙여 받아
     AI 에게 다시 나누게 했다. 이미 고른 `foodRefId` 를 버리고 이름으로 다시 추측하는
@@ -179,6 +183,29 @@ async def _parse_json_input(request: Request) -> _ParsedMealInput:
             status_code=422,
             detail="rawText 는 더 이상 받지 않습니다. 고른 음식을 items 로 보내 주세요.",
         )
+
+    skipped = body.get("skipped", False)
+    if not isinstance(skipped, bool):
+        raise HTTPException(status_code=422, detail="skipped 는 true/false 여야 합니다.")
+    if skipped:
+        # 안 먹은 끼니에 음식·식전 포만감이 함께 오면 어느 쪽이 맞는지 정할 근거가 없다.
+        # 조용히 버리지 않고 거부한다 — rawText 와 같은 원칙이다.
+        for field in ("items", "satietyBeforePct"):
+            if body.get(field) is not None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"skipped 가 true 이면 {field} 를 보낼 수 없습니다.",
+                )
+        return _ParsedMealInput(
+            meal_type=_parse_meal_type(body.get("mealType")),
+            eaten_at=_parse_eaten_at(body.get("eatenAt")),
+            image_bytes=None,
+            image_filename=None,
+            satiety_before_pct=None,
+            items=None,
+            skipped=True,
+        )
+
     if body.get("items") is None:
         raise HTTPException(status_code=422, detail="items 는 필수입니다.")
 
@@ -218,7 +245,10 @@ async def parse_meal_input(request: Request) -> _ParsedMealInput:
     responses={
         201: {
             "model": ApiResponse[MealCreateResponse],
-            "description": "고른 음식(items[])으로 등록 — 분석 없이 REVIEW_REQUIRED",
+            "description": (
+                "고른 음식(items[])으로 등록 — 분석 없이 REVIEW_REQUIRED. "
+                "식사 안 함(skipped: true) — 곧바로 EVALUATED, 끼니 피드백 생성 중"
+            ),
         },
         **error_responses(401, 404, 422),
     },
@@ -246,9 +276,26 @@ def create_meal(
     `async def` 였다면 그 동기 작업이 끝날 때까지 이벤트 루프 전체가 막혀 다른
     요청도 같이 기다렸을 것이다 — `def` 면 FastAPI 가 스레드풀에서 돌려준다.
 
+    ## 식사 안 함(`skipped: true`)은 확정까지 끝난 채로 만든다 (201)
+
+    `{ "mealType", "eatenAt", "skipped": true }` 만 받는다. 음식 분석도 확인 화면도 없이
+    `EVALUATED` 로 두고 끼니 피드백 작업을 함께 넣는다 — FE 는 확정을 부르지 않고 곧바로
+    `GET /meals/{mealId}/feedback` 을 폴링한다. 점수는 매기지 않는다(세 축 모두 null).
+
     사진 인식·`meal_items` 채우기(`worker/jobs/analyze_meal.py`)는 이번 범위 밖이다
     — 큐에 작업만 넣고, 실제 AI 연동 로직은 아직 스켈레톤(TODO) 상태로 남겨둔다.
     """
+    if parsed.skipped:
+        response.status_code = 201
+        return ok(
+            meal_service.create_skipped_meal(
+                db,
+                user_id=user_id,
+                meal_type=parsed.meal_type,
+                eaten_at=parsed.eaten_at,
+            )
+        )
+
     if parsed.items is not None:
         try:
             names = nutrition_service.get_food_names(
@@ -363,6 +410,7 @@ def get_meal(
         )
 
     # 확정 전에는 상세가 피드백을 싣지 않는다 — 제안 조회도 하지 않는다.
+    # 식사 안 함 끼니는 등록과 함께 EVALUATED 라 여기서 제안을 싣는다.
     suggestions = (
         feedback_service.build_meal_suggestions(db, meal.id)
         if meal.status is MealStatus.EVALUATED

@@ -144,16 +144,49 @@ class DailyMealSummary(_Camel):
     qqs: QQS
 
 
+class PreviousMealItem(_Camel):
+    display_name: str
+    amount: float | None
+    unit: str | None
+
+
+class PreviousMeal(_Camel):
+    """그날 이 끼니보다 먼저 먹은 확정 끼니. 문장이 아니라 음식 · 점수로 준다.
+
+    앞 끼니 문장은 아직 만들어지는 중일 수 있어서다 — 음식 · 점수는 확정 때 이미 있다.
+    """
+
+    meal_type: MealType
+    skipped: bool = False  # true 면 "안 먹은 끼니" — items 가 비고 qqs 가 모두 null
+    qqs: QQS
+    items: list[PreviousMealItem] = Field(default_factory=list)
+    nutrition_totals: Nutrition | None = None  # 끼니 영양 합계. 없으면 null
+
+
 class ShortFeedbackRequest(_Camel):
     scope: Scope
     user_id: str
     stage: Stage
-    qqs: QQS  # 채점은 BE Rule Engine 이 이미 끝냈다
+    qqs: QQS  # 채점은 BE Rule Engine 이 이미 끝냈다. 식사 안 함이면 세 축 모두 null
 
     # scope=MEAL
     meal_id: str | None = None
+    # 저녁(DINNER)이면 다음 끼니 추천(suggestions)을 비운다 — 아침 · 점심은 다음 끼니 추천
+    meal_type: MealType | None = None
+    # true 면 "식사 안 함" 끼니다. items · satiety 가 비고 qqs 가 모두 null 이다 —
+    # 영양 판정 없이, 앞선 끼니(previousMeals)와 다음 끼니 챙기기로 문장을 쓴다
+    skipped: bool = False
     items: list[FeedbackItem] = Field(default_factory=list)
     satiety: SatietyContext | None = None
+    # 그날(KST) 이 끼니보다 먼저 먹은 확정 끼니. 먹은 순서. 문장이 이들을 반영해 누적된다 —
+    # 단, Q/Q/S 와 영양소 평가는 이 끼니 단독이다
+    previous_meals: list[PreviousMeal] = Field(default_factory=list)
+    # 그날(KST) 끼니 영양 합 — daily_feedbacks.total_* 와 같은 값. 확정 끼니가 남긴 합계를
+    # 더한 것이라 식사 안 함 · 확인 전 끼니는 빠진다. 더할 합계가 없으면 null
+    daily_nutrition_totals: Nutrition | None = None
+    # 사용자 체중(kg). 먹을 때의 체중, 그 이전 기록이 없으면 가장 최근 체중이다 — BE 가
+    # Quality 채점에 쓴 값과 같다. 기록이 하나도 없으면 null
+    weight_kg: float | None = None
 
     # scope=DAILY
     date: dt.date | None = None
@@ -181,7 +214,8 @@ class ShortFeedbackResponse(_Camel):
     model_version: str
     safety_status: SafetyStatus
     reasoning: str | None = None
-    suggestions: list[Suggestion] | None = None  # scope=DAILY 면 null
+    # scope=DAILY 면 null. mealType=DINNER 면 빈 배열 — BE 도 저녁 추천은 저장하지 않는다
+    suggestions: list[Suggestion] | None = None
 
 
 # ─────────────────────────── /long-feedback ───────────────────────────
@@ -237,6 +271,8 @@ class TodayMeal(_Camel):
     """오늘(KST) 확정된 끼니 하나. 점수는 BE Rule Engine 이 매겼다."""
 
     meal_type: MealType
+    # true 면 "식사 안 함" 끼니 — foods 가 비고 qqs 가 null 이다. 비었다고 추론하지 말고 이 값을 본다
+    skipped: bool = False
     foods: list[str] = Field(default_factory=list)
     qqs: QQS | None = None  # 평가 행이 없으면 null
 
@@ -256,6 +292,7 @@ class BaseMeal(_Camel):
 
     meal_id: str
     meal_type: MealType
+    skipped: bool = False  # true 면 "식사 안 함" 끼니 — qqs 가 null 이다
     qqs: QQS | None = None
     suggestions: list[BaseMealSuggestion] = Field(default_factory=list)
 

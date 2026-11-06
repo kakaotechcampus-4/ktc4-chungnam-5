@@ -31,6 +31,8 @@ class MealListItem(CamelModel):
     display_name: str
     thumbnail_url: str | None
     scores: MealScores | None
+    skipped: bool
+    """"식사 안 함" 으로 기록한 끼니. 이때 `scores` 는 null 이고 `displayName` 은 빈 문자열이다."""
 
 
 class MealListResponse(CamelModel):
@@ -63,6 +65,8 @@ class CalendarDay(CamelModel):
     date: date
     count: int
     recorded_meal_types: list[MealType]
+    skipped_meal_types: list[MealType]
+    """`recordedMealTypes` 중 "식사 안 함" 으로 기록한 끼니. 없으면 빈 배열."""
     stage: MedicationStage
 
 
@@ -363,6 +367,9 @@ class MealDetailResponse(CamelModel):
     meal_id: uuid.UUID
     status: MealStatus
     is_recalculation: bool
+    skipped: bool
+    """"식사 안 함" 끼니. `EVALUATED` 지만 `items` · `steps` · `nutrients` 가 비고 `scores` 의
+    세 축이 모두 null 이다 — 0 이 아니라 "매기지 않았다" 다."""
     stage: MedicationStage
     meal_type: MealType
     eaten_at: KstDatetime
@@ -390,6 +397,10 @@ class MealCreateResponse(CamelModel):
     사진·텍스트는 202 + `ANALYZING` 이고 폴링 안내(`pollIntervalMs` · `timeoutMs`)가
     붙는다. 고른 음식(`items[]`)은 분석이 없어 201 + `REVIEW_REQUIRED` 이고 두 값이
     `null` 이다 — FE 는 폴링 없이 곧바로 확인 화면으로 간다.
+
+    식사 안 함(`skipped: true`)은 분석도 확인도 없어 201 + `EVALUATED` 이고 `steps` 가
+    빈 배열, 두 값이 `null` 이다. 끼니 피드백은 이미 큐에 들어가 있어 FE 는 곧바로
+    `GET /meals/{mealId}/feedback` 을 폴링한다.
     """
 
     meal_id: uuid.UUID

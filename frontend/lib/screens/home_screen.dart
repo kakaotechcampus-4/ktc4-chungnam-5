@@ -137,6 +137,7 @@ class HomeMeal {
     required this.eatenAt,
     required this.displayName,
     required this.scores,
+    this.skipped = false,
     this.thumbnailUrl,
   });
 
@@ -146,6 +147,10 @@ class HomeMeal {
   final String displayName;
   /// 아직 평가 전이면 null.
   final MealScores? scores;
+
+  /// "식사 안 함" 으로 기록한 끼니. 이때 `scores` 는 세 축이 모두 null 인 객체이고
+  /// `displayName` 은 빈 문자열이다 — 평가 전(확인 화면 대기)과 구분하는 건 이 값이다.
+  final bool skipped;
   final String? thumbnailUrl;
 
   factory HomeMeal.fromJson(Map<String, dynamic> json) => HomeMeal(
@@ -153,6 +158,7 @@ class HomeMeal {
     mealType: json['mealType'] as String,
     eatenAt: parseApiDateTime(json['eatenAt'] as String),
     displayName: json['displayName'] as String,
+    skipped: json['skipped'] as bool? ?? false,
     thumbnailUrl: json['thumbnailUrl'] as String?,
     scores: switch (json['scores']) {
       final Map<String, dynamic> s => MealScores.fromJson(s),
@@ -328,17 +334,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _load();
   }
 
-  /// 오늘의 식사 카드 탭 — 평가한 끼니는 다음 끼니 제안(7번), 아직 확정
-  /// 전이면 음식 확인 화면(5번)을 연다. 기록 탭과 같다.
+  /// 오늘의 식사 카드 탭 — 평가한 끼니와 식사 안 함은 끼니 피드백(7번), 아직 확정
+  /// 전이면 음식 확인 화면(5번)을 연다. 기록 탭과 같다. 식사 안 함은 점수가 없어도
+  /// 확정 전이 아니므로 `skipped` 로 먼저 가른다.
   Future<void> _openMeal(HomeMeal meal) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => meal.scores?.satiety == null
+        builder: (_) => meal.skipped
+            ? NextMealSuggestionScreen(mealId: meal.mealId, skipped: true)
+            : meal.scores?.satiety == null
             ? MealReviewScreen(mealId: meal.mealId)
-            : NextMealSuggestionScreen(
-                mealId: meal.mealId,
-                eatenAt: meal.eatenAt,
-              ),
+            : NextMealSuggestionScreen(mealId: meal.mealId),
       ),
     );
     if (!mounted) return;
@@ -513,6 +519,7 @@ class _HomeScreenState extends State<HomeScreen> {
           quantityLabel: meal.scores?.quantityDisplay,
           quality: meal.scores?.quality,
           satiety: meal.scores?.satiety,
+          skipped: meal.skipped,
           thumbnailUrl: meal.thumbnailUrl,
           showChevron: true,
           onTap: () => _openMeal(meal),

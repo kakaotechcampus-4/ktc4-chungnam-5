@@ -210,6 +210,7 @@ def test_context_has_medication_and_todays_evaluated_meals(db: Session):
     assert context["today"]["meals"] == [
         {
             "mealType": "LUNCH",
+            "skipped": False,
             "foods": ["참치김밥"],
             "qqs": {"quantity": 80.0, "quality": None, "satiety": 70.0},
         }
@@ -228,9 +229,52 @@ def test_context_base_meal_carries_safe_suggestions(db: Session):
     assert base == {
         "mealId": str(meal.id),
         "mealType": "LUNCH",
+        "skipped": False,
         "qqs": None,
         "suggestions": [{"foodName": "두부 반 모", "advice": "단백질을 채워요"}],
     }
+
+
+def _mark_skipped(db: Session, meal) -> None:
+    """식사 안 함 끼니 — 등록이 남기는 모양(EVALUATED · skipped · 음식 · 점수 행 없음)."""
+    meal.skipped = True
+    meal.raw_text = None
+    db.flush()
+
+
+def test_context_marks_skipped_meals_in_today(db: Session):
+    """식사 안 함은 음식 · 점수가 비어 있다 — 그걸로 추론하게 두지 않고 skipped 를 싣는다."""
+    user = make_user(db)
+    now = datetime.now(UTC)
+    eaten = make_meal(db, user_id=user.id, status=MealStatus.EVALUATED, eaten_at=now - timedelta(minutes=10))
+    make_meal_item(db, meal_id=eaten.id, display_name="참치김밥")
+    skipped = make_meal(db, user_id=user.id, status=MealStatus.EVALUATED, eaten_at=now)
+    _mark_skipped(db, skipped)
+    conversation_id = _open(db, user.id, eaten.id)
+    reply_id = _send(db, user.id, conversation_id, "오늘 어땠어?")
+
+    meals = _request(db, reply_id)["context"]["today"]["meals"]
+
+    assert [(m["skipped"], m["foods"], m["qqs"]) for m in meals] == [
+        (False, ["참치김밥"], None),
+        (True, [], None),
+    ]
+
+
+def test_context_base_meal_marks_skipped(db: Session):
+    """식사 안 함 끼니에서 챗봇을 열면 AI 가 그 끼니를 안 먹었다는 걸 알아야 한다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.EVALUATED)
+    _mark_skipped(db, meal)
+    make_meal_feedback(db, user_id=user.id, meal_id=meal.id, suggestions=[_TOFU])
+    conversation_id = _open(db, user.id, meal.id)
+    reply_id = _send(db, user.id, conversation_id, "뭐 먹을까")
+
+    base = _request(db, reply_id)["context"]["baseMeal"]
+
+    assert base["skipped"] is True
+    assert base["qqs"] is None
+    assert base["suggestions"] == [{"foodName": "두부 반 모", "advice": "단백질을 채워요"}]
 
 
 def test_context_base_meal_hides_blocked_suggestions(db: Session):

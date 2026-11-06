@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _GATEWAY_PREFIX = "https://mlapi.run/"
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     )
 
     LLM_API_KEY: SecretStr
-    LLM_VISION_URL: str = Field(repr=False)
+    LLM_VISION_URL: str = Field(default="", repr=False)
     """음식 인식(/analyze-meal) — Gemini Flash 게이트웨이."""
     LLM_REASONING_URL: str = Field(repr=False)
     """피드백(/short-feedback, /long-feedback) — Claude Sonnet 5 게이트웨이."""
@@ -35,7 +35,10 @@ class Settings(BaseSettings):
 
     @field_validator("LLM_VISION_URL", "LLM_REASONING_URL")
     @classmethod
-    def _gateway_host_only(cls, value: str) -> str:
+    def _gateway_host_only(cls, value: str, info: ValidationInfo) -> str:
+        # 피드백만 개발할 때는 비전 엔드포인트가 없어도 된다.
+        if info.field_name == "LLM_VISION_URL" and not value:
+            return value
         if not value.startswith(_GATEWAY_PREFIX):
             raise ValueError(f"엔드포인트는 {_GATEWAY_PREFIX}... 형태여야 합니다.")
         return value
@@ -45,3 +48,23 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """`Settings()` 는 매번 `.env`를 다시 읽으므로, 호출부는 이 함수로 캐시된 값을 쓴다."""
     return Settings()
+
+
+class CoachSettings(BaseSettings):
+    """코치는 vision 설정 없이도 실행할 수 있다."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    LLM_API_KEY: SecretStr
+    LLM_COACH_URL: str = Field(repr=False)
+
+    @field_validator("LLM_COACH_URL")
+    @classmethod
+    def _gateway_host_only(cls, value: str) -> str:
+        if not value.startswith(_GATEWAY_PREFIX):
+            raise ValueError("coach 엔드포인트는 mlapi.run HTTPS URL이어야 합니다")
+        return value
+
+
+@lru_cache
+def get_coach_settings() -> CoachSettings:
+    return CoachSettings()

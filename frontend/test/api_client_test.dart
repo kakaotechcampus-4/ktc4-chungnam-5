@@ -48,7 +48,8 @@ Future<(ApiClient, _FakeAdapter)> _client(
   Object? body, {
   bool fail = false,
   String? userId = 'user-1',
-  String demoKey = '',
+  // 기본은 빈 값(헤더 없음). null 을 주면 ApiClient 가 ApiConfig 의 키를 쓴다.
+  String? demoKey = '',
 }) async {
   SharedPreferences.setMockInitialValues(
     userId == null ? {} : {'session.userId': userId},
@@ -106,6 +107,62 @@ void main() {
       noKeyAdapter.lastRequest!.headers.containsKey('X-Demo-Key'),
       isFalse,
     );
+  });
+
+  group('phase addresses', () {
+    test('each phase has its own server', () {
+      expect(ApiConfig.baseUrlFor(AppPhase.local), 'http://localhost:4010/api/v1');
+      expect(ApiConfig.baseUrlFor(AppPhase.dev), 'http://127.0.0.1:8000/api/v1');
+      expect(
+        ApiConfig.baseUrlFor(AppPhase.staging),
+        'https://glp1-staging.duckdns.org/api/v1',
+      );
+      expect(
+        ApiConfig.baseUrlFor(AppPhase.prod),
+        'https://glp1-demo.duckdns.org/api/v1',
+      );
+    });
+
+    test('API_BASE_URL overrides only local and dev', () {
+      expect(
+        ApiConfig.baseUrlFor(AppPhase.local, override: 'http://10.0.2.2:4010/api/v1'),
+        'http://10.0.2.2:4010/api/v1',
+      );
+      expect(
+        ApiConfig.baseUrlFor(AppPhase.dev, override: 'http://10.0.2.2:8000/api/v1'),
+        'http://10.0.2.2:8000/api/v1',
+      );
+    });
+
+    test('staging and prod reject API_BASE_URL', () {
+      // 어느 서버에 붙는 앱인지 알 수 없게 되므로 시작 때 터진다.
+      for (final phase in [AppPhase.staging, AppPhase.prod]) {
+        expect(
+          () => ApiConfig.baseUrlFor(phase, override: 'http://10.0.2.2:8000/api/v1'),
+          throwsA(isA<StateError>()),
+        );
+      }
+    });
+  });
+
+  test('uses the key the web link provided, read at each request', () async {
+    // 웹은 시작한 뒤에 링크로 키를 받는다 — 클라이언트를 만든 뒤에 정해져도 붙어야 한다.
+    addTearDown(() => ApiConfig.runtimeDemoKey = '');
+    final (client, adapter) = await _client(200, {
+      'success': true,
+      'data': {},
+      'error': null,
+    }, demoKey: null);
+
+    await client.get('/home');
+    expect(adapter.lastRequest!.headers.containsKey('X-Demo-Key'), isFalse);
+    expect(ApiConfig.demoKeyHeaders, isNull);
+
+    ApiConfig.runtimeDemoKey = 'from-link';
+    await client.get('/home');
+    expect(adapter.lastRequest!.headers['X-Demo-Key'], 'from-link');
+    // 사진(`Image.network`)도 같은 키를 쓴다.
+    expect(ApiConfig.demoKeyHeaders, {'X-Demo-Key': 'from-link'});
   });
 
   test('403 without an envelope says the demo key is wrong', () async {

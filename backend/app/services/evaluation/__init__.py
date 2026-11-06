@@ -12,7 +12,7 @@ Q/Q/S 는 순수 함수라 0.01 초면 끝난다(절대 규칙 2). 확정은 200
 응답의 `feedbackStatus` 가 `PENDING` 으로 나간다.
 
 **제안 화면을 열 때(`GET /meals/{mealId}/feedback`) 넣지 않고 여기서 넣는 이유:**
-하루 피드백이 끼니 피드백을 근거로 쓴다(`crud/daily_feedback.py::list_day_evidence`).
+하루 피드백이 끼니 피드백으로 채워진다(`worker/jobs/feedback_meal.py::_upsert_daily`).
 화면을 연 끼니에만 문장이 생기면 안 연 끼니가 하루 요약에서 조용히 빠진다. 대가는
 아무도 안 볼 문장에도 AI 를 부른다는 것이다.
 """
@@ -20,6 +20,7 @@ Q/Q/S 는 순수 함수라 0.01 초면 끝난다(절대 규칙 2). 확정은 200
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Final, NamedTuple
 
@@ -51,6 +52,7 @@ from app.schemas.evaluation import (
     NutrientRow,
     QqsScores,
 )
+from app.schemas.nutrition import NutritionInfo
 from app.models.evaluation import QQSEvaluation
 from app.services.evaluation.rule_engine import MealTargets, Scores, evaluate, meal_targets
 from app.services.evaluation.stage_profile import emphasis_for, profile_for
@@ -87,11 +89,13 @@ class EvaluationResult(NamedTuple):
 
 
 DB_SOURCE: Final = "식품안전나라 식품영양성분DB"
-STAGE_RULE_VERSION: Final = "v2"
-WEIGHT_PROFILE_VERSION: Final = "v2"
+STAGE_RULE_VERSION: Final = "v3"
+WEIGHT_PROFILE_VERSION: Final = "v3"
 """명세 `evidence` 의 상수들. 채점 기준선(`stage_profile`)을 바꾸면 올린다.
 
 v2: Quantity · Quality 채점 도입 (`docs/be-qqs-scoring-rule.md`).
+v3: Quantity 구간 밖 감점을 비율의 k 제곱으로, Quality 를 가중 평균(0.5 · 0.2 · 0.3)으로,
+    나트륨을 (한도 ÷ 먹은 양)² 으로 바꿨다. 0점이 쉽게 나오지 않는다.
 """
 
 _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATED})
@@ -154,7 +158,13 @@ def _is_confirmable(meal: Meal) -> bool:
 
     🔗 `services/meal.py::_is_editable` 과 같은 모양이다 — 그쪽은 "고칠 수 있는가",
     이쪽은 "확정할 수 있는가" 이고, `ANALYZING` 을 가르는 기준이 같다.
+
+    **식사 안 함 끼니는 확정하지 않는다** — 등록할 때 이미 `EVALUATED` 이고 매길 점수가
+    없다(`services/meal.py::create_skipped_meal`). 허용하면 빈 음식으로 점수 행이 생겨
+    평균에 0 점이 섞인다.
     """
+    if meal.skipped:
+        return False
     if meal.status in _CONFIRMABLE:
         return True
     return meal.status is MealStatus.ANALYZING and meal.is_recalculation
@@ -179,12 +189,8 @@ def _weight_at(db: Session, meal: Meal) -> Decimal | None:
     경우는 가입 직후 과거 시각으로 식사를 적었을 때다 — 그때 체중이 없다고 Quality 를
     비우면, 온보딩에서 받은 체중이 있는데도 점수가 안 나온다.
     """
-    weight = user_state_crud.get_latest_weight_before(
-        db, user_id=meal.user_id, before=meal.eaten_at
-    )
-    if weight is None:
-        weight = user_state_crud.get_latest_weight(db, meal.user_id)
-    return weight
+    # 규칙은 crud 한 곳에 있다 — 끼니 피드백 AI 요청도 같은 체중을 보낸다.
+    return user_state_crud.get_weight_at(db, user_id=meal.user_id, at=meal.eaten_at)
 
 
 def _targets(
@@ -354,8 +360,15 @@ def confirm(
     user_id: uuid.UUID,
     meal_id: uuid.UUID,
     request: MealConfirmRequest,
+    nutrition_of: Callable[[Meal], NutritionInfo],
 ) -> EvaluationResult:
     """식사를 확정하고 Q/Q/S 를 매긴다. 커밋까지 한다.
+
+    한 끼 영양 합계(`meals.total_*`)도 여기서 남긴다. 합계 규칙은 `services/meal.py`
+    (항목 규칙)와 `services/nutrition.py`(공공 DB 환산)에 있어 여기서 부를 수 없으므로
+    (README 절대 규칙 5) api 레이어가 엮은 `nutrition_of` 를 받는다. **미리 계산한 값이
+    아니라 함수를 받는 이유:** 식사 행을 잠근 뒤에 항목을 읽어야 한다. 잠그기 전에
+    더하면 그 사이 고친 음식이 점수에는 들어가고 합계에는 안 들어간다.
 
     **식사 행부터 잠근다.** `feedback.meal` 워커가 `meals` → `meal_feedbacks` 순으로
     잠그므로 여기도 같은 순서여야 한다 — 거꾸로 잡으면(`invalidate_by_meal` 이 먼저)
@@ -365,7 +378,9 @@ def confirm(
     meal = _owned_meal(db, user_id, meal_id, for_update=True)
     if not _is_confirmable(meal):
         raise MealNotConfirmableError(
-            f"{meal.status.value} 상태의 식사는 확정할 수 없습니다."
+            "식사 안 함으로 기록한 끼니는 확정하지 않습니다."
+            if meal.skipped
+            else f"{meal.status.value} 상태의 식사는 확정할 수 없습니다."
         )
 
     satiety_crud.set_satiety_after(db, meal_id=meal.id, pct=request.satiety_after_pct)
@@ -407,6 +422,17 @@ def confirm(
         # 채점과 **같은 트랜잭션**에 넣는다 — 점수는 저장됐는데 작업은 없는 상태가
         # 생기지 않는다. 제안 화면을 열 때가 아니라 여기서 넣는 이유는 모듈 독스트링 참고.
         enqueue(db, feedback_crud.FEEDBACK_TASK_TYPE, {"mealId": str(meal.id)})
+    totals_for_ai = nutrition_of(meal)
+    meal_crud.set_nutrient_totals(
+        db,
+        meal=meal,
+        kcal=totals_for_ai.kcal,
+        protein_g=totals_for_ai.protein_g,
+        fat_g=totals_for_ai.fat_g,
+        carb_g=totals_for_ai.carb_g,
+        fiber_g=totals_for_ai.fiber_g,
+        sodium_mg=totals_for_ai.sodium_mg,
+    )
     meal_crud.set_status(db, meal, MealStatus.EVALUATED)
     db.commit()
 
