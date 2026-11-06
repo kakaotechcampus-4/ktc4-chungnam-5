@@ -219,7 +219,7 @@ def _scored_as(evaluation: QQSEvaluation) -> tuple[Any, ...]:
         evaluation.quantity_score,
         evaluation.quality_score,
         evaluation.satiety_score,
-        # 평소 섭취량만 고쳐 재확정하면 점수는 같아도 비율이 바뀐다. 문장은 비율을 말한다.
+        # 평소 섭취량만 고쳐 재확정하면 점수는 같아도 비율이 바뀐다 — 문장을 만든 AI 입력이 바뀐 것이다.
         evaluation.intake_ratio_pct,
     )
 
