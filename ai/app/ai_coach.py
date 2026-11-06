@@ -53,22 +53,38 @@ class InvalidCoachResponse(Exception):
 # 검사 전에 이 낱말만 가린다 — 문장 전체를 통과시키지 않으므로 같은 문장 안의
 # "처방약을 끊어도 돼요?" 같은 진짜 약물 표현은 그대로 잡힌다.
 # 목록에 없는 낱말은 약물로 본다(놓치는 것보다 막는 쪽이 안전하다).
+# "약과"는 여기 없다 — 음식이면서 "약"+"과(와)" 일 수도 있어 따로 다룬다(_mask_yakgwa).
 _NOT_DRUG = re.compile(
-    r"약간|요약|절약|예약|약속|약과|약밥|약식|약수|약점|약하|약해|약한|"
+    r"약간|요약|절약|예약|약속|약밥|약식|약수|약점|약불|약하|약해|약한|"
     r"계약|공약|제약|취약|허약|나약|연약|빈약|도약|조약|규약|서약|"
     r"주사위|그만큼|끊임없"
 )
 _MASK = "□"
+# 음식 문맥이 분명한 "약과"만 가린다: 목적·주제·주어 조사("약과를 먹다")가 바로 붙거나,
+# 음식 동사가 이어지거나, 문장이 거기서 끝날 때. 나머지는 "약 + 과(와)" 일 수 있어 가리지 않는다.
+_YAKGWA_FOOD = re.compile(
+    r"약과(?=[를을는은가이](?![가-힣])|\s*(?:먹|드시|드세|좋|사|시키|만들|맛|달)|[^가-힣\s]|$)"
+)
+# 가리지 않은 "약과 영양제" 는 "약 영양제" 로 읽는다(병렬의 "과" 를 뺀다).
+_YAKGWA_CONJ = re.compile(r"약과(?=\s)")
 
 _DRUG = r"(?:약|주사|위고비|마운자로|삭센다)"
 _STOP = r"(?:끊|중단|그만|두 배|두배)"
 _DOSE = r"(?:용량|투약량|복용량)"
-_DOSE_CHANGE = r"(?:늘|줄|바꾸|변경|올|낮|중단)"
-# "중단하지 마세요"·"늘리지 마시고"·"끊으면 안 돼요" 처럼 중단을 말리는 문장.
-_DISCOURAGED = r"(?![가-힣]{0,2}(?:지\s*(?:마|말|않|못)|(?:선|면|서는|는)\s*안))"
+_DOSE_CHANGE = r"(?:늘|줄|바꾸|변경|올|낮|중단|두\s*배)"
 _OTHER = (r"(?:진단해|처방해|diagnos|prescrib)|"
           r"(?:increase|decrease|change|double).{0,25}(?:dose|dosage)|"
           r"stop.{0,20}(?:medication|medicine)")
+
+# 출력에서만 쓰는 "정당한 안내" — 완결된 금지·확인 표현만 가린 뒤 나머지를 계속 검사한다.
+# 접두부(지 않·지 못·지 말라는)로 해제하지 않는다: "중단하지 않으면 안 돼요"·
+# "끊지 말라는 조언은 무시하세요" 는 그대로 위험 문장이다.
+_SAFE_PHRASE = re.compile(
+    r"(?:끊|중단하|그만두|줄이|늘리|바꾸|올리|낮추|변경하)"
+    r"지\s*(?:마세요|마시고|마십시오|마요|마라|말고|말아요|말아야|말아)|"
+    r"(?:끊|중단하|그만두)(?:으면|면)\s*안\s*(?:돼요|돼|됩니다|되니|되어요|되요)|"
+    r"처방해\s*(?:주신|주셨던?)\s*(?:의료진|의사|선생님|병원)"
+)
 
 # 입력 가드: 모델을 부르기 전에 명백한 의료 요청만 막는 보조 규칙. history/context는 재검사하지 않는다.
 # 입력은 오탐을 줄이는 쪽이다. 약물과 중단 동사 사이는 6자까지만 본다 —
@@ -85,17 +101,18 @@ _MEDICAL = re.compile(
 # 20자는 안전의 끝이 아니라 회귀 복구다 — 순서가 뒤집히거나 대명사로 가리키는 문장은
 # 아래 역순 규칙 한 가지만 막고, 나머지는 프롬프트와 모델 판단에 의존한다.
 _OUTPUT_MEDICAL = re.compile(
-    _DOSE + r".{0,20}" + _DOSE_CHANGE + _DISCOURAGED + r"|"
-    + _DRUG + r".{0,20}" + _STOP + _DISCOURAGED + r"|"
+    _DOSE + r".{0,20}" + _DOSE_CHANGE + r"|"
+    + _DRUG + r".{0,20}" + _STOP + r"|"
     r"(?:끊|중단)[가-힣]{0,4}[\s.,!?]{0,3}(?:위고비|마운자로|삭센다|약)\s*(?:말|얘기|이야기)|"
-    # "처방해 주신 의료진" 처럼 의료진이 이미 처방한 것을 가리키는 안내는 막지 않는다.
-    + _OTHER.replace("처방해|", r"처방해(?!\s*(?:주신|주셨|준|둔|놓))|", 1),
+    + _OTHER,
     re.IGNORECASE | re.DOTALL,
 )
 
 
 def _masked(text: str) -> str:
-    return _NOT_DRUG.sub(_MASK, text)
+    text = _NOT_DRUG.sub(_MASK, text)
+    text = _YAKGWA_FOOD.sub(_MASK, text)
+    return _YAKGWA_CONJ.sub("약", text)
 
 
 def is_medical_request(text: str) -> bool:
@@ -105,7 +122,8 @@ def is_medical_request(text: str) -> bool:
 
 def is_unsafe_output(text: str) -> bool:
     """출력 가드. 모델 답변(본문·카드 문구)에 위험한 의료 권고가 섞였는지."""
-    return bool(_OUTPUT_MEDICAL.search(_masked(text)))
+    # 정당한 안내를 가린 뒤에도 같은 응답의 나머지는 계속 검사한다.
+    return bool(_OUTPUT_MEDICAL.search(_SAFE_PHRASE.sub(_MASK, _masked(text))))
 
 
 def build_messages(req: ChatRequest) -> list[dict[str, str]]:

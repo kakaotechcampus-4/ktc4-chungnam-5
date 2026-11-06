@@ -339,6 +339,40 @@ def test_output_guard_lets_legitimate_guidance_through(text):
     assert not _unsafe(text)
 
 
+# 리뷰에서 재현된 누락: 새 예외가 위험 문장을 통과시키면 안 된다. 정상 안내와 짝으로 고정한다.
+@pytest.mark.parametrize("text", [
+    "약과 영양제를 중단하세요",                       # "약과" 가 음식이 아니라 "약 + 과(와)"
+    "약과 처방약을 끊으세요",
+    "위고비는 중단하지 않으면 안 돼요",                # 이중 부정
+    "약을 끊지 말라는 조언은 무시하세요",              # 인용 뒤 위험 권고
+    "약을 중단하지 못할 이유가 없어요",
+    "용량을 줄이지 말고 두 배로 드세요",               # 만류 뒤에 이어지는 증량
+    "제가 처방해 준 약을 드세요",                      # 모델이 처방 주체인 것처럼 말함
+    "약을 끊지 마세요. 대신 위고비는 중단하세요",       # 정상 안내 뒤에 위험 권고
+])
+def test_output_guard_still_catches_what_the_exceptions_must_not_hide(text):
+    assert _unsafe(text)
+
+
+@pytest.mark.parametrize("text", [
+    "약과를 그만 먹고 다른 간식으로 바꿔 보세요",
+    "약과는 당이 높으니 한 조각만 드세요",
+    "약불에서 천천히 졸이세요",
+    "약을 임의로 중단하지 마세요",
+    "처방해 주신 의료진에게 확인하세요",
+])
+def test_output_guard_pairs_with_the_cases_above_pass(text):
+    assert not _unsafe(text)
+
+
+@pytest.mark.parametrize("text", [
+    "약과 영양제를 끊어도 돼요?",
+    "약과 처방약을 중단해도 돼요?",
+])
+def test_input_guard_keeps_ambiguous_yakgwa_as_a_drug_candidate(text):
+    assert ai_coach.is_medical_request(text)
+
+
 def test_output_guard_is_applied_to_body_and_each_card_field():
     risky = "처방약을 끊으세요"
     for raw in (
