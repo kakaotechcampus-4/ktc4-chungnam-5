@@ -54,7 +54,13 @@ from app.schemas.evaluation import (
 )
 from app.schemas.nutrition import NutritionInfo
 from app.models.evaluation import QQSEvaluation
-from app.services.evaluation.rule_engine import MealTargets, Scores, evaluate, meal_targets
+from app.services.evaluation.rule_engine import (
+    MealTargets,
+    Scores,
+    evaluate,
+    intake_ratio_pct,
+    meal_targets,
+)
 from app.services.evaluation.stage_profile import emphasis_for, profile_for
 
 
@@ -113,7 +119,10 @@ _CONFIRMABLE: Final = frozenset({MealStatus.REVIEW_REQUIRED, MealStatus.EVALUATE
 
 
 def _is_stale_feedback(
-    meal: Meal, previous: QQSEvaluation | None, scores: Scores
+    meal: Meal,
+    previous: QQSEvaluation | None,
+    scores: Scores,
+    intake_ratio: Decimal | None,
 ) -> bool:
     """이번 확정이 옛 AI 문장을 무효로 만드는가.
 
@@ -131,6 +140,8 @@ def _is_stale_feedback(
     - **점수가 달라졌다** — 사용자가 `satietyAfterPct` 를 고쳐 다시 확정했다.
       상태로는 못 잡는다. 음식을 안 고쳤으면 `EVALUATED` 그대로 들어온다.
       Quantity·Quality 의 변화(예: 체중을 새로 기록해 목표가 바뀜)도 여기서 잡힌다.
+    - **섭취 비율이 달라졌다** — 평소 섭취량을 고쳐 재확정했다. 구간 안이면 Quantity 는
+      100 그대로지만 문장은 "평소의 몇 %" 를 말한다.
 
     첫 확정은 `previous` 가 없어 True 다 — 지울 행도 없어 0 행 UPDATE 다.
     """
@@ -142,7 +153,17 @@ def _is_stale_feedback(
         previous.quantity_score != scores.quantity
         or previous.quality_score != scores.quality
         or previous.satiety_score != scores.satiety
+        or previous.intake_ratio_pct != intake_ratio
     )
+
+
+def _rounded_ratio(ratio: Decimal | None) -> Decimal | None:
+    """저장 · 비교용으로 소수 둘째 자리에서 자른다. 채점은 반올림 전 값을 쓴다.
+
+    저장한 값과 다시 계산한 값을 비교하므로(`_is_stale_feedback`) 같은 자리수여야 한다 —
+    아니면 아무것도 안 고친 재확정도 "비율이 바뀌었다" 가 된다.
+    """
+    return None if ratio is None else ratio.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def _is_confirmable(meal: Meal) -> bool:
@@ -392,6 +413,9 @@ def confirm(
         raise RuntimeError(f"user {user_id} 가 없습니다.")
     weight = _weight_at(db, meal)
     targets = _targets(stage, weight)
+    intake_ratio = _rounded_ratio(
+        intake_ratio_pct(_usable(totals, "kcal"), user.baseline_meal_kcal)
+    )
     scores = evaluate(
         profile=profile_for(stage),
         satiety_after_pct=request.satiety_after_pct,
@@ -404,7 +428,9 @@ def confirm(
     )
 
     # `upsert` 보다 **먼저** 읽는다 — 덮고 나면 비교할 옛 점수가 없다.
-    stale = _is_stale_feedback(meal, evaluation_crud.get_by_meal(db, meal.id), scores)
+    stale = _is_stale_feedback(
+        meal, evaluation_crud.get_by_meal(db, meal.id), scores, intake_ratio
+    )
 
     evaluation_crud.upsert(
         db,
@@ -413,6 +439,7 @@ def confirm(
         quantity_score=scores.quantity,
         quality_score=scores.quality,
         satiety_score=scores.satiety,
+        intake_ratio_pct=intake_ratio,
     )
     if stale:
         # 행이 아니라 내용만 비운다 — `daily_feedback_sources` 가 CASCADE 라 지우면

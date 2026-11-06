@@ -207,6 +207,31 @@ def test_same_meal_scores_differently_by_stage(client: TestClient, db: Session) 
     assert _confirm(client, user, meal)["scores"]["quantity"] == 66
 
 
+def test_confirm_stores_the_intake_ratio(client: TestClient, db: Session) -> None:
+    """점수와 함께 평소 대비 섭취 비율을 남긴다 — 끼니 피드백이 과식 · 소식 방향을 쓰는 근거다.
+
+    700kcal / 평소 700kcal = 100%.
+    """
+    user, meal = _meal_with(db, calories=Decimal("280"))
+
+    _confirm(client, user, meal)
+
+    row = evaluation_crud.get_by_meal(db, meal.id)
+    assert row is not None
+    assert row.intake_ratio_pct == Decimal("100.00")
+
+
+def test_intake_ratio_is_null_without_kcal(client: TestClient, db: Session) -> None:
+    """열량을 모르면 비율도 null 이다 — Quantity 점수와 같다."""
+    user, meal = _meal_with(db, calories=None)
+
+    assert _confirm(client, user, meal)["scores"]["quantity"] is None
+
+    row = evaluation_crud.get_by_meal(db, meal.id)
+    assert row is not None
+    assert row.intake_ratio_pct is None
+
+
 # 100g 당 단백질 5.6 · 식이섬유 1.6 · 나트륨 200 → 250g 에 14g · 4g · 500mg.
 # 70kg 유지기 목표 28g · 8.33g · 766.7mg → 0.5 · 0.48 · 1 → 가중 평균(0.5 · 0.2 · 0.3) 0.646.
 _BALANCED = dict(protein_g=Decimal("5.6"), fiber_g=Decimal("1.6"), sodium_mg=Decimal("200"))
@@ -1003,6 +1028,25 @@ def test_reconfirm_with_changed_satiety_enqueues_again(client: TestClient, db: S
     make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
 
     _post_confirm(client, user, meal, pct=30)
+
+    assert len(_feedback_tasks(db, meal.id)) == 2
+
+
+def test_reconfirm_with_changed_intake_ratio_enqueues_again(
+    client: TestClient, db: Session
+) -> None:
+    """평소 섭취량을 고쳐 비율만 바뀌어도 옛 문장은 무효다 — 문장이 비율을 말한다.
+
+    500kcal 는 평소 700 이면 71%, 650 이면 77% 다. 둘 다 유지기 구간(60–85%) 안이라
+    Quantity 는 100 그대로다. 점수만 비교하면 "평소의 71%" 문장이 남는다.
+    """
+    user, meal = _meal_with(db, calories=Decimal("200"))
+    _post_confirm(client, user, meal)
+    make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
+    user.baseline_meal_kcal = Decimal("650")
+    db.flush()
+
+    _post_confirm(client, user, meal)
 
     assert len(_feedback_tasks(db, meal.id)) == 2
 

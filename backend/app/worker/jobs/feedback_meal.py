@@ -46,7 +46,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -65,6 +65,7 @@ from app.models.enums import MealStatus, MealType, SafetyStatus
 from app.models.evaluation import QQSEvaluation
 from app.models.meal import Meal, MealItem
 from app.services.meal import item_nutrition, resolved_amount
+from app.services.evaluation.stage_profile import profile_for
 from app.services.nutrition import resolve_by_food_ref_id
 from app.worker.job import Job, Skip
 
@@ -188,6 +189,22 @@ def _basis(db: Session, meal: Meal) -> tuple[Any, ...] | None:
     return None if evaluation is None else _scored_as(evaluation)
 
 
+def _intake_payload(evaluation: QQSEvaluation) -> dict[str, Any] | None:
+    """평소 대비 섭취 비율과 **채점 단계의** 권장 구간. 비율이 없으면 None.
+
+    비율만으로는 방향을 모른다 — 같은 95% 도 조정기(60–90%)에서는 초과, 투약 전
+    (85–105%)에서는 적정이다. 구간을 같이 보내 AI 가 단계 기준을 복사하지 않게 한다.
+    """
+    ratio = evaluation.intake_ratio_pct
+    if ratio is None:
+        return None
+    band = profile_for(evaluation.stage_at_evaluation).quantity
+    return {
+        "ratioPct": float(ratio.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)),
+        "rangePct": [float(band.lo), float(band.hi)],
+    }
+
+
 def _scored_as(evaluation: QQSEvaluation) -> tuple[Any, ...]:
     """문장이 딛고 선 채점 — 쓰기 직전에 이게 그대로인지 본다.
 
@@ -202,6 +219,8 @@ def _scored_as(evaluation: QQSEvaluation) -> tuple[Any, ...]:
         evaluation.quantity_score,
         evaluation.quality_score,
         evaluation.satiety_score,
+        # 평소 섭취량만 고쳐 재확정하면 점수는 같아도 비율이 바뀐다. 문장은 비율을 말한다.
+        evaluation.intake_ratio_pct,
     )
 
 
@@ -384,6 +403,7 @@ def load(db: Session, task: ClaimedTask) -> _Ctx | Skip:
         qqs: dict[str, float | None] = {"quantity": None, "quality": None, "satiety": None}
         items: list[dict[str, Any]] = []
         satiety = None
+        intake = None
         basis = _SKIPPED_BASIS
     else:
         evaluation = evaluation_crud.get_by_meal(db, meal.id)
@@ -399,6 +419,7 @@ def load(db: Session, task: ClaimedTask) -> _Ctx | Skip:
         }
         items = [_item_payload(db, item) for item in meal.items]
         satiety = _satiety_payload(db, meal.id)
+        intake = _intake_payload(evaluation)
         basis = _scored_as(evaluation)
 
     return _Ctx(
@@ -409,6 +430,8 @@ def load(db: Session, task: ClaimedTask) -> _Ctx | Skip:
             "userId": str(meal.user_id),
             "stage": stage.value,
             "qqs": qqs,
+            # 평소 대비 섭취 비율 + 단계 권장 구간. Quantity 점수의 방향(과식 · 소식) 근거다.
+            "intake": intake,
             "mealId": str(meal.id),
             # 저녁이면 AI 는 다음 끼니 추천을 비운다.
             "mealType": meal.meal_type.value,
