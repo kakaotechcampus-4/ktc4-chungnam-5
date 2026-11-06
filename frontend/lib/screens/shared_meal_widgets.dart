@@ -53,19 +53,19 @@ class StageBadge extends StatelessWidget {
 
 /// Q·Q·S 배지 한 줄. 세 색은 의미가 고정이라 다른 용도로 쓰지 않는다.
 ///
-/// - 양: 서버가 내려주는 라벨(`부족`·`적정`·`과다`). FE 는 계산하지 않는다.
-/// - 질 / 포만도: 0~100 정수
+/// - 양 / 질: 0~100 정수, `N점`
+/// - 포만도: 0~100 정수, `N%`
 ///
-/// 양·질은 영양 정보가 있는 음식이 없으면 null 이라 `-` 로 보인다.
+/// 양·질은 영양 정보가 있는 음식이 없으면 null 이라 `-점` 으로 보인다.
 class QqsBadgeRow extends StatelessWidget {
   const QqsBadgeRow({
     super.key,
-    required this.quantityLabel,
+    required this.quantity,
     required this.quality,
     required this.satiety,
   });
 
-  final String? quantityLabel;
+  final int? quantity;
   final int? quality;
   final int satiety;
 
@@ -74,13 +74,13 @@ class QqsBadgeRow extends StatelessWidget {
     return Row(
       children: [
         _Badge(
-          text: '양 ${quantityLabel ?? '-'}',
+          text: '양 ${quantity ?? '-'}점',
           background: AppColors.quantityBg,
           foreground: AppColors.quantity,
         ),
         const SizedBox(width: AppSpacing.xs),
         _Badge(
-          text: quality == null ? '질 -' : '질 $quality점',
+          text: '질 ${quality ?? '-'}점',
           background: AppColors.qualityBg,
           foreground: AppColors.quality,
         ),
@@ -126,7 +126,7 @@ class MealCard extends StatelessWidget {
     required this.mealTypeLabel,
     required this.time,
     required this.foodNames,
-    required this.quantityLabel,
+    required this.quantity,
     required this.quality,
     required this.satiety,
     this.skipped = false,
@@ -152,7 +152,7 @@ class MealCard extends StatelessWidget {
   /// 보인다. 점수 자리에 0 을 채우면 "0점짜리 식사"로 읽힌다. 포만도는 확정
   /// 때 사용자가 꼭 넣으므로 평가 여부를 가른다. 양·질은 평가 뒤에도 null 일
   /// 수 있다(영양 정보 없는 음식만 있을 때).
-  final String? quantityLabel;
+  final int? quantity;
   final int? quality;
   final int? satiety;
 
@@ -210,7 +210,7 @@ class MealCard extends StatelessWidget {
                       )
                     else if (satiety case final s?)
                       QqsBadgeRow(
-                        quantityLabel: quantityLabel,
+                        quantity: quantity,
                         quality: quality,
                         satiety: s,
                       )
