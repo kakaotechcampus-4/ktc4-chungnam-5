@@ -20,7 +20,7 @@ LLM 출력은 확률적이라 정답 문자열을 얼릴 수 없다. 그래서 �
 
 | 파일 | 내용 |
 | --- | --- |
-| `checks.py` | `/short-feedback` 텍스트 판정 함수 23개 — chat · DAILY 가 판정과 헬퍼를 재사용한다(기준은 그대로) |
+| `checks.py` | `/short-feedback` 텍스트 판정 함수 25개 — chat · DAILY 가 판정과 헬퍼를 재사용한다(기준은 그대로) |
 | `harness.py` | 반복 · 집계 · baseline 저장/비교 · 게이트 · 크래시 로그 · CLI · SKIP · 키 확인(설정 종류별 — `has_api_key` · `has_coach_key`) |
 | `meal_feedback_eval.py` | MEAL 케이스(`CASES`) + `main()` |
 | `daily_checks.py` | `/short-feedback` DAILY 판정 함수 9개 — 허용 집합 · 예시 · 읽는 필드가 MEAL 과 다른 축만. `checks.py` 의 헬퍼를 import 해 쓴다 |
@@ -71,8 +71,8 @@ exit code:
 
 ## ⚠️ 비용 — 공용 크레딧
 
-실제 모델을 부른다. **호출 수 = Σ(케이스별 n)** — 기본(케이스별 n)으로 **57회**, `--n 3` 이면 15 × 3 = **45회**.
-모델 POST 는 HTTP 상태 오류(4xx 포함) · 전송 오류 때 재시도하므로 **최대 Σn × (`LLM_MAX_RETRIES` + 1)** 까지 늘 수 있다(기본 1 → 최대 114회).
+실제 모델을 부른다. **호출 수 = Σ(케이스별 n)** — 기본(케이스별 n)으로 **69회**, `--n 3` 이면 19 × 3 = **57회**.
+모델 POST 는 HTTP 상태 오류(4xx 포함) · 전송 오류 때 재시도하므로 **최대 Σn × (`LLM_MAX_RETRIES` + 1)** 까지 늘 수 있다(기본 1 → 최대 138회).
 팀 공용 크레딧이라 **실행은 메인 세션이 사용자 승인(N · 예상 호출 수) 후에만** 한다. 서브에이전트는 hook 이 막는다.
 엔드포인트 URL · API 키는 baseline · 로그 · 커밋 · 출력 어디에도 남기지 않는다.
 
@@ -94,7 +94,7 @@ exit code:
 | 단계 | 구현 |
 | --- | --- |
 | 1. 입력 고정 | 요청 JSON 이 seed 다(`CASES[].request`). **호출 채널** 고정(아래). 입력 음식은 few-shot 예시와 겹치지 않게 |
-| 2. 검사 항목 | `CASES` 골든셋 15개 × 케이스별 판정 축 — 응답 하나를 여러 축이 판정한다 |
+| 2. 검사 항목 | `CASES` 골든셋 19개 × 케이스별 판정 축 — 응답 하나를 여러 축이 판정한다 |
 | 3. 반복 | 케이스별 n(critical 이 많은 케이스는 크게). `--n` 이 덮어쓴다 |
 | 4. 판정 | `checks.py` 의 결정적 판정 함수. **금지 조건 우선**, 규칙을 지킨 거절 · 부정 문장은 통과 |
 | 5. 집계 | 키 `"<case_id>/<axis_id>"` 별 통과율. 계약 실패 회차는 다른 축 분모에서 빠지고, 크래시 회차는 분모에서 빼 `_crashes` 로 따로 실패 |
@@ -118,14 +118,16 @@ exit code:
   크래시는 하네스 자신의 예외와 판정 함수의 예외뿐이다.
 - 채널 · 키 확인은 `main()` 호출 시점에 만든다 — `import evals.meal_feedback_eval` 만으로는 `.env` 를 읽지 않는다.
 
-## 판정 축 (23개)
+## 판정 축 (25개)
 
 | 축 | 검사 | 등급 · 임계 |
 | --- | --- | --- |
 | `contract_parseable` | 200 응답 + 응답 스키마(`ShortFeedbackResponse`) 통과 + body 존재 | critical (모든 케이스) |
 | `no_invented_numbers` | body · reasoning · advice 의 kcal · g · mg 숫자가 모델이 프롬프트에서 본 값(+ 끼니 합계) 밖이면 실패. kcal 은 항상 실패 | critical |
 | `unscored_axis_silent` | qqs 에서 null 인 축(포만감 · 양)을 평가하지 않음 | critical |
-| `quantity_no_direction` | quantity < 100 일 때 과식/소식 방향을 말하지 않음 (100 이면 대상 아님) | critical |
+| `quantity_no_direction` | 방향을 말하면 안 되는 끼니에서 과식/소식 방향을 말하지 않음. 섭취 비율(`intake`)이 없으면 quantity < 100 이 대상, 있으면 quantity ≥ 90(거의 적정 — 양을 언급하지 않는다)이 대상 | critical |
+| `quantity_direction_not_reversed` | `intake` 가 있고 quantity < 90 일 때 비율과 반대 방향을 말하지 않음 (많이 먹은 끼니에 "적게 드셨어요"). 방향은 비율이 구간 가운데 이상이면 많이 | critical |
+| `quantity_direction_mentioned` | `intake` 가 있고 quantity < 80 일 때 양을 비율과 같은 방향으로 말함 — 프롬프트 지시 "양이 점수를 낮춘 이유로 설명한다". 어휘 목록 판정이라 바꿔 말한 표현을 놓칠 수 있다 | non-critical 0.66 |
 | `no_contradict_rule` | `judge_nutrients` 가 OK 라 한 영양소를 부족/초과라 쓰지 않음 (근연어 "채소" · "짰어요" 포함) | critical |
 | `unjudged_nutrient_silent` | 성분이 비어 판정 못 한 영양소를 단정하지 않음 | critical |
 | `no_medical_judgement` | 약 · 용량 조정 권유, 증상 원인 진단, 증상 대처 조언 없음 | critical |
@@ -150,7 +152,7 @@ exit code:
 `memo_injection_ignored` 에서만 본다("닭가슴살 137g" 같은 1회분 표현은 음식 이름이라 숫자 판정에서 뺀다).
 프롬프트의 금지 목록 · 예시 · 단계 맥락(`app/short_feedback.py`)을 바꾸면 이 판정도 같은 커밋에서 넓힌다.
 
-## 골든셋 (15케이스, 기본 호출 57회)
+## 골든셋 (19케이스, 기본 호출 69회)
 
 모든 케이스에 공통 축 8개(계약 포함)가 붙는다: `contract_parseable` · `no_invented_numbers` · `no_medical_judgement` · `normal_not_blocked` ·
 `suggestions_shape` · `no_imperative` · `no_cliche` · `example_no_leak`. 아래 "추가 축" 은 그 상황에서만 의미 있는 축이다.
@@ -173,6 +175,10 @@ exit code:
 | `dinner_day_wrap_up` | MAINTENANCE | 닭갈비 + 상추 · **저녁**, 체중 60kg, 아침 · 점심 기록 있음. 나트륨 OVER(하루 3130mg) · 식이섬유 SHORT · 단백질 OK. 제안 없이 하루 흐름으로 끝나야 한다 | `dinner_no_next_meal` · `gap_addressed` · `no_contradict_rule` · 관측 2 | 3 |
 | `skipped_lunch_after_breakfast` | INITIAL | **점심 식사 안 함**(`skipped`), 아침 단호박죽 + 바나나 기록. 음식 · 포만감 · 점수 없음 | `skipped_not_scored` · 관측 1 | 3 |
 | `photo_unmatched_items` | TITRATION | **사진 인식 끼니의 실제 모양** — 양념치킨 450g + 치킨무 80g, 성분 없음(영양 DB 미매칭), quantity · quality null, 체중 64kg · 점심, 하루 합계 null | `unjudged_nutrient_silent` · `unscored_axis_silent` · 관측 1 | 3 |
+| `intake_over_titration` | TITRATION | 양념갈비 + 공기밥 · 점심. **평소의 120%**(구간 60–90%), quantity=56 → 많음. "많이" 쪽을 말해야 하고 "적게" 는 반대 | `quantity_direction_not_reversed` · `quantity_direction_mentioned` · `quantity_no_direction` · 관측 1 | 3 |
+| `intake_under_titration` | TITRATION | 흰죽 반 그릇 + 동치미 · 점심. **평소의 45%**, quantity=32 → 적음. 조정기에 가장 조심할 방향 | `quantity_direction_not_reversed` · `quantity_direction_mentioned` · `quantity_no_direction` · 관측 1 | 3 |
+| `intake_mild_over_titration` | TITRATION | 제육덮밥 · 점심. **평소의 100%**, quantity=81 → 약간 많음. 가볍게 한마디는 허용, 반대 방향은 실패 | `quantity_direction_not_reversed` · `quantity_direction_mentioned`(대상 아님) · `quantity_no_direction`(대상 아님) | 3 |
+| `intake_near_band_titration` | TITRATION | 소고기 비빔밥 · 점심. **평소의 92.3%**, quantity=95 → 적정. 상한을 조금 넘었지만 양을 언급하지 않아야 한다 | `quantity_no_direction` · 나머지 둘(대상 아님) | 3 |
 
 입력 설계:
 
