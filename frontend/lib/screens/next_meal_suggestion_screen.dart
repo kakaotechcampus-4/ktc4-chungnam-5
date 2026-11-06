@@ -476,7 +476,22 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
         ),
       ];
     }
-    return const [SkeletonBox(width: double.infinity, height: 72)];
+    // 회색 빈 칸만 보이면 멈춘 것처럼 보여서, 만드는 중이라고 적는다.
+    return [
+      Container(
+        width: double.infinity,
+        height: 72,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: AppRadius.smRadius,
+        ),
+        child: Text(
+          '생성중입니다.',
+          style: AppTypography.bodySecondary,
+        ),
+      ),
+    ];
   }
 
   Widget _buildHomeButton() {

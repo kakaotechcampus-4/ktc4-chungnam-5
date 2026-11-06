@@ -516,7 +516,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mealTypeLabel: mealTypeLabel(meal.mealType),
           time: _formatTime(meal.eatenAt),
           foodNames: meal.displayName,
-          quantityLabel: meal.scores?.quantityDisplay,
+          quantity: meal.scores?.quantity,
           quality: meal.scores?.quality,
           satiety: meal.scores?.satiety,
           skipped: meal.skipped,
