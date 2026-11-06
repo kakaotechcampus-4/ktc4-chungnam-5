@@ -49,27 +49,63 @@ class InvalidCoachResponse(Exception):
     """모델 응답 계약 위반. 사용자 본문을 오류 메시지에 넣지 않는다."""
 
 
-# 약물 이름. 다른 낱말의 일부("약간"·"요약"·"절약"·"주사위")는 약물이 아니다:
-# 앞에 한글이 없어야 하고, 뒤는 조사이거나 한글이 끝난 자리여야 한다.
-_DRUG = r"(?<![가-힣])(?:약|주사|위고비|마운자로|삭센다)(?:[을를은는이가도만의과와에]|(?![가-힣]))"
-# 중단 동사. "그만큼"·"끊임없이" 는 중단이 아니다.
-_STOP = r"(?:끊|중단|그만(?!큼)|두 배|두배)"
+# 약물이 아닌 낱말. "약"·"주사"·"그만"·"끊" 이 들어 있어도 약물 중단이 아니다.
+# 검사 전에 이 낱말만 가린다 — 문장 전체를 통과시키지 않으므로 같은 문장 안의
+# "처방약을 끊어도 돼요?" 같은 진짜 약물 표현은 그대로 잡힌다.
+# 목록에 없는 낱말은 약물로 본다(놓치는 것보다 막는 쪽이 안전하다).
+_NOT_DRUG = re.compile(
+    r"약간|요약|절약|예약|약속|약과|약밥|약식|약수|약점|약하|약해|약한|"
+    r"계약|공약|제약|취약|허약|나약|연약|빈약|도약|조약|규약|서약|"
+    r"주사위|그만큼|끊임없"
+)
+_MASK = "□"
 
-# 명백한 의료 요청을 조기에 차단하는 보조 규칙. history/context는 재검사하지 않는다.
-# 약물과 중단 동사 사이는 6자까지만 본다 — "약을 먹는 중인데 간식 그만 먹을까요?" 같은
-# 일반 식사 질문까지 막지 않으려는 것이다(더 멀리 떨어진 표현은 모델의 BLOCKED 판정에 맡긴다).
+_DRUG = r"(?:약|주사|위고비|마운자로|삭센다)"
+_STOP = r"(?:끊|중단|그만|두 배|두배)"
+_DOSE = r"(?:용량|투약량|복용량)"
+_DOSE_CHANGE = r"(?:늘|줄|바꾸|변경|올|낮|중단)"
+# "중단하지 마세요"·"늘리지 마시고"·"끊으면 안 돼요" 처럼 중단을 말리는 문장.
+_DISCOURAGED = r"(?![가-힣]{0,2}(?:지\s*(?:마|말|않|못)|(?:선|면|서는|는)\s*안))"
+_OTHER = (r"(?:진단해|처방해|diagnos|prescrib)|"
+          r"(?:increase|decrease|change|double).{0,25}(?:dose|dosage)|"
+          r"stop.{0,20}(?:medication|medicine)")
+
+# 입력 가드: 모델을 부르기 전에 명백한 의료 요청만 막는 보조 규칙. history/context는 재검사하지 않는다.
+# 입력은 오탐을 줄이는 쪽이다. 약물과 중단 동사 사이는 6자까지만 본다 —
+# "약을 먹는 중인데 간식 그만 먹을까요?" 같은 일반 식사 질문까지 막지 않으려는 것이다.
+# 더 멀리 떨어진 표현은 프롬프트의 BLOCKED 판정에 맡긴다.
 _MEDICAL = re.compile(
-    r"(?:용량|투약량|복용량).{0,20}(?:늘|줄|바꾸|변경|올|낮|중단)|"
-    + _DRUG + r".{0,6}" + _STOP + r"|"
-    r"(?:진단해|처방해|diagnos|prescrib)|"
-    r"(?:increase|decrease|change|double).{0,25}(?:dose|dosage)|"
-    r"stop.{0,20}(?:medication|medicine)",
-    re.IGNORECASE,
+    _DOSE + r".{0,20}" + _DOSE_CHANGE + r"|"
+    + _DRUG + r".{0,6}" + _STOP + r"|" + _OTHER,
+    re.IGNORECASE | re.DOTALL,
+)
+
+# 출력 가드: 모델의 SAFE 판단 뒤에 남는 마지막 방어선이라 위험 문장을 놓치지 않는 쪽이다.
+# 간격을 20자까지 보고 줄바꿈도 넘는다. 정당한 안내("임의로 중단하지 마세요")는 통과시킨다.
+# 20자는 안전의 끝이 아니라 회귀 복구다 — 순서가 뒤집히거나 대명사로 가리키는 문장은
+# 아래 역순 규칙 한 가지만 막고, 나머지는 프롬프트와 모델 판단에 의존한다.
+_OUTPUT_MEDICAL = re.compile(
+    _DOSE + r".{0,20}" + _DOSE_CHANGE + _DISCOURAGED + r"|"
+    + _DRUG + r".{0,20}" + _STOP + _DISCOURAGED + r"|"
+    r"(?:끊|중단)[가-힣]{0,4}[\s.,!?]{0,3}(?:위고비|마운자로|삭센다|약)\s*(?:말|얘기|이야기)|"
+    # "처방해 주신 의료진" 처럼 의료진이 이미 처방한 것을 가리키는 안내는 막지 않는다.
+    + _OTHER.replace("처방해|", r"처방해(?!\s*(?:주신|주셨|준|둔|놓))|", 1),
+    re.IGNORECASE | re.DOTALL,
 )
 
 
+def _masked(text: str) -> str:
+    return _NOT_DRUG.sub(_MASK, text)
+
+
 def is_medical_request(text: str) -> bool:
-    return bool(_MEDICAL.search(text))
+    """입력 가드. 사용자 질문이 명백한 의료 요청인지."""
+    return bool(_MEDICAL.search(_masked(text)))
+
+
+def is_unsafe_output(text: str) -> bool:
+    """출력 가드. 모델 답변(본문·카드 문구)에 위험한 의료 권고가 섞였는지."""
+    return bool(_OUTPUT_MEDICAL.search(_masked(text)))
 
 
 def build_messages(req: ChatRequest) -> list[dict[str, str]]:
@@ -187,7 +223,7 @@ def parse_response(raw: str | dict[str, Any]) -> ChatResponse:
                 cards.append(ChatFoodCard(food_name=name, advice=advice))
         # 의료 검사는 자르기 전 모든 카드에 건다 — 상한 밖·추천 아님으로 버려질 카드라도
         # 위험한 문장이 섞여 있으면 응답 전체를 막는다.
-        if any(is_medical_request(value) for value in
+        if any(is_unsafe_output(value) for value in
                [body, *(c.food_name + " " + c.advice for c in cards)]):
             return _blocked()
         cards = _shape_cards(cards, data.get("recommend"))

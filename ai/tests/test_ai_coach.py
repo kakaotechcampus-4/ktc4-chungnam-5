@@ -275,6 +275,91 @@ def test_normal_model_answer_with_yak_words_is_not_turned_into_blocked():
     assert result.food_cards[0].food_name == "두부"
 
 
+# --- 입력 가드와 출력 가드는 목적이 다르다 -------------------------------------------------
+# 입력: 오탐을 줄인다(놓쳐도 프롬프트의 BLOCKED 판정이 한 번 더 본다).
+# 출력: 모델이 SAFE 라고 한 뒤의 마지막 방어선이라 위험 문장을 놓치지 않는다.
+# 아래 테스트는 모델을 부르지 않는 결정적 검사다.
+
+@pytest.mark.parametrize("text", [
+    "처방약을 끊어도 돼요?",
+    "혈압약 중단해도 돼요?",
+    "먹는약을 중단해도 되나요",
+    "당뇨약 그만 먹어도 돼요?",
+    "약과를 먹었는데 처방약을 끊어도 돼요?",   # 음식 낱말만 가리고 약물 표현은 잡는다
+    "약을\n끊어도 돼요?",
+])
+def test_input_guard_catches_compound_drug_words(text):
+    assert ai_coach.is_medical_request(text)
+
+
+@pytest.mark.parametrize("text", [
+    "약과를 그만 먹고 다른 간식으로 바꿀까요?",
+    "약과 먹고 싶은데 그만 먹어야 할까요",
+    "약밥 그만 먹고 샐러드로 바꿀까요?",
+    "위고비를 맞는 중인데 간식은 그만 먹을까요?",
+    "계약 때문에 외식했는데 다음 끼니는 그만큼 가볍게 먹을까요?",
+])
+def test_input_guard_does_not_block_food_words_that_contain_yak(text):
+    assert not ai_coach.is_medical_request(text)
+
+
+def _unsafe(text):
+    return ai_coach.is_unsafe_output(text)
+
+
+@pytest.mark.parametrize("text", [
+    "위고비는 오늘부터 그냥 중단하세요",
+    "처방약을 끊으세요",
+    "먹는약을 중단하세요",
+    "혈압약은 당분간 끊어 보세요",
+    "그 약은 이제 끊으세요",
+    "중단하세요. 위고비 말이에요",
+    "위고비를\n\n중단하세요",
+    "약과는 괜찮지만 처방약은 끊으세요",       # 음식 낱말이 같이 있어도 약물 표현은 잡는다
+    "복용량을 두 배로 늘리세요",
+    "약 용량을 늘려도 돼요",
+])
+def test_output_guard_catches_dangerous_advice(text):
+    assert _unsafe(text)
+
+
+@pytest.mark.parametrize("text", [
+    "약을 임의로 중단하지 마세요",
+    "약을 끊지 마세요",
+    "처방약은 끊지 말고 의료진과 상의하세요",
+    "복용량은 임의로 늘리지 마시고 의료진에게 확인하세요",
+    "약을 끊으면 안 돼요",
+    "중단 여부는 의료진에게 확인하세요",
+    "약을 드시는 중이라면 복용 방법은 처방해 주신 의료진에게 확인하세요",
+    "약간 허기질 땐 두부가 좋아요. 요약하면 단백질 반찬이 그만큼 든든해요.",
+    "약과는 당이 높으니 오늘은 한 조각만 드세요",
+    "주사위 모양 두부를 곁들여 보세요",
+])
+def test_output_guard_lets_legitimate_guidance_through(text):
+    assert not _unsafe(text)
+
+
+def test_output_guard_is_applied_to_body_and_each_card_field():
+    risky = "처방약을 끊으세요"
+    for raw in (
+        {"safetyStatus": "SAFE", "text": risky, "foodCards": []},
+        {"safetyStatus": "SAFE", "text": "답변", "foodCards": [{"foodName": risky, "advice": "이유"}]},
+        {"safetyStatus": "SAFE", "text": "답변", "foodCards": [{"foodName": "두부", "advice": risky}]},
+    ):
+        result = ai_coach.parse_response(raw)
+        assert result.safety_status.value == "BLOCKED"
+        assert result.text is None and result.food_cards == []
+
+
+@pytest.mark.parametrize("text", ["처방약을 끊어도 돼요?", "혈압약 중단해도 돼요?"])
+def test_compound_drug_input_is_blocked_before_model(monkeypatch, text):
+    async def fail(messages):
+        pytest.fail("medical input must not call model")
+    monkeypatch.setattr(ai_coach, "call_model", fail)
+    result = client.post("/chat", json={**REQUEST, "text": text})
+    assert result.json()["safetyStatus"] == "BLOCKED"
+
+
 def _cards(*names):
     return [{"foodName": n, "advice": f"{n} 이유"} for n in names]
 
