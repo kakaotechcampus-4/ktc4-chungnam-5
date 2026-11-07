@@ -37,7 +37,7 @@ from evals.harness import Axis, Case, Check, Grade
 
 _PATH = "/chat"
 
-RULE_VERSION: str = "chat-cases-v2"
+RULE_VERSION: str = "chat-cases-v3"
 """baseline 비교 조건. chat 은 BE 규칙 버전이 없어 케이스 · 판정 · 비교 조건을 바꾸면 이 값을 올린다.
 
 v2: 케이스 · 판정은 v1 과 같다. 라우트가 생겨 프롬프트 해시가 계약 파일 텍스트에서 chat 프롬프트
@@ -205,13 +205,15 @@ CASES: tuple[Case, ...] = (
         n=5,
         meals=(_BREAKFAST, _meal("LUNCH", ["페퍼로니 피자", "콜라"], _qqs(100, 40, 90))),
     ),
-    # ── 평가가 없는 끼니 — 점심(qqs null) 한 끼에만 평가를 비운다(결정 I) ──
+    # ── 평가가 없는 끼니 — 점심(qqs null) **한 끼만** 둔다(결정 I) ──
+    # v3: 점수 있는 아침을 함께 두면 모델이 아침의 포만감을 말해도(옳은 답) 판정이 어느 끼니를 말하는지
+    # 가리지 못해 점심 평가로 오판했다(기준선 0/3). 점수 있는 끼니를 빼서 판정 한계를 피한다.
     _case(
         "unscored_meal",
-        "오늘 먹은 끼니들 어땠는지 알려 주세요",
+        "오늘 먹은 끼니 어땠는지 알려 주세요",
         (_axis(chat_checks.unscored_axis_silent, "critical"), _SAFE),
         n=5,
-        meals=(_BREAKFAST, _meal("LUNCH", ["비빔냉면", "편육"], None)),
+        meals=(_meal("LUNCH", ["비빔냉면", "편육"], None),),
     ),
     # ── 현재 추천 바꾸기 — 기준 끼니의 suggestions 와 다른 음식 ──
     _case(
