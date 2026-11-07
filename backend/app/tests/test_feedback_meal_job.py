@@ -128,6 +128,7 @@ def _evaluated_meal(
     user,
     *,
     scores: tuple[Any, Any, Any] = (None, None, 68),
+    intake_ratio_pct: Decimal | None = None,
     stage_at_evaluation: MedicationStage = MedicationStage.MAINTENANCE,
     meal_stage: MedicationStage = MedicationStage.MAINTENANCE,
     status: MealStatus = MealStatus.EVALUATED,
@@ -142,6 +143,7 @@ def _evaluated_meal(
         quantity_score=quantity,
         quality_score=quality,
         satiety_score=satiety,
+        intake_ratio_pct=intake_ratio_pct,
         stage_at_evaluation=stage_at_evaluation,
     )
     return meal
@@ -314,6 +316,38 @@ def test_scored_axes_are_sent_as_numbers(db):
     run(db, _task(meal.id), ai)
 
     assert ai.calls[0]["qqs"] == {"quantity": 55.5, "quality": 70.0, "satiety": 80.0}
+
+
+def test_intake_carries_ratio_and_the_stage_range(db):
+    """평소 대비 비율과 **채점 단계의** 권장 구간을 함께 싣는다.
+
+    같은 95% 도 조정기(60–90%)에서는 초과, 투약 전(85–105%)에서는 적정이다. 비율만
+    보내면 AI 가 단계별 구간을 복사해 가져야 한다 — 기준은 BE 한 곳에 둔다.
+    """
+    user = make_user(db)
+    meal = _evaluated_meal(
+        db, user,
+        scores=(95, None, 68),
+        intake_ratio_pct=Decimal("95.24"),
+        stage_at_evaluation=MedicationStage.TITRATION,
+        meal_stage=MedicationStage.MAINTENANCE,
+    )
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["intake"] == {"ratioPct": 95.2, "rangePct": [60.0, 90.0]}
+
+
+def test_intake_is_null_without_ratio(db):
+    """열량이나 평소 섭취량을 몰라 비율이 없으면 null 이다 — 0 으로 채우면 "안 먹었다" 가 된다."""
+    user = make_user(db)
+    meal = _evaluated_meal(db, user, scores=(None, None, 68), intake_ratio_pct=None)
+    ai = FakeAi()
+
+    run(db, _task(meal.id), ai)
+
+    assert ai.calls[0]["intake"] is None
 
 
 def test_items_carry_amount_and_public_db_nutrition(db):
@@ -1032,6 +1066,24 @@ def test_scores_changed_during_ai_call_are_not_written(db):
     assert result == {"skipped": "EVALUATION_CHANGED"}
 
 
+def test_intake_ratio_changed_during_ai_call_is_not_written(db):
+    """평소 섭취량을 고쳐 재확정하면 점수가 같아도(구간 안 100) 비율이 바뀐다 — 옛 비율로 쓴 문장을 쓰지 않는다."""
+    user = make_user(db)
+    meal = _evaluated_meal(db, user, scores=(100, None, 68), intake_ratio_pct=Decimal("71.43"))
+
+    def reconfirm() -> None:
+        db.execute(
+            update(QQSEvaluation)
+            .where(QQSEvaluation.meal_id == meal.id)
+            .values(intake_ratio_pct=Decimal("76.92"))
+        )
+
+    result = run(db, _task(meal.id), FakeAi(on_call=reconfirm))
+
+    assert _rows(db, meal.id) == []
+    assert result == {"skipped": "EVALUATION_CHANGED"}
+
+
 def test_evaluation_replaced_during_ai_call_is_not_written(db):
     """음식을 고치고 재확정까지 AI 호출 중에 끝나면 평가 행이 새로 생긴다 — 점수가 같아도 쓰지 않는다.
 
@@ -1204,6 +1256,7 @@ def test_skipped_meal_request_has_null_scores_and_no_food(db):
     assert payload["qqs"] == {"quantity": None, "quality": None, "satiety": None}
     assert payload["items"] == []
     assert payload["satiety"] is None
+    assert payload["intake"] is None
     # 채점 단계가 없어 먹을 때의 스냅샷 단계를 쓴다.
     assert payload["stage"] == "TITRATION"
 

@@ -35,6 +35,7 @@ def upsert(
     quantity_score: int | None,
     quality_score: int | None,
     satiety_score: int | None,
+    intake_ratio_pct: Decimal | None,
 ) -> QQSEvaluation:
     """있으면 덮고 없으면 만든다. flush 까지만 — 커밋은 services 가 한다.
 
@@ -51,6 +52,7 @@ def upsert(
         "quantity_score": None if quantity_score is None else Decimal(quantity_score),
         "quality_score": None if quality_score is None else Decimal(quality_score),
         "satiety_score": None if satiety_score is None else Decimal(satiety_score),
+        "intake_ratio_pct": intake_ratio_pct,
     }
     stmt = insert(QQSEvaluation).values(**values)
     stmt = stmt.on_conflict_do_update(

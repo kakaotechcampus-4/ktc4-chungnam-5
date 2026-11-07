@@ -174,6 +174,7 @@ def make_qqs_evaluation(
     quantity_score: Decimal | int | None = 60,
     quality_score: Decimal | int | None = 60,
     satiety_score: Decimal | int | None = 60,
+    intake_ratio_pct: Decimal | None = None,
     stage_at_evaluation: MedicationStage = MedicationStage.MAINTENANCE,
 ) -> QQSEvaluation:
     """식사 하나의 Q/Q/S 점수 행. flush 까지만 하고 커밋하지 않는다.
@@ -188,6 +189,7 @@ def make_qqs_evaluation(
         quantity_score=quantity_score,
         quality_score=quality_score,
         satiety_score=satiety_score,
+        intake_ratio_pct=intake_ratio_pct,
     )
     db.add(evaluation)
     db.flush()
