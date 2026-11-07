@@ -197,18 +197,18 @@ def _confirm(client: TestClient, user, meal) -> dict:
 
 
 def test_same_meal_scores_differently_by_stage(client: TestClient, db: Session) -> None:
-    """700kcal = 평소의 100%. 유지기는 15%p 초과 / T30 → 50, 감량기는 10%p 초과 / T15 → 33."""
+    """700kcal = 평소의 100%. 유지기는 (85/100)^2 → 72, 감량기는 (90/100)^4 → 66."""
     user, meal = _meal_with(db, calories=Decimal("280"))
-    assert _confirm(client, user, meal)["scores"]["quantity"] == 50
+    assert _confirm(client, user, meal)["scores"]["quantity"] == 72
 
     user, meal = _meal_with(
         db, stage=MedicationStage.REDUCED, food_ref_id="KFD_TEST_02", calories=Decimal("280")
     )
-    assert _confirm(client, user, meal)["scores"]["quantity"] == 33
+    assert _confirm(client, user, meal)["scores"]["quantity"] == 66
 
 
 # 100g 당 단백질 5.6 · 식이섬유 1.6 · 나트륨 200 → 250g 에 14g · 4g · 500mg.
-# 70kg 유지기 목표 28g · 8.33g · 766.7mg → 0.5 · 0.48 · 1 → 평균 0.66.
+# 70kg 유지기 목표 28g · 8.33g · 766.7mg → 0.5 · 0.48 · 1 → 가중 평균(0.5 · 0.2 · 0.3) 0.646.
 _BALANCED = dict(protein_g=Decimal("5.6"), fiber_g=Decimal("1.6"), sodium_mg=Decimal("200"))
 
 
@@ -217,12 +217,12 @@ def test_quality_is_scored_and_targets_filled(client: TestClient, db: Session) -
 
     data = _confirm(client, user, meal)
 
-    assert data["scores"]["quality"] == 66
+    assert data["scores"]["quality"] == 65
     rows = {r["code"]: r for r in data["nutrients"]}
     assert (rows["PROTEIN"]["target"], rows["PROTEIN"]["state"]) == (28.0, "SHORT")
     assert (rows["FIBER"]["target"], rows["FIBER"]["state"]) == (8.3, "SHORT")
     assert (rows["SODIUM"]["target"], rows["SODIUM"]["state"]) == (766.7, "OK")
-    assert data["evidence"]["stageRuleVersion"] == "v2"
+    assert data["evidence"]["stageRuleVersion"] == "v3"
 
 
 def test_evaluation_view_equals_confirm_with_targets(client: TestClient, db: Session) -> None:
@@ -238,12 +238,12 @@ def test_evaluation_view_equals_confirm_with_targets(client: TestClient, db: Ses
 
 
 def test_missing_fiber_is_dropped_not_zeroed(client: TestClient, db: Session) -> None:
-    """공공 DB 에 식이섬유가 비어 있으면 그 항목만 뺀다 — (0.5 + 1) / 2 = 75 (Review Focus 3)."""
+    """공공 DB 에 식이섬유가 비어 있으면 그 항목만 뺀다 — (0.5×0.5 + 0.3×1) / 0.8 = 69 (Review Focus 3)."""
     user, meal = _meal_with(db, **{**_BALANCED, "fiber_g": None})
 
     data = _confirm(client, user, meal)
 
-    assert data["scores"]["quality"] == 75
+    assert data["scores"]["quality"] == 69
     fiber = next(r for r in data["nutrients"] if r["code"] == "FIBER")
     assert fiber["current"] is None and fiber["state"] is None
 
@@ -267,8 +267,8 @@ def test_excluded_item_is_scored_on_the_rest_with_warning(
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["error"]["code"] == "NUTRITION_NOT_MATCHED"
-    # 매칭된 음식만: 700kcal(유지기 100% → 50), 품질은 _BALANCED 그대로 66
-    assert body["data"]["scores"] == {"quantity": 50, "quality": 66, "satiety": 68}
+    # 매칭된 음식만: 700kcal(유지기 100% → 72), 품질은 _BALANCED 그대로 65
+    assert body["data"]["scores"] == {"quantity": 72, "quality": 65, "satiety": 68}
 
 
 def test_weight_recorded_after_meal_falls_back_to_latest(
@@ -278,7 +278,7 @@ def test_weight_recorded_after_meal_falls_back_to_latest(
     user, meal = _meal_with(db, weight=False, **_BALANCED)
     make_weight(db, user_id=user.id, recorded_at=meal.eaten_at + timedelta(days=1))
 
-    assert _confirm(client, user, meal)["scores"]["quality"] == 66
+    assert _confirm(client, user, meal)["scores"]["quality"] == 65
 
 
 # ── 에러 ───────────────────────────────────────────────────────
@@ -410,8 +410,8 @@ def test_quality_is_null_without_weight(client: TestClient, db: Session) -> None
 
     assert scores["quality"] is None
     assert scores["satiety"] == 68
-    # 125kcal / 평소 700kcal = 17.9% — 유지기 하한 60 에서 30%p 넘게 부족하다
-    assert scores["quantity"] == 0
+    # 125kcal / 평소 700kcal = 17.9% — 유지기 하한 60 의 0.3배라 (17.9/60)^2 = 0.089
+    assert scores["quantity"] == 9
 
 
 def test_nutrient_totals_are_still_reported(client: TestClient, db: Session) -> None:

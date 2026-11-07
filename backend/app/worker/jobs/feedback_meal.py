@@ -13,15 +13,24 @@
 
 BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `ShortFeedbackRequest` · `ShortFeedbackResponse` 다.
 
-**끼니 피드백은 그날 앞 끼니를 누적한 문장이다.** AI 가 아침 피드백을 토대로 점심을,
-아침+점심을 토대로 저녁을 쓴다. 그래서 가장 최근 끼니 피드백이 곧 그날의 하루 피드백이다 —
+**끼니 피드백은 그날 앞 끼니를 누적한 문장이다.** 요청의 `previousMeals` 에 그날(KST)
+이 끼니보다 먼저 먹은 확정 끼니를 **음식 · 점수로** 싣는다 — 앞 끼니의 문장으로 넘기면
+연달아 등록할 때 앞 문장이 아직 만들어지는 중일 수 있어 순서에 묶인다. Q/Q/S 와 영양소는
+이 끼니 단독이다. 그래서 가장 최근 끼니 피드백이 곧 그날의 하루 피드백이다 —
 쓸 때마다 `daily_feedbacks` 에도 upsert 한다(6). 하루 피드백을 만드는 곳은 여기뿐이다.
+
+**저녁(`DINNER`)은 다음 끼니 추천이 없다.** AI 에 `mealType` 을 넘기고, AI 가 제안을
+주더라도 저장하지 않는다(`suggestions = []`).
+
+**식사 안 함(`meals.skipped`)도 여기서 문장을 만든다.** 등록이 곧바로 `EVALUATED` 로 두고
+이 작업을 넣는다(`services/meal.py::create_skipped_meal`). 점수 행이 없으므로 기다리지
+않고 Q/Q/S 를 모두 null, `items` 를 비워 `skipped: true` 로 보낸다.
 
 순서 (load 1~3 전반 · call_ai 3 · apply 4~6):
   1. 식사를 읽는다. 없거나 지워졌거나 확정 상태가 아니면 AI 를 부르지 않고 끝낸다
   2. `qqs_evaluations` 에서 Q/Q/S 를 읽는다. 없으면 채점이 아직이다 — raise 해서
-     재시도에 맡긴다
-  3. `items` · 포만감 컨텍스트를 만들고 AI 를 부른다
+     재시도에 맡긴다. 식사 안 함은 점수가 없는 게 정상이라 건너뛴다
+  3. `items` · 포만감 · 앞선 끼니 컨텍스트를 만들고 AI 를 부른다
   4. 식사를 잠그고 다시 본다 — AI 를 기다리는 사이 지워지거나 고쳐졌거나 다시
      채점됐으면 쓰지 않는다
   5. `meal_feedbacks` 에 upsert
@@ -49,9 +58,10 @@ from app.crud import feedback as feedback_crud
 from app.crud import food as food_crud
 from app.crud import meal as meal_crud
 from app.crud import satiety as satiety_crud
+from app.crud import user_state as user_state_crud
 from app.infra.ai import AiClient
 from app.infra.queue import ClaimedTask
-from app.models.enums import MealStatus, SafetyStatus
+from app.models.enums import MealStatus, MealType, SafetyStatus
 from app.models.evaluation import QQSEvaluation
 from app.models.meal import Meal, MealItem
 from app.services.meal import item_nutrition, resolved_amount
@@ -161,6 +171,23 @@ def _skip_reason(meal: Meal | None) -> str | None:
     return None
 
 
+_SKIPPED_BASIS: tuple[Any, ...] = ("SKIPPED",)
+"""식사 안 함 끼니가 딛고 선 채점. 점수 행이 없고, 고칠 수도 다시 확정할 수도 없어
+(`services/meal.py::_is_editable`) 바뀔 일이 없다."""
+
+
+def _basis(db: Session, meal: Meal) -> tuple[Any, ...] | None:
+    """문장이 딛고 선 채점. 아직 채점 전이면 None.
+
+    식사 안 함은 채점하지 않으므로 고정값이다 — 점수 행이 없다고 "채점이 아직" 으로 보면
+    재시도만 하다 DLQ 로 간다.
+    """
+    if meal.skipped:
+        return _SKIPPED_BASIS
+    evaluation = evaluation_crud.get_by_meal(db, meal.id)
+    return None if evaluation is None else _scored_as(evaluation)
+
+
 def _scored_as(evaluation: QQSEvaluation) -> tuple[Any, ...]:
     """문장이 딛고 선 채점 — 쓰기 직전에 이게 그대로인지 본다.
 
@@ -184,7 +211,7 @@ class _Ctx:
 
     meal_id: uuid.UUID
     scored_as: tuple[Any, ...]
-    """AI 에 넘긴 채점. `apply` 가 쓰기 직전에 이게 그대로인지 본다."""
+    """AI 에 넘긴 채점(`_basis`). `apply` 가 쓰기 직전에 이게 그대로인지 본다."""
     request: dict[str, Any]
 
 
@@ -265,6 +292,82 @@ def _stored_suggestions(db: Session, raw: object) -> list[dict[str, Any]] | None
     ]
 
 
+def _meal_totals(meal: Meal) -> dict[str, Decimal | None]:
+    """`meals.total_*` 를 `NUTRIENT_TOTAL_COLUMNS` 키로 꺼낸다 — 하루 합과 같은 모양."""
+    return {name: getattr(meal, name) for name in daily_feedback_crud.NUTRIENT_TOTAL_COLUMNS}
+
+
+def _totals_payload(totals: dict[str, Decimal | None]) -> dict[str, float | None] | None:
+    """`total_*` 합계 → `Nutrition`. 전부 비었으면 None — 0 이면 "아무것도 안 먹었다" 로 읽힌다.
+
+    끼니 합계(`meals.total_*`)와 하루 합계(`daily_feedbacks.total_*`)가 같은 키라 함께 쓴다.
+    """
+    values = tuple(totals[name] for name in daily_feedback_crud.NUTRIENT_TOTAL_COLUMNS)
+    if all(value is None for value in values):
+        return None
+    kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg = values
+    return {
+        "kcal": _number(kcal),
+        "proteinG": _number(protein_g),
+        "fatG": _number(fat_g),
+        "carbG": _number(carb_g),
+        "fiberG": _number(fiber_g),
+        "sodiumMg": _number(sodium_mg),
+    }
+
+
+def _previous_meals_payload(db: Session, meal: Meal) -> list[dict[str, Any]]:
+    """그날(KST) 이 끼니보다 먼저 먹은 확정 끼니 → `PreviousMeal[]`. 먹은 순서다.
+
+    **문장이 아니라 음식 · 점수 · 영양 합계를 싣는다** — 앞 끼니 문장은 아직 만들어지는
+    중일 수 있다(모듈 독스트링). 음식은 이름 · 양만 싣고, 성분은 확정이 남긴 끼니 합계
+    (`meals.total_*` — AI 입력용 스냅샷)로 대신한다.
+    """
+    range_start, _ = _kst_day_range(meal.eaten_at.astimezone(KST).date())
+    rows = meal_crud.list_earlier_evaluated_meals(db, meal=meal, range_start=range_start)
+    previous = []
+    for earlier, quantity, quality, satiety in rows:
+        items = []
+        for item in earlier.items:
+            _amount_g, amount, unit = resolved_amount(item)
+            items.append(
+                {"displayName": item.display_name, "amount": _number(amount), "unit": unit}
+            )
+        previous.append(
+            {
+                "mealType": earlier.meal_type.value,
+                "skipped": earlier.skipped,
+                # 식사 안 함 · 채점 못 한 축은 null 이다.
+                "qqs": {
+                    "quantity": _number(quantity),
+                    "quality": _number(quality),
+                    "satiety": _number(satiety),
+                },
+                "items": items,
+                "nutritionTotals": _totals_payload(_meal_totals(earlier)),
+            }
+        )
+    return previous
+
+
+def _daily_totals_payload(db: Session, meal: Meal) -> dict[str, float | None] | None:
+    """그날(KST) 영양 합 → `Nutrition`. `daily_feedbacks.total_*` 에 들어갈 값과 같다.
+
+    **행을 읽지 않고 같은 함수로 다시 더한다.** 그 행은 이 작업의 `apply` 가
+    (`_upsert_daily`) 갱신하므로 지금 읽으면 방금 확정한 이 끼니가 빠진 옛 합이다. 같은
+    `day_nutrient_totals` 를 쓰니 숫자는 이 작업이 끝난 뒤 행에 남는 값과 같다.
+
+    ⚠️ 그날 **전체** 합이다 — 이 끼니보다 늦게 먹은 확정 끼니가 있으면(앞 끼니를 뒤늦게
+    입력) 그 끼니도 들어간다. 행과 같은 값을 주려고 자르지 않는다.
+    """
+    range_start, range_end = _kst_day_range(meal.eaten_at.astimezone(KST).date())
+    return _totals_payload(
+        daily_feedback_crud.day_nutrient_totals(
+            db, user_id=meal.user_id, range_start=range_start, range_end=range_end
+        )
+    )
+
+
 def load(db: Session, task: ClaimedTask) -> _Ctx | Skip:
     """식사·평가를 읽고 AI 요청을 만든다. 평가가 아직 없으면 raise — 재시도에 맡긴다."""
     meal_id = uuid.UUID(task.payload["mealId"])
@@ -274,27 +377,50 @@ def load(db: Session, task: ClaimedTask) -> _Ctx | Skip:
         logger.info("끼니 피드백 건너뜀 mealId=%s reason=%s", meal_id, reason)
         return Skip({"skipped": reason})
 
-    evaluation = evaluation_crud.get_by_meal(db, meal.id)
-    if evaluation is None:
-        raise LookupError(f"meal {meal_id} 의 Q/Q/S 평가가 아직 없다")
+    if meal.skipped:
+        # 채점하지 않은 끼니다. 단계는 먹을 때의 스냅샷이다 — 채점이 쓰는 단계도 같은
+        # 스냅샷이다(`services/evaluation::_stage_of`).
+        stage = meal_crud.get_stage(db, meal.medication_snapshot_id)
+        qqs: dict[str, float | None] = {"quantity": None, "quality": None, "satiety": None}
+        items: list[dict[str, Any]] = []
+        satiety = None
+        basis = _SKIPPED_BASIS
+    else:
+        evaluation = evaluation_crud.get_by_meal(db, meal.id)
+        if evaluation is None:
+            raise LookupError(f"meal {meal_id} 의 Q/Q/S 평가가 아직 없다")
+        # 채점 시점의 단계다. 점수와 같은 기준으로 문장을 써야 한다.
+        stage = evaluation.stage_at_evaluation
+        # 채점 못 한 축은 null 이다 — 0 으로 채우면 "못 쟀다" 가 "바닥이다" 가 된다.
+        qqs = {
+            "quantity": _number(evaluation.quantity_score),
+            "quality": _number(evaluation.quality_score),
+            "satiety": _number(evaluation.satiety_score),
+        }
+        items = [_item_payload(db, item) for item in meal.items]
+        satiety = _satiety_payload(db, meal.id)
+        basis = _scored_as(evaluation)
 
     return _Ctx(
         meal_id=meal.id,
-        scored_as=_scored_as(evaluation),
+        scored_as=basis,
         request={
             "scope": "MEAL",
             "userId": str(meal.user_id),
-            # 채점 시점의 단계다. 점수와 같은 기준으로 문장을 써야 한다.
-            "stage": evaluation.stage_at_evaluation.value,
-            # 채점 못 한 축은 null 이다 — 0 으로 채우면 "못 쟀다" 가 "바닥이다" 가 된다.
-            "qqs": {
-                "quantity": _number(evaluation.quantity_score),
-                "quality": _number(evaluation.quality_score),
-                "satiety": _number(evaluation.satiety_score),
-            },
+            "stage": stage.value,
+            "qqs": qqs,
             "mealId": str(meal.id),
-            "items": [_item_payload(db, item) for item in meal.items],
-            "satiety": _satiety_payload(db, meal.id),
+            # 저녁이면 AI 는 다음 끼니 추천을 비운다.
+            "mealType": meal.meal_type.value,
+            "skipped": meal.skipped,
+            "items": items,
+            "satiety": satiety,
+            "previousMeals": _previous_meals_payload(db, meal),
+            "dailyNutritionTotals": _daily_totals_payload(db, meal),
+            # 먹을 때의 체중(없으면 가장 최근). Quality 채점이 쓰는 값과 같다. 기록이 없으면 null.
+            "weightKg": _number(
+                user_state_crud.get_weight_at(db, user_id=meal.user_id, at=meal.eaten_at)
+            ),
         },
     )
 
@@ -319,12 +445,16 @@ def apply(db: Session, task: ClaimedTask, ctx: _Ctx, result: dict[str, Any]) -> 
     # 넣은 작업이 다른 워커에서 먼저 끝날 수 있어서, 여기서 쓰면 옛 점수로 쓴 문장이
     # 새 문장을 덮고 영영 남는다. 확정이 식사 행을 먼저 잠그므로(`services/evaluation`)
     # 잠금을 얻은 지금 읽는 평가는 커밋이 끝난 값이다.
-    current = evaluation_crud.get_by_meal(db, meal.id)
-    if current is None or _scored_as(current) != ctx.scored_as:
+    if _basis(db, meal) != ctx.scored_as:
         logger.info("끼니 피드백 건너뜀 mealId=%s reason=EVALUATION_CHANGED", ctx.meal_id)
         return {"skipped": "EVALUATION_CHANGED"}
 
-    suggestions = _stored_suggestions(db, result.get("suggestions"))
+    # 저녁은 다음 끼니 추천이 없다 — AI 가 주더라도 싣지 않는다(FE 화면 합의).
+    suggestions = (
+        []
+        if meal.meal_type is MealType.DINNER
+        else _stored_suggestions(db, result.get("suggestions"))
+    )
     # safetyStatus 는 AI 가 준 그대로 저장한다. SAFE 로 올리지 않는다 (규칙 1).
     safety_status = SafetyStatus(result["safetyStatus"])
     meal_feedback_id = feedback_crud.upsert(

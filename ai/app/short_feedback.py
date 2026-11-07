@@ -36,7 +36,7 @@ from app.config import get_settings
 # `backend/app/services/evaluation/stage_profile.py` 에서 옮겼다. BE 가 기준을 바꾸면
 # (`STAGE_RULE_VERSION` 이 오르면) 여기도 맞춘다 — 안 맞추면 점수와 문장이 조용히 어긋난다.
 
-BE_RULE_VERSION: Final = "v2"
+BE_RULE_VERSION: Final = "v3"
 """아래 숫자를 옮겨 온 BE `STAGE_RULE_VERSION`."""
 
 MEALS_PER_DAY: Final = 3

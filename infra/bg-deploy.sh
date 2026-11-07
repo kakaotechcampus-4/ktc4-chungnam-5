@@ -18,6 +18,15 @@ ENV=${1:?prod 또는 staging}
 # 운영 릴리스는 버전 태그(v2026.10.18), 스테이징과 태그 없는 수동 배포는 SHA 앞 7자
 TAG=${APP_VERSION:-${GIT_SHA:0:7}}
 
+# .env.prod.example 의 자리표시자(<UUID> 등)가 그대로 남은 키가 있으면 빌드 전에 멈춘다.
+# compose 의 ${X:?} 는 빈 값만 막아서, 예시 값이 남으면 기동은 되고 호출할 때 500 이 난다.
+# 값은 비밀이라 키 이름만 출력한다.
+PLACEHOLDERS=$(grep -E '^[A-Za-z0-9_]+=.*<[A-Za-z0-9_]+>' "$ENV_FILE" | cut -d= -f1 || true)
+if [ -n "$PLACEHOLDERS" ]; then
+  echo "$ENV_FILE 에 예시 값이 남은 키가 있다 — 실제 값으로 채운다: $(echo $PLACEHOLDERS)" >&2
+  exit 1
+fi
+
 ensure_upstreams
 
 if [ -f "$STATE" ]; then

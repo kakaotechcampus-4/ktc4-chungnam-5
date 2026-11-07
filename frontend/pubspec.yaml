@@ -38,6 +38,8 @@ dependencies:
   dio: ^5.11.1
   shared_preferences: ^2.5.5
   image_picker: ^1.2.3
+  # 웹 평가용 창구가 링크의 키를 받아 주소창에서 지울 때만 쓴다(`lib/api/web_demo_key_web.dart`).
+  web: ^1.1.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -8,6 +8,8 @@ import '../theme/app_colors.dart';
 import 'daily_condition_popup.dart';
 import 'feedback_branch_popup.dart';
 import 'meal_delete_confirm_popup.dart';
+import 'meal_skip_confirm_popup.dart';
+import 'review_leave_popup.dart';
 import 'satiety_checkin_popup.dart';
 import 'suggestion_replace_popup.dart';
 
@@ -18,6 +20,12 @@ enum AppPopup {
 
   /// 피드백 탭의 단기·장기 분기. 삭제 확인처럼 방금 누른 탭에 대한 답이다.
   feedbackBranch(0),
+
+  /// 확정 전에 음식 확인 화면을 나갈 때의 확인. 방금 누른 뒤로가기에 대한 답이다.
+  reviewLeave(0),
+
+  /// "이번 끼니 안 먹었어요" 기록 확인. 방금 누른 버튼에 대한 답이다.
+  mealSkipConfirm(0),
 
   /// 챗봇 카드 "이걸로 바꾸기" 확인. 방금 누른 버튼에 대한 답이다.
   suggestionReplace(0),
@@ -95,6 +103,43 @@ class PopupGate {
       show: (c) =>
           _showDialog(c, MealDeleteConfirmPopup(description: description)),
     );
+  }
+
+  /// "이번 끼니 안 먹었어요" 기록 확인. 기록하기를 골랐으면 `true`.
+  /// 버튼을 연달아 눌러도 확인창은 하나만 뜬다.
+  Future<bool> confirmMealSkip(
+    BuildContext context, {
+    required String description,
+  }) {
+    return _request(
+      context,
+      AppPopup.mealSkipConfirm,
+      show: (c) =>
+          _showDialog(c, MealSkipConfirmPopup(description: description)),
+    );
+  }
+
+  /// 확정 전에 음식 확인 화면을 나가려 할 때 계속·나중에·삭제 중 고르게 한다.
+  /// 바깥을 누르거나 겹친 요청이면 null — 호출한 쪽은 화면에 남는다.
+  Future<ReviewLeaveChoice?> confirmReviewLeave(
+    BuildContext context, {
+    required String mealId,
+  }) async {
+    ReviewLeaveChoice? picked;
+    await _request(
+      context,
+      AppPopup.reviewLeave,
+      id: mealId,
+      show: (c) async {
+        picked = await showDialog<ReviewLeaveChoice>(
+          context: c,
+          barrierColor: AppColors.overlay,
+          builder: (_) => const ReviewLeavePopup(),
+        );
+        return picked != null;
+      },
+    );
+    return picked;
   }
 
   /// 챗봇 카드로 다음 끼니 추천을 바꿀지 확인한다. 바꾸기를 골랐으면 `true`.

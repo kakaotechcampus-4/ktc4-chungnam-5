@@ -39,7 +39,7 @@ class HomeStomach(CamelModel):
 
 
 class HomeMeal(CamelModel):
-    """오늘의 식사 항목 하나. 평가 전이면 scores 는 None."""
+    """오늘의 식사 항목 하나. 평가 전이거나 식사 안 함이면 scores 는 None."""
 
     meal_id: uuid.UUID
     meal_type: MealType
@@ -47,6 +47,8 @@ class HomeMeal(CamelModel):
     display_name: str
     thumbnail_url: str | None
     scores: MealScores | None
+    skipped: bool
+    """"식사 안 함" 으로 기록한 끼니. 기록한 끼니라 `missingMealTypes` 에는 들어가지 않는다."""
 
 
 class HomeToday(CamelModel):

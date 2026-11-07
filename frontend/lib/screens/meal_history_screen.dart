@@ -53,14 +53,18 @@ class CalendarDay {
     required this.date,
     required this.count,
     required this.recordedMealTypes,
+    this.skippedMealTypes = const [],
     this.stage,
   });
 
   final DateTime date;
   final int count;
 
-  /// 그 날 기록된 끼니 종류. 달력의 점 3개가 여기서 나온다.
+  /// 그 날 기록된 끼니 종류. 달력의 점 3개가 여기서 나온다. 식사 안 함도 기록한 끼니라 들어 있다.
   final List<String> recordedMealTypes;
+
+  /// [recordedMealTypes] 중 "식사 안 함" 으로 기록한 끼니. 점을 다른 색으로 그린다.
+  final List<String> skippedMealTypes;
 
   final String? stage;
 
@@ -68,6 +72,8 @@ class CalendarDay {
     date: parseApiDate(json['date'] as String),
     count: json['count'] as int,
     recordedMealTypes: (json['recordedMealTypes'] as List<dynamic>)
+        .cast<String>(),
+    skippedMealTypes: (json['skippedMealTypes'] as List<dynamic>? ?? const [])
         .cast<String>(),
     stage: json['stage'] as String?,
   );
@@ -129,6 +135,7 @@ class HistoryMeal {
     required this.eatenAt,
     required this.displayName,
     required this.scores,
+    this.skipped = false,
     this.stage,
     this.thumbnailUrl,
   });
@@ -140,6 +147,9 @@ class HistoryMeal {
 
   /// 평가 전(분석 중·확인 대기)이면 null.
   final MealScores? scores;
+
+  /// "식사 안 함" 으로 기록한 끼니. 이때 `scores` 는 null 이고 `displayName` 은 빈 문자열이다.
+  final bool skipped;
   final String? stage;
   final String? thumbnailUrl;
 
@@ -148,6 +158,7 @@ class HistoryMeal {
     mealType: json['mealType'] as String,
     eatenAt: parseApiDateTime(json['eatenAt'] as String),
     displayName: json['displayName'] as String,
+    skipped: json['skipped'] as bool? ?? false,
     stage: json['stage'] as String?,
     thumbnailUrl: json['thumbnailUrl'] as String?,
     scores: switch (json['scores']) {
@@ -366,18 +377,18 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     _loadMeals();
   }
 
-  /// 끼니 카드 탭 — 평가한 끼니는 다음 끼니 제안(7번)을, 아직 확정 전이면
+  /// 끼니 카드 탭 — 평가한 끼니와 식사 안 함은 끼니 피드백(7번)을, 아직 확정 전이면
   /// 음식 확인 화면(5번)을 연다(확정 전 끼니는 거기서 이어서 평가받는다).
+  /// 식사 안 함은 점수가 없어도 확정 전이 아니므로 `skipped` 로 먼저 가른다.
   /// 돌아오면 목록을 다시 불러온다.
   Future<void> _openMeal(HistoryMeal meal) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => meal.scores?.satiety == null
+        builder: (_) => meal.skipped
+            ? NextMealSuggestionScreen(mealId: meal.mealId, skipped: true)
+            : meal.scores?.satiety == null
             ? MealReviewScreen(mealId: meal.mealId)
-            : NextMealSuggestionScreen(
-                mealId: meal.mealId,
-                eatenAt: meal.eatenAt,
-              ),
+            : NextMealSuggestionScreen(mealId: meal.mealId),
       ),
     );
     if (!mounted) return;
@@ -392,7 +403,8 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     final confirmed = await context.read<PopupGate>().confirmMealDelete(
       context,
       mealId: meal.mealId,
-      description: '${mealTypeLabel(meal.mealType)} · ${meal.displayName}',
+      description:
+          '${mealTypeLabel(meal.mealType)} · ${meal.skipped ? '식사 안 함' : meal.displayName}',
     );
     if (!confirmed || !mounted) return false;
     try {
@@ -583,9 +595,10 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                 mealTypeLabel: mealTypeLabel(meal.mealType),
                 time: _formatTime(meal.eatenAt),
                 foodNames: meal.displayName,
-                quantityLabel: meal.scores?.quantityDisplay,
+                quantity: meal.scores?.quantity,
                 quality: meal.scores?.quality,
                 satiety: meal.scores?.satiety,
+                skipped: meal.skipped,
                 thumbnailUrl: meal.thumbnailUrl,
                 showChevron: true,
                 onTap: () => _openMeal(meal),
@@ -755,7 +768,9 @@ class _MonthGrid extends StatelessWidget {
 
     final date = DateTime(month.year, month.month, dayNumber);
     final isFuture = date.isAfter(today);
-    final recorded = calendar?.dayOf(dayNumber)?.recordedMealTypes ?? const [];
+    final day = calendar?.dayOf(dayNumber);
+    final recorded = day?.recordedMealTypes ?? const [];
+    final skipped = day?.skippedMealTypes ?? const [];
 
     return _DayCell(
       day: dayNumber,
@@ -764,6 +779,9 @@ class _MonthGrid extends StatelessWidget {
       isSelected: date == selectedDay,
       recordedMeals: [
         for (final type in _dotMealTypes) recorded.contains(type),
+      ],
+      skippedMeals: [
+        for (final type in _dotMealTypes) skipped.contains(type),
       ],
       onTap: () => onSelect(date),
     );
@@ -777,6 +795,7 @@ class _DayCell extends StatelessWidget {
     required this.isFuture,
     required this.isSelected,
     required this.recordedMeals,
+    required this.skippedMeals,
     required this.onTap,
   });
 
@@ -787,6 +806,9 @@ class _DayCell extends StatelessWidget {
 
   /// 아침 · 점심 · 저녁 순서.
   final List<bool> recordedMeals;
+
+  /// [recordedMeals] 와 같은 순서. 기록은 했지만 안 먹은 끼니 — 점을 회색으로 그린다.
+  final List<bool> skippedMeals;
 
   final VoidCallback onTap;
 
@@ -835,9 +857,11 @@ class _DayCell extends StatelessWidget {
                     height: _dotSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: recordedMeals[i]
-                          ? AppColors.primary
-                          : AppColors.border,
+                      color: !recordedMeals[i]
+                          ? AppColors.border
+                          : skippedMeals[i]
+                          ? AppColors.textTertiary
+                          : AppColors.primary,
                     ),
                   ),
                   if (i != recordedMeals.length - 1)

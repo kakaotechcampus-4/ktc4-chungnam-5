@@ -82,7 +82,7 @@ def analyze_meal(req: AnalyzeMealRequest, scenario: ScenarioDep) -> AnalyzeMealR
 def short_feedback(req: ShortFeedbackRequest, scenario: ScenarioDep) -> ShortFeedbackResponse:
     if scenario is Scenario.BLOCKED:
         return fixtures.short_feedback_blocked()
-    return fixtures.short_feedback(req.scope)
+    return fixtures.short_feedback(req)
 
 
 @app.post("/long-feedback", response_model=LongFeedbackResponse, tags=["feedback"])

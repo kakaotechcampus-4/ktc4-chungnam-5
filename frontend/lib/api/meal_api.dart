@@ -10,21 +10,29 @@ import 'api_client.dart';
 class MealCreated {
   const MealCreated({
     required this.mealId,
-    required this.pollInterval,
-    required this.timeout,
+    this.pollInterval,
+    this.timeout,
   });
 
   final String mealId;
 
-  /// 서버가 정해 주는 폴링 간격·한도.
-  final Duration pollInterval;
-  final Duration timeout;
+  /// 서버가 정해 주는 폴링 간격·한도. 분석할 것이 없으면(고른 음식으로 등록, 201)
+  /// 서버가 둘 다 `null` 로 준다.
+  final Duration? pollInterval;
+  final Duration? timeout;
 
-  factory MealCreated.fromJson(Map<String, dynamic> json) => MealCreated(
-    mealId: json['mealId'] as String,
-    pollInterval: Duration(milliseconds: json['pollIntervalMs'] as int),
-    timeout: Duration(milliseconds: json['timeoutMs'] as int),
-  );
+  /// 사진 분석을 기다려야 하는지. 아니면 곧바로 음식 확인(`REVIEW_REQUIRED`) 단계다.
+  bool get needsAnalysis => pollInterval != null;
+
+  factory MealCreated.fromJson(Map<String, dynamic> json) {
+    final interval = json['pollIntervalMs'] as int?;
+    final timeout = json['timeoutMs'] as int?;
+    return MealCreated(
+      mealId: json['mealId'] as String,
+      pollInterval: interval == null ? null : Duration(milliseconds: interval),
+      timeout: timeout == null ? null : Duration(milliseconds: timeout),
+    );
+  }
 }
 
 /// 음식 1개(또는 후보 1개)의 영양 정보. 모르는 값은 null 이다.
@@ -124,12 +132,16 @@ class MealDetail {
     required this.eatenAt,
     required this.eatenAtInstant,
     required this.items,
+    this.skipped = false,
     this.imageUrl,
     this.clarifyQuestion,
     this.satietyAfterPct,
   });
 
   final String mealId;
+
+  /// "식사 안 함" 으로 기록한 끼니. 등록과 함께 `EVALUATED` 이고 음식·점수가 없다.
+  final bool skipped;
 
   /// `ANALYZING` · `REVIEW_REQUIRED` · `EVALUATED` · `FAILED`.
   final String status;
@@ -161,6 +173,7 @@ class MealDetail {
     mealId: json['mealId'] as String,
     status: json['status'] as String,
     isRecalculation: json['isRecalculation'] as bool? ?? false,
+    skipped: json['skipped'] as bool? ?? false,
     mealType: json['mealType'] as String,
     eatenAt: parseApiDateTime(json['eatenAt'] as String),
     eatenAtInstant: DateTime.parse(json['eatenAt'] as String),
@@ -352,6 +365,8 @@ class MealFeedback {
 
   /// `PENDING` · `GENERATING` · `READY` · `FAILED`.
   final String feedbackStatus;
+
+  /// 피드백 문장. `safetyStatus` 가 `SAFE` 일 때만 온다. 응답의 `reasoning` 은 받지 않는다.
   final String? summary;
   final List<MealSuggestion> suggestions;
 
@@ -375,51 +390,6 @@ class MealFeedback {
   );
 }
 
-/// `GET /insights/daily?date=` — 그날(KST) 하루 피드백.
-///
-/// 새로고침(`POST /insights/daily/refresh`)을 불러야 만들어진다. 한 번도 안
-/// 만들었으면 `PENDING`, 만든 뒤 그날 식사가 바뀌었으면 [stale] 이다. 만들었는데
-/// 근거(평가한 끼니)가 없으면 `READY` 인데 [summary] 가 비어 있다.
-class DailyFeedback {
-  const DailyFeedback({
-    required this.feedbackStatus,
-    required this.stale,
-    this.summary,
-    this.hasRow = false,
-    this.safetyStatus,
-  });
-
-  /// `PENDING` · `GENERATING` · `READY` · `FAILED`.
-  final String feedbackStatus;
-
-  /// `safetyStatus` 가 `SAFE` 일 때만 온다.
-  final String? summary;
-  final bool stale;
-
-  /// 서버에 그날 요약 행이 있는지(`dailyFeedbackId`). `READY` 인데 행이 없으면
-  /// 요약할 근거(평가된 끼니)가 없어 워커가 만들지 않은 것이다 — 실패가 아니다.
-  final bool hasRow;
-
-  /// `SAFE` · `BLOCKED` · `REVIEW_REQUIRED`. 행이 없으면 null.
-  final String? safetyStatus;
-
-  /// 만들었지만 안전 검사에 걸려 문장을 보여 주지 않는다.
-  bool get isHidden => safetyStatus != null && safetyStatus != 'SAFE';
-
-  /// 새로 만들어 달라고 할지.
-  bool get needsRefresh => feedbackStatus == 'PENDING' || stale;
-
-  bool get isGenerating => feedbackStatus == 'GENERATING';
-
-  factory DailyFeedback.fromJson(Map<String, dynamic> json) => DailyFeedback(
-    feedbackStatus: json['feedbackStatus'] as String,
-    summary: json['summary'] as String?,
-    stale: json['stale'] as bool? ?? false,
-    hasRow: json['dailyFeedbackId'] != null,
-    safetyStatus: json['safetyStatus'] as String?,
-  );
-}
-
 // ── API ─────────────────────────────────────────────────────
 
 /// 식사 기록 흐름 엔드포인트.
@@ -428,11 +398,14 @@ class MealApiService {
 
   final ApiClient _client;
 
-  /// `POST /meals` — 텍스트 입력(JSON).
-  Future<MealCreated> createWithText({
+  /// `POST /meals` — 검색 탭에서 고른 음식(JSON `items[]`).
+  ///
+  /// 이미 고른 `foodRefId` 와 g 이 있으니 AI 분석 없이 곧바로 음식 확인
+  /// (`REVIEW_REQUIRED`) 단계로 등록된다(201). 양은 g 으로만 보낸다.
+  Future<MealCreated> createWithFoods({
     required String mealType,
     required DateTime eatenAt,
-    required String text,
+    required List<({String foodRefId, double amountG})> foods,
     int? satietyBeforePct,
   }) async {
     final result = await _client.post(
@@ -440,8 +413,31 @@ class MealApiService {
       body: {
         'mealType': mealType,
         'eatenAt': formatApiDateTime(eatenAt),
-        'rawText': text,
+        'items': [
+          for (final f in foods)
+            {'foodRefId': f.foodRefId, 'amount': f.amountG, 'unit': 'g'},
+        ],
         'satietyBeforePct': ?satietyBeforePct,
+      },
+    );
+    return MealCreated.fromJson(result.dataMap);
+  }
+
+  /// `POST /meals` — "식사 안 함"(JSON `skipped: true`).
+  ///
+  /// 음식 분석도 확인 화면도 없이 곧바로 `EVALUATED` 로 등록되고(201) 끼니 피드백
+  /// 작업이 함께 들어간다. 확정(`POST /confirm`)은 부르지 않는다(409) — 응답을 받으면
+  /// 곧바로 `GET /meals/{mealId}/feedback` 을 묻는다. 음식·식전 포만감은 보낼 수 없다(422).
+  Future<MealCreated> createSkipped({
+    required String mealType,
+    required DateTime eatenAt,
+  }) async {
+    final result = await _client.post(
+      '/meals',
+      body: {
+        'mealType': mealType,
+        'eatenAt': formatApiDateTime(eatenAt),
+        'skipped': true,
       },
     );
     return MealCreated.fromJson(result.dataMap);
@@ -525,6 +521,9 @@ class MealApiService {
   Future<void> deleteItem(String mealId, String itemId) =>
       _client.delete('/meals/$mealId/items/$itemId');
 
+  /// `DELETE /meals/{mealId}` — 끼니 통째로 soft delete. 되돌리는 API 는 없다.
+  Future<void> deleteMeal(String mealId) => _client.delete('/meals/$mealId');
+
   /// `GET /nutrition/candidates?q=`
   Future<List<FoodCandidate>> searchCandidates(String query) async {
     final result = await _client.get(
@@ -599,6 +598,20 @@ class MealApiService {
     return MealFeedback.fromJson(result.dataMap);
   }
 
+  /// `POST /meals/{mealId}/feedback/retry` — 끼니 피드백을 다시 만든다(본문 없음).
+  ///
+  /// 식사 안 함 끼니는 확정(`confirm`)이 409 라 재확정으로 다시 만들 수 없어 이 API 를
+  /// 쓴다. 보여 줄 문장도 생성 중인 작업도 없을 때만 작업을 다시 넣고 `PENDING` 을
+  /// 돌려준다. 그 밖에는 지금 상태를 그대로 돌려준다(더블탭해도 작업은 하나).
+  /// 점수·포만감은 건드리지 않는다. 응답은 [fetchFeedback] 과 같은 모양이다.
+  ///
+  /// - 404 `NOT_FOUND`: 끼니가 없거나 남의 것이거나 삭제됐다.
+  /// - 409 `NOT_CONFIRMED`: 확정 전이다.
+  Future<MealFeedback> retryFeedback(String mealId) async {
+    final result = await _client.post('/meals/$mealId/feedback/retry');
+    return MealFeedback.fromJson(result.dataMap);
+  }
+
   /// `PUT /meals/{mealId}/feedback/suggestions` — 챗봇 카드 한 장으로 이 끼니의
   /// 다음 끼니 추천을 **통째로** 바꾼다(본문·점수는 그대로).
   ///
@@ -614,27 +627,6 @@ class MealApiService {
       body: {'foodCardId': foodCardId},
     );
     return MealFeedback.fromJson(result.dataMap);
-  }
-
-  /// `GET /insights/daily?date=` — [date] 는 KST 날짜.
-  Future<DailyFeedback> fetchDailyFeedback(DateTime date) async {
-    final result = await _client.get(
-      '/insights/daily',
-      query: {'date': formatApiDate(date)},
-    );
-    return DailyFeedback.fromJson(result.dataMap);
-  }
-
-  /// `POST /insights/daily/refresh` — 새로 만들어 달라고 한다(202).
-  /// 다음에 다시 물어볼 간격을 돌려준다.
-  Future<Duration> refreshDailyFeedback(DateTime date) async {
-    final result = await _client.post(
-      '/insights/daily/refresh',
-      body: {'date': formatApiDate(date)},
-    );
-    return Duration(
-      milliseconds: result.dataMap['pollIntervalMs'] as int? ?? 1500,
-    );
   }
 
   /// `POST /meals/{mealId}/satiety-checkins` — 식사 몇 시간 뒤 포만감.

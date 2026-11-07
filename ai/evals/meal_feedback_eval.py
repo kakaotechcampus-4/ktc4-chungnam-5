@@ -108,16 +108,56 @@ def _request(
     qqs: tuple[float | None, float | None, float | None],
     items: list[dict],
     satiety: dict | None = None,
+    *,
+    meal_type: str | None = None,
+    weight_kg: float | None = None,
+    skipped: bool = False,
+    previous_meals: list[dict] | None = None,
+    daily_totals: dict | None = None,
 ) -> dict:
-    """MEAL 요청 JSON. `mealId` 는 `_case` 가 케이스 id 로 채운다."""
+    """MEAL 요청 JSON. `mealId` 는 `_case` 가 케이스 id 로 채운다.
+
+    키워드 인자는 실제 BE 요청(`backend/app/worker/jobs/feedback_meal.py`)에만 있는 필드다. 준 것만 싣는다 —
+    앞의 8개 케이스는 이 필드 없이 짠 입력이라 그대로 둔다.
+    """
     quantity, quality, satiety_score = qqs
-    return {
+    request = {
         "scope": "MEAL",
         "userId": "eval-user",
         "stage": stage,
         "qqs": {"quantity": quantity, "quality": quality, "satiety": satiety_score},
         "items": items,
         "satiety": satiety,
+    }
+    if meal_type is not None:
+        request["mealType"] = meal_type
+    if weight_kg is not None:
+        request["weightKg"] = weight_kg
+    if skipped:
+        request["skipped"] = True
+    if previous_meals is not None:
+        request["previousMeals"] = previous_meals
+    if daily_totals is not None:
+        request["dailyNutritionTotals"] = daily_totals
+    return request
+
+
+def _totals(kcal: float, protein: float, fiber: float, sodium: float) -> dict:
+    """끼니 · 하루 영양 합계 JSON (`Nutrition`). BE 는 지방 · 탄수화물도 싣지만 판정에 쓰지 않아 비운다."""
+    return {"kcal": kcal, "proteinG": protein, "fatG": None, "carbG": None, "fiberG": fiber, "sodiumMg": sodium}
+
+
+def _previous(
+    meal_type: str, qqs: tuple[float | None, float | None, float | None], foods: list[tuple], totals: dict
+) -> dict:
+    """앞선 확정 끼니 JSON (`PreviousMeal`). 음식은 이름 · 양만, 성분은 끼니 합계로 싣는다(BE 와 같다)."""
+    quantity, quality, satiety = qqs
+    return {
+        "mealType": meal_type,
+        "skipped": False,
+        "qqs": {"quantity": quantity, "quality": quality, "satiety": satiety},
+        "items": [{"displayName": name, "amount": amount, "unit": unit} for name, amount, unit in foods],
+        "nutritionTotals": totals,
     }
 
 
@@ -140,15 +180,24 @@ _QUANTITY = _axis(checks.quantity_no_direction, "critical")
 _CAUSE = _axis(checks.cause_food_named, "ambiguous")
 _SATIETY = _axis(checks.satiety_as_experience, "ambiguous")
 _STAGE = _axis(checks.stage_linked_reasoning, "ambiguous")
+_MET_DAILY = _axis(checks.met_daily_not_pushed, "non_critical")
+_DAILY_EXCESS = _axis(checks.daily_excess_addressed, "non_critical")
+_DINNER = _axis(checks.dinner_no_next_meal, "non_critical")
+_SKIPPED = _axis(checks.skipped_not_scored, "critical")
+
+# 저녁은 제안이 빈 배열이 정답이라 `suggestions_shape`(1~3개)를 뺀다 — 대신 `dinner_no_next_meal` 이 본다
+_COMMON_DINNER: tuple[Axis, ...] = tuple(axis for axis in _COMMON if axis.id != "suggestions_shape")
 
 
-def _case(case_id: str, request: dict, axes: tuple[Axis, ...], *, n: int) -> Case:
+def _case(
+    case_id: str, request: dict, axes: tuple[Axis, ...], *, n: int, common: tuple[Axis, ...] = _COMMON
+) -> Case:
     return Case(
         id=case_id,
         path=_PATH,
         request={**request, "mealId": f"eval-{case_id}"},
         contract=checks.contract_parseable,
-        axes=_COMMON + axes,
+        axes=common + axes,
         n=n,
     )
 
@@ -328,6 +377,163 @@ CASES: tuple[Case, ...] = (
             _STAGE,
         ),
         n=5,
+    ),
+    # ── 실제 BE 요청 모양 — weightKg · mealType · previousMeals · dailyNutritionTotals · skipped ──
+    # 위 8개는 이 필드가 없어 단백질 판정 · 저녁 · 누적 · 결식을 재지 못한다. 아래는 BE 가 보내는 모양 그대로다.
+    #
+    # 체중이 있어 단백질을 판정한다 — 62kg × 1.2 ÷ 3 = 끼니 목표 24.8g, 10.2g 이라 SHORT.
+    # 식이섬유 8.9g · 나트륨 740mg 은 OK 라, 단백질만 다뤄야 하고 나머지를 부족 · 초과로 쓰면 모순이다
+    _case(
+        "protein_short_with_weight",
+        _request(
+            "TITRATION",
+            (85, 55, 60),
+            [
+                _item("곤드레나물밥", 1, "그릇", _n(420, 9, 6.5, 380)),
+                _item("미역오이냉국", 1, "그릇", _n(35, 1.2, 2.4, 360)),
+            ],
+            {"afterPct": 60, "hungerReturnMinutes": 150},
+            meal_type="LUNCH",
+            weight_kg=62,
+        ),
+        (_GAP, _CONTRADICT, _QUANTITY, _CAUSE, _STAGE),
+        n=3,
+    ),
+    # 단백질 OK(32.5g ≥ 28.0g, 70kg) + 식이섬유 SHORT(3.8g) + 나트륨 OVER(1690mg).
+    # 단백질을 "부족" 이라 쓰면 OK 판정과 모순이다 — 체중 없는 케이스에서는 잴 수 없던 방향이다
+    _case(
+        "protein_ok_sodium_over_with_weight",
+        _request(
+            "MAINTENANCE",
+            (100, 52, 70),
+            [
+                _item("소고기 쌀국수", 1, "그릇", _n(520, 30, 2.0, 1480)),
+                _item("숙주무침", 1, "접시", _n(40, 2.5, 1.8, 210)),
+            ],
+            {"afterPct": 70},
+            meal_type="LUNCH",
+            weight_kg=70,
+        ),
+        (_CONTRADICT, _GAP, _CAUSE, _STAGE),
+        n=3,
+    ),
+    # 누적 — 이 끼니의 단백질은 13g 으로 끼니 목표(22.0g, 55kg) 미만이지만, 아침까지 합쳐 하루 71g 으로
+    # 하루 목표(66g)에 이미 도달했다. 단백질을 더 채우라고 하면 실패다(프롬프트 reasoning 규칙).
+    # 식이섬유는 끼니 · 하루 모두 미달이라 방향은 "식이섬유 채우기" 하나다. 나트륨 750mg 은 끼니 OK
+    _case(
+        "daily_protein_met_earlier",
+        _request(
+            "MAINTENANCE",
+            (90, 45, 65),
+            [
+                _item("메밀국수", 1, "그릇", _n(400, 12, 4.5, 600)),
+                _item("오이무침", 1, "접시", _n(30, 1, 1.6, 150)),
+            ],
+            {"afterPct": 65},
+            meal_type="LUNCH",
+            weight_kg=55,
+            previous_meals=[
+                _previous("BREAKFAST", (100, 80, 75), [("닭가슴살 스테이크 도시락", 1, "개")], _totals(520, 58, 3.0, 900)),
+            ],
+            daily_totals=_totals(950, 71, 9.1, 1650),
+        ),
+        (_MET_DAILY, _CONTRADICT, _CAUSE, _STAGE),
+        n=3,
+    ),
+    # 누적 나트륨 초과 — 이 끼니 나트륨은 580mg 으로 끼니 한도 안이지만, 아침 육개장까지 하루 2535mg 으로
+    # 하루 한도(2300mg)를 넘었다. 다음 메뉴에 그 흐름을 반영해야 한다. 식이섬유 6.0g 은 끼니 SHORT.
+    # `no_contradict_rule` 은 붙이지 않는다 — body 가 누적 초과를 "넘었어요" 로 쓰는 것은 정답인데,
+    # 그 축은 이번 끼니(OK)에 대한 모순으로 읽는다
+    _case(
+        "daily_sodium_over_limit",
+        _request(
+            "TITRATION",
+            (95, 70, 72),
+            [
+                _item("연어 샐러드볼", 1, "개", _n(450, 26, 6.0, 520)),
+                _item("그릭요거트", 1, "개", _n(120, 10, 0, 60)),
+            ],
+            {"afterPct": 72},
+            meal_type="LUNCH",
+            weight_kg=65,
+            previous_meals=[
+                _previous(
+                    "BREAKFAST",
+                    (100, 35, 70),
+                    [("육개장", 1, "그릇"), ("쌀밥", 1, "공기"), ("깍두기", 1, "접시")],
+                    _totals(700, 29.5, 4.6, 1955),
+                ),
+            ],
+            daily_totals=_totals(1270, 65.5, 10.6, 2535),
+        ),
+        (_DAILY_EXCESS, _GAP, _CAUSE, _STAGE),
+        n=3,
+    ),
+    # 저녁 — 제안은 빈 배열이고 body 는 하루 흐름을 정리하며 끝낸다(다음 끼니 · 내일 메뉴 제안 없음).
+    # 점심 도시락 · 저녁 닭갈비로 나트륨이 쌓였다(이번 끼니 1410mg OVER, 하루 3130mg). 식이섬유 5.5g SHORT,
+    # 단백질 39.2g OK(60kg → 24.0g)
+    _case(
+        "dinner_day_wrap_up",
+        _request(
+            "MAINTENANCE",
+            (100, 45, 85),
+            [
+                _item("닭갈비", 1, "인분", _n(600, 38, 4.0, 1400)),
+                _item("상추", 1, "접시", _n(15, 1.2, 1.5, 10)),
+            ],
+            {"afterPct": 85},
+            meal_type="DINNER",
+            weight_kg=60,
+            previous_meals=[
+                _previous("BREAKFAST", (100, 70, 60), [("오트밀 우유", 1, "그릇")], _totals(280, 12, 4.0, 120)),
+                _previous("LUNCH", (100, 40, 70), [("편의점 도시락", 1, "개")], _totals(750, 25, 3.0, 1600)),
+            ],
+            daily_totals=_totals(1645, 76.2, 12.5, 3130),
+        ),
+        (_DINNER, _GAP, _CONTRADICT, _CAUSE, _STAGE),
+        n=3,
+        common=_COMMON_DINNER,
+    ),
+    # 식사 안 함 — 점심을 명시적으로 걸렀다. 음식 · 포만감 · 점수가 없다(계약). 결식을 0g 이나 부족으로
+    # 평가하면 실패다. 제안은 아침 기록과 누적을 보고 다음 끼니에 곁들이기 쉬운 음식이다(점심이라 1~3개)
+    _case(
+        "skipped_lunch_after_breakfast",
+        _request(
+            "INITIAL",
+            (None, None, None),
+            [],
+            meal_type="LUNCH",
+            weight_kg=58,
+            skipped=True,
+            previous_meals=[
+                _previous(
+                    "BREAKFAST", (80, 40, 55), [("단호박죽", 1, "그릇"), ("바나나", 1, "개")], _totals(330, 6.5, 3.2, 420)
+                ),
+            ],
+            daily_totals=_totals(330, 6.5, 3.2, 420),
+        ),
+        (_SKIPPED, _STAGE),
+        n=3,
+    ),
+    # 사진 인식 끼니의 실제 모양 — 음식 이름과 g 양은 있지만 영양 DB 에 매칭되지 않아 성분이 없다.
+    # 그래서 BE 는 quantity · quality 를 채점하지 못하고(null), 하루 합계도 없다(null).
+    # `nutrition_all_unknown` 과 달리 체중 · 끼니 종류 · g 양이 있다 — 단백질 목표가 있어도 판정은 못 한다
+    _case(
+        "photo_unmatched_items",
+        _request(
+            "TITRATION",
+            (None, None, 70),
+            [
+                _item("양념치킨", 450, "g", None),
+                _item("치킨무", 80, "g", None),
+            ],
+            {"beforePct": 25, "afterPct": 70},
+            meal_type="LUNCH",
+            weight_kg=64,
+            previous_meals=[],
+        ),
+        (_UNJUDGED, _UNSCORED, _CAUSE),
+        n=3,
     ),
 )
 
