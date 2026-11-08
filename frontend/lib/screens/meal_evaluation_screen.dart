@@ -443,10 +443,11 @@ class _ScoreBody extends StatelessWidget {
           children: [
             Expanded(child: _ScoreBar(score: s, color: color)),
             const SizedBox(width: 12),
+            // 점수인지 먹은 양인지 헷갈리지 않게 `점` 을 붙인다.
             SizedBox(
-              width: 28,
+              width: 38,
               child: Text(
-                s == null ? '-' : '$s',
+                s == null ? '-' : '$s점',
                 textAlign: TextAlign.right,
                 style: AppTypography.cardTitle.copyWith(fontSize: 14),
               ),
