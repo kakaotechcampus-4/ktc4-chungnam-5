@@ -115,17 +115,25 @@ def _nutrition_from_food_ref(food_ref: FoodRef, amount_g: Decimal | None) -> Nut
 def resolve_by_name(
     db: Session, *, name: str, amount_g: Decimal | None
 ) -> NutritionMatch | None:
-    """음식명으로 공공 DB 를 찾는다. **하나로 좁혀지지 않으면 None.**
+    """음식명으로 공공 DB 를 찾는다. **`GET /nutrition/candidates` 의 1위 후보에 건다.**
 
-    못 찾은 것과 여러 건이라 고르지 못한 것을 구분하지 않는다 — 호출부가 할 일이
-    `matched: false` 로 같기 때문이다. 그 신호를 받은 FE 는 `GET /nutrition/candidates`
-    로 후보를 띄우고 사용자가 고른다. 왜 임의로 하나를 집지 않는지는
-    `crud.food.find_unique_by_name` 참고.
+    후보 검색(`search_candidates`)과 같은 검색·정렬을 그대로 쓰므로, 사용자가 같은
+    이름으로 후보 목록을 열면 맨 위에 보이는 음식이 곧 여기서 걸린 음식이다.
+    `limit=1` 로 찾아도 1위는 같다 — 부분일치는 같은 정렬의 LIMIT 이고, 퍼지는
+    부분일치가 0건일 때만 1위 자리를 채우기 때문이다.
+
+    후보가 하나도 없거나 검색어로 쓸 수 없는 이름(정규화하면 빈 문자열 · 단어 수
+    초과)이면 None 이다. 호출부는 이를 `matched: false` 로 옮기고, FE 는 후보 목록을
+    띄워 사용자가 다른 음식을 고르게 한다(`PUT /meals/{mealId}/items/{itemId}/nutrition`).
     """
-    food_ref = food_crud.find_unique_by_name(db, name)
-    if food_ref is None:
+    try:
+        found = _search_food_refs(db, query=name, limit=1)
+    except ValueError:
+        return None
+    if not found:
         return None
 
+    food_ref = found[0]
     nutrition = _nutrition_from_food_ref(food_ref, amount_g)
     return NutritionMatch(food_ref_id=food_ref.id, nutrition=nutrition)
 
@@ -176,11 +184,6 @@ def get_food_names(db: Session, *, food_ref_ids: list[str]) -> dict[str, str]:
 def search_candidates(db: Session, *, query: str, limit: int) -> list[FoodCandidate]:
     """사용자가 고를 후보를 찾는다. 못 찾으면 빈 목록.
 
-    `resolve_by_name` 과 호출 맥락이 정반대다. 저쪽은 서버가 자동으로 음식을 거는
-    자리라 애매하면 포기하고, 여기는 **사람이 눈으로 고르는** 자리라 애매해도
-    보여준다 — 틀린 후보가 목록에 섞이는 비용은 사용자가 무시하면 끝이지만,
-    자동으로 걸린 틀린 값은 Q/Q/S 채점까지 조용히 흘러간다.
-
     **정규화 뒤에 남는 조각이 하나는 있어야 한다**(`MIN_QUERY_LENGTH`). 아니면
     `ValueError` 다. 한 글자 검색은 막지 않는다 — 한글은 한 글자가 단어이고, 거부해도
     비용이 줄지 않는다(상수 쪽에 실측을 적어 두었다).
@@ -190,7 +193,14 @@ def search_candidates(db: Session, *, query: str, limit: int) -> list[FoodCandid
     모든 행에 1점을 주므로(`_tokenize` 참고) 33만건 전부가 후보가 된다.
 
     HTTP 로 옮기는 건 호출부의 몫이다(`api/v1/endpoints/nutrition.py`).
+
+    서버가 이름으로 자동 매칭할 때(`resolve_by_name`)도 같은 검색의 1위를 쓴다.
     """
+    return [_to_candidate(food_ref) for food_ref in _search_food_refs(db, query=query, limit=limit)]
+
+
+def _search_food_refs(db: Session, *, query: str, limit: int) -> list[FoodRef]:
+    """후보 검색 본체 — 관련도 순 `food_refs` 행. 검색어 규칙 위반이면 `ValueError`."""
     tokens = _tokenize(query)
     if max((len(token) for token in tokens), default=0) < MIN_QUERY_LENGTH:
         raise ValueError("검색어를 입력해 주세요.")
@@ -218,7 +228,7 @@ def search_candidates(db: Session, *, query: str, limit: int) -> list[FoodCandid
             exclude_ids=[food_ref.id for food_ref in exact],
         )
 
-    return [_to_candidate(food_ref) for food_ref in found]
+    return found
 
 
 def _bigrams(tokens: list[str]) -> list[str]:

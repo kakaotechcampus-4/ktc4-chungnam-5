@@ -16,7 +16,8 @@
 - **절 범위** — body 는 이번 끼니를 말하는 자리라 모든 절을 본다. reasoning(단계와 잇는 일반 설명)과
   advice(제안 음식 설명)는 **과거형 절만** 이번 끼니에 대한 평가로 본다
   ("곁들이면 든든해요" 는 제안 음식 설명, "배고프셨을 거예요" 는 이번 끼니 평가).
-  예외: "양이 많은 편이에요" 같은 양 상태 서술은 시제와 관계없이 모든 절에서 본다(`quantity_no_direction`)
+  예외: "양이 많은 편이에요" 같은 양 상태 서술은 시제와 관계없이 모든 절에서 본다(`quantity_no_direction` ·
+  `quantity_direction_*`)
 - **거절 · 불확실** — "알 수 없어요", "기록이 없어" 같은 표현이 같은 절에 있으면 단정이 아니다
 """
 
@@ -42,6 +43,8 @@ from app.short_feedback import (
     _FORBIDDEN,
     _LABELS,
     _MEAL_EXAMPLE_GOOD,
+    _QUANTITY_MILD,
+    _QUANTITY_NEAR,
     _UNITS,
     MEAL_SYSTEM_PROMPT,
     STAGE_RISK,
@@ -361,16 +364,8 @@ def _amount_states(clause: str) -> Iterator[str]:
         yield m.group(0)
 
 
-@_with_request
-def quantity_no_direction(resp: dict, model: ShortFeedbackRequest) -> Verdict:
-    """quantity < 100 일 때 과식 · 소식 방향을 말하지 않았는가.
-
-    먹은 행동("많이 드셨어요")은 이번 끼니 절(body 전부 · reasoning · advice 의 과거형)에서,
-    양 상태 서술("양이 많은 편이에요")은 시제와 관계없이 모든 절에서 본다.
-    """
-    quantity = model.qqs.quantity
-    if quantity is None or quantity >= 100:
-        return True, "대상 아님 (quantity 가 null 이거나 100)"
+def _direction_hits(resp: dict) -> list[str]:
+    """이번 끼니 양의 방향을 단정한 곳 — 먹은 행동(이번 끼니 절)과 양 상태 서술(모든 절)."""
     found = _meal_hits(resp, _DIRECTION_ACT_RE)
     found += [
         f"'{word}'({field})"
@@ -378,7 +373,109 @@ def quantity_no_direction(resp: dict, model: ShortFeedbackRequest) -> Verdict:
         if not _UNCERTAIN.search(clause)
         for word in _amount_states(clause)
     ]
-    return _verdict("양의 방향을 단정", found)
+    return found
+
+
+@_with_request
+def quantity_no_direction(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """양의 방향을 말하면 안 되는 끼니에서 과식 · 소식 방향을 말하지 않았는가.
+
+    대상은 둘이다.
+    - 섭취 비율(`intake`)이 없고 quantity < 100 — 점수만으로는 방향을 알 수 없다
+    - 비율이 있고 quantity ≥ 90 — 거의 적정이라 양을 언급하지 않는다(프롬프트 판정 줄 "양은 언급하지 않는다")
+    비율이 있고 90 미만이면 방향을 말해도 된다. 맞는 방향인지는 `quantity_direction_not_reversed` 가 본다.
+
+    먹은 행동("많이 드셨어요")은 이번 끼니 절(body 전부 · reasoning · advice 의 과거형)에서,
+    양 상태 서술("양이 많은 편이에요")은 시제와 관계없이 모든 절에서 본다.
+    """
+    quantity = model.qqs.quantity
+    if quantity is None:
+        return True, "대상 아님 (quantity 가 null)"
+    if model.intake is None and quantity >= 100:
+        return True, "대상 아님 (비율 없이 quantity 100)"
+    if model.intake is not None and quantity < _QUANTITY_NEAR:
+        return True, f"대상 아님 (비율 있음 · quantity < {_QUANTITY_NEAR})"
+    return _verdict("양의 방향을 단정", _direction_hits(resp))
+
+
+# 방향별 표현 — `_DIRECTION_ACT` · `_AMOUNT_WORDS` 를 많이 · 적게 쪽으로 나눈 것이다. 주어 없는 비교
+# ("평소보다 많았어요")와 "식사량 · 섭취량" 주어, "양을 줄이 · 늘리"(반대 방향을 함의)도 함께 본다.
+# "양이 조금 적었어요" 처럼 정도 부사가 끼어도 같은 방향이다
+_DEGREE = r"(?:(?:조금|좀|약간|다소|살짝|꽤|많이)\s*)?"
+_MORE = re.compile(
+    r"(?:많이|배불리|과하게|넉넉히|평소보다\s*더)\s*(?:드셨|드신|먹었|먹은|드셔서|잡수)"
+    r"|(?<![가-힣])더\s*(?:드셨|먹었)"
+    r"|(?:과식|폭식)(?:을\s*)?(?:하셨|했|하신|한\s|이었|이에|이네|이라|인\s)"
+    r"|많은\s*양|(?<![가-힣])양을\s*(?:줄이|줄여)"
+    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _DEGREE + r"(?:많|넘치|과하|넉넉)"
+    r"|평소보다\s*" + _DEGREE + r"(?:많|넉넉|과하)"
+)
+_LESS = re.compile(
+    r"(?:적게|조금만|평소보다\s*덜)\s*(?:드셨|드신|먹었|먹은|드셔서|잡수)"
+    r"|(?<![가-힣])덜\s*(?:드셨|먹었)"
+    r"|소식(?:을\s*)?(?:하셨|했|하신|한\s|이었|이에|이네|이라|인\s)"
+    r"|적은\s*양|(?<![가-힣])양을\s*(?:늘리|늘려)"
+    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _DEGREE + r"(?:적(?!당|절)|모자|부족)"
+    r"|평소보다\s*" + _DEGREE + r"(?:적(?!당|절)|모자)"
+)
+
+
+def _general(clause: str, match: re.Match[str]) -> bool:
+    """조건 · 양보 · 경향의 일반 진술인가 — "양이 적으면", "양이 적어도", "적게 먹기 쉬운 때"."""
+    end = match.end() + len(re.match(r"[가-힣]*", clause[match.end():]).group(0))
+    return bool(_GENERAL_END.search(clause[match.start():end]) or _GENERAL_TAIL.match(clause, end))
+
+
+def _hits(resp: dict, pattern: re.Pattern[str]) -> list[str]:
+    """`pattern` 이 걸린 곳 — 모든 절에서, 불확실 · 일반 진술 절은 뺀다."""
+    return [
+        f"'{m.group(0)}'({field})"
+        for field, clause in _all_clauses(resp)
+        if not _UNCERTAIN.search(clause)
+        for m in pattern.finditer(clause)
+        if not _general(clause, m)
+    ]
+
+
+def _intake_direction(model: ShortFeedbackRequest) -> bool | None:
+    """비율이 구간 가운데 이상이면 True(많이), 아래면 False(적게). 비율이 없으면 None.
+
+    앱 프롬프트(`short_feedback._quantity_judgement`)와 같은 기준이다. 90점 미만이면 비율이 구간 밖이라
+    하한 · 상한 비교와 같은 결과다.
+    """
+    if model.intake is None:
+        return None
+    lo, hi = model.intake.range_pct
+    return model.intake.ratio_pct >= (lo + hi) / 2
+
+
+@_with_request
+def quantity_direction_not_reversed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """비율이 있고 quantity < 90 일 때 비율과 반대 방향을 말하지 않았는가.
+
+    많이 먹은 끼니에 "적게 드셨어요" 는 사실과 반대다. 같은 방향 · 언급 없음 · 불확실 문장은 통과한다.
+    """
+    more = _intake_direction(model)
+    quantity = model.qqs.quantity
+    if more is None or quantity is None or quantity >= _QUANTITY_NEAR:
+        return True, f"대상 아님 (비율 없음 · quantity 가 null 이거나 {_QUANTITY_NEAR} 이상)"
+    return _verdict("양의 방향을 반대로 말함", _hits(resp, _LESS if more else _MORE))
+
+
+@_with_request
+def quantity_direction_mentioned(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """비율이 있고 quantity < 80 일 때 양을 비율과 같은 방향으로 말했는가.
+
+    프롬프트는 "양이 점수를 낮춘 이유로 설명한다" 고 지시한다. 말하지 않으면 사용자는 양 점수가
+    왜 낮은지 모른다. 어휘 목록으로 판정해 바꿔 말한 표현은 놓칠 수 있다 — 그래서 non-critical 이다.
+    """
+    more = _intake_direction(model)
+    quantity = model.qqs.quantity
+    if more is None or quantity is None or quantity >= _QUANTITY_MILD:
+        return True, f"대상 아님 (비율 없음 · quantity 가 null 이거나 {_QUANTITY_MILD} 이상)"
+    if _hits(resp, _MORE if more else _LESS):
+        return True, ""
+    return False, f"양의 방향({'많이' if more else '적게'})을 말하지 않음"
 
 
 # ─────────────────────────── 영양 판정 축 ───────────────────────────

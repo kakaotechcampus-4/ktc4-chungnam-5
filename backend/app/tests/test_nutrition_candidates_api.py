@@ -1,8 +1,8 @@
 """GET /nutrition/candidates 의 HTTP 계약.
 
-이름 매칭이 하나로 좁혀지지 않아 `matched: false` 로 나간 음식(`김치찌개` ·
-`미역국` 처럼 흔한 것들이 여기 해당한다)에 사용자가 직접 영양정보를 붙이는
-폴백 흐름의 첫 단계다. 검색 규칙 자체는 `test_nutrition_service.py` 가 고정하고,
+이름 매칭이 자동으로 건 음식이 틀렸거나 후보가 없어 `matched: false` 로 나간
+음식에 사용자가 직접 영양정보를 붙이는 폴백 흐름의 첫 단계다. 자동 매칭은 이
+검색의 1위를 쓴다(`services.nutrition.resolve_by_name`). 검색 규칙 자체는 `test_nutrition_service.py` 가 고정하고,
 여기서는 FE 가 의존하는 응답 모양·상태코드만 본다.
 """
 

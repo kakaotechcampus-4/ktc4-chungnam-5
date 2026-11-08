@@ -555,16 +555,12 @@ def update_items(
             amount=update.request.amount,
             unit=update.request.unit,
             amount_g=update.amount_g,
-            # 이름이 그대로면 기존 링크를 지킨다. 다시 찾으면 AI 가 정확히 연결해 둔
-            # 항목이 끊기거나 다른 행으로 바뀔 수 있다 — 이름 매칭은 정확히 같은 이름만,
-            # GENERAL 먼저 찾기 때문이다
+            # 이름이 그대로면 기존 링크를 지킨다. 다시 찾으면 AI 나 사용자가 연결해 둔
+            # 항목이 다른 행으로 바뀔 수 있다 — 이름 매칭은 후보 검색 1위에 걸기 때문이다
             # (`endpoints/meal_items.py` 의 update_meal_items 독스트링 참고).
-            # 지킬 링크가 없을 때(`food_ref_id IS NULL`)는 얘기가 다르다. AI 가
-            # `candidateFoodRefId` 를 못 줬다는 뜻이고 이름 매칭은 워커가 쓰지 않는
-            # 별개의 신호라, 방금 찾아 온 결과를 버리면 "미역국 2개 → 200g" 처럼
-            # 이제 환산이 되는 수정도 영양정보를 영영 못 얻는다. 끊을 링크가 없으니
-            # 보수적으로 굴 이유도 없다 — POST 가 이름 매칭만으로 링크를 거는 것과
-            # 같은 신호다.
+            # 지킬 링크가 없을 때(`food_ref_id IS NULL`)는 얘기가 다르다. 끊을 링크가
+            # 없으니 방금 찾아 온 결과를 버릴 이유가 없다 — POST 가 이름 매칭만으로
+            # 링크를 거는 것과 같은 신호다.
             food_ref_id=(
                 update.food_ref_id if renamed or item.food_ref_id is None else item.food_ref_id
             ),
