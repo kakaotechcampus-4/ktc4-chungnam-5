@@ -1,0 +1,303 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-11-08T15:37:31.037906+00:00",
+  "purpose": "Blind photo-based provisional labels for offline assessment of existing AI responses against unchanged BE food matching policy.",
+  "review_method": {
+    "photo_labels_a": "Independent photo inspection for piece_of_pizza, whole_cake, food_and_notfood; findings supplied by parent for consolidation.",
+    "photo_labels_b": "Independent photo inspection for manybanchan, branded_drinks, occludedfood; consolidated all six labels.",
+    "blinding": "Reviewers did not read saved model responses or DB candidate outputs before assigning these labels. Consolidator did not read saved model responses or DB candidate outputs.",
+    "status": "Provisional AI visual review, not a human-verified gold standard."
+  },
+  "protocol": {
+    "photo_to_db_correctness": "Assess whether the selected DB food is supported by the visible photo at a defensible specificity. Defer exact subtype or dish ID when ingredients or preparation are unclear.",
+    "input_name_to_db_semantic_fidelity": "Assess separately whether the selected DB food preserves the meaning of the AI-produced name. A faithful name match can still be wrong relative to the photo.",
+    "allowed_broad_identity": "Clear broad food identity may be accepted at that level, but must not be reported as verified exact recipe, product, or nutritional equivalence.",
+    "uncertainty": "Do not force a DB ID label when visual evidence cannot establish a specific food. Record unjudgeable or approximate rather than counting it as correct.",
+    "packaged_drinks": "Generic juice is at most an approximate substitute for a packaged jelly-containing fruit drink; exact product and nutrition equivalence are unverified.",
+    "missing_and_duplicate_counts": "Only compute definite missing/duplicate counts from a certain visible inventory. Separate dish types from repeated bowls; do not infer closed-container contents or consumed portions.",
+    "independence": "Freeze labels before viewing DB candidate results; record any later label revision with its external evidence rather than adapting labels to candidate rankings."
+  },
+  "cases": {
+    "piece_of_pizza": {
+      "image": "piece_of_pizza.jpg",
+      "reviewer": "photo_labels_a",
+      "supported_identities": [
+        "피자",
+        "포테이토피자"
+      ],
+      "visible_inventory": [
+        {
+          "identity": "삼각형 피자 조각",
+          "count": 1,
+          "confidence": "clear"
+        }
+      ],
+      "visible_attributes": [
+        "치즈",
+        "감자처럼 보이는 덩어리 토핑",
+        "소시지처럼 보이는 둥근 토핑"
+      ],
+      "uncertain_attributes": [
+        "브랜드",
+        "토핑의 정확한 성분",
+        "무게",
+        "실제 섭취량"
+      ],
+      "judgment_scope": "피자 및 감자 토핑 피자 수준의 음식 정체를 평가할 수 있다. 브랜드나 상세 레시피의 일치는 판정하지 않는다.",
+      "duplicate_missing_policy": "피자 구성 토핑을 별도 음식으로 다시 세면 중복 가능성이 있다. 피자 조각 자체는 하나로 보인다.",
+      "image_path": "ai/evals/fixtures/analyze_meal/piece_of_pizza.jpg",
+      "image_sha256": "fbad785aa626d6d2ec286fe1cc424a8e855f276a40ec462ef4d2e99f258f5215",
+      "review_status": "provisional_ai_visual_review_not_human_verified",
+      "candidate_ids": null
+    },
+    "whole_cake": {
+      "image": "whole_cake.jpg",
+      "reviewer": "photo_labels_a",
+      "supported_identities": [
+        "치즈케이크"
+      ],
+      "visible_inventory": [
+        {
+          "identity": "통 치즈케이크",
+          "count": 1,
+          "confidence": "clear"
+        }
+      ],
+      "visible_attributes": [
+        "CHEESE CAKE 표기",
+        "통 케이크 형태"
+      ],
+      "uncertain_attributes": [
+        "상세 레시피",
+        "무게",
+        "실제 섭취 조각 또는 비율"
+      ],
+      "judgment_scope": "치즈케이크라는 음식 종류는 평가할 수 있다. 통 케이크 전체가 섭취량이라는 판단은 하지 않는다.",
+      "duplicate_missing_policy": "명확하게 보이는 하나의 케이크를 기준으로 한다.",
+      "image_path": "ai/evals/fixtures/analyze_meal/whole_cake.jpg",
+      "image_sha256": "c641306d92f828e2d42ddc3e699ac0c680ce898bf2ce64610bcbc13aad8479c4",
+      "review_status": "provisional_ai_visual_review_not_human_verified",
+      "candidate_ids": null
+    },
+    "food_and_notfood": {
+      "image": "food_and_notfood.jpg",
+      "reviewer": "photo_labels_a",
+      "supported_identities": [
+        "갈색 빵",
+        "크림 수프",
+        "소스 또는 스프레드"
+      ],
+      "visible_inventory": [
+        {
+          "identity": "갈색 빵",
+          "count": null,
+          "confidence": "clear broad category"
+        },
+        {
+          "identity": "크림 수프",
+          "count": null,
+          "confidence": "clear broad category"
+        },
+        {
+          "identity": "별도로 담긴 짙은 갈색 소스",
+          "count": 1,
+          "confidence": "clear appearance only"
+        },
+        {
+          "identity": "별도로 담긴 흰 소스",
+          "count": 1,
+          "confidence": "clear appearance only"
+        },
+        {
+          "identity": "별도로 담긴 연한 노란 스프레드",
+          "count": 1,
+          "confidence": "clear appearance only"
+        }
+      ],
+      "visible_attributes": [
+        "갈색 빵",
+        "크림 형태의 수프",
+        "소스 또는 스프레드 세 종류가 별도로 담김"
+      ],
+      "uncertain_attributes": [
+        "빵의 호밀 여부",
+        "수프의 양송이 여부",
+        "블루치즈 여부",
+        "초콜릿 여부",
+        "망고 여부",
+        "버터 여부",
+        "브랜드",
+        "섭취량"
+      ],
+      "judgment_scope": "빵·수프·소스라는 넓은 정체는 검토할 수 있다. 상세 재료를 포함한 DB 항목의 정확성은 사진만으로 확정하지 않는다.",
+      "duplicate_missing_policy": "별도로 보이는 세 소스/스프레드의 존재는 기록한다. 특정 재료명 누락을 오류로 단정하지 않는다.",
+      "image_path": "ai/evals/fixtures/analyze_meal/food_and_notfood.jpg",
+      "image_sha256": "7eddb1217e4858c9129d01af4183baa87c4ee0879bd43f24ee5bafa169a0c492",
+      "review_status": "provisional_ai_visual_review_not_human_verified",
+      "candidate_ids": null
+    },
+    "manybanchan": {
+      "image": "manybanchan.jpg",
+      "reviewer": "photo_labels_b",
+      "supported_identities": [
+        "비빔밥 형태의 채소·고기 덮밥",
+        "콩나물이 보이는 맑은 국",
+        "잡채",
+        "양배추 샐러드",
+        "양념을 얹은 흰 두부",
+        "브로콜리 반찬",
+        "해조류 반찬",
+        "분홍색 절임 반찬"
+      ],
+      "visible_inventory": [
+        {
+          "identity": "비빔밥 형태의 채소·고기 덮밥",
+          "count": 2,
+          "confidence": "clear broad category"
+        },
+        {
+          "identity": "콩나물이 보이는 맑은 국",
+          "count": 3,
+          "confidence": "clear; some bowls partly cropped"
+        },
+        {
+          "identity": "잡채",
+          "count": 1,
+          "confidence": "clear"
+        },
+        {
+          "identity": "양배추 샐러드",
+          "count": 1,
+          "confidence": "clear broad category"
+        },
+        {
+          "identity": "양념을 얹은 흰 두부",
+          "count": 1,
+          "confidence": "clear broad category"
+        },
+        {
+          "identity": "브로콜리 반찬",
+          "count": 1,
+          "confidence": "clear broad category"
+        },
+        {
+          "identity": "해조류 반찬",
+          "count": 1,
+          "confidence": "clear broad category"
+        },
+        {
+          "identity": "분홍색 절임 반찬",
+          "count": 1,
+          "confidence": "appearance; ingredient uncertain"
+        },
+        {
+          "identity": "붉게 양념된 반찬",
+          "count": 2,
+          "confidence": "appearance only; exact identities uncertain"
+        }
+      ],
+      "visible_attributes": [
+        "여러 사람의 식탁",
+        "두 비빔밥 형태의 그릇",
+        "일부 잘린 그릇을 포함해 세 국그릇",
+        "닫힌 밥그릇이 보임"
+      ],
+      "uncertain_attributes": [
+        "고기의 종류",
+        "불고기 조리법",
+        "브로콜리의 흰 부재료가 두부인지",
+        "해조류의 상세 종류와 초무침 여부",
+        "분홍색 절임의 정확한 재료",
+        "붉은 반찬 두 종류의 정확한 정체",
+        "닫힌 밥그릇의 내용",
+        "인별 섭취량"
+      ],
+      "judgment_scope": "넓은 음식 정체와 확실한 잡채 등을 평가한다. 육종·조리법·애매한 반찬의 정확한 DB ID는 확정하지 않는다. 닫힌 그릇만 보고 쌀밥을 정답으로 고정하지 않는다.",
+      "duplicate_missing_policy": "음식 종류별 합산과 그릇별 출력을 구분한다. 여러 그릇을 한 음식 항목으로 합쳤다는 이유만으로 누락으로 세지 않는다. 비빔밥의 구성 재료를 별도 음식으로 다시 세면 중복 가능성이 있다.",
+      "image_path": "ai/evals/fixtures/analyze_meal/manybanchan.jpg",
+      "image_sha256": "7d8b8e4aabafe983250c45a5f719b350fbacbeb08680b3e93b97b6be4232cd91",
+      "review_status": "provisional_ai_visual_review_not_human_verified",
+      "candidate_ids": null
+    },
+    "branded_drinks": {
+      "image": "branded_drinks.jpg",
+      "reviewer": "photo_labels_b",
+      "supported_identities": [
+        "망고맛 과일음료",
+        "복숭아맛 과일음료",
+        "리치맛 과일음료"
+      ],
+      "visible_inventory": [
+        {
+          "identity": "망고맛 포장 과일음료",
+          "count": 1,
+          "confidence": "label readable"
+        },
+        {
+          "identity": "복숭아맛 포장 과일음료",
+          "count": 1,
+          "confidence": "label readable"
+        },
+        {
+          "identity": "리치맛 포장 과일음료",
+          "count": 1,
+          "confidence": "fruit illustration; full product wording obscured"
+        }
+      ],
+      "visible_attributes": [
+        "Mogu Mogu 브랜드 표기",
+        "세 병",
+        "왼쪽 병에 with Nata de… 표기",
+        "젤리를 포함하는 과일음료 제품군"
+      ],
+      "uncertain_attributes": [
+        "정확한 과즙 함량",
+        "당류 함량",
+        "병당 용량",
+        "실제 섭취량",
+        "앞쪽 병의 전체 제품 표시",
+        "DB 제품과 제조 규격의 동일성"
+      ],
+      "judgment_scope": "과일 종류 수준의 일치는 검토할 수 있다. 젤리가 든 포장 과일음료를 일반 과일주스로 연결한 것은 대체/근사 매칭으로 표시하며, 정확한 제품 또는 영양 일치로 인정하지 않는다.",
+      "duplicate_missing_policy": "서로 다른 과일음료 세 병은 구분 가능하다. 내용물과 젤리를 별도 음식으로 중복 세지 않는다.",
+      "image_path": "ai/evals/fixtures/analyze_meal/branded_drinks.jpg",
+      "image_sha256": "544dcb4f9c30a8de67faff4e4526d1b280844b91d2fde4c1905cb27db0451445",
+      "review_status": "provisional_ai_visual_review_not_human_verified",
+      "candidate_ids": null
+    },
+    "occludedfood": {
+      "image": "occludedfood.jpg",
+      "reviewer": "photo_labels_b",
+      "supported_identities": [
+        "붉은 국물 또는 소스의 채소가 든 복합 냄비 요리"
+      ],
+      "visible_inventory": [
+        {
+          "identity": "채소가 든 붉은 국물/소스 복합 요리",
+          "count": 1,
+          "confidence": "broad appearance only; image cropped"
+        }
+      ],
+      "visible_attributes": [
+        "사각 냄비",
+        "양배추",
+        "대파",
+        "붉은 국물 또는 소스",
+        "일부만 보이는 흰 재료"
+      ],
+      "uncertain_attributes": [
+        "정확한 요리명",
+        "흰 재료가 떡·내장·다른 재료인지",
+        "육류 종류",
+        "전체 양",
+        "실제 섭취량"
+      ],
+      "judgment_scope": "정확한 음식 DB 매칭은 판정 보류한다. 특정 전골·대창전골·즉석떡볶이를 사진만으로 정답 또는 오답으로 확정할 수 없다.",
+      "duplicate_missing_policy": "한 복합 요리 안의 채소를 독립 음식으로 중복 세지 않는다. 사진 밖의 재료 누락은 평가하지 않는다.",
+      "image_path": "ai/evals/fixtures/analyze_meal/occludedfood.jpg",
+      "image_sha256": "577b6dde95387e3b765e196bff32c68a16cf8d51e50523a005e3842dc5ec515a",
+      "review_status": "provisional_ai_visual_review_not_human_verified",
+      "candidate_ids": null
+    }
+  }
+}
