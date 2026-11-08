@@ -21,7 +21,9 @@ BE ↔ AI 계약은 `ai-stub/schemas.py` 의 `AnalyzeMealRequest` · `AnalyzeMea
   6. `candidateFoodRefId` 는 `food_refs` 에 실재하는 것만 남긴다. 없는 FK 를
      넣으면 커밋이 통째로 깨진다. 후보가 없거나 실재하지 않으면 음식명으로
      `GET /nutrition/candidates` 의 1위 후보를 건다(`services.nutrition.resolve_by_name`).
-     1위도 없으면 NULL — 사용자가 확인 화면에서 후보를 고른다
+     1위도 없으면 NULL — 사용자가 확인 화면에서 후보를 고른다.
+     걸렸으면 화면 이름(`display_name`)은 그 공공 DB 음식명이고, AI 가 말한 이름은
+     `original_food_name` 에만 남는다. 걸리지 않으면 둘 다 AI 이름이다
   7. 기존 `source=MODEL` 항목을 지우고 새로 넣는다. `source=USER` 는 남긴다.
      최초 분석 중에는 사용자가 음식을 고칠 수 없어(`_is_editable`) USER 항목과
      중복될 일이 없으므로 중복 판정은 하지 않는다
@@ -198,17 +200,22 @@ def _replace_model_items(db: Session, meal: Meal, recognized: list[_Recognized])
     known_ids = food_crud.existing_ids(
         db, {item.food_ref_id for item in recognized if item.food_ref_id is not None}
     )
+    links = [_link(db, item, known_ids) for item in recognized]
+    # 화면 이름은 영양정보를 가져온 공공 DB 음식명이다. 걸리지 않은 항목만 AI 이름으로
+    # 둔다 — 보이는 이름과 계산된 칼로리가 서로 다른 음식을 가리키지 않게 한다.
+    db_names = food_crud.get_names_by_ids(db, {link for link in links if link is not None})
     meal_crud.delete_model_items(db, meal.id)
-    for item in recognized:
+    for item, link in zip(recognized, links, strict=True):
         meal_crud.add_model_item(
             db,
             meal_id=meal.id,
             original_food_name=item.name,
+            display_name=db_names.get(link, item.name) if link is not None else item.name,
             amount=item.amount,
             unit=item.unit,
             amount_g=to_grams(item.amount, item.unit),
             confidence=item.confidence,
-            food_ref_id=_link(db, item, known_ids),
+            food_ref_id=link,
             raw_ai_result=item.raw,
         )
 

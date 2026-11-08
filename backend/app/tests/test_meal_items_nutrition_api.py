@@ -256,6 +256,54 @@ def test_picking_a_candidate_for_an_unconvertible_amount_says_why_it_is_empty(
     # 링크는 남긴다 — 사용자가 나중에 양을 g 으로 고치면 곧바로 환산된다.
     db.refresh(item)
     assert item.food_ref_id == "KFD_01023"
+    # 환산은 못 했어도 사용자가 고른 음식은 이것이다 — 이름도 그 음식으로 바뀐다.
+    assert item.display_name == "달걀_삶은것"
+
+
+def test_picking_a_candidate_renames_the_item_to_the_public_db_name(client, db):
+    """화면 이름은 영양정보를 가져온 DB 음식명이다 — 후보를 고르면 그 이름이 된다.
+
+    AI 가 말한 이름(`original_food_name`)은 바꾸지 않는다. 인식 성능 평가의 기준이다.
+    """
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    make_food_ref(db, food_ref_id="KFD_01023", name="달걀_삶은것")
+    # 팩토리는 `original_food_name` 도 `display_name` 과 같은 값으로 채운다.
+    item = make_meal_item(db, meal_id=meal.id, display_name="삶은 계란", food_ref_id=None)
+    db.commit()
+
+    response = _put(
+        client,
+        user_id=user.id,
+        meal_id=meal.id,
+        item_id=item.id,
+        json={"foodRefId": "KFD_01023"},
+    )
+
+    assert response.status_code == 200, response.text
+    db.refresh(item)
+    assert item.display_name == "달걀_삶은것"
+    assert item.original_food_name == "삶은 계란"
+
+
+def test_direct_input_keeps_the_item_name(client, db):
+    """직접 입력은 DB 음식을 고른 게 아니다 — 이름은 그대로다."""
+    user = make_user(db)
+    meal = make_meal(db, user_id=user.id)
+    item = make_meal_item(db, meal_id=meal.id, display_name="엄마표 잡채", food_ref_id=None)
+    db.commit()
+
+    response = _put(
+        client,
+        user_id=user.id,
+        meal_id=meal.id,
+        item_id=item.id,
+        json={"manual": _MANUAL},
+    )
+
+    assert response.status_code == 200, response.text
+    db.refresh(item)
+    assert item.display_name == "엄마표 잡채"
 
 
 def test_unknown_food_ref_id_is_not_found(client, db):

@@ -352,11 +352,16 @@ def set_meal_item_nutrition(
 
     # 직접 입력은 공공 DB 를 볼 필요가 없다 — 사용자가 적은 값이 곧 결과다.
     public_db_nutrition = None
+    food_name = None
     if request.food_ref_id is not None:
         try:
             public_db_nutrition = nutrition_service.resolve_by_food_ref_id(
                 db, food_ref_id=request.food_ref_id, amount_g=target.amount_g
             )
+            # 고른 후보의 DB 이름 — 항목의 화면 이름이 이것으로 바뀐다.
+            food_name = nutrition_service.get_food_names(
+                db, food_ref_ids=[request.food_ref_id]
+            )[request.food_ref_id]
         except nutrition_service.FoodRefNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -364,6 +369,7 @@ def set_meal_item_nutrition(
         db,
         target=target,
         food_ref_id=request.food_ref_id,
+        food_name=food_name,
         manual=request.manual,
         public_db_nutrition=public_db_nutrition,
     )
