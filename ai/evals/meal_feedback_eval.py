@@ -208,6 +208,45 @@ def _case(
     )
 
 
+def _presentation_request(
+    breakfast_foods: list[tuple], breakfast_quality: int,
+    breakfast_totals: tuple[float, ...], daily_totals: tuple[float, ...],
+) -> dict:
+    """발표 A-1~3: 같은 점심에 아침만 바꾼다. 성분은 섭취량 기준이며 재환산하지 않는다.
+
+    출처: infra/seed/food_refs_20260828.dump, GENERAL, 동일 이름 병합 후 100g 평균.
+    음식별 환산은 BE _nutrition_from_food_ref의 소수 둘째 자리 값이다.
+    대표 ID: 잡곡밥 D101-032000000-0001, 콩조림(콩자반) D111-536000000-0001,
+    시금치나물 D113-586000000-0001, 쌀밥 D301-022000000-0001,
+    감자볶음 D110-450000000-0001, 수육_소고기 D107-335130000-0001,
+    어묵국 D405-310000000-0001, 깍두기 D115-665000000-0001.
+    Quality는 BE v3 집계/채점으로 점심 81, 아침 45/90/46. 개인 baseline 열량과
+    아침 포만감은 주어지지 않았으므로 Quantity·intake와 아침 Satiety는 null이다.
+    """
+    def nutrition(values: tuple[float, ...]) -> dict:
+        return dict(zip(
+            ("kcal", "proteinG", "fatG", "carbG", "fiberG", "sodiumMg"), values, strict=True,
+        ))
+
+    request = _request(
+        "MAINTENANCE", (None, 81, 75),
+        [
+            _item("잡곡밥", 200, "g", nutrition((257.33, 7.07, 1.31, 53.22, 5.60, 3.33))),
+            _item("콩조림(콩자반)", 40, "g", nutrition((110.40, 7.45, 2.39, 14.79, 6.48, 387.00))),
+            _item("시금치나물", 80, "g", nutrition((29.60, 1.71, 1.61, 2.54, 1.40, 166.60))),
+        ],
+        {"beforePct": None, "afterPct": 75, "checkins": [], "hungerReturnMinutes": None, "userComment": None},
+        meal_type="LUNCH", weight_kg=65,
+        previous_meals=[_previous(
+            "BREAKFAST", (None, breakfast_quality, None), breakfast_foods, nutrition(breakfast_totals),
+        )],
+        daily_totals=nutrition(daily_totals),
+    )
+    # BE 워커는 기본값도 명시해 보낸다. 기존 케이스용 빌더는 바꾸지 않는다.
+    request.update(skipped=False, intake=None)
+    return request
+
+
 # ─────────────────────────── 케이스 ───────────────────────────
 
 CASES: tuple[Case, ...] = (
@@ -609,6 +648,40 @@ CASES: tuple[Case, ...] = (
         ),
         (_QUANTITY, _QUANTITY_REVERSED, _QUANTITY_MENTIONED),
         n=3,
+    ),
+    # ── 발표: 점심은 단백질만 SHORT. 아침에 따라 추천 방향이 달라지는가 ──
+    # 관측 축은 기존 정책 그대로 응답 전체를 samples에 남기고 게이트에서는 제외한다.
+    _case(
+        "presentation_a1",
+        _presentation_request(
+            [("쌀밥", 150, "g"), ("감자볶음", 100, "g")], 45,
+            (264.60, 5.19, 2.52, 54.10, 2.27, 192.80),
+            (661.93, 21.42, 7.83, 124.65, 15.75, 749.73),
+        ),
+        (_GAP, _CONTRADICT, _UNSCORED, _CAUSE, _SATIETY, _STAGE),
+        n=5,
+    ),
+    _case(
+        "presentation_a2",
+        _presentation_request(
+            [("쌀밥", 150, "g"), ("수육_소고기", 250, "g")], 90,
+            (591.75, 67.29, 12.84, 48.67, 6.90, 858.50),
+            (989.08, 83.52, 18.15, 119.22, 20.38, 1415.43),
+        ),
+        (_MET_DAILY, _CONTRADICT, _UNSCORED, _CAUSE, _SATIETY, _STAGE),
+        n=5,
+    ),
+    _case(
+        "presentation_a3",
+        _presentation_request(
+            [("쌀밥", 150, "g"), ("어묵국", 450, "g"), ("깍두기", 60, "g")], 46,
+            (386.45, 16.83, 4.67, 69.00, 3.84, 1992.95),
+            (783.78, 33.06, 9.98, 139.55, 17.32, 2549.88),
+        ),
+        # 기존 daily_sodium_over_limit과 동일: 현재 OK / 누적 OVER를 구분하지 못하는
+        # _CONTRADICT는 붙이지 않는다. 판정 함수나 임계는 바꾸지 않는다.
+        (_DAILY_EXCESS, _GAP, _UNSCORED, _CAUSE, _SATIETY, _STAGE),
+        n=5,
     ),
 )
 
