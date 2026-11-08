@@ -868,20 +868,35 @@ void main() {
     expect(_popupTitle, findsNothing);
   });
 
-  /// 식사 흐름 화면 하나를 가짜 서버로 띄운다.
-  Future<FakeApi> pumpMealScreen(WidgetTester tester, Widget screen) async {
+  /// 식사 흐름 화면 하나를 가짜 서버로 띄운다. [setup] 은 화면을 띄우기 전에 가짜 응답을 정한다.
+  Future<FakeApi> pumpMealScreen(
+    WidgetTester tester,
+    Widget screen, {
+    void Function(FakeApi api)? setup,
+  }) async {
     _useDesignSize(tester);
     SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
     final session = await UserSession.load();
     final api = FakeApi();
+    setup?.call(api);
     await tester.pumpWidget(
-      Provider(
-        create: (_) => ApiClient(session: session, dio: api.dio),
+      MultiProvider(
+        providers: [
+          Provider(create: (_) => ApiClient(session: session, dio: api.dio)),
+          Provider(create: (_) => PopupGate()),
+        ],
         child: MaterialApp(home: screen),
       ),
     );
     await _settle(tester);
     return api;
+  }
+
+  /// 음식 확인 화면의 "영양정보 없음" 안내를 닫는다. 이 안내와 상관없는 시험이 쓴다.
+  Future<void> closeNutritionNotice(WidgetTester tester) async {
+    if (find.textContaining('영양정보가 없는 음식이').evaluate().isEmpty) return;
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
   }
 
   testWidgets('review sends amount edits together after a pause', (
@@ -891,6 +906,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     expect(find.text('250g'), findsOneWidget);
     // 매칭 안 된 음식은 영양정보 없음으로 표시한다.
     expect(find.text('영양정보 없음'), findsOneWidget);
@@ -914,6 +930,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     await tester.tap(find.text('수정').first);
     await tester.pumpAndSettle();
     expect(find.text('음식 수정'), findsOneWidget);
@@ -948,6 +965,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     await tester.tap(find.text('수정').first);
     await tester.pumpAndSettle();
 
@@ -988,6 +1006,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     // 두 번째 음식은 '삶은 계란 2개' — 개는 영양을 계산할 수 없다.
     await tester.tap(find.text('수정').at(1));
     await tester.pumpAndSettle();
@@ -1017,6 +1036,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     api.on(
       'PATCH /meals/{meal_id}/items',
       (_) => (500, fakeError('INTERNAL_ERROR')),
@@ -1028,12 +1048,29 @@ void main() {
     expect(find.textContaining('되돌렸어요'), findsOneWidget);
   });
 
+  /// 음식이 모두 영양정보가 있는 끼니. mock 은 두 번째 음식이 매칭되지 않은 상태다.
+  Map<String, dynamic> allMatchedMeal() {
+    final meal = Map<String, dynamic>.from(
+      _mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map,
+    )..['eatenAt'] = '2026-10-06T12:40:00+09:00';
+    final items = (meal['items'] as List).cast<Map<String, dynamic>>();
+    meal['items'] = [
+      for (final i in items)
+        {...i, 'matched': true, 'nutrition': items.first['nutrition']},
+    ];
+    return meal;
+  }
+
   testWidgets('review moves on without confirming', (
     WidgetTester tester,
   ) async {
     final api = await pumpMealScreen(
       tester,
       const MealReviewScreen(mealId: 'm1'),
+      setup: (api) => api.on(
+        'GET /meals/{meal_id}',
+        (_) => (200, fakeOk(allMatchedMeal())),
+      ),
     );
     expect(find.text('식사 후 포만감'), findsNothing);
     await tester.scrollUntilVisible(find.text('확인하고 평가받기'), 100);
@@ -1043,6 +1080,111 @@ void main() {
     expect(api.requests.where((r) => r.path.endsWith('/confirm')), isEmpty);
     expect(find.text('식사 평가'), findsOneWidget);
     expect(find.text('포만감을 입력하면 계산돼요'), findsNWidgets(2));
+  });
+
+  // 영양정보가 없는 음식이 있으면 평가받기를 잠그고, 들어올 때 한 번 알린다.
+  testWidgets('review warns once about foods without nutrition', (
+    WidgetTester tester,
+  ) async {
+    await pumpMealScreen(tester, const MealReviewScreen(mealId: 'm1'));
+    expect(find.text('영양정보가 없는 음식이 1개 있어요'), findsOneWidget);
+
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+    // 닫은 뒤에는 요약과 버튼 문구가 남은 수를 알린다. 팝업은 다시 뜨지 않는다.
+    expect(find.textContaining('영양정보가 없는 음식이'), findsNothing);
+    expect(find.textContaining('영양정보 없는 음식 1개'), findsOneWidget);
+    expect(find.text('영양정보 1개 입력 필요'), findsOneWidget);
+    expect(find.text('확인하고 평가받기'), findsNothing);
+    final button = find.widgetWithText(ElevatedButton, '영양정보 1개 입력 필요');
+    expect(tester.widget<ElevatedButton>(button).onPressed, isNull);
+  });
+
+  testWidgets('the nutrition notice opens the edit sheet of the first food', (
+    WidgetTester tester,
+  ) async {
+    await pumpMealScreen(tester, const MealReviewScreen(mealId: 'm1'));
+    await tester.tap(find.text('입력하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('음식 수정'), findsOneWidget);
+    // 영양정보가 없는 음식(삶은 계란 2개)의 시트다.
+    expect(find.textContaining('삶은 계란'), findsWidgets);
+  });
+
+  testWidgets('review with every food matched has no notice and can move on', (
+    WidgetTester tester,
+  ) async {
+    await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+      setup: (api) => api.on(
+        'GET /meals/{meal_id}',
+        (_) => (200, fakeOk(allMatchedMeal())),
+      ),
+    );
+    expect(find.textContaining('영양정보가 없는 음식이'), findsNothing);
+    expect(find.textContaining('영양정보 없는 음식'), findsNothing);
+    final button = find.widgetWithText(ElevatedButton, '확인하고 평가받기');
+    expect(tester.widget<ElevatedButton>(button).onPressed, isNotNull);
+  });
+
+  testWidgets('deleting the food without nutrition unlocks the button', (
+    WidgetTester tester,
+  ) async {
+    await pumpMealScreen(tester, const MealReviewScreen(mealId: 'm1'));
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+
+    // 두 번째 음식(영양정보 없음)을 지운다 — 카드의 x 버튼.
+    await tester.tap(find.byIcon(Icons.close).last);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('영양정보 없는 음식'), findsNothing);
+    final button = find.widgetWithText(ElevatedButton, '확인하고 평가받기');
+    expect(tester.widget<ElevatedButton>(button).onPressed, isNotNull);
+    // 한 번 닫은 안내는 다시 뜨지 않는다.
+    expect(find.textContaining('영양정보가 없는 음식이'), findsNothing);
+  });
+
+  testWidgets('entering the nutrition unlocks the button', (
+    WidgetTester tester,
+  ) async {
+    var saved = false;
+    await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+      setup: (api) => api
+        ..on('PUT /meals/{meal_id}/items/{item_id}/nutrition', (_) {
+          saved = true;
+          return (200, fakeOk({'nutrition': {'kcal': 123.0}}));
+        })
+        ..on(
+          'GET /meals/{meal_id}',
+          (_) => (
+            200,
+            fakeOk(
+              saved
+                  ? allMatchedMeal()
+                  : (Map<String, dynamic>.from(
+                      _mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map,
+                    )..['eatenAt'] = '2026-10-06T12:40:00+09:00'),
+            ),
+          ),
+        ),
+    );
+    await tester.tap(find.text('입력하기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('직접 입력하기'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(1), '123');
+    await tester.pump();
+    await tester.tap(find.text('저장'));
+    await _settle(tester);
+
+    expect(saved, isTrue);
+    expect(find.textContaining('영양정보 없는 음식'), findsNothing);
+    final button = find.widgetWithText(ElevatedButton, '확인하고 평가받기');
+    expect(tester.widget<ElevatedButton>(button).onPressed, isNotNull);
   });
 
   testWidgets('evaluation confirms with the satiety and shows the scores', (
@@ -1444,8 +1586,11 @@ void main() {
         ),
       );
     await tester.pumpWidget(
-      Provider(
-        create: (_) => ApiClient(session: session, dio: api.dio),
+      MultiProvider(
+        providers: [
+          Provider(create: (_) => ApiClient(session: session, dio: api.dio)),
+          Provider(create: (_) => PopupGate()),
+        ],
         child: const MaterialApp(
           home: MealAnalysisScreen(
             meal: MealCreated(
@@ -1503,6 +1648,7 @@ void main() {
     );
     await tester.tap(find.text('열기'));
     await _settle(tester);
+    await closeNutritionNotice(tester);
     return api;
   }
 
@@ -1562,6 +1708,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     final meal = Map<String, dynamic>.from(
       _mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map,
     )..['eatenAt'] = '2026-10-06T12:40:00+09:00';

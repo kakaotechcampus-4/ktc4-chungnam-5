@@ -9,6 +9,7 @@ import 'daily_condition_popup.dart';
 import 'feedback_branch_popup.dart';
 import 'meal_delete_confirm_popup.dart';
 import 'meal_skip_confirm_popup.dart';
+import 'nutrition_missing_popup.dart';
 import 'review_leave_popup.dart';
 import 'satiety_checkin_popup.dart';
 import 'suggestion_replace_popup.dart';
@@ -33,6 +34,10 @@ enum AppPopup {
   /// 사후 포만감 체크인. 게이지 탭·알림처럼 사용자가 특정 끼니를 골라 연
   /// 요청이라 하루 한 번 팝업보다 먼저 띄운다.
   satietyCheckin(1),
+
+  /// 음식 확인 화면에 들어왔는데 영양정보가 없는 음식이 있을 때의 안내. 사용자가 연
+  /// 화면에 대한 안내라 하루 한 번 팝업보다 먼저 띄운다.
+  nutritionMissing(1),
 
   /// 하루 한 번, 오늘 첫 접속 때 뜨는 컨디션 기록 팝업.
   dailyCondition(2);
@@ -102,6 +107,21 @@ class PopupGate {
       id: mealId,
       show: (c) =>
           _showDialog(c, MealDeleteConfirmPopup(description: description)),
+    );
+  }
+
+  /// 음식 확인 화면 진입 시 영양정보 없는 음식 안내. "입력하기" 를 골랐으면 `true`.
+  /// 같은 끼니([mealId])의 안내는 하나만 뜬다.
+  Future<bool> confirmNutritionMissing(
+    BuildContext context, {
+    required String mealId,
+    required int count,
+  }) {
+    return _request(
+      context,
+      AppPopup.nutritionMissing,
+      id: mealId,
+      show: (c) => _showDialog(c, NutritionMissingPopup(count: count)),
     );
   }
 
