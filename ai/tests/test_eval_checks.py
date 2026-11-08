@@ -1612,3 +1612,149 @@ def test_n14_skipped_axis_not_target_for_eaten_meal():
     ok, note = skipped_not_scored(_resp(body="점심은 0g이라 비었어요."), _req_full(mealType="LUNCH"))
     assert ok is True
     assert "대상 아님" in note
+
+
+# ─────────────────────────── 첫 실측(2026-11-09, n=3) 오탐 ───────────────────────────
+# 문장은 실측 응답 원문이다. 규칙을 지킨 문장을 금지어로 잡던 판정 버그를 고정하고,
+# 짝 테스트로 진짜 위반은 계속 잡히는지 함께 본다.
+
+
+def test_m1_refusing_to_raise_amount_is_not_a_reversal():
+    """m1 — 많이 먹은 끼니의 "양을 늘리는 제안은 하지 않는다" 는 반대 방향이 아니라 거절이다."""
+    resp = _resp(reasoning="적정 양을 넘기지 않도록 양을 늘리는 제안은 하지 않는다.")
+    assert quantity_direction_not_reversed(resp, _req(**_OVER))[0] is True
+    assert quantity_direction_not_reversed(resp, _req(**_MILD_OVER))[0] is True
+
+
+def test_m1_pair_recommending_more_after_overeating_still_fails():
+    """m1 짝 — 많이 먹은 끼니에 양을 늘리라고 하면 여전히 반대 방향이다."""
+    resp = _resp(body="다음 끼니는 양을 늘려 드세요.")
+    assert quantity_direction_not_reversed(resp, _req(**_OVER))[0] is False
+
+
+def test_m2_declining_to_judge_amount_is_not_a_direction():
+    """m2 — "양이 많았는지 적었는지도 단정하지 않는다" 는 방향 단정이 아니다."""
+    req = _req(qqs=_qqs(quantity=70))
+    resp = _resp(reasoning="체중 정보가 없어 단백질 목표나 부족 여부는 만들지 않고, 양이 많았는지 적었는지도 단정하지 않는다.")
+    assert quantity_no_direction(resp, req)[0] is True
+
+
+def test_m2_pair_stating_amount_still_fails():
+    """m2 짝 — 단정 표현이 없으면 여전히 방향 단정이다."""
+    req = _req(qqs=_qqs(quantity=70))
+    assert quantity_no_direction(_resp(reasoning="양이 많았는지 보면 많았다."), req)[0] is False
+
+
+def test_m3_declining_to_judge_nutrients_passes():
+    """m3 — 판정 못 한 끼니의 "영양 충분·부족은 판정하지 않았다" 는 단정이 아니라 거절이다."""
+    req = _nothing_judged()
+    resp = _resp(
+        reasoning=(
+            "성분 정보가 부족해 영양 충분·부족은 판정하지 않았다. 특정 영양소의 부족을 단정하거나 "
+            "많은 양을 채우라는 방향은 피한다."
+        )
+    )
+    assert unjudged_nutrient_silent(resp, req)[0] is True
+
+
+def test_m4_suggested_food_amount_concession_passes_with_null_quantity():
+    """m4 — advice 의 "양이 많지 않아도 챙기기 쉬운" 은 제안 음식 설명이지 이번 끼니 양 평가가 아니다."""
+    req = _req(qqs=_qqs(quantity=None))
+    resp = _resp(suggestions=_with_advice("양이 많지 않아도 챙기기 쉬운 단백질이라, 입맛이 없을 때 가볍게 곁들이기 좋아요."))
+    assert unscored_axis_silent(resp, req)[0] is True
+
+
+@pytest.mark.parametrize(
+    "resp",
+    [
+        _resp(body="양이 많지 않았어요."),
+        _resp(suggestions=_with_advice("이번 끼니는 양이 많았으니 다음엔 가볍게 곁들이기 좋아요.")),
+    ],
+    ids=["negated-claim", "advice-current-meal"],
+)
+def test_m4_pair_evaluating_null_quantity_still_fails(resp):
+    """m4 짝 — 이번 끼니 양을 평가한 문장(부정형 포함)은 여전히 실패한다."""
+    assert unscored_axis_silent(resp, _req(qqs=_qqs(quantity=None)))[0] is False
+
+
+@pytest.mark.parametrize(
+    "case, body",
+    [
+        (_OVER, "양이 평소 한 끼보다 많았고 나트륨이 끼니 한도를 크게 넘었어요."),
+        (_UNDER, "양이 평소보다 조금 적었어요."),
+    ],
+    ids=["over", "under"],
+)
+def test_m5_comparison_between_subject_and_amount_is_a_mention(case, body):
+    """m5 — "양이 평소 한 끼보다 많았고" 처럼 비교 말이 끼어도 같은 방향 언급이다."""
+    assert quantity_direction_mentioned(_resp(body=body), _req(**case))[0] is True
+
+
+def test_m5_pair_comparison_in_reverse_direction_is_a_reversal():
+    """m5 짝 — 같은 모양으로 반대 방향을 말하면 반대 방향 실패다."""
+    resp = _resp(body="양이 평소 한 끼보다 많았어요.")
+    assert quantity_direction_not_reversed(resp, _req(**_UNDER))[0] is False
+
+
+@pytest.mark.parametrize(
+    "resp",
+    [
+        _resp(body="다음 끼니는 부담이 적은 단백질 반찬에 채소를 곁들이는 구성으로 이어 가면 좋아요."),
+        _resp(reasoning="밥 중심이었던 이번 구성에 부담 적은 단백질과 채소를 곁들이는 방향을 우선한다."),
+    ],
+    ids=["subject-particle", "bare-subject"],
+)
+def test_m6_adjective_with_its_own_subject_is_not_a_nutrient_claim(resp):
+    """m6 — "부담(이) 적은 단백질" 의 "적은" 은 부담을 서술한다. 단백질이 적다는 단정이 아니다 (2026-11-09 실측 원문)."""
+    req = _req()  # 체중이 없어 단백질은 판정하지 않는다
+    assert "protein" not in _states(req)
+    assert unjudged_nutrient_silent(resp, req)[0] is True
+
+
+@pytest.mark.parametrize(
+    "body",
+    ["점심은 적은 단백질로 끝났어요.", "다소 적은 단백질로 끝났어요.", "단백질이 적은 식사였어요."],
+    ids=["bare", "degree-adverb", "predicate"],
+)
+def test_m6_pair_adjective_on_the_nutrient_still_fails(body):
+    """m6 짝 — 수식어가 단백질 자체를 꾸미면(정도 부사 포함) 여전히 단정이다."""
+    assert unjudged_nutrient_silent(_resp(body=body), _req())[0] is False
+
+
+def test_m7_predicate_of_a_later_subject_is_not_a_nutrient_claim():
+    """m7 — "나트륨은 한도 안이고 질 점수가 높아" 의 "높아" 는 질 점수를 서술한다 (2026-11-09 재실측 원문)."""
+    req = _all_ok()
+    assert _states(req)["sodium"] == "OK"
+    resp = _resp(reasoning="나트륨은 한도 안이고 질 점수가 높아 현재 구성은 유지한다.")
+    assert no_contradict_rule(resp, req)[0] is True
+
+
+def test_m7_pair_claim_before_the_connective_still_fails():
+    """m7 짝 — "-고" 앞에서 영양소를 직접 서술하면 여전히 모순이다."""
+    req = _all_ok()
+    assert no_contradict_rule(_resp(body="나트륨이 높았고 국물도 진했어요."), req)[0] is False
+
+
+def test_m8_adjective_before_the_next_nutrient_belongs_to_it():
+    """m8 — "식이섬유 흐름과 낮은 나트륨" 의 "낮은" 은 뒤의 나트륨을 꾸민다 (2026-11-09 재실측 원문)."""
+    req = _all_ok()
+    assert _states(req) == {"fiber": "OK", "sodium": "OK"}
+    resp = _resp(body="저녁은 지금의 식이섬유 흐름과 낮은 나트륨 구성을 이어 가는 방향이 좋아요.")
+    assert no_contradict_rule(resp, req)[0] is True
+
+
+def test_m8_pair_predicate_on_the_nutrient_still_fails():
+    """m8 짝 — 식이섬유를 직접 서술한 "낮은 편" 은 여전히 모순이다."""
+    assert no_contradict_rule(_resp(body="식이섬유가 낮은 편이었어요."), _all_ok())[0] is False
+
+
+def test_m9_degree_adverb_manyi_is_not_more():
+    """m9 — "양이 많이 적었어요" 의 "많이" 는 정도 부사다. 적게 먹은 끼니의 같은 방향 언급이다 (2026-11-09 재실측 원문)."""
+    resp = _resp(body="평소 한 끼보다 양이 많이 적었어요.")
+    assert quantity_direction_not_reversed(resp, _req(**_UNDER))[0] is True
+    assert quantity_direction_mentioned(resp, _req(**_UNDER))[0] is True
+
+
+def test_m9_pair_more_on_an_under_meal_still_fails():
+    """m9 짝 — 적게 먹은 끼니에 "양이 많았어요" 는 여전히 반대 방향이다."""
+    assert quantity_direction_not_reversed(_resp(body="양이 많았어요."), _req(**_UNDER))[0] is False
