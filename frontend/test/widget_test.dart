@@ -1240,7 +1240,10 @@ void main() {
     await tester.tap(find.text('현미밥, 된장국, 두부조림'));
     await _settle(tester);
     expect(find.text('끼니 피드백'), findsOneWidget);
-    expect(find.text('이번 끼니'), findsOneWidget);
+    expect(find.text('이번 끼니 결과'), findsOneWidget);
+    // 양·질은 `점`, 포만감은 `%` 단위가 붙는다.
+    expect(find.textContaining(RegExp(r'^\d+점$')), findsNWidgets(2));
+    expect(find.textContaining(RegExp(r'^\d+%$')), findsOneWidget);
     expect(find.text('영양소 상태'), findsOneWidget);
     expect(find.text('두부 반 모'), findsOneWidget);
     // 하루 요약은 따로 보여 주지 않고, 요약을 만들어 달라고도 하지 않는다.
