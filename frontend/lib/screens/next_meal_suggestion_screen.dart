@@ -420,7 +420,8 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
         const SizedBox(height: AppSpacing.sm),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 13),
+          // 막대 사이를 넉넉하게 — 위아래 여백과 줄 간격을 넓혔다.
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
           decoration: BoxDecoration(
             color: AppColors.surface,
             border: Border.all(color: AppColors.border),
@@ -430,7 +431,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var i = 0; i < eval.nutrients.length; i++) ...[
-                if (i > 0) const SizedBox(height: 11),
+                if (i > 0) const SizedBox(height: 20),
                 _NutrientRow(nutrient: eval.nutrients[i]),
               ],
             ],
@@ -614,7 +615,14 @@ class _CommentCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         borderRadius: AppRadius.lgRadius,
       ),
-      child: Text(summary, style: AppTypography.body),
+      // 회색 본문이 잘 안 보인다는 의견이 있어 진한 글자색에 한 단계 키웠다.
+      child: Text(
+        summary,
+        style: AppTypography.body.copyWith(
+          fontSize: 12.5,
+          color: AppColors.textPrimary,
+        ),
+      ),
     );
   }
 }
@@ -631,39 +639,41 @@ class _ScoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scores = evaluation.scores;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: AppRadius.xlRadius,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '이번 끼니',
-                style: AppTypography.cardTitle.copyWith(fontSize: 12),
-              ),
-              _Chip(
-                text: '${stageLabel(evaluation.stage)} 기준',
-                background: AppColors.surfaceMuted,
-                foreground: AppColors.textSecondary,
-              ),
-            ],
+    // 제목 줄(`이번 끼니 결과` + 단계 칩)은 `영양소 상태` 등 다른 섹션처럼 박스 밖에 둔다.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '이번 끼니 결과',
+              style: AppTypography.cardTitle.copyWith(fontSize: 12.5),
+            ),
+            _Chip(
+              text: '${stageLabel(evaluation.stage)} 기준',
+              background: AppColors.surfaceMuted,
+              foreground: AppColors.textSecondary,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.border),
+            borderRadius: AppRadius.xlRadius,
           ),
-          const SizedBox(height: 10),
-          Row(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: _ScoreColumn(
                   label: '양',
                   score: scores.quantity,
+                  unit: '점',
                   color: AppColors.quantity,
                 ),
               ),
@@ -672,6 +682,7 @@ class _ScoreCard extends StatelessWidget {
                 child: _ScoreColumn(
                   label: '질',
                   score: scores.quality,
+                  unit: '점',
                   color: AppColors.quality,
                 ),
               ),
@@ -680,13 +691,14 @@ class _ScoreCard extends StatelessWidget {
                 child: _ScoreColumn(
                   label: '포만감',
                   score: scores.satiety,
+                  unit: '%',
                   color: AppColors.satiety,
                 ),
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -695,11 +707,15 @@ class _ScoreColumn extends StatelessWidget {
   const _ScoreColumn({
     required this.label,
     required this.score,
+    required this.unit,
     required this.color,
   });
 
   final String label;
   final int? score;
+
+  /// 숫자 뒤 단위 — 양·질은 `점`, 포만감은 `%`.
+  final String unit;
   final Color color;
 
   @override
@@ -710,14 +726,11 @@ class _ScoreColumn extends StatelessWidget {
       children: [
         Text(
           label,
-          style: AppTypography.caption.copyWith(
-            fontSize: 9.5,
-            color: AppColors.textTertiary,
-          ),
+          style: AppTypography.cardTitle.copyWith(fontSize: 10.5),
         ),
         const SizedBox(height: 4),
         Text(
-          s == null ? '-' : '$s',
+          s == null ? '-' : '$s$unit',
           style: AppTypography.cardTitle.copyWith(fontSize: 20),
         ),
         const SizedBox(height: 4),
@@ -1003,13 +1016,30 @@ class _DoctorNotice extends StatelessWidget {
         color: AppColors.surfaceMuted,
         borderRadius: AppRadius.mdRadius,
       ),
-      child: Text(
-        '투약량 조절이 필요하다고 느끼면 담당 의사와 상의해 주세요.',
-        style: AppTypography.caption.copyWith(
-          fontSize: 10,
-          height: 1.5,
-          color: AppColors.textSecondary,
-        ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 글자 첫 줄 높이(10 × 1.5)에 맞춰 아이콘을 세로 중앙에 둔다.
+          const SizedBox(
+            height: 15,
+            child: Icon(
+              Icons.error_outline,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '투약량 조절이 필요하다고 느끼면 담당 의사와 상의해 주세요.',
+              style: AppTypography.caption.copyWith(
+                fontSize: 10,
+                height: 1.5,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
