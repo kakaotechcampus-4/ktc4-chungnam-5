@@ -19,6 +19,7 @@ import httpx
 from pydantic import BaseModel
 
 from app.config import get_settings
+from app.food_names import normalize_food_name
 from app.schemas import RecognizedItem
 
 
@@ -155,14 +156,16 @@ mealType: {meal_type}
 def _parse_response(response: str) -> list[RecognizedItem]:
     """모델 응답(JSON 문자열)을 RecognizedItem 목록으로 변환한다.
 
-    `candidate_food_ref_id`/`clarify_question`은 여기서 비워 둔다 — 전자는 tool
-    연동 전까지 항상 None, 후자는 1차 개발 범위 밖(명세 기준)이라 RecognizedItem
-    기본값(None)을 그대로 쓴다.
+    스키마 검증 후 등록된 동의 표기만 정규화한다. 음식명 외 필드는 그대로
+    보존하며, DB ID나 영양값을 새로 만들지 않는다.
 
     게이트웨이가 `output_config.format` 같은 스키마 강제를 지원하는지 몰라서,
     마크다운 코드펜스(```json ... ```)로 감싸서 줄 가능성까지 방어적으로 벗겨낸다.
     """
-    return _ImageAnalysisResult.model_validate_json(_strip_code_fence(response)).items
+    items = _ImageAnalysisResult.model_validate_json(_strip_code_fence(response)).items
+    for item in items:
+        item.original_food_name = normalize_food_name(item.original_food_name)
+    return items
 
 
 def _strip_code_fence(text: str) -> str:

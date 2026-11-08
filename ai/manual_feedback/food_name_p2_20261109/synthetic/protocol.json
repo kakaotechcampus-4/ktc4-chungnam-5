@@ -1,0 +1,243 @@
+{
+  "version": "food-name-normalization-v1",
+  "created_at_utc": "2026-11-08T16:38:52.609949+00:00",
+  "source_file": "synthetic_source.json",
+  "source_sha256": "0bdab854795c92ed5455826c477769ae6c03006e5b4a1e18fb160c0ca0991bb1",
+  "candidate_sha256": "0f23944895cd83546c17fd26c0f54694d2f459e534bb3164484086f033eb3efe",
+  "normalizer_source_file": "food_names.py",
+  "normalizer_source_sha256": "faf42a0fc35b393640f24ae1f73a231e660c0b0bc37fad004cf8e1fb834af731",
+  "source_rule_version": "p2-synthetic-name-invariance-v1",
+  "source_prompt_hash": null,
+  "model_calls": 0,
+  "saved_responses": 61,
+  "item_occurrences": 61,
+  "changed_item_occurrences": 32,
+  "transformations": [
+    {
+      "case": "family_1_2",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "망고쥬스",
+      "after_name": "망고주스"
+    },
+    {
+      "case": "family_1_3",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "망고 주스",
+      "after_name": "망고주스"
+    },
+    {
+      "case": "family_1_4",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "망고 쥬스",
+      "after_name": "망고주스"
+    },
+    {
+      "case": "family_2_2",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "리치쥬스",
+      "after_name": "리치주스"
+    },
+    {
+      "case": "family_2_3",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "리치 주스",
+      "after_name": "리치주스"
+    },
+    {
+      "case": "family_2_4",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "리치 쥬스",
+      "after_name": "리치주스"
+    },
+    {
+      "case": "family_3_2",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "토마토쥬스",
+      "after_name": "토마토주스"
+    },
+    {
+      "case": "family_3_3",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "토마토 주스",
+      "after_name": "토마토주스"
+    },
+    {
+      "case": "family_3_4",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "토마토 쥬스",
+      "after_name": "토마토주스"
+    },
+    {
+      "case": "family_4_1",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "양송이스프",
+      "after_name": "양송이 스프"
+    },
+    {
+      "case": "family_4_2",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "양송이수프",
+      "after_name": "양송이 스프"
+    },
+    {
+      "case": "family_4_4",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "양송이 수프",
+      "after_name": "양송이 스프"
+    },
+    {
+      "case": "family_5_1",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "크림스프",
+      "after_name": "크림 스프"
+    },
+    {
+      "case": "family_5_2",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "크림수프",
+      "after_name": "크림 스프"
+    },
+    {
+      "case": "family_5_4",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "크림 수프",
+      "after_name": "크림 스프"
+    },
+    {
+      "case": "family_6_1",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "옥수수스프",
+      "after_name": "옥수수 스프"
+    },
+    {
+      "case": "family_6_2",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "옥수수수프",
+      "after_name": "옥수수 스프"
+    },
+    {
+      "case": "family_6_4",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "옥수수 수프",
+      "after_name": "옥수수 스프"
+    },
+    {
+      "case": "family_7_1",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "달걀프라이",
+      "after_name": "달걀후라이"
+    },
+    {
+      "case": "family_7_3",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "달걀 프라이",
+      "after_name": "달걀후라이"
+    },
+    {
+      "case": "family_7_4",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "달걀 후라이",
+      "after_name": "달걀후라이"
+    },
+    {
+      "case": "family_7_5",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "계란프라이",
+      "after_name": "달걀후라이"
+    },
+    {
+      "case": "family_7_6",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "계란후라이",
+      "after_name": "달걀후라이"
+    },
+    {
+      "case": "family_7_7",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "계란 프라이",
+      "after_name": "달걀후라이"
+    },
+    {
+      "case": "family_7_8",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "계란 후라이",
+      "after_name": "달걀후라이"
+    },
+    {
+      "case": "format_1",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "망고  쥬스",
+      "after_name": "망고주스"
+    },
+    {
+      "case": "format_2",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "리치\t쥬스",
+      "after_name": "리치주스"
+    },
+    {
+      "case": "format_3",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "토마토\n주스",
+      "after_name": "토마토주스"
+    },
+    {
+      "case": "format_4",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "양송이  수프",
+      "after_name": "양송이 스프"
+    },
+    {
+      "case": "format_5",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "크림\t스프",
+      "after_name": "크림 스프"
+    },
+    {
+      "case": "format_6",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "옥수수  수프",
+      "after_name": "옥수수 스프"
+    },
+    {
+      "case": "format_7",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "계란 프라이",
+      "after_name": "달걀후라이"
+    }
+  ],
+  "scope": "Only originalFoodName in amount_accuracy and confidence_calibration observations is changed. Other fields and historical evaluation results are preserved, not re-evaluated.",
+  "limitation": "Input is previously parsed saved responses. No omitted food, parser failure, photo identity, or model improvement is measured."
+}

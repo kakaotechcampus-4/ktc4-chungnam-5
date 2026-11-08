@@ -730,3 +730,41 @@ python -m evals.score_food_name_ab --manifest evals/fixtures/food_name_matching/
 추가로 출력한 음식과 복합 음식 중복도 원문으로 검토한다. 이 지표만 높아졌다고 개선을 확정하지 않는다.
 결과 해석 전 두 arm의 BE 소스·DB fingerprint·사진 해시·제공된 모델 식별자가 같은지 확인한다.
 원본 실험 결과는 보존하며, 새 비교는 별도 출력 폴더에 저장한다.
+
+## P2 음식명 정규화 오프라인 검증
+
+`app/food_names.py`는 같은 음식의 전체 이름 표기만 정리한다. 현재 7개 음식군
+(망고·리치·토마토 주스, 양송이·크림·옥수수 스프, 달걀후라이)의 32개 별칭을
+공공DB snapshot과 기존 BE 후보 1위 정책으로 확인했다. 스프는 재료 뒤의 공백을
+보존해 `스프_양송이버섯`처럼 순서가 다른 DB 이름도 BE가 찾도록 한다.
+등록되지 않은 이름·브랜드·복합 메뉴·분말 등의 수식어는 원문 그대로 유지한다.
+`양념두부`처럼 이미 DB에 연결되는 이름을 다른 조리법으로 강제 치환하지 않는다.
+
+후처리는 사진 응답의 스키마 검증 직후 `originalFoodName`에만 적용된다.
+프롬프트·모델 요청·음식 ID·섭취량·단위·confidence·영양 계산은 바꾸지 않으며,
+AI 운영 코드에서 DB를 조회하지 않는다. 근거는 `manual_feedback/food_name_p2_20261109`에 있다.
+
+기존 응답의 두 관측 축을 검증한 후 원문 복사본과 이름만 바꾼 후보를 만든다.
+새 출력 경로를 사용하며, 기존 결과나 실패 기록은 수정하지 않는다.
+
+```bash
+cd ai
+python -m evals.food_name_normalization_eval prepare --source evals/baselines/analyze_meal_baseline.json --output-dir manual_feedback/food_name_p2_run/historical
+cd ..
+# 같은 로컬 DB snapshot과 FOOD_MATCH_EVAL_DSN을 사용한다
+python ai/evals/replay_food_db.py --baseline ai/manual_feedback/food_name_p2_run/historical/source.json --backend-root backend --output ai/manual_feedback/food_name_p2_run/historical/before_db.json
+python ai/evals/replay_food_db.py --baseline ai/manual_feedback/food_name_p2_run/historical/candidate.json --backend-root backend --output ai/manual_feedback/food_name_p2_run/historical/after_db.json
+cd ai
+python -m evals.food_name_normalization_eval compare --prepared-dir manual_feedback/food_name_p2_run/historical --before-db manual_feedback/food_name_p2_run/historical/before_db.json --after-db manual_feedback/food_name_p2_run/historical/after_db.json --output manual_feedback/food_name_p2_run/historical/comparison.json
+```
+
+비교기는 원문·후보 해시, 항목 좌표, 이름 외 필드, DB fingerprint, BE 소스와
+읽기 전용 환경의 동일성을 검사한다. 연결 수·선택 ID 변경·영양값과 결측 변화는
+따로 기록하며 결측을 0으로 채우지 않는다. 입력은 파싱된 응답이므로 사진의 음식
+누락이나 과거 파싱 실패가 개선됐다고 해석할 수 없다. 원본에 저장된 평가 점수는
+역사 기록으로만 보존되며, 후보의 새 평가 점수가 아니다.
+
+별칭·공백 검증용 합성 입력과 실제 사진 응답 재생 결과는 구분한다. 같은 이름이
+같은 DB 항목에 연결되는 것은 표기 일관성의 근거이며, 사진의 실제 레시피·영양값
+정답이나 전체 인식 정확도를 입증하지 않는다. 규칙을 확장할 때는 기존에 맞던
+매칭과 영양 결측이 악화하지 않는지 같은 방식으로 확인한다.

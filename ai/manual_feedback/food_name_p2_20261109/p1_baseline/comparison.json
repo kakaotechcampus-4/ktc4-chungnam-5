@@ -1,0 +1,152 @@
+{
+  "created_at_utc": "2026-11-08T16:38:47.294844+00:00",
+  "model_calls": 0,
+  "scope": "Name-only offline replay with identical BE sources and public DB snapshot.",
+  "metric_warning": "DB links, selected-ID changes, and nutrient changes are not semantic accuracy or nutrition ground truth. Source recognition errors are unchanged.",
+  "environment_verified": true,
+  "summary": {
+    "saved_responses": 17,
+    "item_occurrences": 39,
+    "changed_name_occurrences": 3,
+    "changed_selected_ids": 0,
+    "linked_before": 39,
+    "linked_after": 39,
+    "new_links": 0,
+    "lost_links": 0,
+    "nutrition_changed_occurrences": 0,
+    "same_query_selection_changes": 0,
+    "category_transitions": {}
+  },
+  "changes": [
+    {
+      "case": "fried_eggs",
+      "run": 1,
+      "item_index": 1,
+      "before_name": "달걀프라이",
+      "after_name": "달걀후라이",
+      "name_changed": true,
+      "selected_id_changed": false,
+      "before_selected": {
+        "food_ref_id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "100.00",
+      "before_nutrition": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      },
+      "after_nutrition": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      },
+      "nutrient_changes": [],
+      "before_conversion_status": "calculated_complete",
+      "after_conversion_status": "calculated_complete"
+    },
+    {
+      "case": "fried_eggs",
+      "run": 2,
+      "item_index": 1,
+      "before_name": "달걀프라이",
+      "after_name": "달걀후라이",
+      "name_changed": true,
+      "selected_id_changed": false,
+      "before_selected": {
+        "food_ref_id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "100.00",
+      "before_nutrition": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      },
+      "after_nutrition": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      },
+      "nutrient_changes": [],
+      "before_conversion_status": "calculated_complete",
+      "after_conversion_status": "calculated_complete"
+    },
+    {
+      "case": "fried_eggs",
+      "run": 3,
+      "item_index": 1,
+      "before_name": "달걀프라이",
+      "after_name": "달걀후라이",
+      "name_changed": true,
+      "selected_id_changed": false,
+      "before_selected": {
+        "food_ref_id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "100.00",
+      "before_nutrition": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      },
+      "after_nutrition": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      },
+      "nutrient_changes": [],
+      "before_conversion_status": "calculated_complete",
+      "after_conversion_status": "calculated_complete"
+    }
+  ],
+  "source_sha256": {
+    "protocol": "2f27871c4e86236acaae0b34d0139f5932acc07116a0c15f4624e44a310f9455",
+    "source": "82b58072dbd076339668dfe636cb929ca70d6cffab49490bdf3fb27583ea7880",
+    "candidate": "bbc9803bcad44e93055c15da5b419ab28579e7fc5ced2c4bea0130626ebe196b",
+    "before_db": "e5353a0d7d2ea22e8d2bf5cb25668d1f3af5d0a537c53929436775086ba4d3ac",
+    "after_db": "757ce47b89e6338c4ba4c4ce3ea79c5d6f20bf550a1293ae98e462d098e0683c"
+  }
+}

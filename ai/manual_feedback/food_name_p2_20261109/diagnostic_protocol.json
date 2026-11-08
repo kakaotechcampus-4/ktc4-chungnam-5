@@ -1,0 +1,125 @@
+{
+  "created_at_utc": "2026-11-08T16:35:14.920969+00:00",
+  "scope": "P2 development query diagnostics; synthetic variants, not model/photo accuracy",
+  "model_calls": 0,
+  "groups": [
+    {
+      "family": "망고_juice",
+      "queries": [
+        "망고주스",
+        "망고 주스",
+        "망고쥬스"
+      ]
+    },
+    {
+      "family": "리치_juice",
+      "queries": [
+        "리치주스",
+        "리치 주스",
+        "리치쥬스"
+      ]
+    },
+    {
+      "family": "복숭아_juice",
+      "queries": [
+        "복숭아주스",
+        "복숭아 주스",
+        "복숭아쥬스"
+      ]
+    },
+    {
+      "family": "오렌지_juice",
+      "queries": [
+        "오렌지주스",
+        "오렌지 주스",
+        "오렌지쥬스"
+      ]
+    },
+    {
+      "family": "포도_juice",
+      "queries": [
+        "포도주스",
+        "포도 주스",
+        "포도쥬스"
+      ]
+    },
+    {
+      "family": "사과_juice",
+      "queries": [
+        "사과주스",
+        "사과 주스",
+        "사과쥬스"
+      ]
+    },
+    {
+      "family": "토마토_juice",
+      "queries": [
+        "토마토주스",
+        "토마토 주스",
+        "토마토쥬스"
+      ]
+    },
+    {
+      "family": "양송이_soup",
+      "queries": [
+        "양송이스프",
+        "양송이 스프",
+        "양송이수프",
+        "양송이 수프"
+      ]
+    },
+    {
+      "family": "크림_soup",
+      "queries": [
+        "크림스프",
+        "크림 스프",
+        "크림수프",
+        "크림 수프"
+      ]
+    },
+    {
+      "family": "옥수수_soup",
+      "queries": [
+        "옥수수스프",
+        "옥수수 스프",
+        "옥수수수프",
+        "옥수수 수프"
+      ]
+    },
+    {
+      "family": "fried_egg",
+      "queries": [
+        "달걀프라이",
+        "달걀후라이",
+        "달걀 프라이",
+        "달걀 후라이",
+        "계란프라이",
+        "계란후라이",
+        "계란 프라이",
+        "계란 후라이"
+      ]
+    },
+    {
+      "family": "preserve_compound_names",
+      "queries": [
+        "양송이스프분말",
+        "양송이스프라면",
+        "옥수수스프가루",
+        "모구모구 망고 주스",
+        "망고 주스 젤리",
+        "에스프레소",
+        "망고스프레드",
+        "양념두부",
+        "두부부침",
+        "두부무침"
+      ]
+    }
+  ],
+  "criteria": [
+    "Preserve full dish meaning and qualifiers.",
+    "Report DB identity consistency separately from accuracy.",
+    "Check per-100g nutrients and missingness; GENERAL category alone is not proof of correctness.",
+    "No global whitespace deletion or substring replacement; no recipe-changing tofu substitutions."
+  ],
+  "seed_sha256": "43c0962b7f6da1d098647f618aaabad1aeeeb9f1e7763320a166c9c24abfba9b"
+}

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -121,3 +122,34 @@ def test_parse_response_strips_markdown_code_fence():
     result = _parse_response(response)
     assert len(result) == 1
     assert result[0].original_food_name == "김밥"
+
+
+def test_parse_response_normalizes_only_name_preserving_all_other_fields():
+    original = {
+        "originalFoodName": "계란 프라이",
+        "estimatedAmount": 0,
+        "unit": "개",
+        "confidence": 0.45,
+        "candidateFoodRefId": "existing-reference",
+        "clarifyQuestion": "양을 확인해 주세요.",
+    }
+    result = _parse_response(json.dumps({"items": [original]}))
+    assert result[0].model_dump(mode="json", by_alias=True) == {
+        **original, "originalFoodName": "달걀후라이",
+    }
+
+
+def test_analyze_food_applies_normalization_after_model_call(monkeypatch):
+    async def fake_call(_image_url, _prompt):
+        return json.dumps({"items": [
+            {"originalFoodName": "양송이스프", "estimatedAmount": 150,
+             "unit": "g", "confidence": 0.8},
+            {"originalFoodName": "양념두부", "estimatedAmount": 70,
+             "unit": "g", "confidence": 0.7},
+        ]})
+
+    monkeypatch.setattr("app.food_analyzer._call_vision_model", fake_call)
+    result = asyncio.run(analyze_food("LUNCH", "https://example.com/meal.jpg"))
+    assert [item.original_food_name for item in result] == ["양송이 스프", "양념두부"]
+    assert [item.estimated_amount for item in result] == [150, 70]
+    assert all(item.candidate_food_ref_id is None for item in result)
