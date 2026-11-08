@@ -95,7 +95,7 @@ def make_food_ref(
     """공공 영양 DB 음식 1건. flush 까지만 하고 커밋하지 않는다.
 
     `category` 기본값이 `GENERAL` 인 건 이름 매칭이 GENERAL 을 먼저 보기 때문이다
-    (`crud.food.find_unique_by_name`). 기본값을 NULL 로 두면 대부분의 테스트가
+    (`crud.food._candidate_order`). 기본값을 NULL 로 두면 대부분의 테스트가
     폴백 경로만 타게 되어 정작 주 경로를 검증하지 못한다.
     """
     food_ref = FoodRef(

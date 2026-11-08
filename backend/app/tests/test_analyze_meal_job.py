@@ -240,7 +240,38 @@ def test_existing_food_ref_is_linked_and_unknown_one_becomes_null(db, storage):
 
     by_name = {item.original_food_name: item for item in _items(db, meal.id)}
     assert by_name["참치김밥"].food_ref_id == "D000123"
+    # 공공 DB 에 `삶은 계란` 비슷한 이름도 없어 이름 검색 폴백도 비어 있다.
     assert by_name["삶은 계란"].food_ref_id is None
+
+
+def test_missing_or_unknown_candidate_falls_back_to_the_top_name_candidate(db, storage):
+    """A5-1: AI 후보가 없거나 실재하지 않으면 음식명으로 `GET /nutrition/candidates` 1위에 건다.
+
+    AI 후보가 실재하면 이름 검색보다 우선한다. 이름으로도 후보가 없으면 NULL 이다.
+    """
+    make_food_ref(db, food_ref_id="D000123", name="참치김밥")
+    make_food_ref(db, food_ref_id="D000999", name="참치김밥_마요")
+    make_food_ref(db, food_ref_id="KFD_EGG_SHORT", name="삶은 계란")
+    make_food_ref(db, food_ref_id="KFD_EGG_LONG", name="삶은 계란_반숙")
+    meal = _analyzing_meal(db)
+    ai = FakeAi(
+        items=[
+            _item("참치김밥", food_ref_id="D000999"),
+            _item("삶은 계란", 2, "개", food_ref_id="NOT_IN_DB"),
+            _item("김치찌게", food_ref_id=None),
+            _item("존재하지않는음식", food_ref_id=None),
+        ]
+    )
+    make_food_ref(db, food_ref_id="KFD_KIMCHI_JJIGAE", name="김치찌개")
+
+    run(db, _task(meal), ai)
+    db.flush()
+
+    by_name = {item.original_food_name: item for item in _items(db, meal.id)}
+    assert by_name["참치김밥"].food_ref_id == "D000999"
+    assert by_name["삶은 계란"].food_ref_id == "KFD_EGG_SHORT"
+    assert by_name["김치찌게"].food_ref_id == "KFD_KIMCHI_JJIGAE"
+    assert by_name["존재하지않는음식"].food_ref_id is None
 
 
 def test_raw_ai_result_keeps_the_original_item_and_response_meta(db, storage):

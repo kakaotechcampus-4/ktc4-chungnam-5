@@ -54,44 +54,6 @@ def _normalized_name():
     return func.replace(func.replace(FoodRef.name, " ", ""), "_", "")
 
 
-def find_unique_by_name(db: Session, name: str) -> FoodRef | None:
-    """이름이 **딱 하나로 좁혀질 때만** 그 행을 준다. 0건이거나 여러 건이면 None.
-
-    ## 같은 이름은 이미 한 행이다
-
-    공공 DB 에는 이름이 같은 음식이 여러 건씩 있다 — `미역국` 14건의 열량이
-    7~450 kcal, `김치찌개` 28건이 16~140 kcal 였다. 적재할 때 `(category, 정규화한
-    이름)` 마다 한 행으로 합치고 성분은 100g 당 평균으로 둔다(`scripts/load_food_refs.py`,
-    마이그레이션 `8d3f6a1c5e27`). 그래서 **한 category 안에서 이름이 같은 행은 없다.**
-
-    여러 건이 남는 건 category 가 다른 경우뿐이고, 그건 아래 GENERAL 우선 규칙이
-    정한다. 그래도 여러 건이면 포기한다 — 정렬로 하나를 집으면 그 값이
-    `meal_items.food_ref_id` 로 박제되고 Q/Q/S 채점까지 흘러간다. 못 좁힌 경우는 계약서의
-    폴백 흐름으로 넘어간다 — 응답의 `matched: false` 가 FE 에게
-    `GET /nutrition/candidates` 로 후보를 띄우라는 신호다.
-
-    ## GENERAL 을 먼저 보는 이유
-
-    사용자가 "배추김치" 라 쓰면 브랜드 제품이 아니라 그 음식을 뜻한다. 일반음식
-    (`GENERAL`)과 가공식품(`PROCESSED`)에 같은 이름이 한 건씩 있으면 GENERAL 쪽이
-    사용자가 말한 것이다. GENERAL 에 없을 때만 전체에서 다시 찾는다.
-    """
-    matches_name = _normalized_name() == normalize_name(name)
-
-    def _only(*extra_where) -> list[FoodRef]:
-        # LIMIT 2 면 "유일한가" 를 판단하기에 충분하다. 33만건 테이블에서 일치하는
-        # 행을 전부 ORM 객체로 만들 이유가 없다.
-        stmt = select(FoodRef).where(matches_name, *extra_where).limit(2)
-        return list(db.execute(stmt).scalars().all())
-
-    general = _only(FoodRef.category == FoodCategory.GENERAL)
-    if general:
-        return general[0] if len(general) == 1 else None
-
-    every = _only()
-    return every[0] if len(every) == 1 else None
-
-
 def _contains(fragment: str):
     """이름 안에 `fragment` 가 들어 있는가. **와일드카드는 글자로 취급한다.**
 
@@ -112,9 +74,8 @@ def _contains(fragment: str):
 def search_by_tokens(db: Session, *, tokens: list[str], limit: int) -> list[FoodRef]:
     """토큰이 **전부** 들어간 이름을 찾는다. 사용자가 후보 목록에서 고를 때 쓴다.
 
-    `find_unique_by_name` 과 정반대의 판단이다 — 저쪽은 하나로 좁혀지지 않으면
-    포기하지만(틀린 값이 박제되므로), 여기서는 고르는 주체가 사람이라 여러 건을
-    그대로 보여주는 것이 맞다.
+    서버의 이름 자동 매칭(`services.nutrition.resolve_by_name`)도 이 검색의 1위를
+    쓴다 — 사람이 보는 후보 목록 맨 위와 자동으로 걸리는 음식이 같아야 한다.
 
     `LIKE '%…%'` 는 `ix_food_refs_name_normalized` 를 타지 못한다 — 33만건 순차
     스캔이다. 앞뒤 와일드카드를 지우면 인덱스를 타지만 `김밥_계란` 처럼 뒤집힌
@@ -138,8 +99,10 @@ def search_by_tokens(db: Session, *, tokens: list[str], limit: int) -> list[Food
 def _candidate_order():
     """후보 정렬 — GENERAL 먼저, 짧은 이름 먼저, 그다음은 결정적으로.
 
-    GENERAL 을 먼저 두는 이유는 `find_unique_by_name` 과 같다: 사용자가 "배추김치"
-    라 치면 브랜드 제품(PROCESSED 31.6만건)이 아니라 그 음식을 뜻한다.
+    GENERAL 을 먼저 두는 건 사용자가 "배추김치" 라 치면 브랜드 제품(PROCESSED
+    31.6만건)이 아니라 그 음식을 뜻하기 때문이다. 같은 이름은 적재할 때 `(category,
+    정규화한 이름)` 마다 평균으로 합쳐 두었으므로(`scripts/load_food_refs.py`,
+    마이그레이션 `8d3f6a1c5e27`) 이름이 같은 행은 category 당 최대 한 건이다.
 
     짧은 이름을 먼저 두는 건 검색어에 군더더기가 적게 붙은 쪽이 사용자가 친 것에
     가깝기 때문이다 — `계란` 에 `계란빵` 이 `부추넣은 계란말이` 보다 먼저 온다.

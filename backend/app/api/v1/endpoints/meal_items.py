@@ -48,12 +48,12 @@ def add_meal_item(
 
     | 결과 | `matched` | `nutrition` | DB `food_ref_id` |
     |---|---|---|---|
-    | 하나로 좁혀짐 + g 환산 가능 | `true` | 있음 | 연결 |
-    | 하나로 좁혀짐 + 환산 불가("2개") | `false` | `null` | **연결 유지** |
-    | 못 좁힘 (없음 · "김치찌개" 28건) | `false` | `null` | `NULL` |
+    | 후보 1위 있음 + g 환산 가능 | `true` | 있음 | 연결 |
+    | 후보 1위 있음 + 환산 불가("2개") | `false` | `null` | **연결 유지** |
+    | 후보 없음 | `false` | `null` | `NULL` |
 
     두 번째가 링크를 남기는 건 사용자가 나중에 양을 g 으로 고치면 곧바로 환산되기
-    때문이다. 매칭 규칙은 `crud.food.find_unique_by_name` 참고.
+    때문이다. 매칭 규칙은 `services.nutrition.resolve_by_name` 참고.
 
     ## `matched: false` 는 에러가 아니라 폴백 신호다
 
@@ -65,11 +65,10 @@ def add_meal_item(
           → 사용자가 고르거나 직접 입력
           → PUT /meals/{mealId}/items/{itemId}/nutrition
 
-    이름 매칭은 정규화한 이름이 **정확히 같을 때만** 건다 — 틀린 영양성분이
-    `food_ref_id` 로 박제돼 Q/Q/S 채점까지 흘러가는 것보다 비어 있는 편이 낫기
-    때문이다(`quality_score` 가 NULL 허용인 이유). 같은 이름의 여러 건은 적재할 때
-    평균으로 합쳐 두었으므로(`crud.food.find_unique_by_name`) 이 경로로 오는 건
-    공공 DB 에 그 이름이 없는 경우다.
+    이름 매칭은 `GET /nutrition/candidates?q=<displayName>` 의 **1위 후보**에 건다
+    (부분일치 → 퍼지 순, GENERAL · 짧은 이름 우선). 그래서 `matched: false` 로 오는
+    건 그 검색으로도 후보가 하나도 없거나 g 으로 환산되지 않는 경우다. 1위가
+    사용자가 뜻한 음식이 아니면 FE 의 후보 목록에서 다른 음식을 골라 바꾼다.
 
     두 엔드포인트 모두 붙어 있다 — 이 파일의 `set_meal_item_nutrition` 과
     `endpoints/nutrition.py` 의 `search_nutrition_candidates` 다.
@@ -174,15 +173,14 @@ def update_meal_items(
     ## 이름이 바뀌거나 링크가 없을 때 공공 DB 를 다시 찾는다
 
     **이름이 그대로고 `food_ref_id` 가 이미 있으면** 그 링크를 지킨다. 이름 매칭
-    (`crud.food.find_unique_by_name`)은 정확히 같은 이름만 찾고 GENERAL 을 먼저
-    고르므로, AI 가 `candidateFoodRefId` 로 연결해 둔 링크(이름이 조금 다른 행이나
-    가공식품)와 다를 수 있다. "250g → 220g" 같은 수정이 그 링크를 바꾸거나 끊어
+    (`services.nutrition.resolve_by_name`)은 후보 검색 1위에 걸므로, AI 나 사용자가
+    연결해 둔 링크(후보 목록에서 1위가 아닌 음식을 고른 경우 등)와 다를 수 있다. "250g → 220g" 같은 수정이 그 링크를 바꾸거나 끊어
     버리면 영양정보가 이유 없이 달라진다.
 
-    **이름이 그대로여도 `food_ref_id` 가 NULL 이면 새로 찾은 결과를 건다.** AI 가
-    후보를 주지 못했다는 뜻이고 이름 매칭은 워커가 쓰지 않는 별개의 신호라, 지킬
-    링크가 없는데 버릴 이유가 없다. "미역국 2개 → 200g" 처럼 이제 g 으로 환산되는
-    수정이 영양정보를 얻는 경로다. 이름으로도 못 좁히면 NULL 그대로다.
+    **이름이 그대로여도 `food_ref_id` 가 NULL 이면 새로 찾은 결과를 건다.** 분석
+    워커도 같은 이름 매칭을 하므로 보통은 여기서도 후보가 없겠지만, 그사이 공공 DB 가
+    바뀌었을 수 있고 지킬 링크가 없는데 버릴 이유가 없다. 이름으로 찾은 후보가
+    없으면 NULL 그대로다.
 
     이름이 바뀌면 다른 음식이 된 것이므로 다시 찾고, 못 찾으면 링크를 끊는다
     (`matched: false` 폴백 경로로 간다 — `add_meal_item` 독스트링 참고).

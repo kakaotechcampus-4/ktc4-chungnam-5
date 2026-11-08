@@ -61,17 +61,17 @@ def test_update_item_returns_recalculating_status_with_steps(client, db):
 def test_changing_only_the_amount_keeps_the_public_db_link(client, db):
     """양만 고쳤는데 영양정보가 사라지면 안 된다.
 
-    이름 매칭(`crud.food.find_unique_by_name`)은 일부러 보수적이라 흔한 음식에
-    `None` 을 준다. AI 가 `candidateFoodRefId` 로 정확히 연결해 둔 항목을 다시 찾으면
-    링크가 끊긴다 — "250g → 220g" 수정이 영양정보를 통째로 날리는 셈이다.
+    이름 매칭(`services.nutrition.resolve_by_name`)은 후보 검색 1위에 건다. AI 나
+    사용자가 이미 연결해 둔 항목을 다시 찾으면 1위가 아닌 링크가 바뀐다 —
+    "250g → 220g" 수정이 영양정보를 이유 없이 바꾸는 셈이다.
     """
     user = make_user(db)
     meal = make_meal(db, user_id=user.id)
-    # 같은 이름이 공공 DB 에 여러 건 — 이름으로는 하나로 좁혀지지 않는다.
+    # 같은 이름이 공공 DB 에 여러 건 — 이름으로 찾으면 1위는 `KFD_JJIGAE_1` 이다.
     make_food_ref(db, food_ref_id="KFD_JJIGAE_1", name="김치찌개")
     make_food_ref(db, food_ref_id="KFD_JJIGAE_2", name="김치찌개")
     item = make_meal_item(
-        db, meal_id=meal.id, display_name="김치찌개", food_ref_id="KFD_JJIGAE_1"
+        db, meal_id=meal.id, display_name="김치찌개", food_ref_id="KFD_JJIGAE_2"
     )
     db.commit()
 
@@ -92,7 +92,7 @@ def test_changing_only_the_amount_keeps_the_public_db_link(client, db):
 
     assert response.status_code == 200, response.text
     db.refresh(item)
-    assert item.food_ref_id == "KFD_JJIGAE_1"
+    assert item.food_ref_id == "KFD_JJIGAE_2"
     assert item.confirmed_amount_g == Decimal("220.00")
 
 
@@ -123,20 +123,19 @@ def test_amount_only_edit_fills_a_link_the_item_never_had(client, db):
 
 
 def test_amount_only_edit_leaves_an_unmatchable_item_unlinked(client, db):
-    """이름으로도 못 좁히면 NULL 그대로다 — 아무거나 붙이지 않는다."""
+    """이름으로 찾은 후보가 하나도 없으면 NULL 그대로다 — 아무거나 붙이지 않는다."""
     user = make_user(db)
     meal = make_meal(db, user_id=user.id)
-    make_food_ref(db, food_ref_id="KFD_JJIGAE_1", name="김치찌개")
-    make_food_ref(db, food_ref_id="KFD_JJIGAE_2", name="김치찌개")
+    make_food_ref(db, food_ref_id="KFD_SONGPYEON", name="굳지않는송편")
     item = make_meal_item(
-        db, meal_id=meal.id, display_name="김치찌개", food_ref_id=None
+        db, meal_id=meal.id, display_name="존재하지않는음식", food_ref_id=None
     )
     db.commit()
 
     response = client.patch(
         f"/api/v1/meals/{meal.id}/items",
         headers={"X-User-Id": str(user.id)},
-        json=_payload(item.id, displayName="김치찌개", amount=220, unit="g"),
+        json=_payload(item.id, displayName="존재하지않는음식", amount=220, unit="g"),
     )
 
     assert response.status_code == 200, response.text
