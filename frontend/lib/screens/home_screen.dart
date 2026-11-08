@@ -354,8 +354,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// `＋ 저녁 식사 기록하기` 카드 탭 → 식사 입력 화면(3번). 돌아오면 끼니가
   /// 새로 기록됐을 수 있으니 홈을 다시 불러온다.
   Future<void> _openMealInput() async {
+    // 버튼 라벨(＋ ○○ 식사 기록하기)과 같은 끼니로 시작한다.
+    final nextMealType = _home?.missingMealTypes.firstOrNull;
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const MealInputScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => MealInputScreen(initialMealType: nextMealType),
+      ),
     );
     if (!mounted) return;
     _load();

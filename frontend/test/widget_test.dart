@@ -1803,6 +1803,129 @@ void main() {
     expect(find.text('챗봇으로 다른 음식 추천받기'), findsNothing);
   });
 
+  // 식사 입력 화면의 기본 끼니·시각. 확인 팝업의 "점심 · 12:00" 으로 선택된 값을 본다.
+  testWidgets('meal input starts on the meal it was opened for', (
+    WidgetTester tester,
+  ) async {
+    await pumpSkipFlow(
+      tester,
+      const MealInputScreen(initialMealType: 'LUNCH'),
+      api: skippedMealApi(),
+    );
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('점심 · '), findsOneWidget);
+  });
+
+  testWidgets('meal input for a past day starts at the meal representative time', (
+    WidgetTester tester,
+  ) async {
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month, now.day - 3);
+    await pumpSkipFlow(
+      tester,
+      MealInputScreen(initialDate: day, initialMealType: 'BREAKFAST'),
+      api: skippedMealApi(),
+    );
+    final label =
+        '${day.year}년 ${day.month.toString().padLeft(2, '0')}월 '
+        '${day.day.toString().padLeft(2, '0')}일';
+    expect(find.text(label), findsOneWidget);
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('아침 · 08:00'), findsOneWidget);
+  });
+
+  testWidgets('the meal button the user picked is kept', (
+    WidgetTester tester,
+  ) async {
+    await pumpSkipFlow(
+      tester,
+      const MealInputScreen(),
+      api: skippedMealApi(),
+    );
+    await tester.tap(find.text('점심'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('점심 · '), findsOneWidget);
+  });
+
+  testWidgets('home record button opens the input on the same meal as its label', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final home = fakeExample('GET /api/v1/home');
+    final today = (home['data'] as Map<String, dynamic>)['today'] as Map;
+    today['missingMealTypes'] = ['LUNCH', 'DINNER'];
+    final api = FakeApi()..on('GET /home', (_) => (200, home));
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('＋ 점심 식사 기록하기'), 100);
+    await tester.tap(find.text('＋ 점심 식사 기록하기'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    // 저녁이 기본이던 때는 "저녁" 이었다.
+    expect(find.textContaining('점심 · '), findsOneWidget);
+  });
+
+  /// 기록 탭(단기 피드백)을 열고 [monthDelta] 만큼 달을 옮겨 그달 15일을 누른다.
+  /// 선택한 날의 식사 목록은 비어 있다.
+  Future<void> openHistoryDay(WidgetTester tester, int monthDelta) async {
+    _useDesignSize(tester);
+    final list = fakeExample('GET /api/v1/meals');
+    (list['data'] as Map<String, dynamic>)['items'] = <Object?>[];
+    final api = skippedMealApi()..on('GET /meals', (_) => (200, list));
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+    await _openFeedback(tester, '단기 피드백');
+    for (var i = 0; i < monthDelta.abs(); i++) {
+      await tester.tap(find.text(monthDelta < 0 ? '‹' : '›'));
+      await _settle(tester);
+    }
+    await tester.tap(find.text('15').first);
+    await _settle(tester);
+  }
+
+  testWidgets('a past day in the calendar opens the input for that day', (
+    WidgetTester tester,
+  ) async {
+    await openHistoryDay(tester, -1);
+    // 그날 아무것도 없으면 첫 끼니(아침)로, 하드코딩된 "저녁" 이 아니다.
+    expect(find.text('＋ 아침 식사 기록하기'), findsOneWidget);
+    expect(find.text('＋ 저녁 식사 기록하기'), findsNothing);
+
+    await tester.tap(find.text('＋ 아침 식사 기록하기'));
+    await tester.pumpAndSettle();
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month - 1, 15);
+    expect(
+      find.text('${day.year}년 ${day.month.toString().padLeft(2, '0')}월 15일'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('아침 · 08:00'), findsOneWidget);
+  });
+
+  testWidgets('a day beyond the input date range has no record button', (
+    WidgetTester tester,
+  ) async {
+    // 입력 화면의 날짜 선택기는 365일 전까지다. 그보다 오래된 날을 넘기면 조용히 오늘로 바뀐다.
+    await openHistoryDay(tester, -13);
+    expect(find.textContaining('식사 기록하기'), findsNothing);
+    expect(find.text('아직 기록된 식사가 없어요'), findsOneWidget);
+  });
+
   testWidgets('cancelling the skip confirmation registers nothing', (
     WidgetTester tester,
   ) async {

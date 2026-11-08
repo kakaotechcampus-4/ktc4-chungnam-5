@@ -14,6 +14,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'food_search_screen.dart';
 import 'meal_analysis_screen.dart';
+import 'meal_defaults.dart';
 import 'meal_review_screen.dart';
 import 'next_meal_suggestion_screen.dart';
 
@@ -67,7 +68,15 @@ class _PickedFood {
 }
 
 class MealInputScreen extends StatefulWidget {
-  const MealInputScreen({super.key});
+  const MealInputScreen({super.key, this.initialDate, this.initialMealType});
+
+  /// 기록할 날짜. 달력에서 날짜를 눌러 들어오면 그 날짜다. 없으면 오늘.
+  /// 지난 날짜면 식사 시각은 끼니별 대표 시각으로 시작한다(`defaultEatenAt`).
+  final DateTime? initialDate;
+
+  /// 처음 선택해 둘 끼니(서버 값). 홈의 "＋ ○○ 식사 기록하기" 버튼처럼 어느 끼니를 기록할지
+  /// 이미 정해진 채 들어오면 그 끼니. 없으면 시각으로 추정한다(`defaultMealType`).
+  final String? initialMealType;
 
   @override
   State<MealInputScreen> createState() => _MealInputScreenState();
@@ -79,7 +88,35 @@ class _MealInputScreenState extends State<MealInputScreen> {
 
   /// [_selectedMealType] 순서의 서버 값.
   static const _mealTypes = ['BREAKFAST', 'LUNCH', 'DINNER'];
-  DateTime _eatenAt = DateTime.now();
+  late DateTime _eatenAt;
+
+  /// 끼니를 시각으로 추정해 둔 상태. 사용자가 끼니를 직접 고르거나, 끼니가 이미 정해진 채
+  /// 들어왔으면 시각을 바꿔도 끼니를 바꾸지 않는다.
+  late bool _mealTypeFollowsTime;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final day = widget.initialDate ?? now;
+    final type =
+        widget.initialMealType ??
+        defaultMealType(now: now, day: day) ??
+        mealTypeForTime(now);
+    final index = _mealTypes.indexOf(type);
+    _selectedMealType = index < 0 ? 2 : index;
+    _eatenAt = defaultEatenAt(now: now, day: day, mealType: type);
+    _mealTypeFollowsTime =
+        widget.initialMealType == null && widget.initialDate == null;
+  }
+
+  /// 사용자가 끼니 버튼을 눌렀다 — 이제 시각을 바꿔도 끼니를 건드리지 않는다.
+  void _pickMealType(int index) {
+    setState(() {
+      _selectedMealType = index;
+      _mealTypeFollowsTime = false;
+    });
+  }
 
   late final MealApiService _api = MealApiService(context.read<ApiClient>());
 
@@ -165,7 +202,12 @@ class _MealInputScreenState extends State<MealInputScreen> {
       builder: (context) => _DateTimeDialPicker(initial: _eatenAt, mode: mode),
     );
     if (picked == null) return;
-    setState(() => _eatenAt = picked);
+    setState(() {
+      _eatenAt = picked;
+      if (_mealTypeFollowsTime) {
+        _selectedMealType = _mealTypes.indexOf(mealTypeForTime(picked));
+      }
+    });
   }
 
   @override
@@ -353,19 +395,19 @@ class _MealInputScreenState extends State<MealInputScreen> {
                   _MealTypeButton(
                     label: '아침',
                     selected: _selectedMealType == 0,
-                    onTap: () => setState(() => _selectedMealType = 0),
+                    onTap: () => _pickMealType(0),
                   ),
                   const SizedBox(width: 6),
                   _MealTypeButton(
                     label: '점심',
                     selected: _selectedMealType == 1,
-                    onTap: () => setState(() => _selectedMealType = 1),
+                    onTap: () => _pickMealType(1),
                   ),
                   const SizedBox(width: 6),
                   _MealTypeButton(
                     label: '저녁',
                     selected: _selectedMealType == 2,
-                    onTap: () => setState(() => _selectedMealType = 2),
+                    onTap: () => _pickMealType(2),
                   ),
                 ],
               ),
