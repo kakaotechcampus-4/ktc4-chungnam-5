@@ -1204,8 +1204,8 @@ void main() {
       (r) => r.path.endsWith('/confirm'),
     );
     expect(confirm.data, {'satietyAfterPct': 50});
-    expect(find.text('76'), findsOneWidget); // 양
-    expect(find.text('80'), findsOneWidget); // 질
+    expect(find.text('76점'), findsOneWidget); // 양
+    expect(find.text('80점'), findsOneWidget); // 질
     expect(find.textContaining('단백질 부족'), findsOneWidget);
     expect(find.text('다음 끼니 제안 보기'), findsOneWidget);
   });
