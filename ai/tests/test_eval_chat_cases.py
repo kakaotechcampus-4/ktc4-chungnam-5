@@ -817,8 +817,8 @@ def test_c12_prompt_hash_does_not_read_contract_file(monkeypatch, tmp_path):
 # ─────────────────────────── baseline ───────────────────────────
 
 
-def test_c13_saved_baseline_records_rule_version_v2_and_prompt_hash(monkeypatch, tmp_path):
-    """행 c13 — `--save` 로 저장한 baseline 에 `rule_version == "chat-cases-v2"`, `prompt_hash == cases_prompt_hash(CASES)`
+def test_c13_saved_baseline_records_rule_version_v3_and_prompt_hash(monkeypatch, tmp_path):
+    """행 c13 — `--save` 로 저장한 baseline 에 `rule_version == "chat-cases-v3"`, `prompt_hash == cases_prompt_hash(CASES)`
     가 있다 (정상, 결정 D).
 
     baseline 의 비교 조건이다 — 계약 파일 해시로 잰 v1 baseline 과 비교하면 `compare` 가 경고해야 한다.
@@ -839,9 +839,21 @@ def test_c13_saved_baseline_records_rule_version_v2_and_prompt_hash(monkeypatch,
     assert code != 2, "CLI 오용으로 끝났다"
     assert posts, "Fake 채널을 거치지 않았다"
     doc = json.loads(saved.read_text(encoding="utf-8"))
-    assert doc["rule_version"] == "chat-cases-v2"
+    assert doc["rule_version"] == "chat-cases-v3"
     assert doc["prompt_hash"] == cases_prompt_hash(CASES)
     assert not crash_log.exists(), crash_log.read_text(encoding="utf-8")
+
+
+def test_c14_unscored_meal_case_has_only_the_unscored_meal():
+    """행 c14 — `unscored_meal` 의 오늘 끼니는 qqs null 한 끼뿐이다 (v3, 정상).
+
+    `unscored_axis_silent` 는 어느 끼니를 말하는지 가리지 못한다. 점수 있는 끼니를 함께 두면 그 끼니에 대한
+    옳은 평가("아침은 포만감이 좋았어요")까지 점심 평가로 오판해 critical 축이 가짜로 깨진다(기준선 0/3).
+    """
+    case = next(c for c in CASES if c.id == "unscored_meal")
+    meals = case.request["context"]["today"]["meals"]
+    assert len(meals) == 1
+    assert meals[0]["qqs"] is None
 
 
 # ─────────────────────────── 앱 스키마 ───────────────────────────
