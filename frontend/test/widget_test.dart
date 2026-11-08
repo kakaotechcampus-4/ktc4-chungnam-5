@@ -1950,6 +1950,111 @@ void main() {
     expect(find.text('챗봇으로 다른 음식 추천받기'), findsNothing);
   });
 
+  /// 끼니 피드백 화면(7번)을 다른 화면 위에 띄운다 — 삭제 뒤 돌아갈 곳이 있어야 닫힘을 볼 수 있다.
+  Future<FakeApi> pumpFeedbackOnTop(
+    WidgetTester tester, {
+    bool skipped = false,
+    FakeApi? api,
+  }) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    final fake = api ?? FakeApi();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider(create: (_) => ApiClient(session: session, dio: fake.dio)),
+          Provider(create: (_) => PopupGate()),
+          ChangeNotifierProvider(create: (_) => TabState()),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => NextMealSuggestionScreen(
+                      mealId: 'm1',
+                      skipped: skipped,
+                    ),
+                  ),
+                ),
+                child: const Text('열기'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('열기'));
+    await _settle(tester);
+    return fake;
+  }
+
+  testWidgets('the meal feedback screen deletes the meal after confirming', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpFeedbackOnTop(tester);
+    await tester.tap(find.byTooltip('끼니 삭제'));
+    await tester.pumpAndSettle();
+    expect(find.text('식사 기록을 삭제할까요?'), findsOneWidget);
+    // 확인 전에는 지우지 않는다.
+    expect(api.requests.where((r) => r.method == 'DELETE'), isEmpty);
+
+    await tester.tap(find.text('삭제'));
+    await _settle(tester);
+
+    final delete = api.requests.singleWhere((r) => r.method == 'DELETE');
+    expect(delete.path, '/meals/m1');
+    expect(find.byType(NextMealSuggestionScreen), findsNothing);
+    expect(find.text('열기'), findsOneWidget);
+  });
+
+  testWidgets('cancelling the delete keeps the meal feedback screen', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpFeedbackOnTop(tester);
+    await tester.tap(find.byTooltip('끼니 삭제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('취소'));
+    await _settle(tester);
+
+    expect(api.requests.where((r) => r.method == 'DELETE'), isEmpty);
+    expect(find.byType(NextMealSuggestionScreen), findsOneWidget);
+  });
+
+  testWidgets('a failed delete is told and the screen stays', (
+    WidgetTester tester,
+  ) async {
+    final api = FakeApi()
+      ..on('DELETE /meals/{meal_id}', (_) => (500, fakeError('INTERNAL_ERROR')));
+    await pumpFeedbackOnTop(tester, api: api);
+    await tester.tap(find.byTooltip('끼니 삭제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('삭제'));
+    await _settle(tester);
+
+    expect(find.textContaining('삭제하지 못했어요'), findsOneWidget);
+    expect(find.byType(NextMealSuggestionScreen), findsOneWidget);
+    // 다시 시도할 수 있다.
+    expect(find.byTooltip('끼니 삭제'), findsOneWidget);
+  });
+
+  testWidgets('a skipped meal can be deleted from its feedback screen', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpFeedbackOnTop(tester, skipped: true);
+    await tester.tap(find.byTooltip('끼니 삭제'));
+    await tester.pumpAndSettle();
+    // 확인 팝업이 어떤 끼니인지 보여 준다.
+    expect(find.textContaining('식사 안 함'), findsWidgets);
+    await tester.tap(find.text('삭제'));
+    await _settle(tester);
+
+    expect(api.requests.where((r) => r.method == 'DELETE'), hasLength(1));
+    expect(find.byType(NextMealSuggestionScreen), findsNothing);
+  });
+
   // 식사 입력 화면의 기본 끼니·시각. 확인 팝업의 "점심 · 12:00" 으로 선택된 값을 본다.
   testWidgets('meal input starts on the meal it was opened for', (
     WidgetTester tester,
