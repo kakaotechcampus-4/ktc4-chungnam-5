@@ -1,0 +1,2799 @@
+{
+  "created_at_utc": "2026-11-08T16:24:28.770522+00:00",
+  "metric": "Per-response hit of each preconfirmed DB target; not overall food accuracy",
+  "denominator": "Planned n, including failed and missing calls. Duplicate items cannot increase a target hit.",
+  "outside_target_note": "Additional selected IDs are observations, not automatically false positives.",
+  "label_limitation": "Confirmed label status is required; DB ID existence must be verified during P0.",
+  "comparison_parity": {
+    "database_and_backend": "verified: identical DB fingerprint and BE sources",
+    "provider_models_by_arm": {
+      "baseline": [
+        "gemini-3.8-flash"
+      ],
+      "candidate": [
+        "gemini-3.8-flash"
+      ]
+    },
+    "provider_model_status": "same reported model in both arms"
+  },
+  "n": 3,
+  "arms": {
+    "baseline": {
+      "cases": [
+        {
+          "case_id": "manybanchan",
+          "split": "development",
+          "planned_responses": 3,
+          "parsed_responses": 2,
+          "failed_runs": [
+            2
+          ],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "cabbage_salad",
+              "n": 3,
+              "hits": 1,
+              "hit_runs": [
+                1
+              ],
+              "miss_runs": [
+                2,
+                3
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [
+                  3
+                ],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "bean_sprout_soup",
+              "n": 3,
+              "hits": 2,
+              "hit_runs": [
+                1,
+                3
+              ],
+              "miss_runs": [
+                2
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "japchae",
+              "n": 3,
+              "hits": 2,
+              "hit_runs": [
+                1,
+                3
+              ],
+              "miss_runs": [
+                2
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "kimchi",
+              "n": 3,
+              "hits": 2,
+              "hit_runs": [
+                1,
+                3
+              ],
+              "miss_runs": [
+                2
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "beef_bibimbap",
+              "n": 3,
+              "hits": 0,
+              "hit_runs": [],
+              "miss_runs": [
+                1,
+                2,
+                3
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [
+                  1,
+                  3
+                ],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "pan_fried_tofu",
+              "n": 3,
+              "hits": 0,
+              "hit_runs": [],
+              "miss_runs": [
+                1,
+                2,
+                3
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [
+                  1,
+                  3
+                ],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 24,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "P123-201020300-5316": 3,
+            "D301-022000000-0001": 1,
+            "D105-253000000-0001": 2,
+            "D110-492000000-0001": 2,
+            "P114-400020100-0086": 1,
+            "D510-524000000-0001": 1,
+            "D414-688000000-0001": 2,
+            "D315-670000000-0001": 2,
+            "D414-701000000-0001": 1,
+            "D114-632000000-0001": 2,
+            "P114-202020100-0069": 2,
+            "P123-201020300-0002": 2,
+            "D414-724000000-0001": 1,
+            "D314-618000000-0001": 1,
+            "D407-371000000-0001": 1
+          },
+          "outside_scored_targets": {
+            "P123-201020300-5316": 3,
+            "D301-022000000-0001": 1,
+            "P114-400020100-0086": 1,
+            "D510-524000000-0001": 1,
+            "D414-688000000-0001": 2,
+            "D114-632000000-0001": 2,
+            "P114-202020100-0069": 2,
+            "P123-201020300-0002": 2,
+            "D414-724000000-0001": 1,
+            "D314-618000000-0001": 1,
+            "D407-371000000-0001": 1
+          },
+          "regression": {
+            "scope": "Unchanged existing checks on evaluation envelopes; not full API or safety_guard execution.",
+            "baseline_case": "manybanchan.jpg",
+            "gate_passed": false,
+            "gate_reasons": [
+              "_crashes: 실행 중 크래시 1회 (허용 0회) — 걸린 키: manybanchan/contract_parseable"
+            ],
+            "axes": {
+              "manybanchan/contract_parseable": {
+                "passed": 2,
+                "n": 3,
+                "errors": 1,
+                "grade": "critical",
+                "pass_ratio": null,
+                "notes": [
+                  "ERR:RuntimeError:SavedCallUnavailable"
+                ],
+                "samples": []
+              },
+              "manybanchan/no_missing_food": {
+                "passed": 2,
+                "n": 2,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "manybanchan/amount_accuracy": {
+                "passed": 2,
+                "n": 2,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 350.0 g, 쌀밥 210.0 g, 콩나물국 200.0 g, 잡채 80.0 g, 양념게장 70.0 g, 양념두부 60.0 g, 브로콜리두부무침 50.0 g, 배추김치 40.0 g, 양배추샐러드 60.0 g, 미역초무침 40.0 g, 무피클 40.0 g",
+                    "response": {
+                      "mealId": "ab-manybanchan-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 350.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "쌀밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.93,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념게장",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.8,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념두부",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양배추샐러드",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.87,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.82,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 450.0 g, 불고기비빔밥 450.0 g, 공깃밥 210.0 g, 공깃밥 210.0 g, 콩나물국 200.0 g, 잡채 70.0 g, 브로콜리두부무침 50.0 g, 배추김치 40.0 g, 샐러드 60.0 g, 더덕무침 50.0 g, 연두부 70.0 g, 미역초무침 40.0 g, 무피클 40.0 g",
+                    "response": {
+                      "mealId": "ab-manybanchan-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 450.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 450.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "공깃밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "공깃밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "샐러드",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "더덕무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.75,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "연두부",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "manybanchan/confidence_calibration": {
+                "passed": 2,
+                "n": 2,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 0.9, 쌀밥 0.95, 콩나물국 0.92, 잡채 0.93, 양념게장 0.8, 양념두부 0.88, 브로콜리두부무침 0.85, 배추김치 0.95, 양배추샐러드 0.87, 미역초무침 0.82, 무피클 0.85",
+                    "response": {
+                      "mealId": "ab-manybanchan-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 350.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "쌀밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.93,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념게장",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.8,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념두부",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양배추샐러드",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.87,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.82,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 0.9, 불고기비빔밥 0.88, 공깃밥 0.95, 공깃밥 0.95, 콩나물국 0.92, 잡채 0.95, 브로콜리두부무침 0.85, 배추김치 0.95, 샐러드 0.9, 더덕무침 0.75, 연두부 0.85, 미역초무침 0.85, 무피클 0.9",
+                    "response": {
+                      "mealId": "ab-manybanchan-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 450.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 450.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "공깃밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "공깃밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "샐러드",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "더덕무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.75,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "연두부",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "case_id": "piece_of_pizza",
+          "split": "regression",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "potato_pizza",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "D202-120000000-1705": 3
+          },
+          "outside_scored_targets": {},
+          "regression": {
+            "scope": "Unchanged existing checks on evaluation envelopes; not full API or safety_guard execution.",
+            "baseline_case": "piece_of_pizza.jpg",
+            "gate_passed": true,
+            "gate_reasons": [],
+            "axes": {
+              "piece_of_pizza/contract_parseable": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "piece_of_pizza/gram_unit_default": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "piece_of_pizza/amount_in_range": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "piece_of_pizza/confidence_in_range": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "piece_of_pizza/amount_accuracy": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 100.0 g",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 100.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 100.0 g",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 100.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 105.0 g",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 105.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "piece_of_pizza/confidence_calibration": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 0.92",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 100.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 0.92",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 100.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 0.92",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 105.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "case_id": "whole_cake",
+          "split": "regression",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "cheesecake",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "D202-110000000-0340": 3
+          },
+          "outside_scored_targets": {},
+          "regression": {
+            "scope": "Unchanged existing checks on evaluation envelopes; not full API or safety_guard execution.",
+            "baseline_case": "whole_cake.jpg",
+            "gate_passed": true,
+            "gate_reasons": [],
+            "axes": {
+              "whole_cake/contract_parseable": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "whole_cake/natural_unit_allowed": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "whole_cake/standard_name": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "whole_cake/confidence_in_range": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "whole_cake/amount_accuracy": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 1.0 개",
+                    "response": {
+                      "mealId": "ab-whole_cake-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 1.0 개",
+                    "response": {
+                      "mealId": "ab-whole_cake-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 1.0 개",
+                    "response": {
+                      "mealId": "ab-whole_cake-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "whole_cake/confidence_calibration": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 0.98",
+                    "response": {
+                      "mealId": "ab-whole_cake-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 0.98",
+                    "response": {
+                      "mealId": "ab-whole_cake-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 0.98",
+                    "response": {
+                      "mealId": "ab-whole_cake-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "case_id": "coleslaw",
+          "split": "holdout",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "coleslaw",
+              "n": 3,
+              "hits": 0,
+              "hit_runs": [],
+              "miss_runs": [
+                1,
+                2,
+                3
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "P123-224020200-0732": 3
+          },
+          "outside_scored_targets": {
+            "P123-224020200-0732": 3
+          },
+          "regression": null
+        },
+        {
+          "case_id": "fried_eggs",
+          "split": "holdout",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "fried_eggs",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "D609-449000000-0001": 3
+          },
+          "outside_scored_targets": {},
+          "regression": null
+        },
+        {
+          "case_id": "potato_salad",
+          "split": "holdout",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "potato_salad",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "D414-664000000-0001": 3
+          },
+          "outside_scored_targets": {},
+          "regression": null
+        }
+      ],
+      "by_split": {
+        "development": {
+          "planned_responses": 3,
+          "parsed_responses": 2,
+          "failed_responses": 1,
+          "missing_responses": 0,
+          "target_trials": 18,
+          "target_hits": 7,
+          "linked_items": 24,
+          "unlinked_items": 0
+        },
+        "regression": {
+          "planned_responses": 6,
+          "parsed_responses": 6,
+          "failed_responses": 0,
+          "missing_responses": 0,
+          "target_trials": 6,
+          "target_hits": 6,
+          "linked_items": 6,
+          "unlinked_items": 0
+        },
+        "holdout": {
+          "planned_responses": 9,
+          "parsed_responses": 9,
+          "failed_responses": 0,
+          "missing_responses": 0,
+          "target_trials": 9,
+          "target_hits": 6,
+          "linked_items": 9,
+          "unlinked_items": 0
+        }
+      }
+    },
+    "candidate": {
+      "cases": [
+        {
+          "case_id": "manybanchan",
+          "split": "development",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "cabbage_salad",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "bean_sprout_soup",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "japchae",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "kimchi",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "beef_bibimbap",
+              "n": 3,
+              "hits": 0,
+              "hit_runs": [],
+              "miss_runs": [
+                1,
+                2,
+                3
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            },
+            {
+              "target_id": "pan_fried_tofu",
+              "n": 3,
+              "hits": 0,
+              "hit_runs": [],
+              "miss_runs": [
+                1,
+                2,
+                3
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 36,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "P123-201020300-5316": 4,
+            "D105-253000000-0001": 5,
+            "D301-022000000-0001": 1,
+            "D110-492000000-0001": 3,
+            "D414-688000000-0001": 3,
+            "D315-670000000-0001": 3,
+            "D414-701000000-0001": 3,
+            "D114-632000000-0001": 3,
+            "P114-202020100-0069": 3,
+            "D510-524000000-0001": 3,
+            "D314-618000000-0001": 1,
+            "P123-201020300-0002": 2,
+            "P114-400020100-0086": 2
+          },
+          "outside_scored_targets": {
+            "P123-201020300-5316": 4,
+            "D301-022000000-0001": 1,
+            "D414-688000000-0001": 3,
+            "D114-632000000-0001": 3,
+            "P114-202020100-0069": 3,
+            "D510-524000000-0001": 3,
+            "D314-618000000-0001": 1,
+            "P123-201020300-0002": 2,
+            "P114-400020100-0086": 2
+          },
+          "regression": {
+            "scope": "Unchanged existing checks on evaluation envelopes; not full API or safety_guard execution.",
+            "baseline_case": "manybanchan.jpg",
+            "gate_passed": true,
+            "gate_reasons": [],
+            "axes": {
+              "manybanchan/contract_parseable": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "manybanchan/no_missing_food": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "manybanchan/amount_accuracy": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 400.0 g, 불고기비빔밥 400.0 g, 콩나물국 200.0 g, 콩나물국 200.0 g, 콩나물국 200.0 g, 쌀밥 210.0 g, 잡채 80.0 g, 브로콜리두부무침 60.0 g, 배추김치 50.0 g, 양배추샐러드 70.0 g, 미역초무침 50.0 g, 무피클 40.0 g, 양념두부 70.0 g, 더덕무침 50.0 g",
+                    "response": {
+                      "mealId": "ab-manybanchan-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 400.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 400.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "쌀밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.93,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양배추샐러드",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념두부",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "더덕무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.7,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 400.0 g, 공깃밥 210.0 g, 콩나물국 200.0 g, 잡채 80.0 g, 브로콜리두부무침 60.0 g, 배추김치 40.0 g, 양배추샐러드 70.0 g, 양념두부 70.0 g, 양념게장 60.0 g, 미역초무침 40.0 g, 무피클 40.0 g",
+                    "response": {
+                      "mealId": "ab-manybanchan-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 400.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "공깃밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양배추샐러드",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념두부",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념게장",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.75,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.82,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 400.0 g, 공깃밥 210.0 g, 콩나물국 200.0 g, 잡채 80.0 g, 브로콜리두부무침 50.0 g, 배추김치 40.0 g, 양념두부 80.0 g, 양념게장 60.0 g, 양배추샐러드 60.0 g, 미역초무침 40.0 g, 무피클 40.0 g",
+                    "response": {
+                      "mealId": "ab-manybanchan-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 400.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "공깃밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.93,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념두부",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념게장",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.75,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양배추샐러드",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "manybanchan/confidence_calibration": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 0.92, 불고기비빔밥 0.88, 콩나물국 0.9, 콩나물국 0.9, 콩나물국 0.85, 쌀밥 0.9, 잡채 0.95, 브로콜리두부무침 0.88, 배추김치 0.93, 양배추샐러드 0.9, 미역초무침 0.85, 무피클 0.85, 양념두부 0.9, 더덕무침 0.7",
+                    "response": {
+                      "mealId": "ab-manybanchan-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 400.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 400.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "쌀밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.93,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양배추샐러드",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념두부",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "더덕무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.7,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 0.9, 공깃밥 0.95, 콩나물국 0.92, 잡채 0.9, 브로콜리두부무침 0.85, 배추김치 0.92, 양배추샐러드 0.88, 양념두부 0.85, 양념게장 0.75, 미역초무침 0.82, 무피클 0.85",
+                    "response": {
+                      "mealId": "ab-manybanchan-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 400.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "공깃밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양배추샐러드",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념두부",
+                          "estimatedAmount": 70.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념게장",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.75,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.82,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "불고기비빔밥 0.92, 공깃밥 0.95, 콩나물국 0.93, 잡채 0.95, 브로콜리두부무침 0.88, 배추김치 0.9, 양념두부 0.9, 양념게장 0.75, 양배추샐러드 0.9, 미역초무침 0.85, 무피클 0.88",
+                    "response": {
+                      "mealId": "ab-manybanchan-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "불고기비빔밥",
+                          "estimatedAmount": 400.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "공깃밥",
+                          "estimatedAmount": 210.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "콩나물국",
+                          "estimatedAmount": 200.0,
+                          "unit": "g",
+                          "confidence": 0.93,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "잡채",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "브로콜리두부무침",
+                          "estimatedAmount": 50.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "배추김치",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념두부",
+                          "estimatedAmount": 80.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양념게장",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.75,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "양배추샐러드",
+                          "estimatedAmount": 60.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "미역초무침",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.85,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        },
+                        {
+                          "originalFoodName": "무피클",
+                          "estimatedAmount": 40.0,
+                          "unit": "g",
+                          "confidence": 0.88,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "case_id": "piece_of_pizza",
+          "split": "regression",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "potato_pizza",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "D202-120000000-1705": 3
+          },
+          "outside_scored_targets": {},
+          "regression": {
+            "scope": "Unchanged existing checks on evaluation envelopes; not full API or safety_guard execution.",
+            "baseline_case": "piece_of_pizza.jpg",
+            "gate_passed": true,
+            "gate_reasons": [],
+            "axes": {
+              "piece_of_pizza/contract_parseable": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "piece_of_pizza/gram_unit_default": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "piece_of_pizza/amount_in_range": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "piece_of_pizza/confidence_in_range": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "piece_of_pizza/amount_accuracy": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 115.0 g",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 115.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 110.0 g",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 110.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 110.0 g",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 110.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "piece_of_pizza/confidence_calibration": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 0.92",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 115.0,
+                          "unit": "g",
+                          "confidence": 0.92,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 0.9",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 110.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "포테이토피자 0.9",
+                    "response": {
+                      "mealId": "ab-piece_of_pizza-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "포테이토피자",
+                          "estimatedAmount": 110.0,
+                          "unit": "g",
+                          "confidence": 0.9,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "case_id": "whole_cake",
+          "split": "regression",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "cheesecake",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "D202-110000000-0340": 3
+          },
+          "outside_scored_targets": {},
+          "regression": {
+            "scope": "Unchanged existing checks on evaluation envelopes; not full API or safety_guard execution.",
+            "baseline_case": "whole_cake.jpg",
+            "gate_passed": true,
+            "gate_reasons": [],
+            "axes": {
+              "whole_cake/contract_parseable": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "whole_cake/natural_unit_allowed": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "whole_cake/standard_name": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "whole_cake/confidence_in_range": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "non_critical",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": []
+              },
+              "whole_cake/amount_accuracy": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 1.0 판",
+                    "response": {
+                      "mealId": "ab-whole_cake-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "판",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 1.0 개",
+                    "response": {
+                      "mealId": "ab-whole_cake-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 1.0 개",
+                    "response": {
+                      "mealId": "ab-whole_cake-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "whole_cake/confidence_calibration": {
+                "passed": 3,
+                "n": 3,
+                "errors": 0,
+                "grade": "ambiguous",
+                "pass_ratio": null,
+                "notes": [],
+                "samples": [
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 0.95",
+                    "response": {
+                      "mealId": "ab-whole_cake-1",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "판",
+                          "confidence": 0.95,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 0.98",
+                    "response": {
+                      "mealId": "ab-whole_cake-2",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "passed": true,
+                    "note": "치즈케이크 0.98",
+                    "response": {
+                      "mealId": "ab-whole_cake-3",
+                      "modelVersion": "gemini-flash-gateway",
+                      "safetyStatus": "SAFE",
+                      "items": [
+                        {
+                          "originalFoodName": "치즈케이크",
+                          "estimatedAmount": 1.0,
+                          "unit": "개",
+                          "confidence": 0.98,
+                          "candidateFoodRefId": null,
+                          "clarifyQuestion": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "case_id": "coleslaw",
+          "split": "holdout",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "coleslaw",
+              "n": 3,
+              "hits": 0,
+              "hit_runs": [],
+              "miss_runs": [
+                1,
+                2,
+                3
+              ],
+              "name_diagnostic": {
+                "recognized_name_runs": [],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "P123-224020200-0732": 3
+          },
+          "outside_scored_targets": {
+            "P123-224020200-0732": 3
+          },
+          "regression": null
+        },
+        {
+          "case_id": "fried_eggs",
+          "split": "holdout",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "fried_eggs",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "D609-449000000-0001": 3
+          },
+          "outside_scored_targets": {},
+          "regression": null
+        },
+        {
+          "case_id": "potato_salad",
+          "split": "holdout",
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_runs": [],
+          "missing_runs": [],
+          "targets": [
+            {
+              "target_id": "potato_salad",
+              "n": 3,
+              "hits": 3,
+              "hit_runs": [
+                1,
+                2,
+                3
+              ],
+              "miss_runs": [],
+              "name_diagnostic": {
+                "recognized_name_runs": [
+                  1,
+                  2,
+                  3
+                ],
+                "name_present_but_id_not_hit_runs": [],
+                "recognition_review_needed_runs": [],
+                "note": "Exact whitespace-normalized alias observation only; absent alias does not prove food omission."
+              }
+            }
+          ],
+          "linked_items": 3,
+          "unlinked_items": 0,
+          "selected_id_counts": {
+            "D414-664000000-0001": 3
+          },
+          "outside_scored_targets": {},
+          "regression": null
+        }
+      ],
+      "by_split": {
+        "development": {
+          "planned_responses": 3,
+          "parsed_responses": 3,
+          "failed_responses": 0,
+          "missing_responses": 0,
+          "target_trials": 18,
+          "target_hits": 12,
+          "linked_items": 36,
+          "unlinked_items": 0
+        },
+        "regression": {
+          "planned_responses": 6,
+          "parsed_responses": 6,
+          "failed_responses": 0,
+          "missing_responses": 0,
+          "target_trials": 6,
+          "target_hits": 6,
+          "linked_items": 6,
+          "unlinked_items": 0
+        },
+        "holdout": {
+          "planned_responses": 9,
+          "parsed_responses": 9,
+          "failed_responses": 0,
+          "missing_responses": 0,
+          "target_trials": 9,
+          "target_hits": 6,
+          "linked_items": 9,
+          "unlinked_items": 0
+        }
+      }
+    }
+  },
+  "comparison": [
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "cabbage_salad",
+      "n": 3,
+      "baseline_hits": 1,
+      "candidate_hits": 3,
+      "hit_delta": 2
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "bean_sprout_soup",
+      "n": 3,
+      "baseline_hits": 2,
+      "candidate_hits": 3,
+      "hit_delta": 1
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "japchae",
+      "n": 3,
+      "baseline_hits": 2,
+      "candidate_hits": 3,
+      "hit_delta": 1
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "kimchi",
+      "n": 3,
+      "baseline_hits": 2,
+      "candidate_hits": 3,
+      "hit_delta": 1
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "beef_bibimbap",
+      "n": 3,
+      "baseline_hits": 0,
+      "candidate_hits": 0,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "pan_fried_tofu",
+      "n": 3,
+      "baseline_hits": 0,
+      "candidate_hits": 0,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "split": "regression",
+      "target_id": "potato_pizza",
+      "n": 3,
+      "baseline_hits": 3,
+      "candidate_hits": 3,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "whole_cake",
+      "split": "regression",
+      "target_id": "cheesecake",
+      "n": 3,
+      "baseline_hits": 3,
+      "candidate_hits": 3,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "coleslaw",
+      "split": "holdout",
+      "target_id": "coleslaw",
+      "n": 3,
+      "baseline_hits": 0,
+      "candidate_hits": 0,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "fried_eggs",
+      "split": "holdout",
+      "target_id": "fried_eggs",
+      "n": 3,
+      "baseline_hits": 3,
+      "candidate_hits": 3,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "potato_salad",
+      "split": "holdout",
+      "target_id": "potato_salad",
+      "n": 3,
+      "baseline_hits": 3,
+      "candidate_hits": 3,
+      "hit_delta": 0
+    }
+  ],
+  "source_sha256": {
+    "manifest": "24a5a0ef4db335bd3bae8a855686a5956c82e841b18780c0e417b9faf5ed7dda",
+    "raw": "021d20c2bf1aa02e1ca7119caba721b61c3f798430d17b0837c696b2b8fe1f1b",
+    "baseline_db": "a5e36834d4a5066641845bc849c34be166a337e9b155f664dec9ef37d43477c3",
+    "candidate_db": "709f31dfd73f2a8bc9fe3dd9e0d182193deb913ad57a7ad23c5e0d290c22009a"
+  }
+}

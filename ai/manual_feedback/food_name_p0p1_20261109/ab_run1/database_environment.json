@@ -1,0 +1,24 @@
+{
+  "seed_sha256": "43c0962b7f6da1d098647f618aaabad1aeeeb9f1e7763320a166c9c24abfba9b",
+  "counts": [
+    [
+      "PROCESSED",
+      261101
+    ],
+    [
+      "GENERAL",
+      14991
+    ]
+  ],
+  "migration": [
+    [
+      "3a9c7e5b2d41"
+    ]
+  ],
+  "food_refs_sha256": "f6dd19fbc654d14f5f413357818ec320dee6e8149b59954b43819a90b08ba4b4",
+  "both_arms_same_db_and_be": true,
+  "temporary_database_stopped": true,
+  "auto_remove": true,
+  "existing_containers_untouched": true,
+  "finished_at_utc": "2026-11-08T16:21:15.645511+00:00"
+}

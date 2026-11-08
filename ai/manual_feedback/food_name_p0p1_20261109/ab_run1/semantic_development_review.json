@@ -1,0 +1,1639 @@
+{
+  "created_at_utc": "2026-11-08T16:20:14.065315+00:00",
+  "scope": "Development photo manybanchan only; all parsed items independently reviewed; no prompt/label changes",
+  "review_status": "AI semantic review using frozen user-confirmed category labels and visual evidence, not recipe/nutrient ground truth",
+  "source_sha256": {
+    "raw_responses.json": "021d20c2bf1aa02e1ca7119caba721b61c3f798430d17b0837c696b2b8fe1f1b",
+    "baseline_db.json": "a5e36834d4a5066641845bc849c34be166a337e9b155f664dec9ef37d43477c3",
+    "candidate_db.json": "709f31dfd73f2a8bc9fe3dd9e0d182193deb913ad57a7ad23c5e0d290c22009a"
+  },
+  "manifest_sha256": "24a5a0ef4db335bd3bae8a855686a5956c82e841b18780c0e417b9faf5ed7dda",
+  "planned_calls_per_arm": 3,
+  "parsed_calls": {
+    "baseline": 2,
+    "candidate": 3
+  },
+  "parsed_items": {
+    "baseline": 24,
+    "candidate": 36
+  },
+  "target_hits": {
+    "baseline": {
+      "cabbage_salad": {
+        "planned_n": 3,
+        "hit_runs": [
+          1
+        ],
+        "hits": 1
+      },
+      "bean_sprout_soup": {
+        "planned_n": 3,
+        "hit_runs": [
+          1,
+          3
+        ],
+        "hits": 2
+      },
+      "japchae": {
+        "planned_n": 3,
+        "hit_runs": [
+          1,
+          3
+        ],
+        "hits": 2
+      },
+      "kimchi": {
+        "planned_n": 3,
+        "hit_runs": [
+          1,
+          3
+        ],
+        "hits": 2
+      },
+      "beef_bibimbap": {
+        "planned_n": 3,
+        "hit_runs": [],
+        "hits": 0
+      },
+      "pan_fried_tofu": {
+        "planned_n": 3,
+        "hit_runs": [],
+        "hits": 0
+      }
+    },
+    "candidate": {
+      "cabbage_salad": {
+        "planned_n": 3,
+        "hit_runs": [
+          1,
+          2,
+          3
+        ],
+        "hits": 3
+      },
+      "bean_sprout_soup": {
+        "planned_n": 3,
+        "hit_runs": [
+          1,
+          2,
+          3
+        ],
+        "hits": 3
+      },
+      "japchae": {
+        "planned_n": 3,
+        "hit_runs": [
+          1,
+          2,
+          3
+        ],
+        "hits": 3
+      },
+      "kimchi": {
+        "planned_n": 3,
+        "hit_runs": [
+          1,
+          2,
+          3
+        ],
+        "hits": 3
+      },
+      "beef_bibimbap": {
+        "planned_n": 3,
+        "hit_runs": [],
+        "hits": 0
+      },
+      "pan_fried_tofu": {
+        "planned_n": 3,
+        "hit_runs": [],
+        "hits": 0
+      }
+    }
+  },
+  "primary_development_target_trials_per_arm": 18,
+  "primary_target_hits": {
+    "baseline": 7,
+    "candidate": 12
+  },
+  "paired_successful_diagnostic": {
+    "runs": [
+      1,
+      3
+    ],
+    "target_trials_per_arm": 12,
+    "target_hits": {
+      "baseline": 7,
+      "candidate": 8
+    },
+    "cabbage_salad_hits": {
+      "baseline": 1,
+      "candidate": 2
+    },
+    "note": "Successful-pair diagnostic supplements, never replaces, planned-denominator primary results."
+  },
+  "failure_review": {
+    "arm": "baseline",
+    "run": 2,
+    "reported_error": "ValidationError",
+    "gateway_http_status": 200,
+    "raw_tail": "\"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"무초절임\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"오징어초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      ",
+    "finding": "Raw JSON ends mid-item after unit g; closing JSON structure is absent. HTTP200 did not yield a valid parsed response.",
+    "cause_limit": "Output appears incomplete, but no finish_reason or provider cap evidence was recorded; token-limit or transport cause is not established.",
+    "scoring": "Keep as failed call, with zero target hits in planned denominator. Do not repair raw response or rescore.",
+    "confound": "The incomplete raw text already includes 양배추샐러드. Therefore the full salad1/3→3/3 gain is not purely a naming improvement."
+  },
+  "findings": [
+    "Primary development hits7/18→12/18. Four of the five additional hits arise in run2 where baseline failed parsing; successful paired runs1&3 change7/12→8/12.",
+    "Cabbage salad is correctly specific in candidate3/3; baseline1/3 officially, with one valid generic 샐러드 and one invalid response already naming 양배추샐러드. Successful-pair name/ID hit comparison is1/2→2/2.",
+    "All parsed outputs include 콩나물국·잡채·배추김치. Their planned-denominator gains come from baseline parse failure, not changed naming.",
+    "No parsed response uses confirmed 두부부침. Candidate outputs 양념두부3/3; baseline outputs 양념두부 once and 연두부 once. Tofu remains present but preparation-specific DB matching is unresolved.",
+    "Both arms consistently output 불고기비빔밥, outside the frozen 소고기비빔밥 ID set. Record strict non-hits and possible semantic overlap separately.",
+    "Both arms retain unconfirmed rice, acid-seasoned seaweed, broccoli/tofu subtype and uncertain red side-dish guesses. The experiment does not establish a general hallucination reduction.",
+    "Candidate run1 repeats bibimbap twice and soup3times, matching visible bowl counts. No evidence of separately listing constituent vegetables/meat in addition to bibimbap was found. Personal portion/whole-table double counting remains unresolved."
+  ],
+  "per_run_observations": [
+    {
+      "arm": "baseline",
+      "run": 1,
+      "parsed_item_count": 11,
+      "name_counts": {
+        "불고기비빔밥": 1,
+        "쌀밥": 1,
+        "콩나물국": 1,
+        "잡채": 1,
+        "양념게장": 1,
+        "양념두부": 1,
+        "브로콜리두부무침": 1,
+        "배추김치": 1,
+        "양배추샐러드": 1,
+        "미역초무침": 1,
+        "무피클": 1
+      },
+      "quantity_observation": "전체 상의 음식과 개인 섭취량을 구분할 근거가 없으므로 그램값 정확도를 판정하지 않음",
+      "visible_bowls_note": "사진에는 비빔밥2그릇·콩나물국3그릇이 보인다. 같은 이름 반복이 곧 중복 오류는 아니며, 한 항목 출력도 수량 누락으로 단정하지 않음"
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "parsed_item_count": 14,
+      "name_counts": {
+        "불고기비빔밥": 2,
+        "콩나물국": 3,
+        "쌀밥": 1,
+        "잡채": 1,
+        "브로콜리두부무침": 1,
+        "배추김치": 1,
+        "양배추샐러드": 1,
+        "미역초무침": 1,
+        "무피클": 1,
+        "양념두부": 1,
+        "더덕무침": 1
+      },
+      "quantity_observation": "전체 상의 음식과 개인 섭취량을 구분할 근거가 없으므로 그램값 정확도를 판정하지 않음",
+      "visible_bowls_note": "사진에는 비빔밥2그릇·콩나물국3그릇이 보인다. 같은 이름 반복이 곧 중복 오류는 아니며, 한 항목 출력도 수량 누락으로 단정하지 않음"
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "parsed_item_count": 11,
+      "name_counts": {
+        "불고기비빔밥": 1,
+        "공깃밥": 1,
+        "콩나물국": 1,
+        "잡채": 1,
+        "브로콜리두부무침": 1,
+        "배추김치": 1,
+        "양배추샐러드": 1,
+        "양념두부": 1,
+        "양념게장": 1,
+        "미역초무침": 1,
+        "무피클": 1
+      },
+      "quantity_observation": "전체 상의 음식과 개인 섭취량을 구분할 근거가 없으므로 그램값 정확도를 판정하지 않음",
+      "visible_bowls_note": "사진에는 비빔밥2그릇·콩나물국3그릇이 보인다. 같은 이름 반복이 곧 중복 오류는 아니며, 한 항목 출력도 수량 누락으로 단정하지 않음"
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "parsed_item_count": 13,
+      "name_counts": {
+        "불고기비빔밥": 2,
+        "공깃밥": 2,
+        "콩나물국": 1,
+        "잡채": 1,
+        "브로콜리두부무침": 1,
+        "배추김치": 1,
+        "샐러드": 1,
+        "더덕무침": 1,
+        "연두부": 1,
+        "미역초무침": 1,
+        "무피클": 1
+      },
+      "quantity_observation": "전체 상의 음식과 개인 섭취량을 구분할 근거가 없으므로 그램값 정확도를 판정하지 않음",
+      "visible_bowls_note": "사진에는 비빔밥2그릇·콩나물국3그릇이 보인다. 같은 이름 반복이 곧 중복 오류는 아니며, 한 항목 출력도 수량 누락으로 단정하지 않음"
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "parsed_item_count": 11,
+      "name_counts": {
+        "불고기비빔밥": 1,
+        "공깃밥": 1,
+        "콩나물국": 1,
+        "잡채": 1,
+        "브로콜리두부무침": 1,
+        "배추김치": 1,
+        "양념두부": 1,
+        "양념게장": 1,
+        "양배추샐러드": 1,
+        "미역초무침": 1,
+        "무피클": 1
+      },
+      "quantity_observation": "전체 상의 음식과 개인 섭취량을 구분할 근거가 없으므로 그램값 정확도를 판정하지 않음",
+      "visible_bowls_note": "사진에는 비빔밥2그릇·콩나물국3그릇이 보인다. 같은 이름 반복이 곧 중복 오류는 아니며, 한 항목 출력도 수량 누락으로 단정하지 않음"
+    }
+  ],
+  "all_parsed_items": [
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 350.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "related_name_requires_recipe_review",
+        "reason": "비빔밥은 인식했으나 사용자 확인 소고기를 명시하지 않고 불고기 조리법을 썼다. 소고기비빔밥 허용 ID 목록 밖 불고기비빔밥에 연결된다. 음식 누락이나 명백한 오답으로 단정할 수 없다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 2,
+      "original_item": {
+        "originalFoodName": "쌀밥",
+        "estimatedAmount": 210.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D301-022000000-0001",
+        "name": "쌀밥",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_covered_bowl_contents",
+        "reason": "덮인 별도 밥그릇은 있지만 내용은 보이지 않는다. 비빔밥 구성 밥을 중복 계상했다고도, 실제 흰밥이라고도 확정하지 않는다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 3,
+      "original_item": {
+        "originalFoodName": "콩나물국",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D105-253000000-0001",
+        "name": "콩나물국",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 4,
+      "original_item": {
+        "originalFoodName": "잡채",
+        "estimatedAmount": 80.0,
+        "unit": "g",
+        "confidence": 0.93,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D110-492000000-0001",
+        "name": "잡채",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 5,
+      "original_item": {
+        "originalFoodName": "양념게장",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.8,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P114-400020100-0086",
+        "name": "양념게장",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_unlabelled_red_side_dish",
+        "reason": "붉은 별도 반찬의 정확한 메뉴는 확정되지 않았다. 양념게장/더덕무침의 변동은 양쪽 프롬프트에서 나타나며 확실한 추가 음식 오류로 세지 않는다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 6,
+      "original_item": {
+        "originalFoodName": "양념두부",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D510-524000000-0001",
+        "name": "양념두부",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "preparation_underspecified_unresolved",
+        "reason": "두부 항목은 있으나 사용자 확인 두부부침의 부침 조리법을 명시하지 않았다. 양념두부 DB와 두부부침 DB는 동일 항목으로 취급하지 않는다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 7,
+      "original_item": {
+        "originalFoodName": "브로콜리두부무침",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-688000000-0001",
+        "name": "브로콜리 두부무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_vegetable_subtype_unconfirmed",
+        "reason": "사용자가 두부나물무침을 확인했고 사진에 브로콜리 모양의 초록 반찬이 있다. 정확한 채소를 포함한 레시피까지 사용자 확인이 된 것은 아니므로 기존 보류 라벨을 유지한다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 8,
+      "original_item": {
+        "originalFoodName": "배추김치",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D315-670000000-0001",
+        "name": "배추김치",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 9,
+      "original_item": {
+        "originalFoodName": "양배추샐러드",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.87,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-701000000-0001",
+        "name": "양배추 샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 10,
+      "original_item": {
+        "originalFoodName": "미역초무침",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.82,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D114-632000000-0001",
+        "name": "미역초무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_unconfirmed_seasoning",
+        "reason": "미역나물은 사용자 확인됐지만 초무침의 식초 양념은 확인되지 않았다. 미역 반찬 누락은 아니며 세부 조리 표현이 미확정이다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "item_index": 11,
+      "original_item": {
+        "originalFoodName": "무피클",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P114-202020100-0069",
+        "name": "무피클",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_pickled_side_dish_subtype",
+        "reason": "분홍 절임 반찬은 보이나 무라는 재료와 레시피는 이번 사용자 확인 라벨에 포함되지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 400.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "related_name_requires_recipe_review",
+        "reason": "비빔밥은 인식했으나 사용자 확인 소고기를 명시하지 않고 불고기 조리법을 썼다. 소고기비빔밥 허용 ID 목록 밖 불고기비빔밥에 연결된다. 음식 누락이나 명백한 오답으로 단정할 수 없다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 2,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 400.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "related_name_requires_recipe_review",
+        "reason": "비빔밥은 인식했으나 사용자 확인 소고기를 명시하지 않고 불고기 조리법을 썼다. 소고기비빔밥 허용 ID 목록 밖 불고기비빔밥에 연결된다. 음식 누락이나 명백한 오답으로 단정할 수 없다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 3,
+      "original_item": {
+        "originalFoodName": "콩나물국",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D105-253000000-0001",
+        "name": "콩나물국",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 4,
+      "original_item": {
+        "originalFoodName": "콩나물국",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D105-253000000-0001",
+        "name": "콩나물국",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 5,
+      "original_item": {
+        "originalFoodName": "콩나물국",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D105-253000000-0001",
+        "name": "콩나물국",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 6,
+      "original_item": {
+        "originalFoodName": "쌀밥",
+        "estimatedAmount": 210.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D301-022000000-0001",
+        "name": "쌀밥",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_covered_bowl_contents",
+        "reason": "덮인 별도 밥그릇은 있지만 내용은 보이지 않는다. 비빔밥 구성 밥을 중복 계상했다고도, 실제 흰밥이라고도 확정하지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 7,
+      "original_item": {
+        "originalFoodName": "잡채",
+        "estimatedAmount": 80.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D110-492000000-0001",
+        "name": "잡채",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 8,
+      "original_item": {
+        "originalFoodName": "브로콜리두부무침",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-688000000-0001",
+        "name": "브로콜리 두부무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_vegetable_subtype_unconfirmed",
+        "reason": "사용자가 두부나물무침을 확인했고 사진에 브로콜리 모양의 초록 반찬이 있다. 정확한 채소를 포함한 레시피까지 사용자 확인이 된 것은 아니므로 기존 보류 라벨을 유지한다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 9,
+      "original_item": {
+        "originalFoodName": "배추김치",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.93,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D315-670000000-0001",
+        "name": "배추김치",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 10,
+      "original_item": {
+        "originalFoodName": "양배추샐러드",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-701000000-0001",
+        "name": "양배추 샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 11,
+      "original_item": {
+        "originalFoodName": "미역초무침",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D114-632000000-0001",
+        "name": "미역초무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_unconfirmed_seasoning",
+        "reason": "미역나물은 사용자 확인됐지만 초무침의 식초 양념은 확인되지 않았다. 미역 반찬 누락은 아니며 세부 조리 표현이 미확정이다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 12,
+      "original_item": {
+        "originalFoodName": "무피클",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P114-202020100-0069",
+        "name": "무피클",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_pickled_side_dish_subtype",
+        "reason": "분홍 절임 반찬은 보이나 무라는 재료와 레시피는 이번 사용자 확인 라벨에 포함되지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 13,
+      "original_item": {
+        "originalFoodName": "양념두부",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D510-524000000-0001",
+        "name": "양념두부",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "preparation_underspecified_unresolved",
+        "reason": "두부 항목은 있으나 사용자 확인 두부부침의 부침 조리법을 명시하지 않았다. 양념두부 DB와 두부부침 DB는 동일 항목으로 취급하지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "item_index": 14,
+      "original_item": {
+        "originalFoodName": "더덕무침",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.7,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D314-618000000-0001",
+        "name": "더덕무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_unlabelled_red_side_dish",
+        "reason": "붉은 별도 반찬의 정확한 메뉴는 확정되지 않았다. 양념게장/더덕무침의 변동은 양쪽 프롬프트에서 나타나며 확실한 추가 음식 오류로 세지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 400.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "related_name_requires_recipe_review",
+        "reason": "비빔밥은 인식했으나 사용자 확인 소고기를 명시하지 않고 불고기 조리법을 썼다. 소고기비빔밥 허용 ID 목록 밖 불고기비빔밥에 연결된다. 음식 누락이나 명백한 오답으로 단정할 수 없다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 2,
+      "original_item": {
+        "originalFoodName": "공깃밥",
+        "estimatedAmount": 210.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-0002",
+        "name": "0.7공깃밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_covered_bowl_contents",
+        "reason": "덮인 별도 밥그릇은 있지만 내용은 보이지 않는다. 비빔밥 구성 밥을 중복 계상했다고도, 실제 흰밥이라고도 확정하지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 3,
+      "original_item": {
+        "originalFoodName": "콩나물국",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D105-253000000-0001",
+        "name": "콩나물국",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 4,
+      "original_item": {
+        "originalFoodName": "잡채",
+        "estimatedAmount": 80.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D110-492000000-0001",
+        "name": "잡채",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 5,
+      "original_item": {
+        "originalFoodName": "브로콜리두부무침",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-688000000-0001",
+        "name": "브로콜리 두부무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_vegetable_subtype_unconfirmed",
+        "reason": "사용자가 두부나물무침을 확인했고 사진에 브로콜리 모양의 초록 반찬이 있다. 정확한 채소를 포함한 레시피까지 사용자 확인이 된 것은 아니므로 기존 보류 라벨을 유지한다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 6,
+      "original_item": {
+        "originalFoodName": "배추김치",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D315-670000000-0001",
+        "name": "배추김치",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 7,
+      "original_item": {
+        "originalFoodName": "양배추샐러드",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-701000000-0001",
+        "name": "양배추 샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 8,
+      "original_item": {
+        "originalFoodName": "양념두부",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D510-524000000-0001",
+        "name": "양념두부",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "preparation_underspecified_unresolved",
+        "reason": "두부 항목은 있으나 사용자 확인 두부부침의 부침 조리법을 명시하지 않았다. 양념두부 DB와 두부부침 DB는 동일 항목으로 취급하지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 9,
+      "original_item": {
+        "originalFoodName": "양념게장",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.75,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P114-400020100-0086",
+        "name": "양념게장",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_unlabelled_red_side_dish",
+        "reason": "붉은 별도 반찬의 정확한 메뉴는 확정되지 않았다. 양념게장/더덕무침의 변동은 양쪽 프롬프트에서 나타나며 확실한 추가 음식 오류로 세지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 10,
+      "original_item": {
+        "originalFoodName": "미역초무침",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.82,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D114-632000000-0001",
+        "name": "미역초무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_unconfirmed_seasoning",
+        "reason": "미역나물은 사용자 확인됐지만 초무침의 식초 양념은 확인되지 않았다. 미역 반찬 누락은 아니며 세부 조리 표현이 미확정이다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "item_index": 11,
+      "original_item": {
+        "originalFoodName": "무피클",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P114-202020100-0069",
+        "name": "무피클",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_pickled_side_dish_subtype",
+        "reason": "분홍 절임 반찬은 보이나 무라는 재료와 레시피는 이번 사용자 확인 라벨에 포함되지 않는다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 450.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "related_name_requires_recipe_review",
+        "reason": "비빔밥은 인식했으나 사용자 확인 소고기를 명시하지 않고 불고기 조리법을 썼다. 소고기비빔밥 허용 ID 목록 밖 불고기비빔밥에 연결된다. 음식 누락이나 명백한 오답으로 단정할 수 없다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 2,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 450.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "related_name_requires_recipe_review",
+        "reason": "비빔밥은 인식했으나 사용자 확인 소고기를 명시하지 않고 불고기 조리법을 썼다. 소고기비빔밥 허용 ID 목록 밖 불고기비빔밥에 연결된다. 음식 누락이나 명백한 오답으로 단정할 수 없다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 3,
+      "original_item": {
+        "originalFoodName": "공깃밥",
+        "estimatedAmount": 210.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-0002",
+        "name": "0.7공깃밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_covered_bowl_contents",
+        "reason": "덮인 별도 밥그릇은 있지만 내용은 보이지 않는다. 비빔밥 구성 밥을 중복 계상했다고도, 실제 흰밥이라고도 확정하지 않는다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 4,
+      "original_item": {
+        "originalFoodName": "공깃밥",
+        "estimatedAmount": 210.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-0002",
+        "name": "0.7공깃밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_covered_bowl_contents",
+        "reason": "덮인 별도 밥그릇은 있지만 내용은 보이지 않는다. 비빔밥 구성 밥을 중복 계상했다고도, 실제 흰밥이라고도 확정하지 않는다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 5,
+      "original_item": {
+        "originalFoodName": "콩나물국",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D105-253000000-0001",
+        "name": "콩나물국",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 6,
+      "original_item": {
+        "originalFoodName": "잡채",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D110-492000000-0001",
+        "name": "잡채",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 7,
+      "original_item": {
+        "originalFoodName": "브로콜리두부무침",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-688000000-0001",
+        "name": "브로콜리 두부무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_vegetable_subtype_unconfirmed",
+        "reason": "사용자가 두부나물무침을 확인했고 사진에 브로콜리 모양의 초록 반찬이 있다. 정확한 채소를 포함한 레시피까지 사용자 확인이 된 것은 아니므로 기존 보류 라벨을 유지한다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 8,
+      "original_item": {
+        "originalFoodName": "배추김치",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D315-670000000-0001",
+        "name": "배추김치",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 9,
+      "original_item": {
+        "originalFoodName": "샐러드",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-724000000-0001",
+        "name": "햄샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "underspecified_confirmed_food",
+        "reason": "확인된 양배추샐러드의 주재료가 생략됐다. BE는 햄샐러드에 연결한다. 햄 부재 자체를 사진만으로 확정하지는 않는다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 10,
+      "original_item": {
+        "originalFoodName": "더덕무침",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.75,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D314-618000000-0001",
+        "name": "더덕무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_unlabelled_red_side_dish",
+        "reason": "붉은 별도 반찬의 정확한 메뉴는 확정되지 않았다. 양념게장/더덕무침의 변동은 양쪽 프롬프트에서 나타나며 확실한 추가 음식 오류로 세지 않는다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 11,
+      "original_item": {
+        "originalFoodName": "연두부",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D407-371000000-0001",
+        "name": "연두부찜",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "tofu_subtype_and_preparation_unresolved",
+        "reason": "사용자 확인 두부부침과 다른 두부 종류를 지목하고 BE는 연두부찜에 연결한다. 원재료 두부 종류와 조리법은 사진만으로 독립 확정하기 어려워 별도 확인이 필요하다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 12,
+      "original_item": {
+        "originalFoodName": "미역초무침",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D114-632000000-0001",
+        "name": "미역초무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_unconfirmed_seasoning",
+        "reason": "미역나물은 사용자 확인됐지만 초무침의 식초 양념은 확인되지 않았다. 미역 반찬 누락은 아니며 세부 조리 표현이 미확정이다."
+      }
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "item_index": 13,
+      "original_item": {
+        "originalFoodName": "무피클",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P114-202020100-0069",
+        "name": "무피클",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_pickled_side_dish_subtype",
+        "reason": "분홍 절임 반찬은 보이나 무라는 재료와 레시피는 이번 사용자 확인 라벨에 포함되지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 400.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "related_name_requires_recipe_review",
+        "reason": "비빔밥은 인식했으나 사용자 확인 소고기를 명시하지 않고 불고기 조리법을 썼다. 소고기비빔밥 허용 ID 목록 밖 불고기비빔밥에 연결된다. 음식 누락이나 명백한 오답으로 단정할 수 없다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 2,
+      "original_item": {
+        "originalFoodName": "공깃밥",
+        "estimatedAmount": 210.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P123-201020300-0002",
+        "name": "0.7공깃밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_covered_bowl_contents",
+        "reason": "덮인 별도 밥그릇은 있지만 내용은 보이지 않는다. 비빔밥 구성 밥을 중복 계상했다고도, 실제 흰밥이라고도 확정하지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 3,
+      "original_item": {
+        "originalFoodName": "콩나물국",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.93,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D105-253000000-0001",
+        "name": "콩나물국",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 4,
+      "original_item": {
+        "originalFoodName": "잡채",
+        "estimatedAmount": 80.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D110-492000000-0001",
+        "name": "잡채",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 5,
+      "original_item": {
+        "originalFoodName": "브로콜리두부무침",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-688000000-0001",
+        "name": "브로콜리 두부무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_vegetable_subtype_unconfirmed",
+        "reason": "사용자가 두부나물무침을 확인했고 사진에 브로콜리 모양의 초록 반찬이 있다. 정확한 채소를 포함한 레시피까지 사용자 확인이 된 것은 아니므로 기존 보류 라벨을 유지한다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 6,
+      "original_item": {
+        "originalFoodName": "배추김치",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D315-670000000-0001",
+        "name": "배추김치",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 7,
+      "original_item": {
+        "originalFoodName": "양념두부",
+        "estimatedAmount": 80.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D510-524000000-0001",
+        "name": "양념두부",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "preparation_underspecified_unresolved",
+        "reason": "두부 항목은 있으나 사용자 확인 두부부침의 부침 조리법을 명시하지 않았다. 양념두부 DB와 두부부침 DB는 동일 항목으로 취급하지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 8,
+      "original_item": {
+        "originalFoodName": "양념게장",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.75,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P114-400020100-0086",
+        "name": "양념게장",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_unlabelled_red_side_dish",
+        "reason": "붉은 별도 반찬의 정확한 메뉴는 확정되지 않았다. 양념게장/더덕무침의 변동은 양쪽 프롬프트에서 나타나며 확실한 추가 음식 오류로 세지 않는다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 9,
+      "original_item": {
+        "originalFoodName": "양배추샐러드",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D414-701000000-0001",
+        "name": "양배추 샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "supported_confirmed_food",
+        "reason": "사용자 확인 음식과 이름의 핵심 정체가 일치한다. 실제 영양성분·섭취량까지 검증한 것은 아니다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 10,
+      "original_item": {
+        "originalFoodName": "미역초무침",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "D114-632000000-0001",
+        "name": "미역초무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "partly_supported_unconfirmed_seasoning",
+        "reason": "미역나물은 사용자 확인됐지만 초무침의 식초 양념은 확인되지 않았다. 미역 반찬 누락은 아니며 세부 조리 표현이 미확정이다."
+      }
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "item_index": 11,
+      "original_item": {
+        "originalFoodName": "무피클",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "selected": {
+        "food_ref_id": "P114-202020100-0069",
+        "name": "무피클",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "semantic_review": {
+        "status": "uncertain_pickled_side_dish_subtype",
+        "reason": "분홍 절임 반찬은 보이나 무라는 재료와 레시피는 이번 사용자 확인 라벨에 포함되지 않는다."
+      }
+    }
+  ],
+  "adoption_limit": "Development evidence supports a small salad-specific signal, not broad food-name accuracy improvement; holdout/regression and unresolved semantic issues must be considered separately."
+}
