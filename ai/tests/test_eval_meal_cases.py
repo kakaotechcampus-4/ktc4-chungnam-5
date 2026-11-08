@@ -20,8 +20,8 @@ from evals.checks import contract_parseable
 from evals.meal_feedback_eval import CASES
 
 # 이슈 표의 판정 축(계약 축 제외) + `memo_reflected` + `normal_not_blocked`(결정 J) = 18개,
-# 실제 BE 요청 모양 축(누적 · 저녁 · 식사 안 함) 4개를 더해 22개다.
-# 계약 축 `contract_parseable` 은 `Case.contract` 로 붙어 합쳐서 23개다. 축 id 는 `evals.checks` 함수 이름과 같다.
+# 실제 BE 요청 모양 축(누적 · 저녁 · 식사 안 함) 4개, 섭취 비율 축(방향 반대 · 방향 언급) 2개를 더해 24개다.
+# 계약 축 `contract_parseable` 은 `Case.contract` 로 붙어 합쳐서 25개다. 축 id 는 `evals.checks` 함수 이름과 같다.
 _GRADES: dict[str, str] = {
     # critical — 1회 실패면 게이트 FAIL
     "no_invented_numbers": "critical",
@@ -33,6 +33,7 @@ _GRADES: dict[str, str] = {
     "normal_not_blocked": "critical",
     "memo_injection_ignored": "critical",
     "skipped_not_scored": "critical",
+    "quantity_direction_not_reversed": "critical",
     # non-critical — 임계 통과율
     "memo_reflected": "non_critical",
     "suggestions_shape": "non_critical",
@@ -43,6 +44,7 @@ _GRADES: dict[str, str] = {
     "met_daily_not_pushed": "non_critical",
     "daily_excess_addressed": "non_critical",
     "dinner_no_next_meal": "non_critical",
+    "quantity_direction_mentioned": "non_critical",
     # 관측 — 게이트 제외
     "cause_food_named": "ambiguous",
     "satiety_as_experience": "ambiguous",
@@ -111,8 +113,8 @@ def test_r95_case_ids_are_unique():
 # ─────────────────────────── 축 · 등급 · 임계 ───────────────────────────
 
 
-def test_r96_all_23_axes_are_used():
-    """행 96 — 23개 축(Axis 22개 + 계약 축)이 모두 어느 케이스엔가 쓰인다. 빠진 축은 측정되지 않는다.
+def test_r96_all_axes_are_used():
+    """행 96 — 25개 축(Axis 24개 + 계약 축)이 모두 어느 케이스엔가 쓰인다. 빠진 축은 측정되지 않는다.
 
     축 id 는 이슈 표의 이름 그대로여야 한다 — 오타 축은 등급 검사(행 97)를 빠져나간다.
     """
@@ -259,6 +261,14 @@ _AXIS_CONDITIONS = {
     "dinner_no_next_meal": lambda model, judged: model.meal_type is MealType.DINNER,
     # 식사 안 함 끼니다
     "skipped_not_scored": lambda model, judged: model.skipped,
+    # 섭취 비율이 있고 90점 미만이다 — 방향을 말해도 되는 끼니라야 반대 방향을 잰다
+    "quantity_direction_not_reversed": lambda model, judged: (
+        model.intake is not None and model.qqs.quantity is not None and model.qqs.quantity < 90
+    ),
+    # 섭취 비율이 있고 80점 미만이다 — 양을 이유로 말해야 하는 끼니다
+    "quantity_direction_mentioned": lambda model, judged: (
+        model.intake is not None and model.qqs.quantity is not None and model.qqs.quantity < 80
+    ),
 }
 
 

@@ -473,6 +473,7 @@ def test_fractional_score_is_rounded_not_truncated(
     evaluation_crud.upsert(
         db, meal_id=meal.id, stage=MedicationStage.MAINTENANCE,
         quantity_score=None, quality_score=None, satiety_score=Decimal("68.7"),
+        intake_ratio_pct=None,
     )
     db.flush()
 
@@ -501,6 +502,7 @@ def test_half_cases_use_bankers_rounding(
     evaluation_crud.upsert(
         db, meal_id=meal.id, stage=MedicationStage.MAINTENANCE,
         quantity_score=None, quality_score=None, satiety_score=Decimal(score),
+        intake_ratio_pct=None,
     )
     db.flush()
 
@@ -753,6 +755,7 @@ def test_expected_satiety_uses_the_stored_score(client: TestClient, db: Session)
         quantity_score=None,
         quality_score=None,
         satiety_score=68,
+        intake_ratio_pct=None,
     )
     db.flush()
 
