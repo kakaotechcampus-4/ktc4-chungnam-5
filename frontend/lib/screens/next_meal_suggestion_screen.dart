@@ -9,6 +9,7 @@ import '../api/meal_api.dart';
 import '../common/api_format.dart';
 import '../common/polling.dart';
 import '../navigation/nav_icons.dart';
+import '../popups/popup_gate.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -83,6 +84,12 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
 
   bool get _isDinner => mealType == 'DINNER';
 
+  /// 삭제 확인에 보여 줄 음식 이름(`비빔냉면, 편육`). 끼니를 불러오기 전에는 비어 있다.
+  String _foodNames = '';
+
+  /// 끼니를 지우는 중. 휴지통을 연달아 눌러도 한 번만 지운다.
+  bool _deleting = false;
+
   /// 이 화면 전체를 그림으로 찍을 때 쓴다(챗봇 버튼의 밀려 나가는 효과).
   final GlobalKey _screenKey = GlobalKey();
 
@@ -129,6 +136,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
       setState(() {
         mealType = meal.mealType;
         satietyAfterPct = meal.satietyAfterPct;
+        _foodNames = meal.items.map((i) => i.displayName).join(', ');
       });
     } catch (_) {
       if (!mounted) return;
@@ -251,6 +259,38 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  /// 확인 팝업에 한 줄로 보여 줄 끼니(`점심 · 비빔냉면`). 기록 탭 스와이프 삭제와 같은 모양이다.
+  String get _deleteDescription {
+    final type = mealType;
+    final label = type == null || type == 'UNKNOWN' ? '이 끼니' : mealTypeLabel(type);
+    final what = widget.skipped ? '식사 안 함' : _foodNames;
+    return what.isEmpty ? label : '$label · $what';
+  }
+
+  /// 휴지통 — 삭제 확인을 거쳐 이 끼니를 지우고 화면을 닫는다. 기록 탭의 스와이프 삭제와 같은
+  /// 확인 팝업을 쓴다. 홈·기록은 돌아오면 다시 불러오므로 따로 알리지 않는다.
+  Future<void> _deleteMeal() async {
+    if (_deleting) return;
+    final confirmed = await context.read<PopupGate>().confirmMealDelete(
+      context,
+      mealId: widget.mealId,
+      description: _deleteDescription,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await _api.deleteMeal(widget.mealId);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('삭제하지 못했어요: $e')));
+      return;
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
@@ -266,6 +306,14 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
           ),
           title: const Text('끼니 피드백'),
           titleTextStyle: AppTypography.sectionHead.copyWith(fontSize: 14),
+          actions: [
+            // 기록 탭에서 밀어서만 지울 수 있어 모르는 사용자가 많았다 — 이 화면에서도 지운다.
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: '끼니 삭제',
+              onPressed: _deleting ? null : _deleteMeal,
+            ),
+          ],
         ),
         body: SafeArea(
           child: isLoading
