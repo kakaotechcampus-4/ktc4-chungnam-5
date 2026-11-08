@@ -911,6 +911,7 @@ def set_item_nutrition(
     *,
     target: NutritionTarget,
     food_ref_id: str | None,
+    food_name: str | None,
     manual: ManualNutrition | None,
     public_db_nutrition: NutritionInfo | None,
 ) -> NutritionUpdateResponse:
@@ -928,6 +929,14 @@ def set_item_nutrition(
     자리이기도 하다(`test_changing_the_amount_falls_back_to_the_linked_public_db_values`).
     반대로 후보를 고르면 링크가 그 후보로 **바뀐다.**
 
+    ## 후보를 고르면 이름도 그 음식이 된다
+
+    화면 이름은 영양정보를 가져온 공공 DB 음식명이다(`analyze_meal` 과 같은 규칙).
+    `food_name` 은 고른 후보의 DB 이름으로, 후보를 고른 요청에만 온다. 환산을 못 한
+    경우("계란 2개")에도 바꾼다 — 사용자가 고른 음식은 그것이고 링크도 그쪽으로 간다.
+    직접 입력은 DB 음식을 고른 게 아니므로 이름을 건드리지 않는다.
+    AI 가 말한 이름(`original_food_name`)은 어느 쪽이든 그대로다.
+
     ## 이전 직접 입력은 새 값이 그 자리를 채울 때만 지운다
 
     후보를 골랐고 환산까지 됐으면 그 값이 유효한 최신 선택이므로 이전 직접 입력을
@@ -941,6 +950,8 @@ def set_item_nutrition(
     # 후보를 고른 요청은 링크를 바꾸고, 직접 입력(`food_ref_id` 없음)은 지킨다.
     link = food_ref_id if food_ref_id is not None else target.item.food_ref_id
     meal_crud.set_item_food_ref(db, item=target.item, food_ref_id=link)
+    if food_ref_id is not None and food_name is not None:
+        meal_crud.set_item_display_name(db, item=target.item, display_name=food_name)
 
     if manual is not None:
         meal_crud.set_item_manual_nutrition(
