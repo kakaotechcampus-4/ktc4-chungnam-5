@@ -612,6 +612,9 @@ void main() {
     await tester.tap(find.text('나중에')); // 컨디션 팝업
     await tester.pumpAndSettle();
 
+    // 위를 누르면 포만감을 고칠 수 있다는 말풍선이 위 옆에 보인다.
+    expect(find.text('위를 눌러서\n포만감을 설정해 보세요!'), findsOneWidget);
+
     await tester.tap(find.byType(StomachGauge));
     await tester.pumpAndSettle();
     expect(find.text('지금 얼마나 부르세요?'), findsOneWidget);
