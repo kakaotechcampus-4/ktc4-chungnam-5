@@ -114,6 +114,7 @@ def _request(
     skipped: bool = False,
     previous_meals: list[dict] | None = None,
     daily_totals: dict | None = None,
+    intake: tuple[float, float, float] | None = None,
 ) -> dict:
     """MEAL 요청 JSON. `mealId` 는 `_case` 가 케이스 id 로 채운다.
 
@@ -139,6 +140,9 @@ def _request(
         request["previousMeals"] = previous_meals
     if daily_totals is not None:
         request["dailyNutritionTotals"] = daily_totals
+    if intake is not None:
+        ratio, lo, hi = intake
+        request["intake"] = {"ratioPct": ratio, "rangePct": [lo, hi]}
     return request
 
 
@@ -177,6 +181,8 @@ _CONTRADICT = _axis(checks.no_contradict_rule, "critical")
 _UNJUDGED = _axis(checks.unjudged_nutrient_silent, "critical")
 _UNSCORED = _axis(checks.unscored_axis_silent, "critical")
 _QUANTITY = _axis(checks.quantity_no_direction, "critical")
+_QUANTITY_REVERSED = _axis(checks.quantity_direction_not_reversed, "critical")
+_QUANTITY_MENTIONED = _axis(checks.quantity_direction_mentioned, "non_critical")
 _CAUSE = _axis(checks.cause_food_named, "ambiguous")
 _SATIETY = _axis(checks.satiety_as_experience, "ambiguous")
 _STAGE = _axis(checks.stage_linked_reasoning, "ambiguous")
@@ -533,6 +539,75 @@ CASES: tuple[Case, ...] = (
             previous_meals=[],
         ),
         (_UNJUDGED, _UNSCORED, _CAUSE),
+        n=3,
+    ),
+    # ── 섭취 비율(intake) — BE 가 평소 대비 비율과 채점 단계의 권장 구간을 보낸다 ──
+    # 정도는 점수(90 이상 적정 · 80–89 약간 · 80 미만 많음/적음), 방향은 비율이 정한다. 넷 다 조정기(60–90%)다.
+    #
+    # 평소의 120% — 56점, 많음. 양이 점수를 낮춘 이유로 "많이" 쪽을 말해야 하고 "적게" 는 반대다
+    _case(
+        "intake_over_titration",
+        _request(
+            "TITRATION",
+            (56, 70, 85),
+            [
+                _item("양념갈비", 300, "g", _n(780, 48, 1.5, 1350)),
+                _item("공기밥", 1, "공기", _n(300, 5.5, 0.6, 5)),
+            ],
+            {"afterPct": 85},
+            meal_type="LUNCH",
+            weight_kg=66,
+            intake=(120, 60, 90),
+        ),
+        (_QUANTITY_REVERSED, _QUANTITY_MENTIONED, _QUANTITY, _STAGE),
+        n=3,
+    ),
+    # 평소의 45% — 32점, 적음. 조정기에 가장 조심할 방향이다. "많이" 쪽으로 말하면 반대다
+    _case(
+        "intake_under_titration",
+        _request(
+            "TITRATION",
+            (32, 40, 35),
+            [
+                _item("흰죽", 0.5, "그릇", _n(140, 2.5, 0.3, 180)),
+                _item("동치미", 1, "그릇", _n(25, 0.8, 1.0, 610)),
+            ],
+            {"afterPct": 35, "hungerReturnMinutes": 90},
+            meal_type="LUNCH",
+            weight_kg=66,
+            intake=(45, 60, 90),
+        ),
+        (_QUANTITY_REVERSED, _QUANTITY_MENTIONED, _QUANTITY, _STAGE),
+        n=3,
+    ),
+    # 평소만큼(100%) — 81점, 약간 많음. 가볍게 한마디는 해도 되지만 "적게" 쪽은 반대다. 말하지 않아도 된다
+    _case(
+        "intake_mild_over_titration",
+        _request(
+            "TITRATION",
+            (81, 75, 70),
+            [_item("제육덮밥", 1, "그릇", _n(690, 28, 3.5, 1150))],
+            {"afterPct": 70},
+            meal_type="LUNCH",
+            weight_kg=66,
+            intake=(100, 60, 90),
+        ),
+        (_QUANTITY_REVERSED, _QUANTITY_MENTIONED, _QUANTITY),
+        n=3,
+    ),
+    # 평소의 92.3% — 상한 90% 를 조금 넘었지만 95점, 적정. 양을 언급하지 않는다. "많이 드셨어요" 는 점수와 어긋난다
+    _case(
+        "intake_near_band_titration",
+        _request(
+            "TITRATION",
+            (95, 80, 65),
+            [_item("소고기 비빔밥", 1, "그릇", _n(640, 26, 5.0, 900))],
+            {"afterPct": 65},
+            meal_type="LUNCH",
+            weight_kg=66,
+            intake=(92.3, 60, 90),
+        ),
+        (_QUANTITY, _QUANTITY_REVERSED, _QUANTITY_MENTIONED),
         n=3,
     ),
 )

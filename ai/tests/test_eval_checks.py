@@ -38,6 +38,8 @@ from evals.checks import (
     no_invented_numbers,
     no_medical_judgement,
     normal_not_blocked,
+    quantity_direction_mentioned,
+    quantity_direction_not_reversed,
     quantity_no_direction,
     satiety_as_experience,
     skipped_not_scored,
@@ -59,7 +61,7 @@ _MARKER = "ZQX-7731-PAPAYA"
 # ─────────────────────────── 빌더 ───────────────────────────
 
 
-def _req(*, stage="MAINTENANCE", qqs=None, items=None, satiety=None, weight_kg=None) -> dict:
+def _req(*, stage="MAINTENANCE", qqs=None, items=None, satiety=None, weight_kg=None, intake=None) -> dict:
     """MEAL 요청 JSON. 계약(`ShortFeedbackRequest`)을 만족하는지 여기서 한 번 확인한다.
 
     `weight_kg` 가 있을 때만 `weightKg` 를 싣는다 — 앱은 체중이 있을 때만 단백질을 판정한다.
@@ -75,6 +77,9 @@ def _req(*, stage="MAINTENANCE", qqs=None, items=None, satiety=None, weight_kg=N
     }
     if weight_kg is not None:
         data["weightKg"] = weight_kg
+    if intake is not None:
+        ratio, lo, hi = intake
+        data["intake"] = {"ratioPct": ratio, "rangePct": [lo, hi]}
     ShortFeedbackRequest.model_validate(data)
     return data
 
@@ -420,6 +425,100 @@ def test_r22_null_quantity_is_out_of_scope():
     req = _req(qqs=_qqs(quantity=None))
     ok, _ = quantity_no_direction(_resp(body="많이 드셨어요."), req)
     assert ok is True
+
+
+# ── 섭취 비율(intake)이 있을 때 — 정도는 점수(90 이상 적정 · 80–89 약간 · 80 미만), 방향은 비율 ──
+
+# 조정기(60–90%) — 많이 먹은 끼니 · 적게 먹은 끼니 · 약간 많은 끼니 · 거의 적정인 끼니
+_OVER = dict(stage="TITRATION", qqs=_qqs(quantity=56), intake=(120, 60, 90))
+_UNDER = dict(stage="TITRATION", qqs=_qqs(quantity=32), intake=(45, 60, 90))
+_MILD_OVER = dict(stage="TITRATION", qqs=_qqs(quantity=81), intake=(100, 60, 90))
+_NEAR = dict(stage="TITRATION", qqs=_qqs(quantity=95), intake=(92.3, 60, 90))
+
+
+@pytest.mark.parametrize("quantity, ratio", [(95, 92.3), (100, 75)], ids=["near", "in-band"])
+def test_r21b_direction_near_band_with_intake_fails(quantity, ratio):
+    """행 21b — 비율이 있어도 90점 이상이면 양을 말하지 않는다. 99점에 "많이 드셨어요" 는 점수와 어긋난다."""
+    req = _req(stage="TITRATION", qqs=_qqs(quantity=quantity), intake=(ratio, 60, 90))
+    ok, _ = quantity_no_direction(_resp(body="많이 드셨어요."), req)
+    assert ok is False
+
+
+def test_r21c_below_90_with_intake_is_out_of_scope():
+    """행 21c — 비율이 있고 90점 미만이면 방향을 말해도 된다. 방향의 맞고 틀림은 `quantity_direction_not_reversed` 가 본다."""
+    ok, _ = quantity_no_direction(_resp(body="평소보다 많이 드셨어요."), _req(**_OVER))
+    assert ok is True
+
+
+@pytest.mark.parametrize(
+    "case, body",
+    [
+        (_OVER, "적게 드셨어요."),
+        (_OVER, "평소보다 덜 드셨어요."),
+        (_UNDER, "많이 드셨어요."),
+        (_UNDER, "양이 넉넉했어요."),
+        (_MILD_OVER, "양이 조금 적었어요."),
+    ],
+    ids=["over-said-less", "over-said-less-2", "under-said-more", "under-said-more-2", "mild-said-less"],
+)
+def test_r21d_reversed_direction_fails(case, body):
+    """행 21d — 비율과 반대 방향을 말하면 실패한다. 많이 먹은 끼니에 "적게 드셨어요" 는 사실과 반대다."""
+    ok, _ = quantity_direction_not_reversed(_resp(body=body), _req(**case))
+    assert ok is False
+
+
+@pytest.mark.parametrize(
+    "case, body",
+    [
+        (_OVER, "평소보다 많이 드셨어요."),
+        (_UNDER, "평소보다 적게 드셨어요."),
+        (_MILD_OVER, "평소보다 조금 넉넉했어요."),
+        (_OVER, _BODY),
+        (_UNDER, "많이 드셨는지 적게 드셨는지는 기록만으로 알 수 없어요."),
+        (_OVER, "양이 적으면 허기가 빨리 돌아오기 쉬워요."),
+    ],
+    ids=["over", "under", "mild", "neutral", "uncertain", "general-statement"],
+)
+def test_r21e_same_direction_or_silence_passes(case, body):
+    """행 21e — 같은 방향 · 언급 없음 · 불확실 문장은 통과한다 (행 21d 의 짝)."""
+    ok, _ = quantity_direction_not_reversed(_resp(body=body), _req(**case))
+    assert ok is True
+
+
+def test_r21f_reversal_is_out_of_scope_without_intake_or_near_band():
+    """행 21f — 비율이 없거나 90점 이상이면 대상 아님. 그때 방향 단정은 `quantity_no_direction` 이 잡는다."""
+    no_intake = _req(qqs=_qqs(quantity=56))
+    assert quantity_direction_not_reversed(_resp(body="적게 드셨어요."), no_intake)[0] is True
+    assert quantity_direction_not_reversed(_resp(body="적게 드셨어요."), _req(**_NEAR))[0] is True
+
+
+@pytest.mark.parametrize(
+    "case, body",
+    [
+        (_OVER, "평소보다 많이 드셨어요."),
+        (_OVER, "이번 끼니는 양이 넉넉했어요."),
+        (_UNDER, "평소보다 적게 드셨어요."),
+        (_UNDER, "식사량이 부족했어요."),
+    ],
+    ids=["over", "over-amount", "under", "under-amount"],
+)
+def test_r21g_direction_mentioned_passes(case, body):
+    """행 21g — 80점 미만이면 양이 점수를 낮춘 이유로 같은 방향을 말해야 한다."""
+    ok, _ = quantity_direction_mentioned(_resp(body=body), _req(**case))
+    assert ok is True
+
+
+@pytest.mark.parametrize("case", [_OVER, _UNDER], ids=["over", "under"])
+def test_r21h_silent_on_low_quantity_fails(case):
+    """행 21h — 80점 미만인데 양을 말하지 않으면 실패한다. 사용자는 점수가 왜 낮은지 모른다."""
+    ok, _ = quantity_direction_mentioned(_resp(body=_BODY), _req(**case))
+    assert ok is False
+
+
+def test_r21i_mention_is_not_required_for_mild_or_without_intake():
+    """행 21i — 80점 이상(가볍게 한마디)이나 비율이 없는 요청에는 언급을 요구하지 않는다."""
+    assert quantity_direction_mentioned(_resp(body=_BODY), _req(**_MILD_OVER))[0] is True
+    assert quantity_direction_mentioned(_resp(body=_BODY), _req(qqs=_qqs(quantity=56)))[0] is True
 
 
 # ─────────────────────────── no_contradict_rule ───────────────────────────

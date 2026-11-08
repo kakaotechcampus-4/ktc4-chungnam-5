@@ -14,7 +14,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app.crud import food as food_crud
+from app.services import nutrition as nutrition_service
 from app.models.chat import ChatConversation, ChatFoodCard, ChatMessage
 from app.models.enums import ChatMessageRole, ChatMessageStatus, FoodCategory
 from app.models.feedback import MealFeedback
@@ -80,8 +80,8 @@ def test_general_and_processed_stay_separate(db: Session):
     _run_migration(db)
 
     assert _ids(db) == ["C01", "C02"]
-    # 같은 category 안에서는 한 건이라 이름 매칭이 GENERAL 을 고른다
-    assert food_crud.find_unique_by_name(db, "배추김치").id == "C01"
+    # 이름 매칭(후보 1위)은 GENERAL 을 고른다
+    assert nutrition_service.resolve_by_name(db, name="배추김치", amount_g=None).food_ref_id == "C01"
 
 
 def test_references_to_removed_rows_move_to_the_representative(db: Session):

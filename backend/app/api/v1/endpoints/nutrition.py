@@ -37,6 +37,9 @@ def search_nutrition_candidates(
 ) -> ApiResponse[NutritionCandidatesResponse]:
     """사용자가 고를 공공 DB 후보를 검색한다.
 
+    서버의 이름 자동 매칭(`POST /meals/{mealId}/items` · `PATCH /meals/{mealId}/items` ·
+    AI 분석 워커)도 같은 검색의 **1위 후보**에 건다(`services.nutrition.resolve_by_name`).
+
     `matched: false` 로 나간 음식(`POST /meals/{mealId}/items` 독스트링 참고)에
     영양정보를 붙이는 폴백의 첫 단계다. 사용자가 여기서 고른 `foodRefId` 는
     `PUT /meals/{mealId}/items/{itemId}/nutrition` 으로 간다.
@@ -72,7 +75,7 @@ def search_nutrition_candidates(
     ## 같은 이름은 최대 두 건이다
 
     공공 DB 의 동명 음식은 적재할 때 `(category, 이름)` 마다 평균으로 합쳐 두었다
-    (`crud.food.find_unique_by_name` 참고). 그래도 일반음식과 가공식품에 같은 이름이
+    (`crud.food._candidate_order` 참고). 그래도 일반음식과 가공식품에 같은 이름이
     한 건씩 있으면 두 줄이 나온다 — `nutrition.kcal` 을 함께 보여줘야 고를 수 있다.
     그 값이 `servingSizeG` 기준량이라는 점도 함께 적어야 한다
     (`schemas.nutrition.FoodCandidate`).

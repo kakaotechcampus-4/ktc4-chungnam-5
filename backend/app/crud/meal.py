@@ -353,6 +353,7 @@ def add_model_item(
     *,
     meal_id: uuid.UUID,
     original_food_name: str,
+    display_name: str,
     amount: Decimal,
     unit: str,
     amount_g: Decimal | None,
@@ -363,14 +364,17 @@ def add_model_item(
     """AI 가 인식한 음식 1건을 넣는다. add + flush 까지만 하고 커밋하지 않는다.
 
     `add_item`(사용자 추가)과 반대로 양은 `estimated_*` 로 들어가고 `confirmed_*` 는
-    전부 NULL 이다 — 사용자가 확인하기 전이다. `display_name` 은 사용자가 고치기
-    전까지 AI 가 말한 이름 그대로다.
+    전부 NULL 이다 — 사용자가 확인하기 전이다.
+
+    이름이 둘이다. `original_food_name` 은 AI 가 말한 이름으로, 인식 성능 평가의
+    기준이라 이후로 바뀌지 않는다. `display_name` 은 화면에 보일 이름이라 공공 DB 에
+    걸렸으면 그 음식명, 아니면 AI 이름이다 — 정하는 건 호출부다(`analyze_meal`).
     """
     item = MealItem(
         meal_id=meal_id,
         food_ref_id=food_ref_id,
         original_food_name=original_food_name,
-        display_name=original_food_name,
+        display_name=display_name,
         estimated_amount=amount,
         estimated_unit=unit,
         estimated_amount_g=amount_g,
@@ -561,6 +565,16 @@ def set_item_food_ref(db: Session, *, item: MealItem, food_ref_id: str | None) -
     "얼마나 먹었는가" 가 아니다.
     """
     item.food_ref_id = food_ref_id
+
+
+def set_item_display_name(db: Session, *, item: MealItem, display_name: str) -> None:
+    """화면 이름만 바꾼다. 커밋하지 않는다.
+
+    후보를 고른 경로(`services.meal.set_item_nutrition`)가 쓴다. `original_food_name`
+    · `estimated_*` · `raw_ai_result` 는 건드리지 않는다 — `update_item` 과 같은 이유로
+    AI 최초 추정값 자리다.
+    """
+    item.display_name = display_name
 
 
 def set_item_manual_nutrition(
