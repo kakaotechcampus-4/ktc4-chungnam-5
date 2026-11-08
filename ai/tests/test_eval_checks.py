@@ -1758,3 +1758,63 @@ def test_m9_degree_adverb_manyi_is_not_more():
 def test_m9_pair_more_on_an_under_meal_still_fails():
     """m9 짝 — 적게 먹은 끼니에 "양이 많았어요" 는 여전히 반대 방향이다."""
     assert quantity_direction_not_reversed(_resp(body="양이 많았어요."), _req(**_UNDER))[0] is False
+
+
+# ── 하루 목표를 채운 영양소: 우선하지 않으면서 가볍게 곁들이는 카드 1장은 허용 (2026-11-09 결정) ──
+
+_DEPRIORITIZED = "다음 끼니는 단백질을 더 늘리기보다 식이섬유 흐름을 이어 가고, 가볍게 단백질 반찬을 한 가지 곁들이는 쪽이면 좋아요."
+
+
+def _cards(*advices: str) -> list[dict]:
+    return [{"foodName": f"반찬{i}", "advice": a} for i, a in enumerate(advices)]
+
+
+@pytest.mark.parametrize(
+    "resp",
+    [
+        # 첫 실측 presentation_a2 원문 — 단백질을 우선하지 않고 채소 위주, 가벼운 단백질 카드 1장
+        _resp(
+            body="저녁은 단백질을 더 늘리기보다 지금의 식이섬유 흐름을 유지하면서 가볍게 단백질 반찬을 곁들이는 구성이 좋아요.",
+            suggestions=_cards(
+                "점심에 밥 위주 구성이어서 저녁에는 양념을 적게 한 두부구이로 단백질 반찬을 바꿔 곁들이기 좋아요.",
+                "점심 시금치나물로 이어진 식이섬유 흐름을 저녁에도 짠 소스 없이 이어가기 좋아요.",
+            ),
+        ),
+        _resp(
+            body="저녁은 단백질을 더 끌어올리기보다 아직 덜 쌓인 식이섬유를 채소 반찬으로 이어 가는 구성이 어울려요.",
+            suggestions=_cards("점심 단백질이 끼니 목표보다 적었던 만큼 부담 없이 곁들일 수 있지만, 하루 단백질은 이미 채워진 흐름이라 가볍게 더하는 정도가 좋아요."),
+        ),
+        # 재실측 daily_protein_met_earlier 원문 — 콩을 고른 이유가 식이섬유
+        _resp(
+            body="다음 끼니는 단백질을 더 얹기보다 채소와 통곡물, 콩류로 식이섬유를 채우는 구성이면 좋아요.",
+            suggestions=_cards("단백질은 아침에 이미 충분히 채웠으니, 다음 끼니에는 단백질과 식이섬유를 함께 주는 콩류를 가볍게 곁들여 섬유 위주로 보완하기 좋아요."),
+        ),
+    ],
+    ids=["a2-light-card", "a2-light-advice", "met-earlier-fiber-reason"],
+)
+def test_m10_light_protein_card_after_deprioritizing_passes(resp):
+    """m10 — 단백질을 우선하지 않는다고 밝히고 가볍게 곁들이는 카드 1장은 허용한다."""
+    assert met_daily_not_pushed(resp, _protein_met())[0] is True
+
+
+@pytest.mark.parametrize(
+    "resp",
+    [
+        _resp(  # 우선하지 않는다고 했지만 카드 2장이 단백질을 민다
+            body=_DEPRIORITIZED,
+            suggestions=_cards("두부로 단백질 반찬을 곁들이기 좋아요.", "달걀로 단백질을 보충하기 좋아요."),
+        ),
+        _resp(  # 우선하지 않는다고 했지만 body 가 가볍지 않게 민다
+            body="단백질을 더 늘리기보다 채소를 이어 가요. 다음 끼니에는 단백질 반찬을 보충하세요.",
+            suggestions=[],
+        ),
+        _resp(  # 가벼운 표현이지만 우선하지 않는다는 말이 없다
+            body="다음 끼니에는 가볍게 단백질 반찬을 곁들이면 좋아요.",
+            suggestions=[],
+        ),
+    ],
+    ids=["two-cards", "heavy-body", "no-deprioritizing"],
+)
+def test_m10_pair_protein_push_still_fails(resp):
+    """m10 짝 — 카드 2장 이상, 가볍지 않은 권유, 우선하지 않는다는 말 없는 권유는 여전히 실패한다."""
+    assert met_daily_not_pushed(resp, _protein_met())[0] is False

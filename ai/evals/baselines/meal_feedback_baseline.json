@@ -2770,14 +2770,12 @@
       "samples": []
     },
     "daily_protein_met_earlier/met_daily_not_pushed": {
-      "passed": 2,
+      "passed": 3,
       "n": 3,
       "errors": 0,
       "grade": "non_critical",
       "pass_ratio": null,
-      "notes": [
-        "하루 목표에 도달한 영양소를 더 채우라고 했다: 단백질 '다음 끼니에는 단백질과 식이섬유를 함께 주는 콩류를 가볍게 곁들여 섬유 위주로 보완하기 좋아요'(advice)"
-      ],
+      "notes": [],
       "samples": []
     },
     "daily_protein_met_earlier/no_contradict_rule": {

@@ -1184,8 +1184,10 @@ def met_daily_not_pushed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     ]
     if not met:
         return True, "대상 아님 (하루 목표에 도달한 영양소 없음)"
+    deprioritized = _deprioritized(resp, met)
     found = []
-    for field, text in _texts(resp, ("body", "advice")):
+    pushing_cards: dict[str, set[int]] = {}
+    for index, (field, text) in enumerate(_texts(resp, ("body", "advice"))):
         for clause in _clauses(text):
             for name, _before, after in _nutrient_segments(clause):
                 if name not in met:
@@ -1200,8 +1202,36 @@ def met_daily_not_pushed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
                         exempt.group(0) in {"이미", "충분", "굳이"} and _RECOMMENDATION.search(part)
                     ):
                         continue
+                    # 허용(2026-11-09 결정): body 가 그 영양소를 우선하지 않는다고 밝혔으면, body 의 가벼운
+                    # 곁들임과 그 영양소를 미는 카드 1장은 실패가 아니다. 카드는 아래에서 장 수를 센다.
+                    if name in deprioritized and field == "advice":
+                        pushing_cards.setdefault(name, set()).add(index)
+                        continue
+                    if name in deprioritized and _LIGHT.search(clause):
+                        continue
                     found.append(f"{_LABELS[name]} '{clause}'({field})")
+    for name, cards in pushing_cards.items():
+        if len(cards) > _ALLOWED_CARDS:
+            found.append(f"{_LABELS[name]} 카드 {len(cards)}장이 더 채우라고 했다 (허용 {_ALLOWED_CARDS}장)")
     return _verdict("하루 목표에 도달한 영양소를 더 채우라고 했다", found)
+
+
+# 하루 목표를 채운 영양소를 "우선하지 않는다" 는 body 의 말 — "단백질을 더 늘리기보다", "단백질을 채우는 대신"
+_REDIRECT = re.compile(r"(?:기|는)\s*(?:보다|대신)")
+# 곁들임의 정도를 낮추는 말 — "가볍게 단백질 반찬을", "한 가지 곁들이는 정도"
+_LIGHT = re.compile(r"가볍게|가벼운|부담\s*없이|한\s*가지|정도로?\b|정도(?:가|면|만)")
+_ALLOWED_CARDS = 1
+
+
+def _deprioritized(resp: dict, met: list[str]) -> set[str]:
+    """body 가 우선하지 않는다고 밝힌 영양소 — 그 영양소의 서술 구간에 "-기보다 · -는 대신" 이 있다."""
+    names: set[str] = set()
+    for _field, text in _texts(resp, ("body",)):
+        for clause in _clauses(text):
+            for name, _before, after in _nutrient_segments(clause):
+                if name in met and _REDIRECT.search(after):
+                    names.add(name)
+    return names
 
 
 @_with_request
