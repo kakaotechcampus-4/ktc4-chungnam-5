@@ -1818,3 +1818,53 @@ def test_m10_light_protein_card_after_deprioritizing_passes(resp):
 def test_m10_pair_protein_push_still_fails(resp):
     """m10 짝 — 카드 2장 이상, 가볍지 않은 권유, 우선하지 않는다는 말 없는 권유는 여전히 실패한다."""
     assert met_daily_not_pushed(resp, _protein_met())[0] is False
+
+
+# ─────────────────────────── 단계 연결 프롬프트 실측(2026-11-09, n=3) 오탐 ───────────────────────────
+# 이미 있는 규칙(일반 진술 · 다른 목적어 · "-기보다")을 아직 적용하지 않던 축에 맞춘다. 문장은 실측 응답 원문이다.
+
+
+@pytest.mark.parametrize(
+    "advice",
+    [
+        "포만감이 오래 이어진 편이라 양이 많지 않아도 단백질을 보탤 수 있는 달걀을 다음 끼니에 곁들이기 좋아요.",
+        "다음에는 손쉽게 구할 수 있는 달걀로 단백질 자리를 채우면 양이 적은 날에도 챙기기 좋아요.",
+    ],
+    ids=["negated-concession", "hypothetical-day"],
+)
+def test_m11_general_amount_statement_is_not_a_direction(advice):
+    """m11 — "양이 많지 않아도" · "양이 적은 날에도" 는 일반 진술이다. `unscored_axis_silent` 가 쓰는 일반 진술 규칙을 이 축에도 쓴다."""
+    req = _req(qqs=_qqs(quantity=70))
+    assert quantity_no_direction(_resp(suggestions=_with_advice(advice)), req)[0] is True
+
+
+@pytest.mark.parametrize("body", ["양이 많지 않았어요.", "양이 적은 끼니였어요.", "양이 적은 날이었어요."])
+def test_m11_pair_amount_claim_still_fails(body):
+    """m11 짝 — 이번 끼니 양을 서술하면(부정형 · 관형형 포함) 여전히 방향 단정이다."""
+    assert quantity_no_direction(_resp(body=body), _req(qqs=_qqs(quantity=70)))[0] is False
+
+
+def test_m12_amount_word_on_another_object_is_not_a_nutrient_claim():
+    """m12 — "단백질 반찬에 채소를 넉넉히" 의 "넉넉히" 는 채소를 서술한다. 근연어도 구간 경계로 쓴다 (`no_contradict_rule` 과 같다)."""
+    req = _req()  # 체중이 없어 단백질은 판정하지 않는다
+    assert "protein" not in _states(req)
+    resp = _resp(body="다음 끼니는 단백질 반찬에 채소를 넉넉히 곁들이는 쪽으로 구성하면 좋아요.")
+    assert unjudged_nutrient_silent(resp, req)[0] is True
+
+
+@pytest.mark.parametrize("body", ["단백질 반찬이 넉넉했어요.", "단백질과 채소가 넉넉했어요."], ids=["own", "shared"])
+def test_m12_pair_amount_word_on_the_nutrient_still_fails(body):
+    """m12 짝 — 단백질을 서술하거나 접속조사로 서술을 함께 쓰면 여전히 단정이다."""
+    assert unjudged_nutrient_silent(_resp(body=body), _req())[0] is False
+
+
+def test_m13_redirect_away_from_more_is_not_a_reversal():
+    """m13 — 많이 먹은 끼니의 "양을 늘리기보다 구성을 바꿔" 는 늘리지 말자는 말이다. `met_daily_not_pushed` 의 "-기보다" 규칙과 같다."""
+    resp = _resp(body="다음 끼니는 양을 늘리기보다 양념이 덜한 단백질과 채소 중심으로 구성을 바꿔 보면 좋아요.")
+    assert quantity_direction_not_reversed(resp, _req(**_OVER))[0] is True
+
+
+def test_m13_pair_recommending_more_still_fails():
+    """m13 짝 — "-기보다" 없이 늘리라고 하면 여전히 반대 방향이다."""
+    resp = _resp(body="다음 끼니는 양을 늘리고 단백질을 곁들이면 좋아요.")
+    assert quantity_direction_not_reversed(resp, _req(**_OVER))[0] is False

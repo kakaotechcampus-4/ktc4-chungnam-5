@@ -423,7 +423,7 @@ def unscored_axis_silent(resp: dict, model: ShortFeedbackRequest) -> Verdict:
 def _amount_states(clause: str) -> Iterator[str]:
     """절 안의 양 상태 서술 — 조건 · 양보 · 변화 경향 같은 일반 진술은 뺀다."""
     for m in _AMOUNT_STATE.finditer(clause):
-        if _GENERAL_END.search(m.group(0)) or _GENERAL_TAIL.match(clause, m.end()):
+        if _general(clause, m):
             continue
         yield m.group(0)
 
@@ -490,12 +490,22 @@ _LESS = re.compile(
 
 # 부정된 양보 — "양이 많지 않아도"(제안 음식 설명). 끝이 양보형이면 `_GENERAL_END` 가 일반 진술로 본다
 _NEGATED_TAIL = re.compile(r"[가-힣]*(?:\s+(?:않|안)[가-힣]*)?")
+# 가정한 때를 꾸미는 관형형 — "양이 적은 날에도", "양이 많은 때라면". "양이 적은 날이었어요" 는 이번 끼니 서술이다
+_GENERAL_NOUN = re.compile(r"\s*(?:날|때|경우)\s*(?:에도|에는|엔|이라도|라도|라면|이면)")
+# 그 방향을 택하지 않는다는 말 — "양을 늘리기보다", "양을 줄이는 대신". `_REDIRECT` 와 같은 꼴이다
+_REDIRECT_AFTER = re.compile(r"[가-힣]*?기\s*(?:보다|대신)|는\s*(?:것보다|대신)")
 
 
 def _general(clause: str, match: re.Match[str]) -> bool:
-    """조건 · 양보 · 경향의 일반 진술인가 — "양이 적으면", "양이 적어도", "양이 많지 않아도", "적게 먹기 쉬운 때"."""
+    """조건 · 양보 · 경향의 일반 진술인가 — "양이 적으면", "양이 적어도", "양이 많지 않아도", "적게 먹기 쉬운 때",
+    "양이 적은 날에도"."""
     end = match.end() + len(_NEGATED_TAIL.match(clause, match.end()).group(0))
-    return bool(_GENERAL_END.search(clause[match.start():end]) or _GENERAL_TAIL.match(clause, end))
+    span = clause[match.start():end]
+    return bool(
+        _GENERAL_END.search(span)
+        or _GENERAL_TAIL.match(clause, end)
+        or (span.endswith(("은", "는")) and _GENERAL_NOUN.match(clause, end))
+    )
 
 
 def _hits(resp: dict, pattern: re.Pattern[str]) -> list[str]:
@@ -505,7 +515,7 @@ def _hits(resp: dict, pattern: re.Pattern[str]) -> list[str]:
         for field, clause in _all_clauses(resp)
         if not _UNCERTAIN.search(clause)
         for m in pattern.finditer(clause)
-        if not _general(clause, m)
+        if not _general(clause, m) and not _REDIRECT_AFTER.match(clause, m.end())
     ]
 
 
@@ -703,6 +713,13 @@ def no_contradict_rule(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     return _verdict("OK 판정과 모순", found)
 
 
+# 이름만 판정 대상이지만 근연어("채소를 넉넉히")도 구간을 끊는다 — 그 서술은 근연어의 것이다. 경계 키는 대상이 될 수 없다
+_UNJUDGED_BOUNDARIES: dict[str, re.Pattern[str]] = {
+    **_TERM_PATTERNS,
+    "_related": re.compile("|".join(n for nouns in _RELATED_NOUNS.values() for n in nouns)),
+}
+
+
 @_with_request
 def unjudged_nutrient_silent(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     """판정하지 못한 영양소를 단정하지 않았는가.
@@ -717,7 +734,7 @@ def unjudged_nutrient_silent(resp: dict, model: ShortFeedbackRequest) -> Verdict
         targets.add(_GENERIC)
     found: list[str] = []
     for field, clause in _meal_clauses(resp):
-        for name, before, after in _nutrient_segments(clause):
+        for name, before, after in _nutrient_segments(clause, _UNJUDGED_BOUNDARIES):
             if name not in targets or _UNCERTAIN.search(after):
                 continue
             label = _LABELS.get(name, "영양")
