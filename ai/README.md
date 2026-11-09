@@ -113,6 +113,16 @@ uvicorn app.main:app --reload --port 8000
 pytest
 ```
 
+### 자동 회귀 테스트 (CI)
+
+[`AI tests`](../.github/workflows/ai-tests.yml)는 `ai/**` 또는 워크플로 파일이 바뀐
+`develop`·`main` 대상 PR과 두 브랜치의 push에서 실행됩니다. PR에서는 대상 브랜치와
+합친 코드를 운영 Docker와 같은 Python 3.12로 검사합니다.
+
+- `requirements.txt` 설치 후 `python -m pytest -q --tb=short`로 전체 테스트를 실행합니다.
+- 모델 호출은 모킹하므로 API 키나 운영 DB가 필요 없습니다. 실제 모델 평가와는 별도입니다.
+- 결과는 PR Checks에 표시되며, JUnit 결과는 `ai-test-results` 아티팩트로 7일간 보관합니다.
+
 ---
 
 ## 참고

@@ -1,0 +1,52 @@
+name: AI tests
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'ai/**'
+      - '.github/workflows/ai-tests.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'ai/**'
+      - '.github/workflows/ai-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: AI regression (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ai
+    steps:
+      # PR에서는 기본 merge ref를 검사해 대상 브랜치와 합친 결과를 검증한다.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ai/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      # 모델 통신은 테스트에서 모킹한다. API 키·운영 DB·실제 모델 평가 실행기는 사용하지 않는다.
+      - name: Run AI regression tests
+        run: python -m pytest -q --tb=short --junitxml=test-results/ai.xml
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-test-results
+          path: ai/test-results/ai.xml
+          if-no-files-found: ignore
+          retention-days: 7
