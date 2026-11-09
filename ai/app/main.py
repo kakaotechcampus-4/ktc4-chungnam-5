@@ -13,7 +13,7 @@ import httpx
 
 from fastapi import FastAPI, HTTPException, status
 
-from app.food_analyzer import analyze_food
+from app.food_analyzer import InvalidVisionResponse, VisionUnavailable, analyze_food
 from app.short_feedback import generate_short_feedback
 from app.safety_guard import BLOCKED_BODY, is_unsafe
 from app.ai_coach import generate_chat, CoachUnavailable, InvalidCoachResponse
@@ -64,7 +64,14 @@ def health() -> dict[str, str]:
 
 @app.post("/analyze-meal", response_model=AnalyzeMealResponse, tags=["analyze"])
 async def analyze_meal(req: AnalyzeMealRequest) -> AnalyzeMealResponse:
-    items = await analyze_food(req.meal_type.value, req.image_url)
+    try:
+        items = await analyze_food(req.meal_type.value, req.image_url)
+    except VisionUnavailable:
+        raise HTTPException(status_code=503, detail="음식 분석 모델을 사용할 수 없습니다") from None
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="음식 분석 요청 시간이 초과되었습니다") from None
+    except (httpx.HTTPError, InvalidVisionResponse):
+        raise HTTPException(status_code=502, detail="음식 분석 모델 응답을 처리하지 못했습니다") from None
     return AnalyzeMealResponse(
         meal_id=req.meal_id,
         model_version=_VISION_MODEL_VERSION,

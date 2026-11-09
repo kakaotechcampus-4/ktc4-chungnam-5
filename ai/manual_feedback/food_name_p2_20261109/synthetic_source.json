@@ -1,0 +1,2691 @@
+{
+  "rule_version": "p2-synthetic-name-invariance-v1",
+  "prompt_hash": null,
+  "scope": "Constructed name variants only; no vision model or photo evidence.",
+  "results": {
+    "family_1_1/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_1_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_1_1/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_1_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_1_2/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_1_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_1_2/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_1_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_1_3/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_1_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_1_3/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_1_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_1_4/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_1_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고 쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_1_4/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_1_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고 쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_2_1/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_2_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_2_1/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_2_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_2_2/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_2_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_2_2/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_2_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_2_3/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_2_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_2_3/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_2_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_2_4/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_2_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치 쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_2_4/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_2_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치 쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_3_1/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_3_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_3_1/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_3_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_3_2/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_3_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_3_2/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_3_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_3_3/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_3_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_3_3/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_3_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_3_4/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_3_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토 쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_3_4/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_3_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토 쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_4_1/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_4_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_4_1/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_4_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_4_2/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_4_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_4_2/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_4_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_4_3/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_4_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이 스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_4_3/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_4_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이 스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_4_4/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_4_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이 수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_4_4/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_4_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이 수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_5_1/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_5_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_5_1/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_5_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_5_2/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_5_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_5_2/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_5_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_5_3/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_5_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림 스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_5_3/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_5_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림 스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_5_4/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_5_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림 수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_5_4/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_5_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림 수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_6_1/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_6_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_6_1/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_6_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_6_2/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_6_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_6_2/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_6_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_6_3/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_6_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수 스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_6_3/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_6_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수 스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_6_4/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_6_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수 수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_6_4/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_6_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수 수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_1/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "달걀프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_1/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "달걀프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_2/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "달걀후라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_2/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "달걀후라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_3/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "달걀 프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_3/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "달걀 프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_4/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "달걀 후라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_4/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "달걀 후라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_5/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_5",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_5/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_5",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_6/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_6",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란후라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_6/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_6",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란후라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_7/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_7",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란 프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_7/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_7",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란 프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_8/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_8",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란 후라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "family_7_8/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "family_7_8",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란 후라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_1/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이스프분말",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_1/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이스프분말",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_2/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이스프라면",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_2/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이스프라면",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_3/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수스프가루",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_3/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수스프가루",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_4/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "모구모구 망고 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_4/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "모구모구 망고 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_5/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_5",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고 주스 젤리",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_5/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_5",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고 주스 젤리",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_6/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_6",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "에스프레소",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_6/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_6",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "에스프레소",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_7/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_7",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고스프레드",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_7/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_7",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고스프레드",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_8/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_8",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양념두부",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_8/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_8",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양념두부",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_9/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_9",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "두부부침",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_9/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_9",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "두부부침",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_10/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_10",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "두부무침",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_10/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_10",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "두부무침",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_11/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_11",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "복숭아주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_11/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_11",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "복숭아주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_12/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_12",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "복숭아 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_12/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_12",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "복숭아 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_13/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_13",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "복숭아쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_13/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_13",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "복숭아쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_14/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_14",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "오렌지주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_14/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_14",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "오렌지주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_15/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_15",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "오렌지 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_15/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_15",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "오렌지 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_16/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_16",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "오렌지쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_16/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_16",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "오렌지쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_17/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_17",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "포도주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_17/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_17",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "포도주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_18/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_18",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "포도 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_18/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_18",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "포도 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_19/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_19",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "포도쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_19/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_19",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "포도쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_20/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_20",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "사과주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_20/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_20",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "사과주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_21/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_21",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "사과 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_21/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_21",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "사과 주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_22/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_22",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "사과쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "control_22/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "control_22",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "사과쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_1/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고  쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_1/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_1",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "망고  쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_2/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치\t쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_2/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_2",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "리치\t쥬스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_3/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토\n주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_3/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_3",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "토마토\n주스",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_4/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이  수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_4/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_4",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "양송이  수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_5/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_5",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림\t스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_5/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_5",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "크림\t스프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_6/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_6",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수  수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_6/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_6",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "옥수수  수프",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_7/amount_accuracy": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_7",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란 프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "format_7/confidence_calibration": {
+      "n": 1,
+      "samples": [
+        {
+          "response": {
+            "mealId": "format_7",
+            "modelVersion": "synthetic-no-model",
+            "safetyStatus": "SAFE",
+            "items": [
+              {
+                "originalFoodName": "계란 프라이",
+                "estimatedAmount": 100,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

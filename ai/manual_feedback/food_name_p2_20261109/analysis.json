@@ -1,0 +1,200 @@
+{
+  "measured_date_kst": "2026-11-09",
+  "summarized_at_utc": "2026-11-08T16:42:02.533713+00:00",
+  "base_commit": "9cbd074b0c95a8afc2f6d0de98868bb8b672fa48",
+  "scope": "P2 deterministic name normalization; unchanged BE top-1 matching with shipped public DB.",
+  "new_model_calls": 0,
+  "historical_response_accounting": {
+    "total_saved_attempts": 54,
+    "parsed_responses_replayed": 53,
+    "existing_unparseable_response_excluded": 1,
+    "excluded_reason": "P1 baseline manybanchan run2 has incomplete JSON; kept in original evidence and unchanged frozen P0 denominator."
+  },
+  "runtime_change": {
+    "families": 7,
+    "full_name_aliases": 32,
+    "normalizer_source_sha256": "faf42a0fc35b393640f24ae1f73a231e660c0b0bc37fad004cf8e1fb834af731",
+    "database_reads_in_ai_runtime": false,
+    "changed_response_field": "originalFoodName",
+    "unknown_or_qualified_names": "exact original string preserved"
+  },
+  "saved_response_results": {
+    "saved_responses": 53,
+    "item_occurrences": 159,
+    "changed_name_occurrences": 13,
+    "changed_selected_ids": 5,
+    "linked_before": 159,
+    "linked_after": 159,
+    "new_links": 0,
+    "lost_links": 0,
+    "nutrition_changed_occurrences": 5
+  },
+  "by_source": {
+    "historical": {
+      "saved_responses": 18,
+      "item_occurrences": 69,
+      "changed_name_occurrences": 7,
+      "changed_selected_ids": 5,
+      "linked_before": 69,
+      "linked_after": 69,
+      "new_links": 0,
+      "lost_links": 0,
+      "nutrition_changed_occurrences": 5,
+      "same_query_selection_changes": 0,
+      "category_transitions": {
+        "PROCESSED -> GENERAL": 3,
+        "GENERAL -> GENERAL": 2
+      }
+    },
+    "p1_baseline": {
+      "saved_responses": 17,
+      "item_occurrences": 39,
+      "changed_name_occurrences": 3,
+      "changed_selected_ids": 0,
+      "linked_before": 39,
+      "linked_after": 39,
+      "new_links": 0,
+      "lost_links": 0,
+      "nutrition_changed_occurrences": 0,
+      "same_query_selection_changes": 0,
+      "category_transitions": {}
+    },
+    "p1_candidate": {
+      "saved_responses": 18,
+      "item_occurrences": 51,
+      "changed_name_occurrences": 3,
+      "changed_selected_ids": 0,
+      "linked_before": 51,
+      "linked_after": 51,
+      "new_links": 0,
+      "lost_links": 0,
+      "nutrition_changed_occurrences": 0,
+      "same_query_selection_changes": 0,
+      "category_transitions": {}
+    }
+  },
+  "nutrient_missingness": {
+    "historical": {
+      "known_to_missing_cells": 0,
+      "missing_to_known_cells": 4
+    },
+    "p1_baseline": {
+      "known_to_missing_cells": 0,
+      "missing_to_known_cells": 0
+    },
+    "p1_candidate": {
+      "known_to_missing_cells": 0,
+      "missing_to_known_cells": 0
+    },
+    "synthetic": {
+      "known_to_missing_cells": 0,
+      "missing_to_known_cells": 34
+    }
+  },
+  "synthetic_validation": {
+    "alias_family": {
+      "n": 32,
+      "before_canonical_id_hits": 12,
+      "after_canonical_id_hits": 32
+    },
+    "preservation_control": {
+      "n": 22,
+      "unchanged_item_and_selection": 22
+    },
+    "synthetic_format_validation": {
+      "n": 7,
+      "before_canonical_id_hits": 2,
+      "after_canonical_id_hits": 7
+    }
+  },
+  "synthetic_scope": "Constructed language/format variants chosen during rule development; not independent photos or model accuracy.",
+  "saved_id_changes_review": [
+    {
+      "name": "양송이스프",
+      "occurrences": 3,
+      "after_name": "양송이 스프",
+      "selected_before": "양송이스프 (PROCESSED)",
+      "selected_after": "스프_양송이버섯 (GENERAL)",
+      "classification": "Plain soup identity and variant consistency; actual recipe/nutrient accuracy unmeasured.",
+      "at_200g_before": {
+        "kcal": 263.79,
+        "sodiumMg": 898.63
+      },
+      "at_200g_after": {
+        "kcal": 147.0,
+        "sodiumMg": 423.0
+      },
+      "note": "Values are derived from different DB references, not measured nutrients. No claim that old reference is definitely dry powder."
+    },
+    {
+      "name": "망고 주스",
+      "occurrences": 2,
+      "after_name": "망고주스",
+      "selected_before": "과ㆍ채주스_놀라운망고",
+      "selected_after": "과ㆍ채주스_망고 주스",
+      "classification": "Generic mango-juice representation and same-name consistency; packaged drink exact match remains approximate.",
+      "missing_nutrient_fields_per_row_before": 3,
+      "missing_nutrient_fields_per_row_after": 1
+    }
+  ],
+  "remaining_limitations": [
+    "No overall photo accuracy estimate, actual meal recipe/weight/nutrition ground truth, or new model experiment.",
+    "Existing vision omissions and parser failure are unchanged.",
+    "P1 90 item DB IDs and nutrition unchanged, including approximate tofu and bibimbap matches.",
+    "32 alias tests are development-derived canonical-ID consistency tests, not 32 independent real meals.",
+    "Outside approved families, BE may still choose poor matches (e.g. butter or mixed juice); no override added.",
+    "Shipped 20260828 DB snapshot may differ from deployed data."
+  ],
+  "validation": {
+    "focused_pytest_passed": 126,
+    "focused_pytest_failed": 0,
+    "production_parser_matches_prepared_responses": 114,
+    "frozen_p0_target_counts_unchanged": true,
+    "historical_input_bytes_unchanged": true,
+    "p0_labels_unchanged": true,
+    "prompt_and_model_client_unchanged": true,
+    "backend_sources_unchanged": true,
+    "git_diff_check_passed": true,
+    "temporary_db_cleaned": true
+  },
+  "test_command": "python -m pytest tests/test_food_analyzer.py tests/test_food_names.py tests/test_eval_food_name_normalization.py tests/test_eval_food_name_ab.py tests/test_eval_score_food_name_ab.py tests/test_eval_food_db_replay.py -q",
+  "semantic_review": "Independent read-only assistant review found no blocking regression; five changed real IDs are representation consistency, not five proven photo recognition corrections.",
+  "state_at_measurement": {
+    "committed": false,
+    "pushed": false,
+    "deployed": false
+  },
+  "source_sha256": {
+    "database_environment.json": "f523ff5c354e0d8ddf0104ae92e1c6d609b31f4c0126e051f41bbeec4be6b0b4",
+    "diagnostic_protocol.json": "044f724113cabaf9c07aa343d808f0aba3b6811e588f0f225e880b0540d7fb8a",
+    "diagnostics.json": "febb76c1c81f1b8a9e01356cdda2a879e82e2ba8cebf78d9ba664ab3b43ff5f4",
+    "frozen_p0_score.json": "11e9d09b2c70c21fa7c28153d71d4cac67ef2757b6c20bdc0d29febd5da1c98a",
+    "historical/after_db.json": "488cd35e1a4781cc7010fd9de7e5c2e1439940bd35dd277a59d8656270301bc5",
+    "historical/before_db.json": "70cb548d697ff2323a16d03993821bfad32a853dfe95fe45162b861f1fcc2cec",
+    "historical/candidate.json": "df8d623e95fe9eb5fe6f141ea3ba6523ba208353147335f69b9b9d2e82124b97",
+    "historical/comparison.json": "3e3d4849626f66a9bab631794821ca5df52357ccfc53d083f22c9f73fce58ff8",
+    "historical/protocol.json": "351b634b565f0c0c4a2ead43547ec04512e8286e0f9f13823bd022da36a48ae6",
+    "historical/source.json": "db14548e249b5b9e3c571460b4816b0acc3654a226dee54b073f1a207068749b",
+    "p1_baseline/after_db.json": "757ce47b89e6338c4ba4c4ce3ea79c5d6f20bf550a1293ae98e462d098e0683c",
+    "p1_baseline/before_db.json": "e5353a0d7d2ea22e8d2bf5cb25668d1f3af5d0a537c53929436775086ba4d3ac",
+    "p1_baseline/candidate.json": "bbc9803bcad44e93055c15da5b419ab28579e7fc5ced2c4bea0130626ebe196b",
+    "p1_baseline/comparison.json": "3fd3cc907492efcecf017d4ecfb257de9e9d4e644bde990d76116403055c2483",
+    "p1_baseline/protocol.json": "2f27871c4e86236acaae0b34d0139f5932acc07116a0c15f4624e44a310f9455",
+    "p1_baseline/source.json": "82b58072dbd076339668dfe636cb929ca70d6cffab49490bdf3fb27583ea7880",
+    "p1_candidate/after_db.json": "4edbed1a90451a69b8ecb15235fd199d5fb6cab523a4fef47af88f7cd4956653",
+    "p1_candidate/before_db.json": "81c28aec54557a158830ad9a2fea94f488bf1d9dbed85b86a05f0361e71d1c2d",
+    "p1_candidate/candidate.json": "91fd8cd92c60dbffe59dc6414a4d39690b50b780a643efdd66f35f4df9871c59",
+    "p1_candidate/comparison.json": "2d18dcd1b956174e23a375ea2911e63c135f6a4617ac5330d522f6505e5df13b",
+    "p1_candidate/protocol.json": "8be4dd883f4e0cf81dca5e7e9876a0fbee5c70054420f8b5faa605298f527b9b",
+    "p1_candidate/source.json": "b2e498001890b6715e9b198e5eb358d22960122413adde741aca6712d6d7370c",
+    "rule_review.json": "43d5b6259f35d1e872de40f6c134a2d0689435a49e5704fa94bba9cba6d0a1a7",
+    "synthetic/after_db.json": "10843701464c0637526c5fdb0307e5a8ae3b2725579da3606215c021154209d7",
+    "synthetic/before_db.json": "a4d8d8a9a36c2fc988397c09b15080c1fdd146fe024165516ca91d03ea94fd0e",
+    "synthetic/candidate.json": "0f23944895cd83546c17fd26c0f54694d2f459e534bb3164484086f033eb3efe",
+    "synthetic/comparison.json": "5386fa815b247d13c806396aa9220f510ea79978bc41f6cdb002f2a6bcb28b75",
+    "synthetic/protocol.json": "14c1b112b1ca9fb6a8b8d0adc1ef934b0f1edb6d21721f51d11dbcdf65ff6ca1",
+    "synthetic/source.json": "0bdab854795c92ed5455826c477769ae6c03006e5b4a1e18fb160c0ca0991bb1",
+    "synthetic_labels.json": "4b3133ef937ea485350b452072585f38cd2ffdf189de0e3ce4a590d0b5e4db03",
+    "synthetic_source.json": "0bdab854795c92ed5455826c477769ae6c03006e5b4a1e18fb160c0ca0991bb1"
+  }
+}

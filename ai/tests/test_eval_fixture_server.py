@@ -385,8 +385,8 @@ def test_r42_integration_sends_fixture_bytes_as_data_uri(tmp_path, model_posts):
     assert image_block["image_url"]["url"] == "data:image/jpeg;base64," + base64.b64encode(data).decode("ascii")
 
 
-def test_r43_integration_missing_fixture_is_500_without_model_call(tmp_path, model_posts):
-    """없는 fixture 이름이면 Observation 이 500 이고(하네스 크래시 아님), 모델 POST 는 0회다.
+def test_r43_integration_missing_fixture_is_502_without_model_call(tmp_path, model_posts):
+    """없는 fixture 이름이면 Observation 이 502 이고(하네스 크래시 아님), 모델 POST 는 0회다.
 
     사진이 빠진 케이스가 빈 이미지로 모델을 불러 크레딧을 쓰면 안 된다 — 계약 실패로 판정된다.
     """
@@ -397,7 +397,7 @@ def test_r43_integration_missing_fixture_is_500_without_model_call(tmp_path, mod
     with serve_fixtures(tmp_path) as base:
         observation = with_image_base(default_post(), base)("/analyze-meal", request)
 
-    assert observation.status_code == 500
+    assert observation.status_code == 502
     assert model_posts == []
 
 

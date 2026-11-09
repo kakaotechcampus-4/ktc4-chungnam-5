@@ -1,0 +1,1020 @@
+{
+  "manifest_sha256": "24a5a0ef4db335bd3bae8a855686a5956c82e841b18780c0e417b9faf5ed7dda",
+  "frozen_manifest": {
+    "version": "food-name-p0p1-v1",
+    "created_at_utc": "2026-11-08T16:10:15.480986+00:00",
+    "status": "labels frozen before live model calls",
+    "baseline_ref": "a088974",
+    "repetitions": 3,
+    "primary_metric": "Per target, per response: at least one selected BE food_ref_id belongs to the predeclared acceptable set. Denominator includes failed or missing planned calls.",
+    "not_overall_accuracy": "Allowlist non-hit can be an omission, DB mismatch, or an unlisted legitimate variant. Review separately; do not claim all non-hits are semantic errors.",
+    "recognition_metric_note": "recognized_names only supports a whitespace-normalized name observation; unfamiliar names require review and are not proven omissions.",
+    "db_dataset": "20260828; shipped seed and existing migrations; BE matching policy unchanged",
+    "human_confirmation": {
+      "first_reply": "양배추샐러드, 콩나물국, 두부나물무침(보통 쑥갓두부무침, 시금치두부무침 이렇게 나물의 주재료에 따라 달라)",
+      "additional_reply": "잡채, 김치, 소고기비빔밥, 미역나물, 두부부침",
+      "scope": "User identified foods by looking at photo; not an ingredient-weighed meal record."
+    },
+    "heldout_scope": "New photographs not used to draft the4-line P1 change; not claimed absent from foundation-model training. Do not tune again on holdout results.",
+    "candidate_scope": "Only4 generic food-name instructions; no synonyms mapping, candidate ID override, model change, or BE change.",
+    "acceptance_plan": [
+      "Complete paired collection with same gateway/settings and n=3 per image per arm; report every failure and retry.",
+      "Look for increased development target hits with no per-target decrease on heldout photos.",
+      "Check unchanged existing regression axes; inspect new unsupported ingredients, omitted targets, and composite-dish double counting.",
+      "Do not claim improvement if comparison is incomplete, holdout regresses, or unresolved semantic errors explain a metric gain.",
+      "Do not modify labels or loosen thresholds after outputs. Any label revision requires a new version and separate evaluation."
+    ],
+    "cases": [
+      {
+        "case_id": "manybanchan",
+        "split": "development",
+        "meal_type": "DINNER",
+        "image_path": "ai/evals/fixtures/analyze_meal/manybanchan.jpg",
+        "baseline_case": "manybanchan",
+        "targets": [
+          {
+            "target_id": "cabbage_salad",
+            "label": "양배추샐러드",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "D414-701000000-0001",
+              "D114-640220000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D414-701000000-0001",
+                "name": "양배추 샐러드",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D114-640220000-0001",
+                "name": "샐러드_양배추",
+                "category": "GENERAL",
+                "origin_type": "가정식(분석 함량)",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "양배추샐러드",
+              "양배추 샐러드"
+            ]
+          },
+          {
+            "target_id": "bean_sprout_soup",
+            "label": "콩나물국",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "D105-253000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D105-253000000-0001",
+                "name": "콩나물국",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "콩나물국",
+              "콩나물 국"
+            ]
+          },
+          {
+            "target_id": "japchae",
+            "label": "잡채",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "D110-492000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D110-492000000-0001",
+                "name": "잡채",
+                "category": "GENERAL",
+                "origin_type": "가정식(분석 함량)",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "잡채"
+            ]
+          },
+          {
+            "target_id": "kimchi",
+            "label": "배추김치",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls; cabbage subtype supported by visible leaf-shaped kimchi",
+            "acceptable_food_ref_ids": [
+              "D315-670000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D315-670000000-0001",
+                "name": "배추김치",
+                "category": "GENERAL",
+                "origin_type": "외식(분석함량)",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "배추김치",
+              "김치"
+            ]
+          },
+          {
+            "target_id": "beef_bibimbap",
+            "label": "소고기비빔밥",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "P123-201020200-1027",
+              "D501-018283500-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "P123-201020200-1027",
+                "name": "소고기비빔밥",
+                "category": "PROCESSED",
+                "origin_type": "가공식품",
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D501-018283500-0001",
+                "name": "비빔밥_소고기_양념장",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "소고기비빔밥",
+              "쇠고기비빔밥",
+              "소고기 비빔밥",
+              "소불고기비빔밥",
+              "불고기비빔밥"
+            ]
+          },
+          {
+            "target_id": "pan_fried_tofu",
+            "label": "두부부침",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "D109-419000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D109-419000000-0001",
+                "name": "두부부침",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "두부부침",
+              "부침두부",
+              "두부구이",
+              "양념두부구이"
+            ]
+          }
+        ],
+        "unscored_observations": [
+          {
+            "food": "미역나물",
+            "source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "reason": "Seaweed identity confirmed; vinegar/preparation not confirmed. Search outputs 미역줄기나물 and 미역초무침 are not automatically equivalent."
+          },
+          {
+            "food": "두부나물무침",
+            "source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "reason": "Tofu-greens side confirmed; exact vegetable not confirmed. Do not relabel as spinach/crown-daisy to fit DB."
+          },
+          {
+            "food": "쌀밥/공깃밥",
+            "reason": "Covered bowls do not establish contents."
+          },
+          {
+            "food": "기타 반찬",
+            "reason": "All model items are searched and retained; unlabelled foods require review rather than automatic false-positive counting."
+          }
+        ],
+        "image_sha256": "7d8b8e4aabafe983250c45a5f719b350fbacbeb08680b3e93b97b6be4232cd91"
+      },
+      {
+        "case_id": "piece_of_pizza",
+        "split": "regression",
+        "meal_type": "DINNER",
+        "image_path": "ai/evals/fixtures/analyze_meal/piece_of_pizza.jpg",
+        "baseline_case": "piece_of_pizza",
+        "targets": [
+          {
+            "target_id": "potato_pizza",
+            "label": "포테이토피자",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "Existing photo visual review: potato topping on pizza; prior baseline known, not held out",
+            "acceptable_food_ref_ids": [
+              "D202-120000000-1705"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D202-120000000-1705",
+                "name": "피자_포테이토 피자",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "포테이토피자",
+              "감자피자",
+              "피자"
+            ]
+          }
+        ],
+        "image_sha256": "fbad785aa626d6d2ec286fe1cc424a8e855f276a40ec462ef4d2e99f258f5215"
+      },
+      {
+        "case_id": "whole_cake",
+        "split": "regression",
+        "meal_type": "SNACK",
+        "image_path": "ai/evals/fixtures/analyze_meal/whole_cake.jpg",
+        "baseline_case": "whole_cake",
+        "targets": [
+          {
+            "target_id": "cheesecake",
+            "label": "치즈케이크",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "Visible CHEESE CAKE label; prior baseline known, not held out",
+            "acceptable_food_ref_ids": [
+              "D202-110000000-0340"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D202-110000000-0340",
+                "name": "케이크_치즈 케이크",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "치즈케이크",
+              "치즈 케이크"
+            ]
+          }
+        ],
+        "image_sha256": "c641306d92f828e2d42ddc3e699ac0c680ce898bf2ce64610bcbc13aad8479c4"
+      },
+      {
+        "case_id": "coleslaw",
+        "split": "holdout",
+        "meal_type": "LUNCH",
+        "image_path": "ai/evals/fixtures/food_name_matching/coleslaw.jpg",
+        "source": {
+          "case_id": "coleslaw",
+          "file": "coleslaw.jpg",
+          "title": "Coleslaw (3173259085).jpg",
+          "description_url": "https://commons.wikimedia.org/wiki/File:Coleslaw_(3173259085).jpg",
+          "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/df/Coleslaw_%283173259085%29.jpg/960px-Coleslaw_%283173259085%29.jpg",
+          "original_url": "https://upload.wikimedia.org/wikipedia/commons/d/df/Coleslaw_%283173259085%29.jpg",
+          "author": "David Pursehouse",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_description": "Coleslaw",
+          "bytes": 112448,
+          "sha256": "f1b52dc677cf5baab6182f8a4a8b3a63cf8448280dd4b51d4049f5a07410e16f",
+          "changes": "Wikimedia-provided960px thumbnail; Exif metadata removed locally without changing compressed pixel data",
+          "retrieved_date_kst": "2026-11-09",
+          "download_sha256": "b7c936dee473dae9f1c0cb494e4efc49122934a777c9238674a5ca4dd0bf1eaa"
+        },
+        "targets": [
+          {
+            "target_id": "coleslaw",
+            "label": "코울슬로/양배추샐러드",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "https://commons.wikimedia.org/wiki/File:Coleslaw_(3173259085).jpg",
+            "acceptable_food_ref_ids": [
+              "D214-640000000-0043",
+              "D314-640224600-0001",
+              "P116-702070100-0576",
+              "D414-701000000-0001",
+              "D114-640220000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D214-640000000-0043",
+                "name": "샐러드_코울슬로",
+                "category": "GENERAL",
+                "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D314-640224600-0001",
+                "name": "샐러드_양배추_코올슬로",
+                "category": "GENERAL",
+                "origin_type": "외식(분석함량)",
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "P116-702070100-0576",
+                "name": "코울슬로",
+                "category": "PROCESSED",
+                "origin_type": "가공식품",
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D414-701000000-0001",
+                "name": "양배추 샐러드",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D114-640220000-0001",
+                "name": "샐러드_양배추",
+                "category": "GENERAL",
+                "origin_type": "가정식(분석 함량)",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "코울슬로",
+              "콜슬로",
+              "코올슬로",
+              "양배추샐러드"
+            ]
+          }
+        ],
+        "image_sha256": "f1b52dc677cf5baab6182f8a4a8b3a63cf8448280dd4b51d4049f5a07410e16f"
+      },
+      {
+        "case_id": "fried_eggs",
+        "split": "holdout",
+        "meal_type": "BREAKFAST",
+        "image_path": "ai/evals/fixtures/food_name_matching/fried_eggs.jpg",
+        "source": {
+          "case_id": "fried_eggs",
+          "file": "fried_eggs.jpg",
+          "title": "Fried eggs.jpg",
+          "description_url": "https://commons.wikimedia.org/wiki/File:Fried_eggs.jpg",
+          "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Fried_eggs.jpg/960px-Fried_eggs.jpg",
+          "original_url": "https://upload.wikimedia.org/wikipedia/commons/2/23/Fried_eggs.jpg",
+          "author": "Stangoldsmith",
+          "license": "CC BY 3.0",
+          "license_url": "https://creativecommons.org/licenses/by/3.0/",
+          "source_description": "fried eggs",
+          "bytes": 181804,
+          "sha256": "ca5806156bceb32c557c5b3b424b0db0a2406a8b2cc8bc810232304eb2d0389b",
+          "changes": "Wikimedia-provided960px thumbnail; Exif metadata removed locally without changing compressed pixel data",
+          "retrieved_date_kst": "2026-11-09",
+          "download_sha256": "5955bae3d366346de1a1af467b4752c84f6618306a2b3e55384c8751d470f1bd"
+        },
+        "targets": [
+          {
+            "target_id": "fried_eggs",
+            "label": "달걀 프라이",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "https://commons.wikimedia.org/wiki/File:Fried_eggs.jpg",
+            "acceptable_food_ref_ids": [
+              "D609-449000000-0001",
+              "D109-417000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D609-449000000-0001",
+                "name": "달걀후라이",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D109-417000000-0001",
+                "name": "달걀부침(달걀후라이)",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "달걀프라이",
+              "달걀후라이",
+              "계란프라이",
+              "계란후라이",
+              "달걀부침"
+            ]
+          }
+        ],
+        "image_sha256": "ca5806156bceb32c557c5b3b424b0db0a2406a8b2cc8bc810232304eb2d0389b"
+      },
+      {
+        "case_id": "potato_salad",
+        "split": "holdout",
+        "meal_type": "LUNCH",
+        "image_path": "ai/evals/fixtures/food_name_matching/potato_salad.jpg",
+        "source": {
+          "case_id": "potato_salad",
+          "file": "potato_salad.jpg",
+          "title": "Potato salad close-up.jpg",
+          "description_url": "https://commons.wikimedia.org/wiki/File:Potato_salad_close-up.jpg",
+          "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Potato_salad_close-up.jpg/960px-Potato_salad_close-up.jpg",
+          "original_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Potato_salad_close-up.jpg",
+          "author": "Steven Depolo",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_description": "Potato salad close-up",
+          "bytes": 108531,
+          "sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6",
+          "changes": "Wikimedia-provided 960px thumbnail; no local pixel editing",
+          "retrieved_date_kst": "2026-11-09"
+        },
+        "targets": [
+          {
+            "target_id": "potato_salad",
+            "label": "감자샐러드",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "https://commons.wikimedia.org/wiki/File:Potato_salad_close-up.jpg",
+            "acceptable_food_ref_ids": [
+              "D414-664000000-0001",
+              "P123-226020200-0060"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D414-664000000-0001",
+                "name": "감자샐러드",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "P123-226020200-0060",
+                "name": "감자샐러드",
+                "category": "PROCESSED",
+                "origin_type": "가공식품",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "감자샐러드",
+              "감자 샐러드"
+            ]
+          }
+        ],
+        "image_sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6"
+      }
+    ]
+  },
+  "selected_cases": [
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "meal_type": "DINNER",
+      "image_path": "ai/evals/fixtures/analyze_meal/manybanchan.jpg",
+      "baseline_case": "manybanchan",
+      "targets": [
+        {
+          "target_id": "cabbage_salad",
+          "label": "양배추샐러드",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+          "acceptable_food_ref_ids": [
+            "D414-701000000-0001",
+            "D114-640220000-0001"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D414-701000000-0001",
+              "name": "양배추 샐러드",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            },
+            {
+              "id": "D114-640220000-0001",
+              "name": "샐러드_양배추",
+              "category": "GENERAL",
+              "origin_type": "가정식(분석 함량)",
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "양배추샐러드",
+            "양배추 샐러드"
+          ]
+        },
+        {
+          "target_id": "bean_sprout_soup",
+          "label": "콩나물국",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+          "acceptable_food_ref_ids": [
+            "D105-253000000-0001"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D105-253000000-0001",
+              "name": "콩나물국",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "콩나물국",
+            "콩나물 국"
+          ]
+        },
+        {
+          "target_id": "japchae",
+          "label": "잡채",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+          "acceptable_food_ref_ids": [
+            "D110-492000000-0001"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D110-492000000-0001",
+              "name": "잡채",
+              "category": "GENERAL",
+              "origin_type": "가정식(분석 함량)",
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "잡채"
+          ]
+        },
+        {
+          "target_id": "kimchi",
+          "label": "배추김치",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls; cabbage subtype supported by visible leaf-shaped kimchi",
+          "acceptable_food_ref_ids": [
+            "D315-670000000-0001"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D315-670000000-0001",
+              "name": "배추김치",
+              "category": "GENERAL",
+              "origin_type": "외식(분석함량)",
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "배추김치",
+            "김치"
+          ]
+        },
+        {
+          "target_id": "beef_bibimbap",
+          "label": "소고기비빔밥",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+          "acceptable_food_ref_ids": [
+            "P123-201020200-1027",
+            "D501-018283500-0001"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "P123-201020200-1027",
+              "name": "소고기비빔밥",
+              "category": "PROCESSED",
+              "origin_type": "가공식품",
+              "dataset_version": "20260828"
+            },
+            {
+              "id": "D501-018283500-0001",
+              "name": "비빔밥_소고기_양념장",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "소고기비빔밥",
+            "쇠고기비빔밥",
+            "소고기 비빔밥",
+            "소불고기비빔밥",
+            "불고기비빔밥"
+          ]
+        },
+        {
+          "target_id": "pan_fried_tofu",
+          "label": "두부부침",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+          "acceptable_food_ref_ids": [
+            "D109-419000000-0001"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D109-419000000-0001",
+              "name": "두부부침",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "두부부침",
+            "부침두부",
+            "두부구이",
+            "양념두부구이"
+          ]
+        }
+      ],
+      "unscored_observations": [
+        {
+          "food": "미역나물",
+          "source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+          "reason": "Seaweed identity confirmed; vinegar/preparation not confirmed. Search outputs 미역줄기나물 and 미역초무침 are not automatically equivalent."
+        },
+        {
+          "food": "두부나물무침",
+          "source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+          "reason": "Tofu-greens side confirmed; exact vegetable not confirmed. Do not relabel as spinach/crown-daisy to fit DB."
+        },
+        {
+          "food": "쌀밥/공깃밥",
+          "reason": "Covered bowls do not establish contents."
+        },
+        {
+          "food": "기타 반찬",
+          "reason": "All model items are searched and retained; unlabelled foods require review rather than automatic false-positive counting."
+        }
+      ],
+      "image_sha256": "7d8b8e4aabafe983250c45a5f719b350fbacbeb08680b3e93b97b6be4232cd91"
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "split": "regression",
+      "meal_type": "DINNER",
+      "image_path": "ai/evals/fixtures/analyze_meal/piece_of_pizza.jpg",
+      "baseline_case": "piece_of_pizza",
+      "targets": [
+        {
+          "target_id": "potato_pizza",
+          "label": "포테이토피자",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "Existing photo visual review: potato topping on pizza; prior baseline known, not held out",
+          "acceptable_food_ref_ids": [
+            "D202-120000000-1705"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D202-120000000-1705",
+              "name": "피자_포테이토 피자",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "포테이토피자",
+            "감자피자",
+            "피자"
+          ]
+        }
+      ],
+      "image_sha256": "fbad785aa626d6d2ec286fe1cc424a8e855f276a40ec462ef4d2e99f258f5215"
+    },
+    {
+      "case_id": "whole_cake",
+      "split": "regression",
+      "meal_type": "SNACK",
+      "image_path": "ai/evals/fixtures/analyze_meal/whole_cake.jpg",
+      "baseline_case": "whole_cake",
+      "targets": [
+        {
+          "target_id": "cheesecake",
+          "label": "치즈케이크",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "Visible CHEESE CAKE label; prior baseline known, not held out",
+          "acceptable_food_ref_ids": [
+            "D202-110000000-0340"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D202-110000000-0340",
+              "name": "케이크_치즈 케이크",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "치즈케이크",
+            "치즈 케이크"
+          ]
+        }
+      ],
+      "image_sha256": "c641306d92f828e2d42ddc3e699ac0c680ce898bf2ce64610bcbc13aad8479c4"
+    },
+    {
+      "case_id": "coleslaw",
+      "split": "holdout",
+      "meal_type": "LUNCH",
+      "image_path": "ai/evals/fixtures/food_name_matching/coleslaw.jpg",
+      "source": {
+        "case_id": "coleslaw",
+        "file": "coleslaw.jpg",
+        "title": "Coleslaw (3173259085).jpg",
+        "description_url": "https://commons.wikimedia.org/wiki/File:Coleslaw_(3173259085).jpg",
+        "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/df/Coleslaw_%283173259085%29.jpg/960px-Coleslaw_%283173259085%29.jpg",
+        "original_url": "https://upload.wikimedia.org/wikipedia/commons/d/df/Coleslaw_%283173259085%29.jpg",
+        "author": "David Pursehouse",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0/",
+        "source_description": "Coleslaw",
+        "bytes": 112448,
+        "sha256": "f1b52dc677cf5baab6182f8a4a8b3a63cf8448280dd4b51d4049f5a07410e16f",
+        "changes": "Wikimedia-provided960px thumbnail; Exif metadata removed locally without changing compressed pixel data",
+        "retrieved_date_kst": "2026-11-09",
+        "download_sha256": "b7c936dee473dae9f1c0cb494e4efc49122934a777c9238674a5ca4dd0bf1eaa"
+      },
+      "targets": [
+        {
+          "target_id": "coleslaw",
+          "label": "코울슬로/양배추샐러드",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "https://commons.wikimedia.org/wiki/File:Coleslaw_(3173259085).jpg",
+          "acceptable_food_ref_ids": [
+            "D214-640000000-0043",
+            "D314-640224600-0001",
+            "P116-702070100-0576",
+            "D414-701000000-0001",
+            "D114-640220000-0001"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D214-640000000-0043",
+              "name": "샐러드_코울슬로",
+              "category": "GENERAL",
+              "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+              "dataset_version": "20260828"
+            },
+            {
+              "id": "D314-640224600-0001",
+              "name": "샐러드_양배추_코올슬로",
+              "category": "GENERAL",
+              "origin_type": "외식(분석함량)",
+              "dataset_version": "20260828"
+            },
+            {
+              "id": "P116-702070100-0576",
+              "name": "코울슬로",
+              "category": "PROCESSED",
+              "origin_type": "가공식품",
+              "dataset_version": "20260828"
+            },
+            {
+              "id": "D414-701000000-0001",
+              "name": "양배추 샐러드",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            },
+            {
+              "id": "D114-640220000-0001",
+              "name": "샐러드_양배추",
+              "category": "GENERAL",
+              "origin_type": "가정식(분석 함량)",
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "코울슬로",
+            "콜슬로",
+            "코올슬로",
+            "양배추샐러드"
+          ]
+        }
+      ],
+      "image_sha256": "f1b52dc677cf5baab6182f8a4a8b3a63cf8448280dd4b51d4049f5a07410e16f"
+    },
+    {
+      "case_id": "fried_eggs",
+      "split": "holdout",
+      "meal_type": "BREAKFAST",
+      "image_path": "ai/evals/fixtures/food_name_matching/fried_eggs.jpg",
+      "source": {
+        "case_id": "fried_eggs",
+        "file": "fried_eggs.jpg",
+        "title": "Fried eggs.jpg",
+        "description_url": "https://commons.wikimedia.org/wiki/File:Fried_eggs.jpg",
+        "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Fried_eggs.jpg/960px-Fried_eggs.jpg",
+        "original_url": "https://upload.wikimedia.org/wikipedia/commons/2/23/Fried_eggs.jpg",
+        "author": "Stangoldsmith",
+        "license": "CC BY 3.0",
+        "license_url": "https://creativecommons.org/licenses/by/3.0/",
+        "source_description": "fried eggs",
+        "bytes": 181804,
+        "sha256": "ca5806156bceb32c557c5b3b424b0db0a2406a8b2cc8bc810232304eb2d0389b",
+        "changes": "Wikimedia-provided960px thumbnail; Exif metadata removed locally without changing compressed pixel data",
+        "retrieved_date_kst": "2026-11-09",
+        "download_sha256": "5955bae3d366346de1a1af467b4752c84f6618306a2b3e55384c8751d470f1bd"
+      },
+      "targets": [
+        {
+          "target_id": "fried_eggs",
+          "label": "달걀 프라이",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "https://commons.wikimedia.org/wiki/File:Fried_eggs.jpg",
+          "acceptable_food_ref_ids": [
+            "D609-449000000-0001",
+            "D109-417000000-0001"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D609-449000000-0001",
+              "name": "달걀후라이",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            },
+            {
+              "id": "D109-417000000-0001",
+              "name": "달걀부침(달걀후라이)",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "달걀프라이",
+            "달걀후라이",
+            "계란프라이",
+            "계란후라이",
+            "달걀부침"
+          ]
+        }
+      ],
+      "image_sha256": "ca5806156bceb32c557c5b3b424b0db0a2406a8b2cc8bc810232304eb2d0389b"
+    },
+    {
+      "case_id": "potato_salad",
+      "split": "holdout",
+      "meal_type": "LUNCH",
+      "image_path": "ai/evals/fixtures/food_name_matching/potato_salad.jpg",
+      "source": {
+        "case_id": "potato_salad",
+        "file": "potato_salad.jpg",
+        "title": "Potato salad close-up.jpg",
+        "description_url": "https://commons.wikimedia.org/wiki/File:Potato_salad_close-up.jpg",
+        "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Potato_salad_close-up.jpg/960px-Potato_salad_close-up.jpg",
+        "original_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Potato_salad_close-up.jpg",
+        "author": "Steven Depolo",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0/",
+        "source_description": "Potato salad close-up",
+        "bytes": 108531,
+        "sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6",
+        "changes": "Wikimedia-provided 960px thumbnail; no local pixel editing",
+        "retrieved_date_kst": "2026-11-09"
+      },
+      "targets": [
+        {
+          "target_id": "potato_salad",
+          "label": "감자샐러드",
+          "label_status": "confirmed",
+          "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+          "label_source": "https://commons.wikimedia.org/wiki/File:Potato_salad_close-up.jpg",
+          "acceptable_food_ref_ids": [
+            "D414-664000000-0001",
+            "P123-226020200-0060"
+          ],
+          "acceptable_db_entries": [
+            {
+              "id": "D414-664000000-0001",
+              "name": "감자샐러드",
+              "category": "GENERAL",
+              "origin_type": null,
+              "dataset_version": "20260828"
+            },
+            {
+              "id": "P123-226020200-0060",
+              "name": "감자샐러드",
+              "category": "PROCESSED",
+              "origin_type": "가공식품",
+              "dataset_version": "20260828"
+            }
+          ],
+          "recognized_names": [
+            "감자샐러드",
+            "감자 샐러드"
+          ]
+        }
+      ],
+      "image_sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6"
+    }
+  ],
+  "repetitions": 1,
+  "planned_submissions": 6,
+  "max_submissions": 6,
+  "schedule": [
+    {
+      "case_id": "manybanchan",
+      "run": 1,
+      "meal_type": "DINNER",
+      "image_path": "ai/evals/fixtures/analyze_meal/manybanchan.jpg",
+      "image_sha256": "7d8b8e4aabafe983250c45a5f719b350fbacbeb08680b3e93b97b6be4232cd91"
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "run": 1,
+      "meal_type": "DINNER",
+      "image_path": "ai/evals/fixtures/analyze_meal/piece_of_pizza.jpg",
+      "image_sha256": "fbad785aa626d6d2ec286fe1cc424a8e855f276a40ec462ef4d2e99f258f5215"
+    },
+    {
+      "case_id": "whole_cake",
+      "run": 1,
+      "meal_type": "SNACK",
+      "image_path": "ai/evals/fixtures/analyze_meal/whole_cake.jpg",
+      "image_sha256": "c641306d92f828e2d42ddc3e699ac0c680ce898bf2ce64610bcbc13aad8479c4"
+    },
+    {
+      "case_id": "coleslaw",
+      "run": 1,
+      "meal_type": "LUNCH",
+      "image_path": "ai/evals/fixtures/food_name_matching/coleslaw.jpg",
+      "image_sha256": "f1b52dc677cf5baab6182f8a4a8b3a63cf8448280dd4b51d4049f5a07410e16f"
+    },
+    {
+      "case_id": "fried_eggs",
+      "run": 1,
+      "meal_type": "BREAKFAST",
+      "image_path": "ai/evals/fixtures/food_name_matching/fried_eggs.jpg",
+      "image_sha256": "ca5806156bceb32c557c5b3b424b0db0a2406a8b2cc8bc810232304eb2d0389b"
+    },
+    {
+      "case_id": "potato_salad",
+      "run": 1,
+      "meal_type": "LUNCH",
+      "image_path": "ai/evals/fixtures/food_name_matching/potato_salad.jpg",
+      "image_sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6"
+    }
+  ],
+  "created_at": "2026-11-08T17:21:15.551342+00:00",
+  "mode": "run",
+  "environment": "isolated_local",
+  "stop_at": "REVIEW_REQUIRED",
+  "poll_deadline_seconds": 300,
+  "poll_interval_seconds": 1.5,
+  "max_polls_per_meal": 200,
+  "maximum_client_http_requests": 1211,
+  "synthetic_profile": {
+    "heightCm": 170,
+    "weightKg": 65,
+    "baselineIntake": 600
+  },
+  "synthetic_medication": {
+    "drugName": "위고비",
+    "doseMg": 2.4
+  },
+  "intended_stage": "MAINTENANCE",
+  "satiety_before_pct": 50,
+  "polling_clock_starts": "after the POST /meals response",
+  "timing_note": "Observed completion is bounded by GET intervals; the 30s metric uses the API budget, not the FE's backoff/overshoot schedule",
+  "confirmed_meals": 0,
+  "feedback_requests": 0,
+  "public_api_unobservable": [
+    "originalFoodName",
+    "candidateFoodRefId",
+    "selectedFoodRefId",
+    "rawModelResponse",
+    "modelVersion",
+    "gatewayAttemptCount",
+    "queueAttempts"
+  ],
+  "model_budget_note": "Upload count is not gateway call count; queue and AI retries apply"
+}

@@ -1,0 +1,32 @@
+{
+  "scope": "Current API+vision HTTP client+parser+P2 with mock image/model transport; input uses saved parsed items and synthetic variants. No live model or DB calls.",
+  "new_model_calls": 0,
+  "api_responses_passed": 114,
+  "food_items_verified": 220,
+  "groups": [
+    {
+      "group": "historical",
+      "passed": 18,
+      "food_items_verified": 69,
+      "all_first_attempt_success": true
+    },
+    {
+      "group": "p1_baseline",
+      "passed": 17,
+      "food_items_verified": 39,
+      "all_first_attempt_success": true
+    },
+    {
+      "group": "p1_candidate",
+      "passed": 18,
+      "food_items_verified": 51,
+      "all_first_attempt_success": true
+    },
+    {
+      "group": "synthetic",
+      "passed": 61,
+      "food_items_verified": 61,
+      "all_first_attempt_success": true
+    }
+  ]
+}

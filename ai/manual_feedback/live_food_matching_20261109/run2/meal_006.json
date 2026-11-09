@@ -1,0 +1,134 @@
+{
+  "case_id": "potato_salad",
+  "run": 1,
+  "meal_type": "LUNCH",
+  "image_path": "ai/evals/fixtures/food_name_matching/potato_salad.jpg",
+  "image_sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6",
+  "sequence": 6,
+  "observability": {
+    "originalFoodName": "not_exposed_by_public_api",
+    "candidateFoodRefId": "not_exposed_by_public_api",
+    "selectedFoodRefId": "not_exposed_by_public_api",
+    "rawModelResponse": "not_exposed_by_public_api",
+    "modelVersion": "not_exposed_by_public_api",
+    "gatewayAttemptCount": "not_exposed_by_public_api",
+    "queueAttempts": "not_exposed_by_public_api"
+  },
+  "request": {
+    "mealType": "LUNCH",
+    "eatenAt": "2026-11-09T02:21:15.595898+09:00",
+    "satietyBeforePct": "50",
+    "image_sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6",
+    "image_bytes": 108531,
+    "content_type": "image/jpeg"
+  },
+  "upload_request_sequence": 45,
+  "meal_id": "48382ffc-69d4-4230-9fb6-3ef570632c01",
+  "create_response": {
+    "mealId": "48382ffc-69d4-4230-9fb6-3ef570632c01",
+    "status": "ANALYZING",
+    "steps": [
+      {
+        "key": "FOOD_RECOGNITION",
+        "state": "RUNNING"
+      },
+      {
+        "key": "DB_MATCHING",
+        "state": "PENDING"
+      },
+      {
+        "key": "STAGE_RULE_APPLY",
+        "state": "PENDING"
+      }
+    ],
+    "pollIntervalMs": 1500,
+    "timeoutMs": 30000
+  },
+  "outcome": "REVIEW_REQUIRED",
+  "elapsed_seconds": 6.084,
+  "polls": [
+    {
+      "request_sequence": 46,
+      "elapsed_seconds": 0.005,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 47,
+      "elapsed_seconds": 1.527,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 48,
+      "elapsed_seconds": 3.05,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 49,
+      "elapsed_seconds": 4.565,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 50,
+      "elapsed_seconds": 6.084,
+      "status_code": 200,
+      "status": "REVIEW_REQUIRED"
+    }
+  ],
+  "final_detail": {
+    "mealId": "48382ffc-69d4-4230-9fb6-3ef570632c01",
+    "status": "REVIEW_REQUIRED",
+    "isRecalculation": false,
+    "skipped": false,
+    "stage": "MAINTENANCE",
+    "mealType": "LUNCH",
+    "eatenAt": "2026-11-09T02:21:15.595898+09:00",
+    "imageUrl": "[REDACTED]",
+    "steps": [
+      {
+        "key": "FOOD_RECOGNITION",
+        "state": "DONE"
+      },
+      {
+        "key": "DB_MATCHING",
+        "state": "RUNNING"
+      },
+      {
+        "key": "STAGE_RULE_APPLY",
+        "state": "PENDING"
+      }
+    ],
+    "clarifyQuestion": null,
+    "items": [
+      {
+        "itemId": "1925b8ec-8979-4065-ac2f-657a7e64bd37",
+        "displayName": "감자샐러드",
+        "amount": 250.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 405.0,
+          "proteinG": 6.81,
+          "fatG": 25.14,
+          "carbG": 39.01,
+          "fiberG": 5.75,
+          "sodiumMg": 775.0
+        }
+      }
+    ],
+    "scores": null,
+    "nutrients": [],
+    "satiety": null,
+    "feedback": null
+  },
+  "api_advertised_timeout_ms": 30000,
+  "ready_within_api_advertised_timeout": true,
+  "pending_work_may_continue": false,
+  "upload_to_observation_seconds": 6.099
+}

@@ -1,0 +1,548 @@
+{
+  "created_at_utc": "2026-11-08T16:38:42.002604+00:00",
+  "model_calls": 0,
+  "scope": "Name-only offline replay with identical BE sources and public DB snapshot.",
+  "metric_warning": "DB links, selected-ID changes, and nutrient changes are not semantic accuracy or nutrition ground truth. Source recognition errors are unchanged.",
+  "environment_verified": true,
+  "summary": {
+    "saved_responses": 18,
+    "item_occurrences": 69,
+    "changed_name_occurrences": 7,
+    "changed_selected_ids": 5,
+    "linked_before": 69,
+    "linked_after": 69,
+    "new_links": 0,
+    "lost_links": 0,
+    "nutrition_changed_occurrences": 5,
+    "same_query_selection_changes": 0,
+    "category_transitions": {
+      "PROCESSED -> GENERAL": 3,
+      "GENERAL -> GENERAL": 2
+    }
+  },
+  "changes": [
+    {
+      "case": "food_and_notfood",
+      "run": 1,
+      "item_index": 2,
+      "before_name": "양송이스프",
+      "after_name": "양송이 스프",
+      "name_changed": true,
+      "selected_id_changed": true,
+      "before_selected": {
+        "food_ref_id": "P123-206020300-0092",
+        "name": "양송이스프",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "D104-185060000-0001",
+        "name": "스프_양송이버섯",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "200.00",
+      "before_nutrition": {
+        "kcal": 263.79,
+        "proteinG": 6.49,
+        "fatG": 14.11,
+        "carbG": 27.59,
+        "fiberG": 0.0,
+        "sodiumMg": 898.63
+      },
+      "after_nutrition": {
+        "kcal": 147.0,
+        "proteinG": 3.19,
+        "fatG": 8.15,
+        "carbG": 15.29,
+        "fiberG": 2.0,
+        "sodiumMg": 423.0
+      },
+      "nutrient_changes": [
+        {
+          "field": "carbG",
+          "before": 27.59,
+          "after": 15.29,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -12.3
+        },
+        {
+          "field": "fatG",
+          "before": 14.11,
+          "after": 8.15,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -5.96
+        },
+        {
+          "field": "fiberG",
+          "before": 0.0,
+          "after": 2.0,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": 2.0
+        },
+        {
+          "field": "kcal",
+          "before": 263.79,
+          "after": 147.0,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -116.79
+        },
+        {
+          "field": "proteinG",
+          "before": 6.49,
+          "after": 3.19,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -3.3
+        },
+        {
+          "field": "sodiumMg",
+          "before": 898.63,
+          "after": 423.0,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -475.63
+        }
+      ],
+      "before_conversion_status": "calculated_complete",
+      "after_conversion_status": "calculated_complete"
+    },
+    {
+      "case": "food_and_notfood",
+      "run": 2,
+      "item_index": 2,
+      "before_name": "양송이스프",
+      "after_name": "양송이 스프",
+      "name_changed": true,
+      "selected_id_changed": true,
+      "before_selected": {
+        "food_ref_id": "P123-206020300-0092",
+        "name": "양송이스프",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "D104-185060000-0001",
+        "name": "스프_양송이버섯",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "200.00",
+      "before_nutrition": {
+        "kcal": 263.79,
+        "proteinG": 6.49,
+        "fatG": 14.11,
+        "carbG": 27.59,
+        "fiberG": 0.0,
+        "sodiumMg": 898.63
+      },
+      "after_nutrition": {
+        "kcal": 147.0,
+        "proteinG": 3.19,
+        "fatG": 8.15,
+        "carbG": 15.29,
+        "fiberG": 2.0,
+        "sodiumMg": 423.0
+      },
+      "nutrient_changes": [
+        {
+          "field": "carbG",
+          "before": 27.59,
+          "after": 15.29,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -12.3
+        },
+        {
+          "field": "fatG",
+          "before": 14.11,
+          "after": 8.15,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -5.96
+        },
+        {
+          "field": "fiberG",
+          "before": 0.0,
+          "after": 2.0,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": 2.0
+        },
+        {
+          "field": "kcal",
+          "before": 263.79,
+          "after": 147.0,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -116.79
+        },
+        {
+          "field": "proteinG",
+          "before": 6.49,
+          "after": 3.19,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -3.3
+        },
+        {
+          "field": "sodiumMg",
+          "before": 898.63,
+          "after": 423.0,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -475.63
+        }
+      ],
+      "before_conversion_status": "calculated_complete",
+      "after_conversion_status": "calculated_complete"
+    },
+    {
+      "case": "food_and_notfood",
+      "run": 3,
+      "item_index": 2,
+      "before_name": "양송이스프",
+      "after_name": "양송이 스프",
+      "name_changed": true,
+      "selected_id_changed": true,
+      "before_selected": {
+        "food_ref_id": "P123-206020300-0092",
+        "name": "양송이스프",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "D104-185060000-0001",
+        "name": "스프_양송이버섯",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "200.00",
+      "before_nutrition": {
+        "kcal": 263.79,
+        "proteinG": 6.49,
+        "fatG": 14.11,
+        "carbG": 27.59,
+        "fiberG": 0.0,
+        "sodiumMg": 898.63
+      },
+      "after_nutrition": {
+        "kcal": 147.0,
+        "proteinG": 3.19,
+        "fatG": 8.15,
+        "carbG": 15.29,
+        "fiberG": 2.0,
+        "sodiumMg": 423.0
+      },
+      "nutrient_changes": [
+        {
+          "field": "carbG",
+          "before": 27.59,
+          "after": 15.29,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -12.3
+        },
+        {
+          "field": "fatG",
+          "before": 14.11,
+          "after": 8.15,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -5.96
+        },
+        {
+          "field": "fiberG",
+          "before": 0.0,
+          "after": 2.0,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": 2.0
+        },
+        {
+          "field": "kcal",
+          "before": 263.79,
+          "after": 147.0,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -116.79
+        },
+        {
+          "field": "proteinG",
+          "before": 6.49,
+          "after": 3.19,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -3.3
+        },
+        {
+          "field": "sodiumMg",
+          "before": 898.63,
+          "after": 423.0,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": -475.63
+        }
+      ],
+      "before_conversion_status": "calculated_complete",
+      "after_conversion_status": "calculated_complete"
+    },
+    {
+      "case": "branded_drinks",
+      "run": 2,
+      "item_index": 1,
+      "before_name": "망고 주스",
+      "after_name": "망고주스",
+      "name_changed": true,
+      "selected_id_changed": true,
+      "before_selected": {
+        "food_ref_id": "D220-716000000-0013",
+        "name": "과ㆍ채주스_놀라운망고",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "D220-716000000-0046",
+        "name": "과ㆍ채주스_망고 주스",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "320.00",
+      "before_nutrition": {
+        "kcal": 102.4,
+        "proteinG": 0.1,
+        "fatG": null,
+        "carbG": null,
+        "fiberG": null,
+        "sodiumMg": 0.0
+      },
+      "after_nutrition": {
+        "kcal": 179.2,
+        "proteinG": 1.61,
+        "fatG": 1.12,
+        "carbG": 20.67,
+        "fiberG": null,
+        "sodiumMg": 39.2
+      },
+      "nutrient_changes": [
+        {
+          "field": "carbG",
+          "before": null,
+          "after": 20.67,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": null
+        },
+        {
+          "field": "fatG",
+          "before": null,
+          "after": 1.12,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": null
+        },
+        {
+          "field": "kcal",
+          "before": 102.4,
+          "after": 179.2,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": 76.8
+        },
+        {
+          "field": "proteinG",
+          "before": 0.1,
+          "after": 1.61,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": 1.51
+        },
+        {
+          "field": "sodiumMg",
+          "before": 0.0,
+          "after": 39.2,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": 39.2
+        }
+      ],
+      "before_conversion_status": "calculated_with_missing_nutrients",
+      "after_conversion_status": "calculated_with_missing_nutrients"
+    },
+    {
+      "case": "branded_drinks",
+      "run": 2,
+      "item_index": 2,
+      "before_name": "리치 주스",
+      "after_name": "리치주스",
+      "name_changed": true,
+      "selected_id_changed": false,
+      "before_selected": {
+        "food_ref_id": "P109-302030200-0712",
+        "name": "리치주스",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "P109-302030200-0712",
+        "name": "리치주스",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "320.00",
+      "before_nutrition": {
+        "kcal": 164.8,
+        "proteinG": 0.0,
+        "fatG": 0.0,
+        "carbG": 41.2,
+        "fiberG": null,
+        "sodiumMg": 90.4
+      },
+      "after_nutrition": {
+        "kcal": 164.8,
+        "proteinG": 0.0,
+        "fatG": 0.0,
+        "carbG": 41.2,
+        "fiberG": null,
+        "sodiumMg": 90.4
+      },
+      "nutrient_changes": [],
+      "before_conversion_status": "calculated_with_missing_nutrients",
+      "after_conversion_status": "calculated_with_missing_nutrients"
+    },
+    {
+      "case": "branded_drinks",
+      "run": 3,
+      "item_index": 1,
+      "before_name": "망고 주스",
+      "after_name": "망고주스",
+      "name_changed": true,
+      "selected_id_changed": true,
+      "before_selected": {
+        "food_ref_id": "D220-716000000-0013",
+        "name": "과ㆍ채주스_놀라운망고",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "D220-716000000-0046",
+        "name": "과ㆍ채주스_망고 주스",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "320.00",
+      "before_nutrition": {
+        "kcal": 102.4,
+        "proteinG": 0.1,
+        "fatG": null,
+        "carbG": null,
+        "fiberG": null,
+        "sodiumMg": 0.0
+      },
+      "after_nutrition": {
+        "kcal": 179.2,
+        "proteinG": 1.61,
+        "fatG": 1.12,
+        "carbG": 20.67,
+        "fiberG": null,
+        "sodiumMg": 39.2
+      },
+      "nutrient_changes": [
+        {
+          "field": "carbG",
+          "before": null,
+          "after": 20.67,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": null
+        },
+        {
+          "field": "fatG",
+          "before": null,
+          "after": 1.12,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": null
+        },
+        {
+          "field": "kcal",
+          "before": 102.4,
+          "after": 179.2,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": 76.8
+        },
+        {
+          "field": "proteinG",
+          "before": 0.1,
+          "after": 1.61,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": 1.51
+        },
+        {
+          "field": "sodiumMg",
+          "before": 0.0,
+          "after": 39.2,
+          "before_present": true,
+          "after_present": true,
+          "numeric_delta": 39.2
+        }
+      ],
+      "before_conversion_status": "calculated_with_missing_nutrients",
+      "after_conversion_status": "calculated_with_missing_nutrients"
+    },
+    {
+      "case": "branded_drinks",
+      "run": 3,
+      "item_index": 2,
+      "before_name": "리치 주스",
+      "after_name": "리치주스",
+      "name_changed": true,
+      "selected_id_changed": false,
+      "before_selected": {
+        "food_ref_id": "P109-302030200-0712",
+        "name": "리치주스",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "after_selected": {
+        "food_ref_id": "P109-302030200-0712",
+        "name": "리치주스",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "amount_g": "320.00",
+      "before_nutrition": {
+        "kcal": 164.8,
+        "proteinG": 0.0,
+        "fatG": 0.0,
+        "carbG": 41.2,
+        "fiberG": null,
+        "sodiumMg": 90.4
+      },
+      "after_nutrition": {
+        "kcal": 164.8,
+        "proteinG": 0.0,
+        "fatG": 0.0,
+        "carbG": 41.2,
+        "fiberG": null,
+        "sodiumMg": 90.4
+      },
+      "nutrient_changes": [],
+      "before_conversion_status": "calculated_with_missing_nutrients",
+      "after_conversion_status": "calculated_with_missing_nutrients"
+    }
+  ],
+  "source_sha256": {
+    "protocol": "351b634b565f0c0c4a2ead43547ec04512e8286e0f9f13823bd022da36a48ae6",
+    "source": "db14548e249b5b9e3c571460b4816b0acc3654a226dee54b073f1a207068749b",
+    "candidate": "df8d623e95fe9eb5fe6f141ea3ba6523ba208353147335f69b9b9d2e82124b97",
+    "before_db": "70cb548d697ff2323a16d03993821bfad32a853dfe95fe45162b861f1fcc2cec",
+    "after_db": "488cd35e1a4781cc7010fd9de7e5c2e1439940bd35dd277a59d8656270301bc5"
+  }
+}

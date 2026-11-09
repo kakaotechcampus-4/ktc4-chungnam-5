@@ -1,0 +1,196 @@
+{
+  "decided_at_utc": "2026-11-08T16:37:36.190773+00:00",
+  "model_calls": 0,
+  "scope": "Development diagnostics select meaning-preserving full-name alias rules, not heldout-photo accuracy.",
+  "families": [
+    {
+      "family": "망고_juice",
+      "canonical": "망고주스",
+      "aliases": [
+        "망고주스",
+        "망고쥬스",
+        "망고 주스",
+        "망고 쥬스"
+      ],
+      "canonical_db": {
+        "id": "D220-716000000-0046",
+        "name": "과ㆍ채주스_망고 주스",
+        "category": "GENERAL"
+      },
+      "canonical_nutrition_per_100g": {
+        "kcal": 56.0,
+        "proteinG": 0.5,
+        "fatG": 0.35,
+        "carbG": 6.46,
+        "fiberG": null,
+        "sodiumMg": 12.25
+      }
+    },
+    {
+      "family": "리치_juice",
+      "canonical": "리치주스",
+      "aliases": [
+        "리치주스",
+        "리치쥬스",
+        "리치 주스",
+        "리치 쥬스"
+      ],
+      "canonical_db": {
+        "id": "P109-302030200-0712",
+        "name": "리치주스",
+        "category": "PROCESSED"
+      },
+      "canonical_nutrition_per_100g": {
+        "kcal": 51.5,
+        "proteinG": 0.0,
+        "fatG": 0.0,
+        "carbG": 12.88,
+        "fiberG": null,
+        "sodiumMg": 28.25
+      }
+    },
+    {
+      "family": "토마토_juice",
+      "canonical": "토마토주스",
+      "aliases": [
+        "토마토주스",
+        "토마토쥬스",
+        "토마토 주스",
+        "토마토 쥬스"
+      ],
+      "canonical_db": {
+        "id": "D220-716000000-0179",
+        "name": "과ㆍ채주스_토마토 주스",
+        "category": "GENERAL"
+      },
+      "canonical_nutrition_per_100g": {
+        "kcal": 22.33,
+        "proteinG": 0.63,
+        "fatG": null,
+        "carbG": null,
+        "fiberG": null,
+        "sodiumMg": 3.33
+      }
+    },
+    {
+      "family": "양송이_soup",
+      "canonical": "양송이 스프",
+      "aliases": [
+        "양송이스프",
+        "양송이수프",
+        "양송이 스프",
+        "양송이 수프"
+      ],
+      "canonical_db": {
+        "id": "D104-185060000-0001",
+        "name": "스프_양송이버섯",
+        "category": "GENERAL"
+      },
+      "canonical_nutrition_per_100g": {
+        "kcal": 73.5,
+        "proteinG": 1.6,
+        "fatG": 4.08,
+        "carbG": 7.64,
+        "fiberG": 1.0,
+        "sodiumMg": 211.5
+      }
+    },
+    {
+      "family": "크림_soup",
+      "canonical": "크림 스프",
+      "aliases": [
+        "크림스프",
+        "크림수프",
+        "크림 스프",
+        "크림 수프"
+      ],
+      "canonical_db": {
+        "id": "D304-185120000-0001",
+        "name": "스프_크림",
+        "category": "GENERAL"
+      },
+      "canonical_nutrition_per_100g": {
+        "kcal": 45.0,
+        "proteinG": 0.64,
+        "fatG": 1.59,
+        "carbG": 7.03,
+        "fiberG": 0.3,
+        "sodiumMg": 251.0
+      }
+    },
+    {
+      "family": "옥수수_soup",
+      "canonical": "옥수수 스프",
+      "aliases": [
+        "옥수수스프",
+        "옥수수수프",
+        "옥수수 스프",
+        "옥수수 수프"
+      ],
+      "canonical_db": {
+        "id": "D304-185140000-0001",
+        "name": "스프_옥수수",
+        "category": "GENERAL"
+      },
+      "canonical_nutrition_per_100g": {
+        "kcal": 46.0,
+        "proteinG": 0.83,
+        "fatG": 1.48,
+        "carbG": 7.33,
+        "fiberG": 0.4,
+        "sodiumMg": 229.0
+      }
+    },
+    {
+      "family": "fried_egg",
+      "canonical": "달걀후라이",
+      "aliases": [
+        "달걀프라이",
+        "달걀후라이",
+        "달걀 프라이",
+        "달걀 후라이",
+        "계란프라이",
+        "계란후라이",
+        "계란 프라이",
+        "계란 후라이"
+      ],
+      "canonical_db": {
+        "id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL"
+      },
+      "canonical_nutrition_per_100g": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      }
+    }
+  ],
+  "decisions": {
+    "mango": "Generic mango-juice term and fewer missing nutrient fields; actual branded drink remains approximate.",
+    "lychee": "쥬스 query changes pudding category to juice.",
+    "tomato": "Same dish DB identity consistency only.",
+    "soups": "Spaced ingredient + 스프 preserves ingredient and selects plain GENERAL soup with six nutrient fields. Actual recipe and nutrient accuracy are unmeasured.",
+    "fried_egg": "계란 synonyms previously select fried rice, ham, or gummy; canonical preserves fried egg food type.",
+    "unchanged_tofu": "양념두부 already links to same-name DB; no forced change to pan-fried or greens-mixed dish."
+  },
+  "not_adopted": {
+    "peach_juice": "Canonical still adds apricot, no adequate canonical for this rule set.",
+    "orange_juice": "Some variants lose known nutrient fields; defer.",
+    "grape_juice": "Canonical adds green-grape subtype and some variants lose known nutrient fields.",
+    "apple_juice": "Canonical adds carrot; defer.",
+    "global_space_removal": "Changes BE token AND semantics.",
+    "global_soup_spelling_replacement": "크림수프 introduces pumpkin; ingredient + space + 스프 is vetted per family only."
+  },
+  "criteria": [
+    "Full-name semantic equivalence only.",
+    "Unknown names and qualifiers are preserved exactly.",
+    "Do not fabricate food IDs, nutrients, quantities, or ingredients.",
+    "No prompt or BE policy changes.",
+    "DB identity consistency and nutrient completeness are not nutrition accuracy."
+  ],
+  "diagnostics_sha256": "febb76c1c81f1b8a9e01356cdda2a879e82e2ba8cebf78d9ba664ab3b43ff5f4"
+}

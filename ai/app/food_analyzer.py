@@ -13,13 +13,31 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import logging
 
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.config import get_settings
+from app.food_names import normalize_food_name
 from app.schemas import RecognizedItem
+
+logger = logging.getLogger(__name__)
+_FINISH_REASONS = {"stop", "length", "content_filter", "tool_calls", "function_call"}
+
+
+class InvalidVisionResponse(Exception):
+    """응답 원문이나 검증 오류를 노출하지 않는 모델 응답 오류."""
+
+    def __init__(self, reason: str = "invalid_response") -> None:
+        self.reason = reason
+        super().__init__("음식 분석 모델의 응답 형식이 올바르지 않습니다")
+
+
+class VisionUnavailable(Exception):
+    """비전 모델이 설정되지 않은 경우."""
 
 
 class _ImageAnalysisResult(BaseModel):
@@ -32,11 +50,20 @@ async def analyze_food(meal_type: str, image_url: str) -> list[RecognizedItem]:
     """음식 사진을 분석하여 RecognizedItem 목록을 반환한다."""
     prompt = _build_prompt(meal_type)
     response_text = await _call_vision_model(image_url, prompt)
-    return _parse_response(response_text)
+    try:
+        return _parse_response(response_text)
+    except ValidationError as exc:
+        # 클라이언트에서도 검증한다. 별도 클라이언트/테스트 대체 경로에서도
+        # Pydantic 오류에 들어 있는 원문을 HTTP 오류에 노출하지 않는다.
+        raise InvalidVisionResponse(_validation_reason(exc)) from None
 
 
 async def _call_vision_model(image_url: str, prompt: str) -> str:
-    """`LLM_VISION_URL`(mlapi.run 게이트웨이, Gemini Flash)을 호출해 JSON 문자열을 받는다.
+    """게이트웨이에서 스키마 검증을 통과한 원문 JSON 문자열을 받는다.
+
+    HTTP 오류와 응답 형식 오류가 재시도 예산을 공유한다. 모델 POST는 최대
+    `LLM_MAX_RETRIES + 1`회이며, 이미지 다운로드와 모든 시도를 합친 시간은
+    `LLM_TIMEOUT_SEC` 이내다. 원문을 임의 복구하거나 부분 결과로 성공하지 않는다.
 
     실제 호출로 확인된 스펙(2026-10-17):
     - 엔드포인트는 `LLM_VISION_URL` 바로 뒤에 `/v1/chat/completions`를 붙여야 한다 —
@@ -49,44 +76,115 @@ async def _call_vision_model(image_url: str, prompt: str) -> str:
     """
     settings = get_settings()
     if not settings.LLM_VISION_URL:
-        raise ValueError("음식 분석에는 LLM_VISION_URL 설정이 필요하다")
+        raise VisionUnavailable("음식 분석 모델이 설정되지 않았습니다")
     endpoint = f"{settings.LLM_VISION_URL}/v1/chat/completions"
     headers = {"Authorization": f"Bearer {settings.LLM_API_KEY.get_secret_value()}"}
+    max_attempts = max(0, settings.LLM_MAX_RETRIES) + 1
+    attempt = 0
 
-    async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT_SEC) as client:
-        image_response = await client.get(image_url)
-        image_response.raise_for_status()
-        media_type = image_response.headers.get("content-type", "image/jpeg").split(";")[0]
-        data_uri = (
-            f"data:{media_type};base64,"
-            f"{base64.b64encode(image_response.content).decode('ascii')}"
-        )
-
-        last_error: Exception | None = None
-        for attempt in range(settings.LLM_MAX_RETRIES + 1):
-            try:
-                response = await client.post(
-                    endpoint,
-                    headers=headers,
-                    json={
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "image_url", "image_url": {"url": data_uri}},
-                                    {"type": "text", "text": prompt},
-                                ],
-                            }
-                        ],
-                    },
+    try:
+        async with asyncio.timeout(settings.LLM_TIMEOUT_SEC):
+            async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT_SEC) as client:
+                image_response = await client.get(image_url)
+                image_response.raise_for_status()
+                media_type = image_response.headers.get("content-type", "image/jpeg").split(";")[0]
+                data_uri = (
+                    f"data:{media_type};base64,"
+                    f"{base64.b64encode(image_response.content).decode('ascii')}"
                 )
-                response.raise_for_status()
-                return response.json()["choices"][0]["message"]["content"]
-            except (httpx.HTTPStatusError, httpx.TransportError) as exc:
-                last_error = exc
+                payload = {"messages": [{"role": "user", "content": [
+                    {"type": "image_url", "image_url": {"url": data_uri}},
+                    {"type": "text", "text": prompt},
+                ]}]}
+                for attempt in range(1, max_attempts + 1):
+                    metadata = {"attempt": attempt, "max_attempts": max_attempts,
+                                "status_code": None, "finish_reason": "unknown",
+                                "response_chars": 0}
+                    try:
+                        response = await client.post(endpoint, headers=headers, json=payload)
+                        metadata["status_code"] = response.status_code
+                        response.raise_for_status()
+                        try:
+                            body = response.json()
+                        except ValueError:
+                            raise InvalidVisionResponse("invalid_envelope") from None
+                        choice = _vision_choice(body)
+                        finish = choice.get("finish_reason")
+                        metadata["finish_reason"] = (
+                            finish if isinstance(finish, str) and finish in _FINISH_REASONS
+                            else "unknown" if finish is None else "other"
+                        )
+                        message = choice.get("message")
+                        if not isinstance(message, dict):
+                            raise InvalidVisionResponse("invalid_envelope")
+                        content = message.get("content")
+                        metadata["response_chars"] = len(content) if isinstance(content, str) else 0
+                        if finish == "content_filter" or message.get("refusal"):
+                            raise InvalidVisionResponse("refused")
+                        if finish == "length":
+                            raise InvalidVisionResponse("truncated")
+                        if finish in ("tool_calls", "function_call"):
+                            raise InvalidVisionResponse("unexpected_finish_reason")
+                        if not isinstance(content, str) or not content.strip():
+                            raise InvalidVisionResponse("invalid_content")
+                        try:
+                            _parse_response(content)
+                        except ValidationError as exc:
+                            raise InvalidVisionResponse(_validation_reason(exc)) from None
+                    except InvalidVisionResponse as exc:
+                        _log_attempt(logging.WARNING, metadata, exc.reason)
+                        if exc.reason == "refused" or attempt == max_attempts:
+                            raise
+                    except httpx.HTTPStatusError as exc:
+                        _log_attempt(logging.WARNING, metadata, "http_error")
+                        code = exc.response.status_code
+                        retryable = code in (408, 429) or (500 <= code < 600 and code != 501)
+                        if not retryable or attempt == max_attempts:
+                            raise
+                    except httpx.TransportError:
+                        _log_attempt(logging.WARNING, metadata, "transport_error")
+                        if attempt == max_attempts:
+                            raise
+                    else:
+                        _log_attempt(logging.INFO, metadata, "success")
+                        return content
+    except TimeoutError:
+        logger.warning(
+            "vision_deadline_exceeded attempts_started=%d max_attempts=%d timeout_seconds=%s",
+            attempt, max_attempts, settings.LLM_TIMEOUT_SEC,
+            extra={"attempts_started": attempt, "max_attempts": max_attempts,
+                   "timeout_seconds": settings.LLM_TIMEOUT_SEC},
+        )
+        raise httpx.TimeoutException("음식 분석 요청 시간이 초과되었습니다") from None
 
-    assert last_error is not None
-    raise last_error
+    raise AssertionError("Vision attempt loop ended without a result")
+
+
+def _vision_choice(body: object) -> dict:
+    """호환 API 응답 봉투를 확인하되 오류에 원문을 포함하지 않는다."""
+    if not isinstance(body, dict):
+        raise InvalidVisionResponse("invalid_envelope")
+    choices = body.get("choices")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        raise InvalidVisionResponse("invalid_envelope")
+    return choices[0]
+
+
+def _validation_reason(error: ValidationError) -> str:
+    """응답 본문·오류 설명을 로그에 전달하지 않고 고정 코드만 반환한다."""
+    types = {item["type"] for item in error.errors(include_input=False, include_url=False)}
+    return "invalid_json" if "json_invalid" in types else "invalid_schema"
+
+
+def _log_attempt(level: int, metadata: dict, outcome: str) -> None:
+    # 구조화 로거용 extra와 기본 포매터 모두에 동일한 안전한 값만 남긴다.
+    logger.log(
+        level,
+        "vision_attempt attempt=%d max_attempts=%d outcome=%s status_code=%s finish_reason=%s response_chars=%d",
+        metadata["attempt"], metadata["max_attempts"], outcome, metadata["status_code"],
+        metadata["finish_reason"], metadata["response_chars"],
+        extra={**metadata, "outcome": outcome},
+    )
 
 
 def _build_prompt(meal_type: str) -> str:
@@ -123,6 +221,10 @@ mealType: {meal_type}
 각 음식에 대해 다음 정보를 반환하세요.
 
 - originalFoodName: 표준 음식명 (브랜드명·불필요한 수식어는 제거)
+  - 사진에서 확인되는 주재료와 조리법 중 음식을 구분하는 핵심 정보는 이름에 남기세요.
+  - 브랜드명·홍보 표현·감상이나 분량 설명은 빼되, 음식 종류를 구분하는 재료·조리법까지 생략하지 마세요.
+  - 사진에서 확인할 수 없는 재료·고기 종류·조리법을 추측해 추가하지 마세요.
+  - 여러 후보를 나열하거나 설명문을 쓰지 말고, 확인 가능한 범위의 간결한 음식명 하나로 쓰세요.
 - estimatedAmount: 추정 섭취량
 - unit: 섭취량 단위
   - **기본은 그램(g)입니다.** 밥·국·면류는 물론, 빵 조각·고기 한 점·만두 한 개처럼
@@ -151,14 +253,16 @@ mealType: {meal_type}
 def _parse_response(response: str) -> list[RecognizedItem]:
     """모델 응답(JSON 문자열)을 RecognizedItem 목록으로 변환한다.
 
-    `candidate_food_ref_id`/`clarify_question`은 여기서 비워 둔다 — 전자는 tool
-    연동 전까지 항상 None, 후자는 1차 개발 범위 밖(명세 기준)이라 RecognizedItem
-    기본값(None)을 그대로 쓴다.
+    스키마 검증 후 등록된 동의 표기만 정규화한다. 음식명 외 필드는 그대로
+    보존하며, DB ID나 영양값을 새로 만들지 않는다.
 
     게이트웨이가 `output_config.format` 같은 스키마 강제를 지원하는지 몰라서,
     마크다운 코드펜스(```json ... ```)로 감싸서 줄 가능성까지 방어적으로 벗겨낸다.
     """
-    return _ImageAnalysisResult.model_validate_json(_strip_code_fence(response)).items
+    items = _ImageAnalysisResult.model_validate_json(_strip_code_fence(response)).items
+    for item in items:
+        item.original_food_name = normalize_food_name(item.original_food_name)
+    return items
 
 
 def _strip_code_fence(text: str) -> str:

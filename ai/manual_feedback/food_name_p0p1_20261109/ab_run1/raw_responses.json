@@ -1,0 +1,1911 @@
+{
+  "planned_calls": 36,
+  "completed_calls": 36,
+  "failed_calls": 1,
+  "actual_gateway_attempts": 36,
+  "stopped_reason": null,
+  "records": [
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "run": 1,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:12:23.725655+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.93\n    },\n    {\n      \"originalFoodName\": \"양념게장\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.8\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.87\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.82\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-manybanchan-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "불고기비빔밥",
+            "estimatedAmount": 350.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "쌀밥",
+            "estimatedAmount": 210.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "콩나물국",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "잡채",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.93,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양념게장",
+            "estimatedAmount": 70.0,
+            "unit": "g",
+            "confidence": 0.8,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양념두부",
+            "estimatedAmount": 60.0,
+            "unit": "g",
+            "confidence": 0.88,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "브로콜리두부무침",
+            "estimatedAmount": 50.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "배추김치",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양배추샐러드",
+            "estimatedAmount": 60.0,
+            "unit": "g",
+            "confidence": 0.87,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "미역초무침",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.82,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "무피클",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 1,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 1448,
+            "prompt_tokens": 1641,
+            "total_tokens": 3089,
+            "input_tokens": 1641,
+            "output_tokens": 1448,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 15.509
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "run": 1,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:12:39.236453+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 400,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 400,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.93\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"더덕무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.7\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-manybanchan-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "불고기비빔밥",
+            "estimatedAmount": 400.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "불고기비빔밥",
+            "estimatedAmount": 400.0,
+            "unit": "g",
+            "confidence": 0.88,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "콩나물국",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "콩나물국",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "콩나물국",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "쌀밥",
+            "estimatedAmount": 210.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "잡채",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "브로콜리두부무침",
+            "estimatedAmount": 60.0,
+            "unit": "g",
+            "confidence": 0.88,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "배추김치",
+            "estimatedAmount": 50.0,
+            "unit": "g",
+            "confidence": 0.93,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양배추샐러드",
+            "estimatedAmount": 70.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "미역초무침",
+            "estimatedAmount": 50.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "무피클",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양념두부",
+            "estimatedAmount": 70.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "더덕무침",
+            "estimatedAmount": 50.0,
+            "unit": "g",
+            "confidence": 0.7,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 2,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 1701,
+            "prompt_tokens": 1763,
+            "total_tokens": 3464,
+            "input_tokens": 1763,
+            "output_tokens": 1701,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 15.671
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "run": 2,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:12:54.914430+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 400,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"공깃밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"양념게장\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.75\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.82\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-manybanchan-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "불고기비빔밥",
+            "estimatedAmount": 400.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "공깃밥",
+            "estimatedAmount": 210.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "콩나물국",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "잡채",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "브로콜리두부무침",
+            "estimatedAmount": 60.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "배추김치",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양배추샐러드",
+            "estimatedAmount": 70.0,
+            "unit": "g",
+            "confidence": 0.88,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양념두부",
+            "estimatedAmount": 70.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양념게장",
+            "estimatedAmount": 60.0,
+            "unit": "g",
+            "confidence": 0.75,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "미역초무침",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.82,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "무피클",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 3,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 1518,
+            "prompt_tokens": 1763,
+            "total_tokens": 3281,
+            "input_tokens": 1763,
+            "output_tokens": 1518,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 13.817
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "run": 2,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:13:08.733858+00:00",
+      "error": "ValidationError",
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"연두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"무초절임\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"오징어초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      ",
+      "response": null,
+      "gateway_attempts": [
+        {
+          "index": 4,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 1996,
+            "prompt_tokens": 1641,
+            "total_tokens": 3637,
+            "input_tokens": 1641,
+            "output_tokens": 1996,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 17.299
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "run": 3,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:13:26.035860+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 450,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 450,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"공깃밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"공깃밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"더덕무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.75\n    },\n    {\n      \"originalFoodName\": \"연두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-manybanchan-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "불고기비빔밥",
+            "estimatedAmount": 450.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "불고기비빔밥",
+            "estimatedAmount": 450.0,
+            "unit": "g",
+            "confidence": 0.88,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "공깃밥",
+            "estimatedAmount": 210.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "공깃밥",
+            "estimatedAmount": 210.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "콩나물국",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "잡채",
+            "estimatedAmount": 70.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "브로콜리두부무침",
+            "estimatedAmount": 50.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "배추김치",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "샐러드",
+            "estimatedAmount": 60.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "더덕무침",
+            "estimatedAmount": 50.0,
+            "unit": "g",
+            "confidence": 0.75,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "연두부",
+            "estimatedAmount": 70.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "미역초무침",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "무피클",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 5,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 1565,
+            "prompt_tokens": 1641,
+            "total_tokens": 3206,
+            "input_tokens": 1641,
+            "output_tokens": 1565,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 14.749
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "run": 3,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:13:40.788588+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 400,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"공깃밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.93\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양념게장\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.75\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-manybanchan-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "불고기비빔밥",
+            "estimatedAmount": 400.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "공깃밥",
+            "estimatedAmount": 210.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "콩나물국",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.93,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "잡채",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "브로콜리두부무침",
+            "estimatedAmount": 50.0,
+            "unit": "g",
+            "confidence": 0.88,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "배추김치",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양념두부",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양념게장",
+            "estimatedAmount": 60.0,
+            "unit": "g",
+            "confidence": 0.75,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "양배추샐러드",
+            "estimatedAmount": 60.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "미역초무침",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          },
+          {
+            "originalFoodName": "무피클",
+            "estimatedAmount": 40.0,
+            "unit": "g",
+            "confidence": 0.88,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 6,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 1234,
+            "prompt_tokens": 1763,
+            "total_tokens": 2997,
+            "input_tokens": 1763,
+            "output_tokens": 1234,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 11.969
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "split": "regression",
+      "run": 1,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:13:52.760555+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"포테이토피자\", \"estimatedAmount\": 115, \"unit\": \"g\", \"confidence\": 0.92}]}\n```",
+      "response": {
+        "mealId": "ab-piece_of_pizza-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "포테이토피자",
+            "estimatedAmount": 115.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 7,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 344,
+            "prompt_tokens": 1799,
+            "total_tokens": 2143,
+            "input_tokens": 1799,
+            "output_tokens": 344,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 6.547
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "split": "regression",
+      "run": 1,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:13:59.312923+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"포테이토피자\", \"estimatedAmount\": 100, \"unit\": \"g\", \"confidence\": 0.92}]}\n```",
+      "response": {
+        "mealId": "ab-piece_of_pizza-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "포테이토피자",
+            "estimatedAmount": 100.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 8,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 386,
+            "prompt_tokens": 1677,
+            "total_tokens": 2063,
+            "input_tokens": 1677,
+            "output_tokens": 386,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.835
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "split": "regression",
+      "run": 2,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:14:05.153015+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"포테이토피자\", \"estimatedAmount\": 100, \"unit\": \"g\", \"confidence\": 0.92}]}\n```",
+      "response": {
+        "mealId": "ab-piece_of_pizza-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "포테이토피자",
+            "estimatedAmount": 100.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 9,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 335,
+            "prompt_tokens": 1677,
+            "total_tokens": 2012,
+            "input_tokens": 1677,
+            "output_tokens": 335,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.245
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "split": "regression",
+      "run": 2,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:14:10.403912+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"포테이토피자\", \"estimatedAmount\": 110, \"unit\": \"g\", \"confidence\": 0.9}]}\n```",
+      "response": {
+        "mealId": "ab-piece_of_pizza-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "포테이토피자",
+            "estimatedAmount": 110.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 10,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 328,
+            "prompt_tokens": 1799,
+            "total_tokens": 2127,
+            "input_tokens": 1799,
+            "output_tokens": 328,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.482
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "split": "regression",
+      "run": 3,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:14:15.892398+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"포테이토피자\", \"estimatedAmount\": 110, \"unit\": \"g\", \"confidence\": 0.9}]}\n```",
+      "response": {
+        "mealId": "ab-piece_of_pizza-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "포테이토피자",
+            "estimatedAmount": 110.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 11,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 246,
+            "prompt_tokens": 1799,
+            "total_tokens": 2045,
+            "input_tokens": 1799,
+            "output_tokens": 246,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 4.511
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "split": "regression",
+      "run": 3,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:14:20.408904+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"포테이토피자\", \"estimatedAmount\": 105, \"unit\": \"g\", \"confidence\": 0.92}]}\n```",
+      "response": {
+        "mealId": "ab-piece_of_pizza-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "포테이토피자",
+            "estimatedAmount": 105.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 12,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 304,
+            "prompt_tokens": 1677,
+            "total_tokens": 1981,
+            "input_tokens": 1677,
+            "output_tokens": 304,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.045
+    },
+    {
+      "case_id": "whole_cake",
+      "split": "regression",
+      "run": 1,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:14:25.458852+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"치즈케이크\", \"estimatedAmount\": 1, \"unit\": \"개\", \"confidence\": 0.98}]}\n```",
+      "response": {
+        "mealId": "ab-whole_cake-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "치즈케이크",
+            "estimatedAmount": 1.0,
+            "unit": "개",
+            "confidence": 0.98,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 13,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 281,
+            "prompt_tokens": 1666,
+            "total_tokens": 1947,
+            "input_tokens": 1666,
+            "output_tokens": 281,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.133
+    },
+    {
+      "case_id": "whole_cake",
+      "split": "regression",
+      "run": 1,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:14:30.597423+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"치즈케이크\",\n      \"estimatedAmount\": 1,\n      \"unit\": \"판\",\n      \"confidence\": 0.95\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-whole_cake-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "치즈케이크",
+            "estimatedAmount": 1.0,
+            "unit": "판",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 14,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 362,
+            "prompt_tokens": 1788,
+            "total_tokens": 2150,
+            "input_tokens": 1788,
+            "output_tokens": 362,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.896
+    },
+    {
+      "case_id": "whole_cake",
+      "split": "regression",
+      "run": 2,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:14:36.497869+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"치즈케이크\", \"estimatedAmount\": 1, \"unit\": \"개\", \"confidence\": 0.98}]}\n```",
+      "response": {
+        "mealId": "ab-whole_cake-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "치즈케이크",
+            "estimatedAmount": 1.0,
+            "unit": "개",
+            "confidence": 0.98,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 15,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 403,
+            "prompt_tokens": 1788,
+            "total_tokens": 2191,
+            "input_tokens": 1788,
+            "output_tokens": 403,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 6.547
+    },
+    {
+      "case_id": "whole_cake",
+      "split": "regression",
+      "run": 2,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:14:43.051354+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"치즈케이크\", \"estimatedAmount\": 1, \"unit\": \"개\", \"confidence\": 0.98}]}\n```",
+      "response": {
+        "mealId": "ab-whole_cake-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "치즈케이크",
+            "estimatedAmount": 1.0,
+            "unit": "개",
+            "confidence": 0.98,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 16,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 284,
+            "prompt_tokens": 1666,
+            "total_tokens": 1950,
+            "input_tokens": 1666,
+            "output_tokens": 284,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 4.898
+    },
+    {
+      "case_id": "whole_cake",
+      "split": "regression",
+      "run": 3,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:14:47.955778+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"치즈케이크\", \"estimatedAmount\": 1, \"unit\": \"개\", \"confidence\": 0.98}]}\n```",
+      "response": {
+        "mealId": "ab-whole_cake-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "치즈케이크",
+            "estimatedAmount": 1.0,
+            "unit": "개",
+            "confidence": 0.98,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 17,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 328,
+            "prompt_tokens": 1666,
+            "total_tokens": 1994,
+            "input_tokens": 1666,
+            "output_tokens": 328,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.075
+    },
+    {
+      "case_id": "whole_cake",
+      "split": "regression",
+      "run": 3,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:14:53.037506+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"치즈케이크\", \"estimatedAmount\": 1, \"unit\": \"개\", \"confidence\": 0.98}]}\n```",
+      "response": {
+        "mealId": "ab-whole_cake-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "치즈케이크",
+            "estimatedAmount": 1.0,
+            "unit": "개",
+            "confidence": 0.98,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 18,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 339,
+            "prompt_tokens": 1788,
+            "total_tokens": 2127,
+            "input_tokens": 1788,
+            "output_tokens": 339,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.374
+    },
+    {
+      "case_id": "coleslaw",
+      "split": "holdout",
+      "run": 1,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:14:58.417278+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"무샐러드\", \"estimatedAmount\": 80, \"unit\": \"g\", \"confidence\": 0.8}]}\n```",
+      "response": {
+        "mealId": "ab-coleslaw-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "무샐러드",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.8,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 19,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 451,
+            "prompt_tokens": 1763,
+            "total_tokens": 2214,
+            "input_tokens": 1763,
+            "output_tokens": 451,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 8.17
+    },
+    {
+      "case_id": "coleslaw",
+      "split": "holdout",
+      "run": 1,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:15:06.593380+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"무샐러드\",\n      \"estimatedAmount\": 90,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-coleslaw-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "무샐러드",
+            "estimatedAmount": 90.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 20,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 343,
+            "prompt_tokens": 1641,
+            "total_tokens": 1984,
+            "input_tokens": 1641,
+            "output_tokens": 343,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.727
+    },
+    {
+      "case_id": "coleslaw",
+      "split": "holdout",
+      "run": 2,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:15:12.326739+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"무샐러드\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.8\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-coleslaw-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "무샐러드",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.8,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 21,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 462,
+            "prompt_tokens": 1641,
+            "total_tokens": 2103,
+            "input_tokens": 1641,
+            "output_tokens": 462,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 6.857
+    },
+    {
+      "case_id": "coleslaw",
+      "split": "holdout",
+      "run": 2,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:15:19.191079+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"무샐러드\", \"estimatedAmount\": 80, \"unit\": \"g\", \"confidence\": 0.82}]}\n```",
+      "response": {
+        "mealId": "ab-coleslaw-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "무샐러드",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.82,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 22,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 392,
+            "prompt_tokens": 1763,
+            "total_tokens": 2155,
+            "input_tokens": 1763,
+            "output_tokens": 392,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.946
+    },
+    {
+      "case_id": "coleslaw",
+      "split": "holdout",
+      "run": 3,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:15:25.143679+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"무샐러드\", \"estimatedAmount\": 80, \"unit\": \"g\", \"confidence\": 0.85}]}\n```",
+      "response": {
+        "mealId": "ab-coleslaw-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "무샐러드",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.85,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 23,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 448,
+            "prompt_tokens": 1763,
+            "total_tokens": 2211,
+            "input_tokens": 1763,
+            "output_tokens": 448,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 7.009
+    },
+    {
+      "case_id": "coleslaw",
+      "split": "holdout",
+      "run": 3,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:15:32.158892+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"무샐러드\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.8\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-coleslaw-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "무샐러드",
+            "estimatedAmount": 80.0,
+            "unit": "g",
+            "confidence": 0.8,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 24,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 494,
+            "prompt_tokens": 1641,
+            "total_tokens": 2135,
+            "input_tokens": 1641,
+            "output_tokens": 494,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 6.724
+    },
+    {
+      "case_id": "fried_eggs",
+      "split": "holdout",
+      "run": 1,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:15:38.889110+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"달걀프라이\",\n      \"estimatedAmount\": 100,\n      \"unit\": \"g\",\n      \"confidence\": 0.98\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-fried_eggs-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "달걀프라이",
+            "estimatedAmount": 100.0,
+            "unit": "g",
+            "confidence": 0.98,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 25,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 205,
+            "prompt_tokens": 1641,
+            "total_tokens": 1846,
+            "input_tokens": 1641,
+            "output_tokens": 205,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 4.527
+    },
+    {
+      "case_id": "fried_eggs",
+      "split": "holdout",
+      "run": 1,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:15:43.422844+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"달걀프라이\",\n      \"estimatedAmount\": 100,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-fried_eggs-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "달걀프라이",
+            "estimatedAmount": 100.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 26,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 192,
+            "prompt_tokens": 1763,
+            "total_tokens": 1955,
+            "input_tokens": 1763,
+            "output_tokens": 192,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 4.041
+    },
+    {
+      "case_id": "fried_eggs",
+      "split": "holdout",
+      "run": 2,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:15:47.471177+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"달걀프라이\",\n      \"estimatedAmount\": 100,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-fried_eggs-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "달걀프라이",
+            "estimatedAmount": 100.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 27,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 212,
+            "prompt_tokens": 1763,
+            "total_tokens": 1975,
+            "input_tokens": 1763,
+            "output_tokens": 212,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 4.172
+    },
+    {
+      "case_id": "fried_eggs",
+      "split": "holdout",
+      "run": 2,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:15:51.649471+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"달걀프라이\",\n      \"estimatedAmount\": 100,\n      \"unit\": \"g\",\n      \"confidence\": 0.96\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-fried_eggs-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "달걀프라이",
+            "estimatedAmount": 100.0,
+            "unit": "g",
+            "confidence": 0.96,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 28,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 559,
+            "prompt_tokens": 1641,
+            "total_tokens": 2200,
+            "input_tokens": 1641,
+            "output_tokens": 559,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 6.86
+    },
+    {
+      "case_id": "fried_eggs",
+      "split": "holdout",
+      "run": 3,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:15:58.516624+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"달걀프라이\",\n      \"estimatedAmount\": 100,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-fried_eggs-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "달걀프라이",
+            "estimatedAmount": 100.0,
+            "unit": "g",
+            "confidence": 0.95,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 29,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 222,
+            "prompt_tokens": 1641,
+            "total_tokens": 1863,
+            "input_tokens": 1641,
+            "output_tokens": 222,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.312
+    },
+    {
+      "case_id": "fried_eggs",
+      "split": "holdout",
+      "run": 3,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:16:03.836192+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"달걀프라이\",\n      \"estimatedAmount\": 100,\n      \"unit\": \"g\",\n      \"confidence\": 0.98\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-fried_eggs-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "달걀프라이",
+            "estimatedAmount": 100.0,
+            "unit": "g",
+            "confidence": 0.98,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 30,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 161,
+            "prompt_tokens": 1763,
+            "total_tokens": 1924,
+            "input_tokens": 1763,
+            "output_tokens": 161,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 4.356
+    },
+    {
+      "case_id": "potato_salad",
+      "split": "holdout",
+      "run": 1,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:16:08.199193+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"감자샐러드\", \"estimatedAmount\": 200, \"unit\": \"g\", \"confidence\": 0.88}]}\n```",
+      "response": {
+        "mealId": "ab-potato_salad-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "감자샐러드",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.88,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 31,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 249,
+            "prompt_tokens": 1779,
+            "total_tokens": 2028,
+            "input_tokens": 1779,
+            "output_tokens": 249,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 6.384
+    },
+    {
+      "case_id": "potato_salad",
+      "split": "holdout",
+      "run": 1,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:16:14.589983+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"감자샐러드\", \"estimatedAmount\": 200, \"unit\": \"g\", \"confidence\": 0.9}]}\n```",
+      "response": {
+        "mealId": "ab-potato_salad-1",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "감자샐러드",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 32,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 278,
+            "prompt_tokens": 1657,
+            "total_tokens": 1935,
+            "input_tokens": 1657,
+            "output_tokens": 278,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 4.99
+    },
+    {
+      "case_id": "potato_salad",
+      "split": "holdout",
+      "run": 2,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:16:19.587167+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"감자샐러드\", \"estimatedAmount\": 200, \"unit\": \"g\", \"confidence\": 0.9}]}\n```",
+      "response": {
+        "mealId": "ab-potato_salad-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "감자샐러드",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 33,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 227,
+            "prompt_tokens": 1657,
+            "total_tokens": 1884,
+            "input_tokens": 1657,
+            "output_tokens": 227,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.216
+    },
+    {
+      "case_id": "potato_salad",
+      "split": "holdout",
+      "run": 2,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:16:24.811832+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"감자샐러드\",\n      \"estimatedAmount\": 250,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-potato_salad-2",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "감자샐러드",
+            "estimatedAmount": 250.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 34,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 315,
+            "prompt_tokens": 1779,
+            "total_tokens": 2094,
+            "input_tokens": 1779,
+            "output_tokens": 315,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 5.666
+    },
+    {
+      "case_id": "potato_salad",
+      "split": "holdout",
+      "run": 3,
+      "arm": "candidate",
+      "started_at_utc": "2026-11-08T16:16:30.481906+00:00",
+      "error": null,
+      "raw_text": "```json\n{\"items\": [{\"originalFoodName\": \"감자샐러드\", \"estimatedAmount\": 250, \"unit\": \"g\", \"confidence\": 0.9}]}\n```",
+      "response": {
+        "mealId": "ab-potato_salad-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "감자샐러드",
+            "estimatedAmount": 250.0,
+            "unit": "g",
+            "confidence": 0.9,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 35,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 343,
+            "prompt_tokens": 1779,
+            "total_tokens": 2122,
+            "input_tokens": 1779,
+            "output_tokens": 343,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 6.217
+    },
+    {
+      "case_id": "potato_salad",
+      "split": "holdout",
+      "run": 3,
+      "arm": "baseline",
+      "started_at_utc": "2026-11-08T16:16:36.706598+00:00",
+      "error": null,
+      "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"감자샐러드\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    }\n  ]\n}\n```",
+      "response": {
+        "mealId": "ab-potato_salad-3",
+        "modelVersion": "gemini-flash-gateway",
+        "safetyStatus": "SAFE",
+        "items": [
+          {
+            "originalFoodName": "감자샐러드",
+            "estimatedAmount": 200.0,
+            "unit": "g",
+            "confidence": 0.92,
+            "candidateFoodRefId": null,
+            "clarifyQuestion": null
+          }
+        ]
+      },
+      "gateway_attempts": [
+        {
+          "index": 36,
+          "status_code": 200,
+          "model": "gemini-3.8-flash",
+          "usage": {
+            "completion_tokens": 309,
+            "prompt_tokens": 1657,
+            "total_tokens": 1966,
+            "input_tokens": 1657,
+            "output_tokens": 309,
+            "cached_prompt_tokens": 0,
+            "cache_write_tokens": 0
+          }
+        }
+      ],
+      "elapsed_seconds": 6.543
+    }
+  ]
+}

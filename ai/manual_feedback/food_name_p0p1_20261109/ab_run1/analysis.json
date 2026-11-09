@@ -1,0 +1,294 @@
+{
+  "measured_date_kst": "2026-11-09",
+  "summarized_at_utc": "2026-11-08T16:24:28.822135+00:00",
+  "baseline_commit": "a088974",
+  "candidate_change": "Four generic originalFoodName instructions only; preserve visually supported ingredients/preparation and avoid unsupported specifics.",
+  "scope": "Same model+images+BE+publicDB; P0 labels and P1 prompt frozen before calls. No full API, safety_guard, real meal quantity truth, or nutrition truth validation.",
+  "provider_models": [
+    "gemini-3.8-flash"
+  ],
+  "planned_calls": 36,
+  "actual_gateway_attempts": 36,
+  "model_call_retries": 0,
+  "parse_success": {
+    "baseline": {
+      "passed": 17,
+      "n": 18
+    },
+    "candidate": {
+      "passed": 18,
+      "n": 18
+    }
+  },
+  "db_linking": {
+    "baseline": {
+      "linked": 39,
+      "items": 39
+    },
+    "candidate": {
+      "linked": 51,
+      "items": 51
+    }
+  },
+  "target_metric": "Hit of predeclared acceptable food_ref_id per target per response; not overall accuracy. Failed/missing responses remain in denominator.",
+  "by_split": {
+    "baseline": {
+      "development": {
+        "planned_responses": 3,
+        "parsed_responses": 2,
+        "failed_responses": 1,
+        "missing_responses": 0,
+        "target_trials": 18,
+        "target_hits": 7,
+        "linked_items": 24,
+        "unlinked_items": 0
+      },
+      "regression": {
+        "planned_responses": 6,
+        "parsed_responses": 6,
+        "failed_responses": 0,
+        "missing_responses": 0,
+        "target_trials": 6,
+        "target_hits": 6,
+        "linked_items": 6,
+        "unlinked_items": 0
+      },
+      "holdout": {
+        "planned_responses": 9,
+        "parsed_responses": 9,
+        "failed_responses": 0,
+        "missing_responses": 0,
+        "target_trials": 9,
+        "target_hits": 6,
+        "linked_items": 9,
+        "unlinked_items": 0
+      }
+    },
+    "candidate": {
+      "development": {
+        "planned_responses": 3,
+        "parsed_responses": 3,
+        "failed_responses": 0,
+        "missing_responses": 0,
+        "target_trials": 18,
+        "target_hits": 12,
+        "linked_items": 36,
+        "unlinked_items": 0
+      },
+      "regression": {
+        "planned_responses": 6,
+        "parsed_responses": 6,
+        "failed_responses": 0,
+        "missing_responses": 0,
+        "target_trials": 6,
+        "target_hits": 6,
+        "linked_items": 6,
+        "unlinked_items": 0
+      },
+      "holdout": {
+        "planned_responses": 9,
+        "parsed_responses": 9,
+        "failed_responses": 0,
+        "missing_responses": 0,
+        "target_trials": 9,
+        "target_hits": 6,
+        "linked_items": 9,
+        "unlinked_items": 0
+      }
+    }
+  },
+  "target_comparison": [
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "cabbage_salad",
+      "n": 3,
+      "baseline_hits": 1,
+      "candidate_hits": 3,
+      "hit_delta": 2
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "bean_sprout_soup",
+      "n": 3,
+      "baseline_hits": 2,
+      "candidate_hits": 3,
+      "hit_delta": 1
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "japchae",
+      "n": 3,
+      "baseline_hits": 2,
+      "candidate_hits": 3,
+      "hit_delta": 1
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "kimchi",
+      "n": 3,
+      "baseline_hits": 2,
+      "candidate_hits": 3,
+      "hit_delta": 1
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "beef_bibimbap",
+      "n": 3,
+      "baseline_hits": 0,
+      "candidate_hits": 0,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "manybanchan",
+      "split": "development",
+      "target_id": "pan_fried_tofu",
+      "n": 3,
+      "baseline_hits": 0,
+      "candidate_hits": 0,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "split": "regression",
+      "target_id": "potato_pizza",
+      "n": 3,
+      "baseline_hits": 3,
+      "candidate_hits": 3,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "whole_cake",
+      "split": "regression",
+      "target_id": "cheesecake",
+      "n": 3,
+      "baseline_hits": 3,
+      "candidate_hits": 3,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "coleslaw",
+      "split": "holdout",
+      "target_id": "coleslaw",
+      "n": 3,
+      "baseline_hits": 0,
+      "candidate_hits": 0,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "fried_eggs",
+      "split": "holdout",
+      "target_id": "fried_eggs",
+      "n": 3,
+      "baseline_hits": 3,
+      "candidate_hits": 3,
+      "hit_delta": 0
+    },
+    {
+      "case_id": "potato_salad",
+      "split": "holdout",
+      "target_id": "potato_salad",
+      "n": 3,
+      "baseline_hits": 3,
+      "candidate_hits": 3,
+      "hit_delta": 0
+    }
+  ],
+  "paired_successful_development": {
+    "runs": [
+      1,
+      3
+    ],
+    "target_hits": {
+      "baseline": 7,
+      "candidate": 8
+    },
+    "target_trials": 12,
+    "cabbage_salad_hits": {
+      "baseline": 1,
+      "candidate": 2
+    },
+    "cabbage_salad_trials": 2
+  },
+  "parse_failure_confound": "Development target gain5 consists of4 hits associated with the baseline failed run and1 additional target hit among paired successful runs. The failed raw response already mentions cabbage salad.",
+  "failures": [
+    {
+      "case_id": "manybanchan",
+      "arm": "baseline",
+      "run": 2,
+      "error": "ValidationError",
+      "reason": "Saved raw JSON ends mid-item and fails json_invalid. No provider finish_reason was recorded; stop cause is unknown."
+    }
+  ],
+  "unchanged_existing_gate_reapplication": {
+    "baseline": {
+      "manybanchan": {
+        "passed": false,
+        "reasons": [
+          "_crashes: 실행 중 크래시 1회 (허용 0회) — 걸린 키: manybanchan/contract_parseable"
+        ]
+      },
+      "piece_of_pizza": {
+        "passed": true,
+        "reasons": []
+      },
+      "whole_cake": {
+        "passed": true,
+        "reasons": []
+      }
+    },
+    "candidate": {
+      "manybanchan": {
+        "passed": true,
+        "reasons": []
+      },
+      "piece_of_pizza": {
+        "passed": true,
+        "reasons": []
+      },
+      "whole_cake": {
+        "passed": true,
+        "reasons": []
+      }
+    }
+  },
+  "findings": [
+    "Cabbage salad: frozen-ID hit1/3→3/3; paired successfully parsed runs1/2→2/2. Small case-level signal, not broad accuracy evidence.",
+    "New heldout photos:6/9→6/9. Core names are identical across arms; no new generalization gain observed.",
+    "Existing pizza/cake regression:6/6→6/6; unchanged evaluator gates pass for both.",
+    "Coleslaw source label vsbotharms 무샐러드→비트무샐러드: frozen0/3 for each. Source/ingredient ambiguity noted; labels are not changed after outputs.",
+    "Beef bibimbap target0/3 for both: both output 불고기비빔밥, a potentially related variant outside narrow frozen acceptable-ID set; not proven complete recognition failure.",
+    "Pan-fried tofu target0/3 for both: candidate outputs 양념두부3/3; tofu is recognized but user-confirmed preparation remains unresolved.",
+    "Candidate two bibimbap andthree soups in one run match visible bowls and are not automatically duplicate errors.",
+    "Missing recipe evidence (seaweed vinegar, greens type, covered rice bowls) remains uncertain. No broad hallucination-reduction claim.",
+    "Potato salad quantity200/200/200g→200/250/250g andpizza100/100/105g→115/110/110g; no measured weight truth to evaluate or assign causality."
+  ],
+  "implementation_decision": {
+    "candidate_retained_in_worktree": true,
+    "committed": false,
+    "deployed": false,
+    "reason": "Minimal naming improvement shows one additional paired development target hit with no detected heldout/regression target decrease; evidence remains small and narrow. No second tuning pass on holdout."
+  },
+  "validation": {
+    "same_db_and_be": true,
+    "same_provider_model": true,
+    "photos_and_manifest_match_protocol": true,
+    "baseline_prompt_unchanged": true,
+    "candidate_source_matches_protocol": true,
+    "temporary_db_cleaned": true
+  },
+  "source_sha256": {
+    "score_validated.json": "f13bc55c2cb6f2cb23ab251504d7293d552fb12e228b07015f2d80b4008beb4c",
+    "raw_responses.json": "021d20c2bf1aa02e1ca7119caba721b61c3f798430d17b0837c696b2b8fe1f1b",
+    "protocol.json": "7d2edcb7251cf869080d8187a0effa05a17189b8d48cc08de8b3ab6702fbf952",
+    "baseline_db.json": "a5e36834d4a5066641845bc849c34be166a337e9b155f664dec9ef37d43477c3",
+    "candidate_db.json": "709f31dfd73f2a8bc9fe3dd9e0d182193deb913ad57a7ad23c5e0d290c22009a",
+    "semantic_development_review.json": "3e36f16697b446cc7aa208d82f4f8baf06ce0aec669306ec144c5d13b96ceb73",
+    "semantic_holdout_review.json": "b9324163375b905c50894ae60aa8c1b3175c3b7d29d3df3b235c23ec06f76f8a",
+    "database_environment.json": "6d6fec80cd4049462ee0814c3fb3861d86ab34b6ac5e292803fdaf16aadeac21"
+  }
+}
