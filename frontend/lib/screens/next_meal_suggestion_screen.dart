@@ -255,7 +255,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
   }
 
   void _closeFlowAndGoTo(int tab) {
-    context.read<TabState>().setIndex(tab);
+    context.read<TabState>().reselect(tab);
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
