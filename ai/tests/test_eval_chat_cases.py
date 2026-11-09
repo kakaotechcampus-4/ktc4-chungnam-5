@@ -817,8 +817,8 @@ def test_c12_prompt_hash_does_not_read_contract_file(monkeypatch, tmp_path):
 # ─────────────────────────── baseline ───────────────────────────
 
 
-def test_c13_saved_baseline_records_rule_version_v3_and_prompt_hash(monkeypatch, tmp_path):
-    """행 c13 — `--save` 로 저장한 baseline 에 `rule_version == "chat-cases-v3"`, `prompt_hash == cases_prompt_hash(CASES)`
+def test_c13_saved_baseline_records_rule_version_v4_and_prompt_hash(monkeypatch, tmp_path):
+    """행 c13 — `--save` 로 저장한 baseline 에 `rule_version == "chat-cases-v4"`, `prompt_hash == cases_prompt_hash(CASES)`
     가 있다 (정상, 결정 D).
 
     baseline 의 비교 조건이다 — 계약 파일 해시로 잰 v1 baseline 과 비교하면 `compare` 가 경고해야 한다.
@@ -839,7 +839,7 @@ def test_c13_saved_baseline_records_rule_version_v3_and_prompt_hash(monkeypatch,
     assert code != 2, "CLI 오용으로 끝났다"
     assert posts, "Fake 채널을 거치지 않았다"
     doc = json.loads(saved.read_text(encoding="utf-8"))
-    assert doc["rule_version"] == "chat-cases-v3"
+    assert doc["rule_version"] == "chat-cases-v4"
     assert doc["prompt_hash"] == cases_prompt_hash(CASES)
     assert not crash_log.exists(), crash_log.read_text(encoding="utf-8")
 
