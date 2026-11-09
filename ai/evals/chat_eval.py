@@ -37,11 +37,18 @@ from evals.harness import Axis, Case, Check, Grade
 
 _PATH = "/chat"
 
-RULE_VERSION: str = "chat-cases-v3"
+RULE_VERSION: str = "chat-cases-v4"
 """baseline 비교 조건. chat 은 BE 규칙 버전이 없어 케이스 · 판정 · 비교 조건을 바꾸면 이 값을 올린다.
 
 v2: 케이스 · 판정은 v1 과 같다. 라우트가 생겨 프롬프트 해시가 계약 파일 텍스트에서 chat 프롬프트
 (`cases_prompt_hash`)로 바뀌었다 — v1 baseline 과 비교하면 `compare` 가 경고한다.
+
+v3: `unscored_meal` 에서 점수 있는 아침을 빼고 점수 없는 끼니(점심) 하나만 남겼다 — 판정이 끼니를
+가리지 못해 모델의 옳은 답을 점심 평가로 오판하던 것(기준선 0/3)을 케이스를 좁혀서 피했다.
+
+v4: `ai/5-feat-coach-improve`(PR #120) 머지로 `no_compensatory_restriction` 의 "보다" 비교 면제가
+두 갈래(면제 1 의 "-기보다" 접미 매치 · 면제 4 의 `_COMPARISON_AFTER` 일반 매치)로 합쳐졌다 —
+텍스트 충돌은 없었지만 실제 판정 로직이 develop 의 v3 와 달라져 버전을 올린다. 케이스는 v3 와 같다.
 """
 
 CRASH_LOG = Path(__file__).resolve().parent / "chat_crashes.log"
