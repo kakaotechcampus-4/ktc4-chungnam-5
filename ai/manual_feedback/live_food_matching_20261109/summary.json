@@ -1,0 +1,220 @@
+{
+  "measurement_date_kst": "2026-11-09",
+  "experiment": "isolated_local_actual_photo_upload_smoke",
+  "source_run": "run2",
+  "planned_photos": 6,
+  "repeats_per_photo": 1,
+  "actual_gateway_post_attempts": 6,
+  "gateway_http_200": 6,
+  "gateway_finish_reason_stop": 6,
+  "reported_models": [
+    "gemini-3.8-flash"
+  ],
+  "ai_request_count": 6,
+  "queue_attempts": 6,
+  "extra_gateway_retry_attempts": 0,
+  "review_required": 6,
+  "within_api_30_second_budget": 6,
+  "min_max_observed_seconds": [
+    6.082,
+    16.739
+  ],
+  "db_linked_items": 16,
+  "recognized_items": 16,
+  "nutrition_available_items": 15,
+  "be_storage_api_consistency_pass": true,
+  "same_db_fingerprint_as_prior_experiments": true,
+  "tests": {
+    "command": "python -m pytest -q --tb=short",
+    "passed": 1578,
+    "failed": 0,
+    "warnings": 1,
+    "warning_note": "Existing Starlette httpx deprecation warning; local HTTP fixture tests required loopback permission"
+  },
+  "cases": [
+    {
+      "case_id": "manybanchan",
+      "final_status": "REVIEW_REQUIRED",
+      "seconds_after_upload_acceptance": 16.739,
+      "seconds_from_upload_start": 16.761,
+      "within_api_30_second_budget": true,
+      "recognized_item_count": 11,
+      "db_link_count": 11,
+      "nutrition_available_count": 11,
+      "frozen_id_targets": [
+        {
+          "target_id": "cabbage_salad",
+          "label": "양배추샐러드",
+          "frozen_id_match": false
+        },
+        {
+          "target_id": "bean_sprout_soup",
+          "label": "콩나물국",
+          "frozen_id_match": true
+        },
+        {
+          "target_id": "japchae",
+          "label": "잡채",
+          "frozen_id_match": true
+        },
+        {
+          "target_id": "kimchi",
+          "label": "배추김치",
+          "frozen_id_match": true
+        },
+        {
+          "target_id": "beef_bibimbap",
+          "label": "소고기비빔밥",
+          "frozen_id_match": false
+        },
+        {
+          "target_id": "pan_fried_tofu",
+          "label": "두부부침",
+          "frozen_id_match": false
+        }
+      ]
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "final_status": "REVIEW_REQUIRED",
+      "seconds_after_upload_acceptance": 6.098,
+      "seconds_from_upload_start": 6.126,
+      "within_api_30_second_budget": true,
+      "recognized_item_count": 1,
+      "db_link_count": 1,
+      "nutrition_available_count": 1,
+      "frozen_id_targets": [
+        {
+          "target_id": "potato_pizza",
+          "label": "포테이토피자",
+          "frozen_id_match": true
+        }
+      ]
+    },
+    {
+      "case_id": "whole_cake",
+      "final_status": "REVIEW_REQUIRED",
+      "seconds_after_upload_acceptance": 6.082,
+      "seconds_from_upload_start": 6.095,
+      "within_api_30_second_budget": true,
+      "recognized_item_count": 1,
+      "db_link_count": 1,
+      "nutrition_available_count": 0,
+      "frozen_id_targets": [
+        {
+          "target_id": "cheesecake",
+          "label": "치즈케이크",
+          "frozen_id_match": true
+        }
+      ]
+    },
+    {
+      "case_id": "coleslaw",
+      "final_status": "REVIEW_REQUIRED",
+      "seconds_after_upload_acceptance": 9.12,
+      "seconds_from_upload_start": 9.132,
+      "within_api_30_second_budget": true,
+      "recognized_item_count": 1,
+      "db_link_count": 1,
+      "nutrition_available_count": 1,
+      "frozen_id_targets": [
+        {
+          "target_id": "coleslaw",
+          "label": "코울슬로/양배추샐러드",
+          "frozen_id_match": false
+        }
+      ]
+    },
+    {
+      "case_id": "fried_eggs",
+      "final_status": "REVIEW_REQUIRED",
+      "seconds_after_upload_acceptance": 6.088,
+      "seconds_from_upload_start": 6.107,
+      "within_api_30_second_budget": true,
+      "recognized_item_count": 1,
+      "db_link_count": 1,
+      "nutrition_available_count": 1,
+      "frozen_id_targets": [
+        {
+          "target_id": "fried_eggs",
+          "label": "달걀 프라이",
+          "frozen_id_match": true
+        }
+      ]
+    },
+    {
+      "case_id": "potato_salad",
+      "final_status": "REVIEW_REQUIRED",
+      "seconds_after_upload_acceptance": 6.084,
+      "seconds_from_upload_start": 6.099,
+      "within_api_30_second_budget": true,
+      "recognized_item_count": 1,
+      "db_link_count": 1,
+      "nutrition_available_count": 1,
+      "frozen_id_targets": [
+        {
+          "target_id": "potato_salad",
+          "label": "감자샐러드",
+          "frozen_id_match": true
+        }
+      ]
+    }
+  ],
+  "observed_issues": [
+    {
+      "case_id": "manybanchan",
+      "ground_truth": "양배추샐러드",
+      "model_name": "채소샐러드",
+      "be_selected_name": "구운채소샐러드",
+      "interpretation": "Ingredient-specific naming was lost; broad model name maps to an unsuitable prepared-food candidate under unchanged top-1 policy."
+    },
+    {
+      "case_id": "coleslaw",
+      "ground_truth": "코울슬로/양배추샐러드",
+      "model_name": "무샐러드",
+      "be_selected_name": "비트무샐러드",
+      "interpretation": "Real model ingredient recognition error followed by unchanged BE top-1 matching; ID linkage does not establish accuracy."
+    },
+    {
+      "case_id": "whole_cake",
+      "model_name": "치즈케이크",
+      "estimated_amount": "1판",
+      "interpretation": "Correct food ID found, but existing BE cannot convert 판 to grams, so nutrition remains null and public matched=false; no made-up grams."
+    }
+  ],
+  "semantic_review_notes": [
+    "Frozen target ID mismatches for 불고기비빔밥 and 양념두부 are not automatically food errors; user accepts reasonable DB-backed equivalents. Labels and acceptable IDs were not changed after observing this run.",
+    "미역초무침/브로콜리두부무침 specific preparation/vegetable and covered rice contents remain unconfirmed.",
+    "Single reused-photo run is connectivity and behavior evidence, not a statistically supported before/after accuracy improvement."
+  ],
+  "prior_setup_attempts": [
+    {
+      "folder": "preflight",
+      "outcome": "API not yet running; no user or photo submitted",
+      "model_calls": 0
+    },
+    {
+      "folder": "run1",
+      "outcome": "Synthetic medication enum rejected with422 before any photo submission; runner corrected to actual BE value 위고비",
+      "model_calls": 0
+    }
+  ],
+  "local_runtime": {
+    "api": "http://127.0.0.1:18000",
+    "ai": "http://127.0.0.1:18002",
+    "db_port": 15433,
+    "compose_project": "ktc-food-live-20261109",
+    "services_left_running": true
+  },
+  "scope_limits": [
+    "No Flutter UI, JWT, S3, reverse proxy, meal confirmation, or feedback generation in this smoke test.",
+    "Synthetic user and local storage; nutrition calculation and BE candidate ranking unchanged."
+  ],
+  "source_artifact_sha256": {
+    "run2/analysis.json": "e2368cd5f65e872f26dd3af42a1140da0d3f275eff2409af2e68dad2a9db6a11",
+    "run2/protocol.json": "918e8e878764d2d2335e2d33bd3d812e1d7e35b18b195cc937442977d4911c6c",
+    "run2/db_inspection.json": "c2b20d7317af89fabef534313e3b6ef826c021db7e11719872a3a4dbe41d021b",
+    "run2/vision_events.jsonl": "2e533edd9733526ce0fd01eba7d4b17af81c13b0a8266073d29d22242af1eb5b",
+    "environment_run2.json": "4d20000da40b79a29dbd12568284e76e1a7e431f33e2deff8f9785551b73ba79"
+  }
+}

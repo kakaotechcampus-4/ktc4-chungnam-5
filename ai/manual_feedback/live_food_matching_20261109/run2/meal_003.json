@@ -1,0 +1,127 @@
+{
+  "case_id": "whole_cake",
+  "run": 1,
+  "meal_type": "SNACK",
+  "image_path": "ai/evals/fixtures/analyze_meal/whole_cake.jpg",
+  "image_sha256": "c641306d92f828e2d42ddc3e699ac0c680ce898bf2ce64610bcbc13aad8479c4",
+  "sequence": 3,
+  "observability": {
+    "originalFoodName": "not_exposed_by_public_api",
+    "candidateFoodRefId": "not_exposed_by_public_api",
+    "selectedFoodRefId": "not_exposed_by_public_api",
+    "rawModelResponse": "not_exposed_by_public_api",
+    "modelVersion": "not_exposed_by_public_api",
+    "gatewayAttemptCount": "not_exposed_by_public_api",
+    "queueAttempts": "not_exposed_by_public_api"
+  },
+  "request": {
+    "mealType": "SNACK",
+    "eatenAt": "2026-11-09T02:21:15.595898+09:00",
+    "satietyBeforePct": "50",
+    "image_sha256": "c641306d92f828e2d42ddc3e699ac0c680ce898bf2ce64610bcbc13aad8479c4",
+    "image_bytes": 171513,
+    "content_type": "image/jpeg"
+  },
+  "upload_request_sequence": 25,
+  "meal_id": "b5dd713f-0b00-49b2-85f6-360507fce060",
+  "create_response": {
+    "mealId": "b5dd713f-0b00-49b2-85f6-360507fce060",
+    "status": "ANALYZING",
+    "steps": [
+      {
+        "key": "FOOD_RECOGNITION",
+        "state": "RUNNING"
+      },
+      {
+        "key": "DB_MATCHING",
+        "state": "PENDING"
+      },
+      {
+        "key": "STAGE_RULE_APPLY",
+        "state": "PENDING"
+      }
+    ],
+    "pollIntervalMs": 1500,
+    "timeoutMs": 30000
+  },
+  "outcome": "REVIEW_REQUIRED",
+  "elapsed_seconds": 6.082,
+  "polls": [
+    {
+      "request_sequence": 26,
+      "elapsed_seconds": 0.006,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 27,
+      "elapsed_seconds": 1.524,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 28,
+      "elapsed_seconds": 3.043,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 29,
+      "elapsed_seconds": 4.562,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 30,
+      "elapsed_seconds": 6.082,
+      "status_code": 200,
+      "status": "REVIEW_REQUIRED"
+    }
+  ],
+  "final_detail": {
+    "mealId": "b5dd713f-0b00-49b2-85f6-360507fce060",
+    "status": "REVIEW_REQUIRED",
+    "isRecalculation": false,
+    "skipped": false,
+    "stage": "MAINTENANCE",
+    "mealType": "SNACK",
+    "eatenAt": "2026-11-09T02:21:15.595898+09:00",
+    "imageUrl": "[REDACTED]",
+    "steps": [
+      {
+        "key": "FOOD_RECOGNITION",
+        "state": "DONE"
+      },
+      {
+        "key": "DB_MATCHING",
+        "state": "RUNNING"
+      },
+      {
+        "key": "STAGE_RULE_APPLY",
+        "state": "PENDING"
+      }
+    ],
+    "clarifyQuestion": null,
+    "items": [
+      {
+        "itemId": "8aa022e4-8432-4fa9-a145-42bc618968c0",
+        "displayName": "케이크_치즈 케이크",
+        "amount": 1.0,
+        "unit": "판",
+        "confidence": 0.95,
+        "matched": false,
+        "nutritionSource": null,
+        "userConfirmed": false,
+        "nutrition": null
+      }
+    ],
+    "scores": null,
+    "nutrients": [],
+    "satiety": null,
+    "feedback": null
+  },
+  "api_advertised_timeout_ms": 30000,
+  "ready_within_api_advertised_timeout": true,
+  "pending_work_may_continue": false,
+  "upload_to_observation_seconds": 6.095
+}

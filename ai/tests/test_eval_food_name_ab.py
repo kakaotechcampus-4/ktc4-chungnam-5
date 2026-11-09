@@ -1,6 +1,7 @@
 """Experiment integrity without network or model calls."""
 import asyncio
 import json
+import httpx
 import pytest
 
 from evals import food_name_ab as ab
@@ -99,3 +100,97 @@ def test_parsed_nested_strings_are_redacted_without_altering_other_values(tmp_pa
     assert 'sensitive-token' not in json.dumps(state)
     assert state['records'][0]['response']['items'][0]['confidence'] == 0.5
     assert state['records'][0]['response']['items'][0]['nested'][0] == 'ordinary'
+
+
+@pytest.mark.parametrize('body', [None, [], 'not an envelope', {}, {'choices': []},
+                                {'choices': {}}, {'choices': [None]},
+                                {'choices': [{'message': {'content': ['not text']}}]}])
+def test_attempt_evidence_handles_malformed_or_nontext_content(body):
+    assert ab.gateway_attempt_evidence(body, lambda value: value) == {
+        'raw_text': None, 'response_chars': None, 'finish_reason': None,
+    }
+
+
+@pytest.mark.parametrize('reason,expected', [
+    ('stop', 'stop'), ('length', 'length'), ('content_filter', 'content_filter'),
+    ('tool_calls', 'tool_calls'), ('function_call', 'function_call'),
+    (None, None), ('private-key', 'other'), ({'private-key': True}, 'other'),
+])
+def test_attempt_finish_reason_is_allowlisted(reason, expected):
+    evidence = ab.gateway_attempt_evidence(
+        {'choices': [{'finish_reason': reason, 'message': {'content': ''}}]},
+        lambda value: value.replace('private-key', '[REDACTED]'))
+    assert evidence == {'raw_text': '', 'response_chars': 0, 'finish_reason': expected}
+
+
+def test_attempt_redacts_raw_model_and_usage_keys_without_mutating_source():
+    secret = 'https://private-gateway.invalid/key'
+    body = {'model': secret, 'usage': {secret: 9, 'completion_tokens': 100,
+                                    'bool': True, 'nan': float('nan'), 'string': secret},
+            'choices': [{'message': {'content': '{"value":"' + secret + '"'},
+                         'finish_reason': 'length'}]}
+    original_raw = body['choices'][0]['message']['content']
+    evidence = ab.gateway_attempt_evidence(body, lambda value: value.replace(secret, '[REDACTED]'))
+    assert secret not in json.dumps(evidence, allow_nan=False)
+    assert evidence['raw_text'] == '{"value":"[REDACTED]"'
+    assert evidence['response_chars'] == len(original_raw)
+    assert evidence['model'] == '[REDACTED]'
+    assert evidence['usage'] == {'[REDACTED]': 9, 'completion_tokens': 100}
+    assert body['choices'][0]['message']['content'] == original_raw
+
+
+def test_collect_preserves_every_rejected_and_successful_attempt(tmp_path):
+    bodies = iter([
+        {'choices': [{'finish_reason': 'length', 'message': {'content': 'bad private-key'}}]},
+        {'choices': [{'finish_reason': 'stop', 'message': {'content': '{"items": []}'}}]},
+        {'choices': [{'finish_reason': 'length', 'message': {'content': 'bad private-key'}}]},
+        {'choices': [{'finish_reason': 'stop', 'message': {'content': 'still bad private-key'}}]},
+    ])
+    attempts = []
+    async def original_post(client, *args, **kwargs):
+        return httpx.Response(200, json=next(bodies))
+    redact = lambda value: value.replace('private-key', '[REDACTED]')
+    tracked = ab.track_gateway_posts(original_post, attempts, redact)
+    async def call_model(url, prompt):
+        # Emulate a shared two-attempt client; rejected content never returns to collect.
+        for _ in range(2):
+            response = await tracked(None, 'unused')
+            raw = response.json()['choices'][0]['message']['content']
+            if raw == '{"items": []}':
+                return raw
+        raise ValueError('private-key must not be recorded from exception details')
+    cases = [{'case_id': 'meal', 'split': 'development', 'image_path': 'meal.jpg', 'meal_type': 'LUNCH'}]
+    state = asyncio.run(ab.collect(cases, 1, {'baseline': {'LUNCH': 'old'}, 'candidate': {'LUNCH': 'new'}},
+                                  'http://local', tmp_path, call_model, lambda raw: [], attempts, redact,
+                                  {'baseline': 'b', 'candidate': 'c'}))
+    assert state['actual_gateway_attempts'] == 4
+    assert state['completed_calls'] == 2 and state['failed_calls'] == 1
+    first, second = state['records']
+    assert [a['index'] for a in first['gateway_attempts']] == [1, 2]
+    assert [a['index'] for a in second['gateway_attempts']] == [3, 4]
+    assert first['raw_text'] == '{"items": []}'
+    assert second['raw_text'] is None
+    assert second['gateway_attempts'][1]['raw_text'] == 'still bad [REDACTED]'
+    assert 'private-key' not in (tmp_path/'raw_responses.json').read_text()
+
+
+def test_tracking_keeps_nonjson_and_transport_attempts_without_exception_details():
+    attempts = []
+    calls = 0
+    async def original_post(client, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(502, text='private-key unparseable upstream body')
+        raise httpx.ConnectError('private-key transport error')
+    tracked = ab.track_gateway_posts(original_post, attempts, lambda value: value.replace('private-key', '[REDACTED]'))
+    async def run():
+        response = await tracked(None)
+        assert response.status_code == 502
+        with pytest.raises(httpx.ConnectError):
+            await tracked(None)
+    asyncio.run(run())
+    assert attempts[0] == {'index': 1, 'status_code': 502, 'raw_text': None,
+                           'response_chars': None, 'finish_reason': None}
+    assert attempts[1] == {'index': 2, 'error': 'ConnectError'}
+    assert 'private-key' not in json.dumps(attempts)

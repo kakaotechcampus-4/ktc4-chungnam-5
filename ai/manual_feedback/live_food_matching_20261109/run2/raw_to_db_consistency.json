@@ -1,0 +1,437 @@
+{
+  "scope": "Offline captured response -> current production AI schema/parser/P2 -> stored BE items -> public API",
+  "model_calls": 0,
+  "db_mutations": 0,
+  "evidence_sha256": {
+    "capture": "2e533edd9733526ce0fd01eba7d4b17af81c13b0a8266073d29d22242af1eb5b",
+    "db_inspection": "c2b20d7317af89fabef534313e3b6ef826c021db7e11719872a3a4dbe41d021b"
+  },
+  "ai_source_sha256": {
+    "app/food_analyzer.py": "1d840519bf3264eceda5d609bbf5be7151b26cc3d007b7208020ca04cadca718",
+    "app/food_names.py": "faf42a0fc35b393640f24ae1f73a231e660c0b0bc37fad004cf8e1fb834af731",
+    "app/schemas.py": "8f62f5082ad5b6c1e6da58798604ba8996cd542f89404580a45053d31d0de9cc",
+    "app/main.py": "cd4ee6d3f7e5a79552c853f3139a25eef689a572558de68e97cde15b6bc13958"
+  },
+  "summary": {
+    "meals": 6,
+    "items": 16,
+    "gateway_attempts_in_evidence": 6,
+    "all_checks_pass": true,
+    "semantic_accuracy": "not_judged",
+    "weight_and_nutrition_accuracy": "not_judged; no weighed meal ground truth"
+  },
+  "meals": [
+    {
+      "case_id": "manybanchan",
+      "run": 1,
+      "meal_id": "4c9819e8-f8fa-444d-a32e-f2cc648d0cdc",
+      "gateway_attempts": 1,
+      "successful_request_matches": [
+        "0122804b-69a6-464b-9f9f-c763f6d9a600"
+      ],
+      "checks": {
+        "capture_start_finish_pairs_match": true,
+        "capture_starts_unique": true,
+        "successful_raw_output_matches_db_items": true,
+        "all_stored_item_fields_match_ai": true,
+        "db_and_public_api_consistency": true
+      },
+      "successful_request_candidates": [
+        {
+          "request_id": "0122804b-69a6-464b-9f9f-c763f6d9a600",
+          "checks": {
+            "successful_gateway_http": true,
+            "accepted_finish_reason": true,
+            "capture_has_no_redaction_marker": true,
+            "schema_and_p2_output_equal_db_raw_items_multiset": true,
+            "item_count_matches": true,
+            "non_name_fields_unchanged_by_p2": true
+          },
+          "p2_name_changes": 0,
+          "schema_added_default_fields": 22,
+          "schema_dropped_extra_fields": 0
+        }
+      ],
+      "items": [
+        {
+          "item_id": "2c46e105-c048-4bde-97fa-5e133b17bf0d",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "40c44cbb-3254-461c-80af-6690a3954bf7",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "7180d9d9-e64b-407d-a582-85b8383d62e8",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "7de547a9-a13f-4012-a81b-66a01635029e",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "7f68f72f-40ea-4b9d-b1c4-6b165574cf7d",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "a92d37a9-031d-477c-8865-5375f5180482",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "ba05fd42-f521-41f9-b1c4-5d97bb0a63e5",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "bad0e5b7-203b-482e-a6be-aac524aa94a0",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "cd9b73b7-d820-4d2e-b231-073254cc5711",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "e43f6a2c-c3f7-4056-9d5c-79b7930d4819",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        },
+        {
+          "item_id": "f26a5b30-fcf1-4b2d-9f17-009c4e100e30",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "piece_of_pizza",
+      "run": 1,
+      "meal_id": "a3f0db7a-a02f-4c89-967d-ec6bb3729bab",
+      "gateway_attempts": 1,
+      "successful_request_matches": [
+        "1f321ebf-18d8-453a-ba5b-afb6b854098b"
+      ],
+      "checks": {
+        "capture_start_finish_pairs_match": true,
+        "capture_starts_unique": true,
+        "successful_raw_output_matches_db_items": true,
+        "all_stored_item_fields_match_ai": true,
+        "db_and_public_api_consistency": true
+      },
+      "successful_request_candidates": [
+        {
+          "request_id": "1f321ebf-18d8-453a-ba5b-afb6b854098b",
+          "checks": {
+            "successful_gateway_http": true,
+            "accepted_finish_reason": true,
+            "capture_has_no_redaction_marker": true,
+            "schema_and_p2_output_equal_db_raw_items_multiset": true,
+            "item_count_matches": true,
+            "non_name_fields_unchanged_by_p2": true
+          },
+          "p2_name_changes": 0,
+          "schema_added_default_fields": 2,
+          "schema_dropped_extra_fields": 0
+        }
+      ],
+      "items": [
+        {
+          "item_id": "38224680-863e-4b8b-947f-64997354e62a",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "whole_cake",
+      "run": 1,
+      "meal_id": "b5dd713f-0b00-49b2-85f6-360507fce060",
+      "gateway_attempts": 1,
+      "successful_request_matches": [
+        "10f56e63-9a0d-4a9b-9518-71173098c058"
+      ],
+      "checks": {
+        "capture_start_finish_pairs_match": true,
+        "capture_starts_unique": true,
+        "successful_raw_output_matches_db_items": true,
+        "all_stored_item_fields_match_ai": true,
+        "db_and_public_api_consistency": true
+      },
+      "successful_request_candidates": [
+        {
+          "request_id": "10f56e63-9a0d-4a9b-9518-71173098c058",
+          "checks": {
+            "successful_gateway_http": true,
+            "accepted_finish_reason": true,
+            "capture_has_no_redaction_marker": true,
+            "schema_and_p2_output_equal_db_raw_items_multiset": true,
+            "item_count_matches": true,
+            "non_name_fields_unchanged_by_p2": true
+          },
+          "p2_name_changes": 0,
+          "schema_added_default_fields": 2,
+          "schema_dropped_extra_fields": 0
+        }
+      ],
+      "items": [
+        {
+          "item_id": "8aa022e4-8432-4fa9-a145-42bc618968c0",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "coleslaw",
+      "run": 1,
+      "meal_id": "2efed279-1cb6-4966-91d0-9e6fc8e00c27",
+      "gateway_attempts": 1,
+      "successful_request_matches": [
+        "b3775aa0-63bd-450b-b1fb-03a763d4981a"
+      ],
+      "checks": {
+        "capture_start_finish_pairs_match": true,
+        "capture_starts_unique": true,
+        "successful_raw_output_matches_db_items": true,
+        "all_stored_item_fields_match_ai": true,
+        "db_and_public_api_consistency": true
+      },
+      "successful_request_candidates": [
+        {
+          "request_id": "b3775aa0-63bd-450b-b1fb-03a763d4981a",
+          "checks": {
+            "successful_gateway_http": true,
+            "accepted_finish_reason": true,
+            "capture_has_no_redaction_marker": true,
+            "schema_and_p2_output_equal_db_raw_items_multiset": true,
+            "item_count_matches": true,
+            "non_name_fields_unchanged_by_p2": true
+          },
+          "p2_name_changes": 0,
+          "schema_added_default_fields": 2,
+          "schema_dropped_extra_fields": 0
+        }
+      ],
+      "items": [
+        {
+          "item_id": "ff207234-6033-49bc-9628-6d90d6dbaae9",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "fried_eggs",
+      "run": 1,
+      "meal_id": "8e65137d-2888-4b4b-8b3c-49c48f957a42",
+      "gateway_attempts": 1,
+      "successful_request_matches": [
+        "243093ab-b4f1-4f99-a067-a271162aa3f2"
+      ],
+      "checks": {
+        "capture_start_finish_pairs_match": true,
+        "capture_starts_unique": true,
+        "successful_raw_output_matches_db_items": true,
+        "all_stored_item_fields_match_ai": true,
+        "db_and_public_api_consistency": true
+      },
+      "successful_request_candidates": [
+        {
+          "request_id": "243093ab-b4f1-4f99-a067-a271162aa3f2",
+          "checks": {
+            "successful_gateway_http": true,
+            "accepted_finish_reason": true,
+            "capture_has_no_redaction_marker": true,
+            "schema_and_p2_output_equal_db_raw_items_multiset": true,
+            "item_count_matches": true,
+            "non_name_fields_unchanged_by_p2": true
+          },
+          "p2_name_changes": 1,
+          "schema_added_default_fields": 2,
+          "schema_dropped_extra_fields": 0
+        }
+      ],
+      "items": [
+        {
+          "item_id": "fcca1228-2b7c-46a3-86d4-9610437e8abb",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "potato_salad",
+      "run": 1,
+      "meal_id": "48382ffc-69d4-4230-9fb6-3ef570632c01",
+      "gateway_attempts": 1,
+      "successful_request_matches": [
+        "34bcbda9-dc80-4be9-b0db-cc82cf41e852"
+      ],
+      "checks": {
+        "capture_start_finish_pairs_match": true,
+        "capture_starts_unique": true,
+        "successful_raw_output_matches_db_items": true,
+        "all_stored_item_fields_match_ai": true,
+        "db_and_public_api_consistency": true
+      },
+      "successful_request_candidates": [
+        {
+          "request_id": "34bcbda9-dc80-4be9-b0db-cc82cf41e852",
+          "checks": {
+            "successful_gateway_http": true,
+            "accepted_finish_reason": true,
+            "capture_has_no_redaction_marker": true,
+            "schema_and_p2_output_equal_db_raw_items_multiset": true,
+            "item_count_matches": true,
+            "non_name_fields_unchanged_by_p2": true
+          },
+          "p2_name_changes": 0,
+          "schema_added_default_fields": 2,
+          "schema_dropped_extra_fields": 0
+        }
+      ],
+      "items": [
+        {
+          "item_id": "1925b8ec-8979-4065-ac2f-657a7e64bd37",
+          "checks": {
+            "original_name_matches_ai_output": true,
+            "amount_matches_ai_with_be_rounding": true,
+            "unit_matches_ai_output": true,
+            "confidence_matches_ai_with_be_rounding": true,
+            "model_version_matches_actual_ai_app": true,
+            "safety_status_matches_analyze_route": true,
+            "candidate_id_follows_worker_policy": true,
+            "saved_grams_and_public_nutrition_match": true
+          }
+        }
+      ]
+    }
+  ]
+}

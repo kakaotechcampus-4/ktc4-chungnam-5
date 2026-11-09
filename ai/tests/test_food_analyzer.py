@@ -83,6 +83,8 @@ def test_call_vision_model_downloads_image_and_posts_to_gateway(monkeypatch):
             pass
 
     class _FakeChatResponse:
+        status_code = 200
+
         def raise_for_status(self) -> None:
             pass
 

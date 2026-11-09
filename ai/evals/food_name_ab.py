@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import logging
+import math
 from pathlib import Path
 import re
 import subprocess
@@ -80,6 +81,60 @@ def redact_values(value, redact):
     if isinstance(value, dict):
         return {redact_values(key, redact): redact_values(item, redact) for key, item in value.items()}
     return value
+
+
+def gateway_attempt_evidence(body, redact) -> dict:
+    """Keep safe attempt evidence even when the client rejects the envelope.
+
+    Raw content is evaluation-only and redacted before storage. Length describes
+    the provider's original string, before redaction. Missing/non-text content
+    remains None; an arbitrary finish reason is never copied into evidence.
+    """
+    evidence = {'raw_text': None, 'response_chars': None, 'finish_reason': None}
+    if not isinstance(body, dict):
+        return evidence
+    if isinstance(body.get('model'), str):
+        evidence['model'] = redact(body['model'])[:200]
+    if isinstance(body.get('usage'), dict):
+        evidence['usage'] = {
+            redact(key): value for key, value in body['usage'].items()
+            if isinstance(key, str) and isinstance(value, (int, float))
+            and not isinstance(value, bool) and (isinstance(value, int) or math.isfinite(value))
+        }
+    choices = body.get('choices')
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return evidence
+    choice = choices[0]
+    reason = choice.get('finish_reason')
+    allowed = {'stop', 'length', 'content_filter', 'tool_calls', 'function_call'}
+    evidence['finish_reason'] = reason if isinstance(reason, str) and reason in allowed else (
+        None if reason is None else 'other')
+    message = choice.get('message')
+    if isinstance(message, dict) and isinstance(message.get('content'), str):
+        raw = message['content']
+        evidence['raw_text'] = redact(raw)
+        evidence['response_chars'] = len(raw)
+    return evidence
+
+
+def track_gateway_posts(original_post, attempts: list[dict], redact):
+    """Wrap HTTP attempts, including rejected responses and transport failures."""
+    async def tracked_post(client, *positional, **keyword):
+        attempt = {'index': len(attempts) + 1}
+        attempts.append(attempt)
+        try:
+            response = await original_post(client, *positional, **keyword)
+            attempt['status_code'] = response.status_code
+            try:
+                body = response.json()
+            except ValueError:
+                body = None
+            attempt.update(gateway_attempt_evidence(body, redact))
+            return response
+        except Exception as exc:
+            attempt['error'] = type(exc).__name__
+            raise
+    return tracked_post
 
 
 def replay_documents(records: list[dict], prompt_hashes: dict) -> dict:
@@ -208,33 +263,17 @@ def main(argv=None) -> int:
         snapshot['execution_scope'] = (
             'Calls production food_analyzer vision client and parser only, not the full API or safety_guard. '
             'mealId, modelVersion and safetyStatus are evaluation scaffolding; SAFE is not a safety classifier result. '
+            'Envelope/schema validation and HTTP retries share the configured gateway attempt budget. '
+            'gateway_attempts retains each attempt\'s redacted content, allowlisted finish reason and original '
+            'character count, including responses rejected before the client returns. '
+            'Record raw_text is the final returned content when available. '
             'Actual provider model metadata is recorded in gateway_attempts when supplied.')
         write_json(args.output_dir/'protocol.json', snapshot)
         attempts = []
         original_post, original_settings = httpx.AsyncClient.post, food_analyzer.get_settings
 
-        async def tracked_post(client, *positional, **keyword):
-            attempt = {'index': len(attempts)+1}
-            attempts.append(attempt)
-            try:
-                response = await original_post(client, *positional, **keyword)
-                attempt['status_code'] = response.status_code
-                try:
-                    body = response.json()
-                    if isinstance(body.get('model'), str):
-                        attempt['model'] = redact(body['model'])[:200]
-                    if isinstance(body.get('usage'), dict):
-                        attempt['usage'] = {k: v for k, v in body['usage'].items()
-                                            if isinstance(v, (int, float)) and not isinstance(v, bool)}
-                except (ValueError, AttributeError):
-                    pass
-                return response
-            except Exception as exc:
-                attempt['error'] = type(exc).__name__
-                raise
-
         food_analyzer.get_settings = lambda: settings
-        httpx.AsyncClient.post = tracked_post
+        httpx.AsyncClient.post = track_gateway_posts(original_post, attempts, redact)
         try:
             with serve_fixtures(root) as base_url:
                 state = asyncio.run(collect(cases, args.n, prompts, base_url, args.output_dir,

@@ -1,0 +1,73 @@
+{
+  "baseline_commit": "bbee3c1",
+  "scope": "Deterministic fault injection through actual before/after vision client and FastAPI. Image/model transports mocked; no live recovery-rate estimate.",
+  "new_model_calls": 0,
+  "scenario_count": 7,
+  "passed": 7,
+  "actual_failed_raw_sha256": "37d552b1562753f60ddac4cd4564868499e0735d25030285dfc43d5bf8bb10f7",
+  "source_fixture_sha256": "134a9ceeb27eb64c1e6d6a7e8e62c05183cda08f07d7a5f452ee1a5f37d2c313",
+  "source_raw_responses_sha256": "021d20c2bf1aa02e1ca7119caba721b61c3f798430d17b0837c696b2b8fe1f1b",
+  "valid_response_source": {
+    "case_id": "manybanchan",
+    "arm": "baseline",
+    "run": 1,
+    "raw_sha256": "06bbcfb250663152aab78ed232e0bb85307e50c3954203fc5c6a4420676a26d7"
+  },
+  "summary": [
+    {
+      "scenario": "saved_truncation_then_saved_valid",
+      "before_status": 500,
+      "after_status": 200,
+      "before_mocked_posts": 1,
+      "after_mocked_posts": 2
+    },
+    {
+      "scenario": "saved_truncation_twice",
+      "before_status": 500,
+      "after_status": 502,
+      "before_mocked_posts": 1,
+      "after_mocked_posts": 2
+    },
+    {
+      "scenario": "http503_then_truncated_shared_budget",
+      "before_status": 500,
+      "after_status": 502,
+      "before_mocked_posts": 2,
+      "after_mocked_posts": 2
+    },
+    {
+      "scenario": "length_flag_with_empty_json_then_valid",
+      "before_status": 200,
+      "after_status": 200,
+      "before_mocked_posts": 1,
+      "after_mocked_posts": 2
+    },
+    {
+      "scenario": "unauthorized_not_retried",
+      "before_status": 500,
+      "after_status": 502,
+      "before_mocked_posts": 2,
+      "after_mocked_posts": 1
+    },
+    {
+      "scenario": "http429_then_valid_regression",
+      "before_status": 200,
+      "after_status": 200,
+      "before_mocked_posts": 2,
+      "after_mocked_posts": 2
+    },
+    {
+      "scenario": "valid_first_attempt_regression",
+      "before_status": 200,
+      "after_status": 200,
+      "before_mocked_posts": 1,
+      "after_mocked_posts": 1
+    }
+  ],
+  "limitations": [
+    "Injected valid second response is historical, not a fresh model retry.",
+    "Old failure has no finish_reason, so original truncation cause remains unknown.",
+    "Repeated invalid response still fails, now sanitized502.",
+    "BE matching, nutrition, prompt and P2 rules are unchanged."
+  ]
+}

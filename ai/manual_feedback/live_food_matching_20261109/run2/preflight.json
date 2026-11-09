@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "check": "api_health",
+      "passed": true,
+      "request_sequence": 1
+    },
+    {
+      "check": "database_readiness",
+      "passed": true,
+      "request_sequence": 2
+    },
+    {
+      "check": "ai_health",
+      "passed": true,
+      "request_sequence": 3
+    }
+  ],
+  "model_calls": 0,
+  "limitations": [
+    "Does not prove worker or gateway connectivity",
+    "DB readiness does not prove the nutrition seed is loaded"
+  ]
+}
