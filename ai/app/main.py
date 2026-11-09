@@ -97,8 +97,9 @@ async def short_feedback(req: ShortFeedbackRequest) -> ShortFeedbackResponse:
         # 게이트웨이 URL·키·사용자 기록을 오류 응답에 노출하지 않는다.
         raise HTTPException(status_code=502, detail="피드백 모델 응답을 처리하지 못했다") from None
     # 화면 문장(body · 카드)은 약 낱말을 쓰지 않는다. reasoning 은 사용자에게 하는 약 지시만 막는다(safety_guard 참고)
+    dinner = req.scope is Scope.MEAL and req.meal_type is MealType.DINNER
     screen_texts = [draft.body]
-    for suggestion in draft.suggestions or []:
+    for suggestion in [] if dinner else draft.suggestions or []:  # 저녁 카드는 화면에 나가지 않는다
         screen_texts.extend([suggestion.food_name, suggestion.advice])
     if any(screen_unsafe(text) for text in screen_texts) or reasoning_unsafe(draft.reasoning or ""):
         return blocked()
