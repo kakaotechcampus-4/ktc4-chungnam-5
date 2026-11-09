@@ -592,6 +592,36 @@ void main() {
     expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
   });
 
+  testWidgets('the satiety check-in shows the meal photo', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final api = FakeApi()
+      ..on('GET /meals/{meal_id}', (_) {
+        final meal = {
+          ...(_mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map),
+          'eatenAt': formatApiDateTime(
+            DateTime.now().subtract(const Duration(hours: 3)),
+          ),
+          'imageUrl': '/media/meals/lunch.png',
+        };
+        return (200, fakeOk(meal));
+      });
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+    // 홈 mock 끼니에는 사진이 없어서 ApiImage 가 없다.
+    expect(find.byType(ApiImage), findsNothing);
+
+    await tester.tap(find.byType(StomachGauge));
+    await tester.pumpAndSettle();
+    expect(find.text('지금 얼마나 부르세요?'), findsOneWidget);
+    expect(find.textContaining('경과'), findsOneWidget);
+
+    final photos = tester.widgetList<ApiImage>(find.byType(ApiImage));
+    expect(photos.map((p) => p.path), ['/media/meals/lunch.png']);
+  });
+
   testWidgets('tapping the stomach gauge opens the satiety check-in', (
     WidgetTester tester,
   ) async {
