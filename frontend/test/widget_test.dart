@@ -711,6 +711,10 @@ void main() {
       });
     await _pumpApp(tester, withProfile: false, api: api);
     expect(find.text('프로필 입력'), findsOneWidget);
+    // 평소 한 끼 열량을 모르는 사람을 위한 한국인 평균 안내가 칸 아래에 있다.
+    expect(find.text('참고 · 한국인 평균 섭취량 (kcal)'), findsOneWidget);
+    expect(find.text('약 680 ~ 710'), findsOneWidget);
+    expect(find.text('약 510 ~ 530'), findsOneWidget);
 
     // 빈 값으로는 넘어가지 않는다.
     await tester.tap(find.text('시작하기'));

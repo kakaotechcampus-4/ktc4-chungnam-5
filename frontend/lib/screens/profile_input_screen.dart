@@ -168,6 +168,9 @@ class _ProfileInputScreenState extends State<ProfileInputScreen> {
                 hint: '투약 전 평소 한 끼 기준',
                 validator: (v) => _validateRange(v, max: 10000, name: '열량'),
               ),
+              // 본인이 얼마나 먹는지 모르는 사람이 참고할 한국인 평균.
+              const SizedBox(height: AppSpacing.sm),
+              const _KoreanIntakeGuide(),
               if (_saveError != null) ...[
                 const SizedBox(height: AppSpacing.lg),
                 Text(
@@ -212,6 +215,57 @@ String? _validateRange(
   if (parsed == null) return '$name을(를) 숫자로 입력해 주세요';
   if (parsed <= 0 || parsed > max) return '0보다 크고 $max 이하로 입력해 주세요';
   return null;
+}
+
+/// "평소 한 끼 열량" 을 모르는 사람이 참고할 한국인 평균 섭취량(작은 글씨 안내).
+class _KoreanIntakeGuide extends StatelessWidget {
+  const _KoreanIntakeGuide();
+
+  static const _header = ['구분', '하루 섭취량', '1끼 평균', '권장량(1일)'];
+  static const _rows = [
+    ['성인 남자', '약 2,050 ~ 2,130', '약 680 ~ 710', '2,400 ~ 2,600'],
+    ['성인 여자', '약 1,550 ~ 1,580', '약 510 ~ 530', '1,900 ~ 2,000'],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTypography.caption.copyWith(
+      fontSize: 10,
+      height: 1.5,
+      color: AppColors.textTertiary,
+    );
+    final headStyle = style.copyWith(
+      fontWeight: FontWeight.w700,
+      color: AppColors.textSecondary,
+    );
+
+    TableRow row(List<String> cells, TextStyle s) => TableRow(
+      children: [
+        for (final c in cells)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text(c, style: s),
+          ),
+      ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('참고 · 한국인 평균 섭취량 (kcal)', style: headStyle),
+        const SizedBox(height: 4),
+        Table(
+          columnWidths: const {
+            0: FlexColumnWidth(1.1),
+            1: FlexColumnWidth(1.6),
+            2: FlexColumnWidth(1.3),
+            3: FlexColumnWidth(1.3),
+          },
+          children: [row(_header, headStyle), for (final r in _rows) row(r, style)],
+        ),
+      ],
+    );
+  }
 }
 
 class _ProfileField extends StatelessWidget {
