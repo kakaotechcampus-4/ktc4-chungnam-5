@@ -182,7 +182,9 @@ _UNCERTAIN = re.compile(
     r"|(?:단정|판단|확인)(?:하기|할\s*수)\s*(?:가\s*)?(?:어렵|없)"
     r"|기록(?:이|은|도|만으로는)?\s*없|기록되지|기록(?:이|은)?\s*안\s"
     r"|측정(?:이|은)?\s*(?:되지|하지|못|안|없)|정보(?:가|는|도)?\s*없"
-    r"|(?:다루|언급하|평가하|판단하)지\s*(?:는\s*)?않"
+    r"|(?:다루|언급하|평가하|판단하|판정하|단정하)지\s*(?:는\s*)?않"
+    # 제안 · 방향을 거절하는 reasoning 문장 — "양을 늘리는 제안은 하지 않는다", "많은 양을 채우라는 방향은 피한다"
+    r"|(?:제안|권유|방향)(?:은|도|을)?\s*(?:하지\s*(?:는\s*)?않|피하|피한)"
 )
 
 # 단어 바로 뒤 · 앞의 부정 — "부족하지 않았어요", "많이 안 나왔어요", "안 짰어요"
@@ -397,7 +399,7 @@ def _unscored_quantity_hits(resp: dict) -> list[str]:
         if _UNCERTAIN.search(clause):
             continue
         for match in _QUANTITY_EVAL.finditer(clause):
-            if not _future_quantity_action(clause, match.start()):
+            if not _future_quantity_action(clause, match.start()) and not _general(clause, match):
                 found.append(f"'{match.group(0)}'({field})")
     return found
 
@@ -464,12 +466,16 @@ def quantity_no_direction(resp: dict, model: ShortFeedbackRequest) -> Verdict:
 # ("평소보다 많았어요")와 "식사량 · 섭취량" 주어, "양을 줄이 · 늘리"(반대 방향을 함의)도 함께 본다.
 # "양이 조금 적었어요" 처럼 정도 부사가 끼어도 같은 방향이다
 _DEGREE = r"(?:(?:조금|좀|약간|다소|살짝|꽤|많이)\s*)?"
+# 주어와 서술 사이의 비교 — "양이 평소 한 끼보다 많았고"
+_COMPARE = r"(?:평소(?:\s*한\s*끼)?보다\s*)?"
 _MORE = re.compile(
     r"(?:많이|배불리|과하게|넉넉히|평소보다\s*더)\s*(?:드셨|드신|먹었|먹은|드셔서|잡수)"
     r"|(?<![가-힣])더\s*(?:드셨|먹었)"
     r"|(?:과식|폭식)(?:을\s*)?(?:하셨|했|하신|한\s|이었|이에|이네|이라|인\s)"
     r"|많은\s*양|(?<![가-힣])양을\s*(?:줄이|줄여)"
-    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _DEGREE + r"(?:많|넘치|과하|넉넉)"
+    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _COMPARE + _DEGREE
+    # "양이 많이 적었어요" 의 "많이" 는 정도 부사다 — 뒤에 적은 쪽 서술이 오면 많은 쪽이 아니다
+    + r"(?:많(?!이\s*(?:적(?!당|절)|모자|부족))|넘치|과하|넉넉)"
     r"|평소보다\s*" + _DEGREE + r"(?:많|넉넉|과하)"
 )
 _LESS = re.compile(
@@ -477,14 +483,18 @@ _LESS = re.compile(
     r"|(?<![가-힣])덜\s*(?:드셨|먹었)"
     r"|소식(?:을\s*)?(?:하셨|했|하신|한\s|이었|이에|이네|이라|인\s)"
     r"|적은\s*양|(?<![가-힣])양을\s*(?:늘리|늘려)"
-    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _DEGREE + r"(?:적(?!당|절)|모자|부족)"
+    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _COMPARE + _DEGREE + r"(?:적(?!당|절)|모자|부족)"
     r"|평소보다\s*" + _DEGREE + r"(?:적(?!당|절)|모자)"
 )
 
 
+# 부정된 양보 — "양이 많지 않아도"(제안 음식 설명). 끝이 양보형이면 `_GENERAL_END` 가 일반 진술로 본다
+_NEGATED_TAIL = re.compile(r"[가-힣]*(?:\s+(?:않|안)[가-힣]*)?")
+
+
 def _general(clause: str, match: re.Match[str]) -> bool:
-    """조건 · 양보 · 경향의 일반 진술인가 — "양이 적으면", "양이 적어도", "적게 먹기 쉬운 때"."""
-    end = match.end() + len(re.match(r"[가-힣]*", clause[match.end():]).group(0))
+    """조건 · 양보 · 경향의 일반 진술인가 — "양이 적으면", "양이 적어도", "양이 많지 않아도", "적게 먹기 쉬운 때"."""
+    end = match.end() + len(_NEGATED_TAIL.match(clause, match.end()).group(0))
     return bool(_GENERAL_END.search(clause[match.start():end]) or _GENERAL_TAIL.match(clause, end))
 
 
@@ -589,6 +599,13 @@ _ENOUGH = re.compile(r"충분|적당|괜찮|넉넉|풍부|채웠|채워졌|잘\s
 _POLARITY = {"SHORT": _SHORT, "OVER": _OVER, "ENOUGH": _ENOUGH}
 _ADNOMINAL = re.compile(r"(?:부족한|모자란|적은|많은|높은|낮은|과한|넘치는|충분한|풍부한|넉넉한)\s*$")
 _CONJ = re.compile(r"\s*(?:와|과|이랑|랑|하고|및|,|·)?\s*")
+# 수식어 앞의 자기 주어 — "부담(이) 적은 단백질" 의 "적은" 은 부담을 서술한다. 정도 부사("다소 적은")는 주어가 아니다
+_OWN_SUBJECT = re.compile(r"(?<![가-힣])([가-힣]+?)(이|가)?\s+\S+\s*$")
+# 주어 조사 없이 쓰는 자기 주어 — "부담 적은 단백질". 목록 밖의 앞말("특히 · 여전히 부족한")은 주어로 보지 않는다
+_BARE_SUBJECTS = frozenset({"부담", "자극", "기름기", "칼로리", "열량", "지방", "간", "당"})
+# "-고" 뒤에 다른 주어가 오는 곳 — "한도 안이고 질 점수가 높아". "있고 끼니 한도를 넘었어요" 는 같은 영양소의 서술이다
+_AND_CONNECTIVE = re.compile(r"(?<=[가-힣]고)\s+(?=(?:[가-힣]+\s+){0,2}[가-힣]+(?:이|가|은|는)\s)")
+_DEGREE_ADVERBS = frozenset({"다소", "조금", "좀", "약간", "꽤", "너무", "매우", "아주", "비교적", "가장", "더", "훨씬", "많이"})
 
 
 def _nutrient_segments(
@@ -627,15 +644,29 @@ def _rejected_food_modifier(text: str, start: int, end: int) -> bool:
     return bool(_FOOD_MODIFIER.fullmatch(text[start:end]) and _REJECTED_OBJECT.match(text, end))
 
 
+def _has_own_subject(before: str) -> bool:
+    """영양소 앞 수식어가 제 주어를 따로 가졌는가 — "부담이 적은" · "부담 적은" 은 True, "다소 적은" 은 False."""
+    m = _OWN_SUBJECT.search(before)
+    if not m or m.group(1) + (m.group(2) or "") in _DEGREE_ADVERBS or m.group(1) in _DEGREE_ADVERBS:
+        return False
+    return bool(m.group(2)) or m.group(1) in _BARE_SUBJECTS
+
+
 def _claims(before: str, after: str, *, exclude_rejected_food: bool = False) -> list[tuple[str, bool, str]]:
     """(방향, 부정됨?, 어휘) — 앞 수식("부족한 식이섬유")과 뒤 서술에서 찾은 평가."""
     found = []
-    if m := _ADNOMINAL.search(before):
+    if (m := _ADNOMINAL.search(before)) and not _has_own_subject(before):
         word = m.group(0).strip()
         if kind := next((k for k, p in _POLARITY.items() if p.search(word)), None):
             found.append((kind, False, word))
+    # "나트륨은 한도 안이고 질 점수가 높아" — "-고" 뒤는 다른 주어의 서술일 수 있어 이 영양소의 서술에서 뗀다
+    if cut := _AND_CONNECTIVE.search(after):
+        after = after[: cut.start()]
     for kind, pattern in _POLARITY.items():
         for m in pattern.finditer(after):
+            # "식이섬유 흐름과 낮은 나트륨" — 구간 끝의 관형형은 뒤에 오는 영양소를 꾸민다
+            if _ADNOMINAL.fullmatch(after, m.start()):
+                continue
             if exclude_rejected_food and _rejected_food_modifier(after, m.start(), m.end()):
                 continue
             negated = bool(_NEG_AFTER.match(after, m.end()) or _NEG_BEFORE.search(after[: m.start()]))
@@ -1154,8 +1185,10 @@ def met_daily_not_pushed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     ]
     if not met:
         return True, "대상 아님 (하루 목표에 도달한 영양소 없음)"
+    deprioritized = _deprioritized(resp, met)
     found = []
-    for field, text in _texts(resp, ("body", "advice")):
+    pushing_cards: dict[str, set[int]] = {}
+    for index, (field, text) in enumerate(_texts(resp, ("body", "advice"))):
         for clause in _clauses(text):
             for name, _before, after in _nutrient_segments(clause):
                 if name not in met:
@@ -1170,8 +1203,50 @@ def met_daily_not_pushed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
                         exempt.group(0) in {"이미", "충분", "굳이"} and _RECOMMENDATION.search(part)
                     ):
                         continue
+                    # 허용(2026-11-09 결정): body 가 그 영양소를 우선하지 않는다고 밝혔으면, body 의 가벼운
+                    # 곁들임과 그 영양소를 미는 카드 1장은 실패가 아니다. 카드는 아래에서 장 수를 센다.
+                    if name in deprioritized and field == "advice" and _light_card(clause, part):
+                        pushing_cards.setdefault(name, set()).add(index)
+                        continue
+                    if name in deprioritized and _LIGHT.search(clause):
+                        continue
                     found.append(f"{_LABELS[name]} '{clause}'({field})")
+    for name, cards in pushing_cards.items():
+        if len(cards) > _ALLOWED_CARDS:
+            found.append(f"{_LABELS[name]} 카드 {len(cards)}장이 더 채우라고 했다 (허용 {_ALLOWED_CARDS}장)")
     return _verdict("하루 목표에 도달한 영양소를 더 채우라고 했다", found)
+
+
+# 하루 목표를 채운 영양소를 "우선하지 않는다" 는 body 의 말 — "단백질을 더 늘리기보다", "단백질을 채우는 대신"
+# 앞의 행동이 더 채우는 쪽이어야 한다 — "줄이기보다 유지해요" 는 아니다
+_REDIRECT = re.compile(
+    r"(?:(?<![가-힣])더\s*[가-힣]+|늘리|채우|보충하|끌어올리|추가하)(?:기|는)\s*(?:보다|대신)"
+)
+# 카드 1장 허용에서도 빼는 적극적인 보충 권유 — "많이 보충하면 좋아요"
+_STRONG = re.compile(r"많이|많은|충분히|듬뿍|넉넉히|가득|최대한|꼭|반드시")
+# 부족한 것을 채우는 동사 — 곁들이는 동사(곁들 · 더하)와 달리 가벼운 표현이 함께 있어야 허용한다
+_FILL = re.compile(r"채우|채워|보충|늘리|늘려|보태")
+
+
+def _light_card(clause: str, part: str) -> bool:
+    """허용 카드인가 — 적극적인 보충 권유가 없고, 채우는 동사면 같은 절에 가벼운 표현이 있다."""
+    if _STRONG.search(part):
+        return False
+    return not _FILL.search(part) or bool(_LIGHT.search(clause))
+# 곁들임의 정도를 낮추는 말 — "가볍게 단백질 반찬을", "한 가지 곁들이는 정도"
+_LIGHT = re.compile(r"가볍게|가벼운|부담\s*없이|한\s*가지|정도로?\b|정도(?:가|면|만)")
+_ALLOWED_CARDS = 1
+
+
+def _deprioritized(resp: dict, met: list[str]) -> set[str]:
+    """body 가 우선하지 않는다고 밝힌 영양소 — 그 영양소의 서술 구간에 "-기보다 · -는 대신" 이 있다."""
+    names: set[str] = set()
+    for _field, text in _texts(resp, ("body",)):
+        for clause in _clauses(text):
+            for name, _before, after in _nutrient_segments(clause):
+                if name in met and _REDIRECT.search(after):
+                    names.add(name)
+    return names
 
 
 @_with_request
