@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, status
 
 from app.food_analyzer import analyze_food
 from app.short_feedback import generate_short_feedback
-from app.safety_guard import BLOCKED_BODY, is_unsafe
+from app.safety_guard import BLOCKED_BODY, is_unsafe, reasoning_unsafe, screen_unsafe
 from app.ai_coach import generate_chat, CoachUnavailable, InvalidCoachResponse
 from app.schemas import (
     ChatRequest,
@@ -96,10 +96,11 @@ async def short_feedback(req: ShortFeedbackRequest) -> ShortFeedbackResponse:
     except (httpx.HTTPError, ValueError):
         # 게이트웨이 URL·키·사용자 기록을 오류 응답에 노출하지 않는다.
         raise HTTPException(status_code=502, detail="피드백 모델 응답을 처리하지 못했다") from None
-    output_texts = [draft.body, draft.reasoning or ""]
+    # 화면 문장(body · 카드)은 약 낱말을 쓰지 않는다. reasoning 은 사용자에게 하는 약 지시만 막는다(safety_guard 참고)
+    screen_texts = [draft.body]
     for suggestion in draft.suggestions or []:
-        output_texts.extend([suggestion.food_name, suggestion.advice])
-    if any(is_unsafe(text) for text in output_texts):
+        screen_texts.extend([suggestion.food_name, suggestion.advice])
+    if any(screen_unsafe(text) for text in screen_texts) or reasoning_unsafe(draft.reasoning or ""):
         return blocked()
     return ShortFeedbackResponse(
         body=draft.body, reasoning=draft.reasoning,
