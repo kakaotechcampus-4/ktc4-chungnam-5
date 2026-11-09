@@ -8,12 +8,13 @@ from datetime import timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
-from sqlalchemy import event, select, text
+from sqlalchemy import event, select, text, update
 from sqlalchemy.orm import Session
 
 from app.crud import evaluation as evaluation_crud
 from app.crud import meal as meal_crud
 from app.models.enums import MealStatus, MedicationStage
+from app.models.feedback import MealFeedback
 from app.models.task import Task
 from app.tests.factories import (
     make_food_ref,
@@ -205,6 +206,31 @@ def test_same_meal_scores_differently_by_stage(client: TestClient, db: Session) 
         db, stage=MedicationStage.REDUCED, food_ref_id="KFD_TEST_02", calories=Decimal("280")
     )
     assert _confirm(client, user, meal)["scores"]["quantity"] == 66
+
+
+def test_confirm_stores_the_intake_ratio(client: TestClient, db: Session) -> None:
+    """점수와 함께 평소 대비 섭취 비율을 남긴다 — 끼니 피드백이 과식 · 소식 방향을 쓰는 근거다.
+
+    700kcal / 평소 700kcal = 100%.
+    """
+    user, meal = _meal_with(db, calories=Decimal("280"))
+
+    _confirm(client, user, meal)
+
+    row = evaluation_crud.get_by_meal(db, meal.id)
+    assert row is not None
+    assert str(row.intake_ratio_pct) == "100.00"
+
+
+def test_intake_ratio_is_null_without_kcal(client: TestClient, db: Session) -> None:
+    """열량을 모르면 비율도 null 이다 — Quantity 점수와 같다."""
+    user, meal = _meal_with(db, calories=None)
+
+    assert _confirm(client, user, meal)["scores"]["quantity"] is None
+
+    row = evaluation_crud.get_by_meal(db, meal.id)
+    assert row is not None
+    assert row.intake_ratio_pct is None
 
 
 # 100g 당 단백질 5.6 · 식이섬유 1.6 · 나트륨 200 → 250g 에 14g · 4g · 500mg.
@@ -986,6 +1012,58 @@ def test_reconfirm_without_changes_keeps_feedback_and_enqueues_nothing(
     assert len(_feedback_tasks(db, meal.id)) == 1
 
 
+def test_reconfirm_with_a_repeating_ratio_keeps_feedback(
+    client: TestClient, db: Session
+) -> None:
+    """나누어떨어지지 않는 비율도 아무것도 안 고친 재확정에서는 같다고 본다.
+
+    500kcal / 700kcal = 71.428…%. 저장은 71.43 이고 재확정이 다시 계산한 값도 같은
+    자리에서 반올림해야 같다. 반올림을 빼거나 자리를 바꾸면 더블탭마다 문장을 비우고
+    AI 를 다시 부른다.
+    """
+    user, meal = _meal_with(db, calories=Decimal("200"))
+    _post_confirm(client, user, meal)
+    make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
+
+    _post_confirm(client, user, meal)
+
+    row = evaluation_crud.get_by_meal(db, meal.id)
+    assert row is not None
+    assert str(row.intake_ratio_pct) == "71.43"
+    assert len(_feedback_tasks(db, meal.id)) == 1
+
+
+def test_reconfirm_of_a_row_scored_before_the_ratio_enqueues_once(
+    client: TestClient, db: Session
+) -> None:
+    """비율 컬럼이 생기기 전에 매긴 행(비율 NULL)은 첫 재확정에서 한 번만 다시 만든다.
+
+    옛 문장은 양의 방향을 모르고 쓴 것이라 다시 만든다. 그 뒤로는 비율이 저장되어
+    아무것도 안 고친 재확정이 또 비우지 않는다.
+    """
+    user, meal = _meal_with(db, calories=Decimal("200"))
+    _post_confirm(client, user, meal)
+    make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
+    row = evaluation_crud.get_by_meal(db, meal.id)
+    assert row is not None
+    row.intake_ratio_pct = None  # 마이그레이션 전 행
+    db.flush()
+
+    _post_confirm(client, user, meal)
+    # 다시 넣은 작업이 문장을 채운 상태 — 재확정은 행을 지우지 않고 내용만 비운다.
+    db.execute(
+        update(MealFeedback)
+        .where(MealFeedback.meal_id == meal.id)
+        .values(body="다시 만든 문장이에요.")
+    )
+    db.flush()
+    # 요청마다 세션이 새로 열리는 실제 동작처럼, 앞서 바꾼 ORM 객체를 버린다.
+    db.expire_all()
+    _post_confirm(client, user, meal)
+
+    assert len(_feedback_tasks(db, meal.id)) == 2
+
+
 def test_reconfirm_without_feedback_enqueues_again(client: TestClient, db: Session) -> None:
     """문장이 아직(또는 영영) 없으면 재확정이 다시 넣는다 — 앞선 작업이 DLQ 로 갔어도 되살릴 길이다."""
     user, meal = _ready_meal(db)
@@ -1003,6 +1081,25 @@ def test_reconfirm_with_changed_satiety_enqueues_again(client: TestClient, db: S
     make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
 
     _post_confirm(client, user, meal, pct=30)
+
+    assert len(_feedback_tasks(db, meal.id)) == 2
+
+
+def test_reconfirm_with_changed_intake_ratio_enqueues_again(
+    client: TestClient, db: Session
+) -> None:
+    """평소 섭취량을 고쳐 비율만 바뀌어도 옛 문장은 무효다 — 문장을 만든 AI 입력이 바뀌었다.
+
+    500kcal 는 평소 700 이면 71%, 650 이면 77% 다. 둘 다 유지기 구간(60–85%) 안이라
+    Quantity 는 100 그대로다. 점수만 비교하면 옛 비율로 만든 문장이 남는다.
+    """
+    user, meal = _meal_with(db, calories=Decimal("200"))
+    _post_confirm(client, user, meal)
+    make_meal_feedback(db, user_id=user.id, meal_id=meal.id)
+    user.baseline_meal_kcal = Decimal("650")
+    db.flush()
+
+    _post_confirm(client, user, meal)
 
     assert len(_feedback_tasks(db, meal.id)) == 2
 

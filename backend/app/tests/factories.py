@@ -95,7 +95,7 @@ def make_food_ref(
     """공공 영양 DB 음식 1건. flush 까지만 하고 커밋하지 않는다.
 
     `category` 기본값이 `GENERAL` 인 건 이름 매칭이 GENERAL 을 먼저 보기 때문이다
-    (`crud.food.find_unique_by_name`). 기본값을 NULL 로 두면 대부분의 테스트가
+    (`crud.food._candidate_order`). 기본값을 NULL 로 두면 대부분의 테스트가
     폴백 경로만 타게 되어 정작 주 경로를 검증하지 못한다.
     """
     food_ref = FoodRef(
@@ -174,6 +174,7 @@ def make_qqs_evaluation(
     quantity_score: Decimal | int | None = 60,
     quality_score: Decimal | int | None = 60,
     satiety_score: Decimal | int | None = 60,
+    intake_ratio_pct: Decimal | None = None,
     stage_at_evaluation: MedicationStage = MedicationStage.MAINTENANCE,
 ) -> QQSEvaluation:
     """식사 하나의 Q/Q/S 점수 행. flush 까지만 하고 커밋하지 않는다.
@@ -188,6 +189,7 @@ def make_qqs_evaluation(
         quantity_score=quantity_score,
         quality_score=quality_score,
         satiety_score=satiety_score,
+        intake_ratio_pct=intake_ratio_pct,
     )
     db.add(evaluation)
     db.flush()

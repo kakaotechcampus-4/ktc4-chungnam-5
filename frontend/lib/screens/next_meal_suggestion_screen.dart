@@ -9,6 +9,7 @@ import '../api/meal_api.dart';
 import '../common/api_format.dart';
 import '../common/polling.dart';
 import '../navigation/nav_icons.dart';
+import '../popups/popup_gate.dart';
 import '../state/tab_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -83,6 +84,12 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
 
   bool get _isDinner => mealType == 'DINNER';
 
+  /// 삭제 확인에 보여 줄 음식 이름(`비빔냉면, 편육`). 끼니를 불러오기 전에는 비어 있다.
+  String _foodNames = '';
+
+  /// 끼니를 지우는 중. 휴지통을 연달아 눌러도 한 번만 지운다.
+  bool _deleting = false;
+
   /// 이 화면 전체를 그림으로 찍을 때 쓴다(챗봇 버튼의 밀려 나가는 효과).
   final GlobalKey _screenKey = GlobalKey();
 
@@ -129,6 +136,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
       setState(() {
         mealType = meal.mealType;
         satietyAfterPct = meal.satietyAfterPct;
+        _foodNames = meal.items.map((i) => i.displayName).join(', ');
       });
     } catch (_) {
       if (!mounted) return;
@@ -247,8 +255,40 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
   }
 
   void _closeFlowAndGoTo(int tab) {
-    context.read<TabState>().setIndex(tab);
+    context.read<TabState>().reselect(tab);
     Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  /// 확인 팝업에 한 줄로 보여 줄 끼니(`점심 · 비빔냉면`). 기록 탭 스와이프 삭제와 같은 모양이다.
+  String get _deleteDescription {
+    final type = mealType;
+    final label = type == null || type == 'UNKNOWN' ? '이 끼니' : mealTypeLabel(type);
+    final what = widget.skipped ? '식사 안 함' : _foodNames;
+    return what.isEmpty ? label : '$label · $what';
+  }
+
+  /// 휴지통 — 삭제 확인을 거쳐 이 끼니를 지우고 화면을 닫는다. 기록 탭의 스와이프 삭제와 같은
+  /// 확인 팝업을 쓴다. 홈·기록은 돌아오면 다시 불러오므로 따로 알리지 않는다.
+  Future<void> _deleteMeal() async {
+    if (_deleting) return;
+    final confirmed = await context.read<PopupGate>().confirmMealDelete(
+      context,
+      mealId: widget.mealId,
+      description: _deleteDescription,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await _api.deleteMeal(widget.mealId);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('삭제하지 못했어요: $e')));
+      return;
+    }
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -266,6 +306,14 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
           ),
           title: const Text('끼니 피드백'),
           titleTextStyle: AppTypography.sectionHead.copyWith(fontSize: 14),
+          actions: [
+            // 기록 탭에서 밀어서만 지울 수 있어 모르는 사용자가 많았다 — 이 화면에서도 지운다.
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: '끼니 삭제',
+              onPressed: _deleting ? null : _deleteMeal,
+            ),
+          ],
         ),
         body: SafeArea(
           child: isLoading
@@ -372,7 +420,8 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
         const SizedBox(height: AppSpacing.sm),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 13),
+          // 막대 사이를 넉넉하게 — 위아래 여백과 줄 간격을 넓혔다.
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
           decoration: BoxDecoration(
             color: AppColors.surface,
             border: Border.all(color: AppColors.border),
@@ -382,7 +431,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var i = 0; i < eval.nutrients.length; i++) ...[
-                if (i > 0) const SizedBox(height: 11),
+                if (i > 0) const SizedBox(height: 20),
                 _NutrientRow(nutrient: eval.nutrients[i]),
               ],
             ],
@@ -476,7 +525,22 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
         ),
       ];
     }
-    return const [SkeletonBox(width: double.infinity, height: 72)];
+    // 회색 빈 칸만 보이면 멈춘 것처럼 보여서, 만드는 중이라고 적는다.
+    return [
+      Container(
+        width: double.infinity,
+        height: 72,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: AppRadius.smRadius,
+        ),
+        child: Text(
+          '생성중입니다.',
+          style: AppTypography.bodySecondary,
+        ),
+      ),
+    ];
   }
 
   Widget _buildHomeButton() {
@@ -551,7 +615,14 @@ class _CommentCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         borderRadius: AppRadius.lgRadius,
       ),
-      child: Text(summary, style: AppTypography.body),
+      // 회색 본문이 잘 안 보인다는 의견이 있어 진한 글자색에 한 단계 키웠다.
+      child: Text(
+        summary,
+        style: AppTypography.body.copyWith(
+          fontSize: 12.5,
+          color: AppColors.textPrimary,
+        ),
+      ),
     );
   }
 }
@@ -568,39 +639,41 @@ class _ScoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scores = evaluation.scores;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: AppRadius.xlRadius,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '이번 끼니',
-                style: AppTypography.cardTitle.copyWith(fontSize: 12),
-              ),
-              _Chip(
-                text: '${stageLabel(evaluation.stage)} 기준',
-                background: AppColors.surfaceMuted,
-                foreground: AppColors.textSecondary,
-              ),
-            ],
+    // 제목 줄(`이번 끼니 결과` + 단계 칩)은 `영양소 상태` 등 다른 섹션처럼 박스 밖에 둔다.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '이번 끼니 결과',
+              style: AppTypography.cardTitle.copyWith(fontSize: 12.5),
+            ),
+            _Chip(
+              text: '${stageLabel(evaluation.stage)} 기준',
+              background: AppColors.surfaceMuted,
+              foreground: AppColors.textSecondary,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.border),
+            borderRadius: AppRadius.xlRadius,
           ),
-          const SizedBox(height: 10),
-          Row(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: _ScoreColumn(
                   label: '양',
                   score: scores.quantity,
+                  unit: '점',
                   color: AppColors.quantity,
                 ),
               ),
@@ -609,6 +682,7 @@ class _ScoreCard extends StatelessWidget {
                 child: _ScoreColumn(
                   label: '질',
                   score: scores.quality,
+                  unit: '점',
                   color: AppColors.quality,
                 ),
               ),
@@ -617,13 +691,14 @@ class _ScoreCard extends StatelessWidget {
                 child: _ScoreColumn(
                   label: '포만감',
                   score: scores.satiety,
+                  unit: '%',
                   color: AppColors.satiety,
                 ),
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -632,11 +707,15 @@ class _ScoreColumn extends StatelessWidget {
   const _ScoreColumn({
     required this.label,
     required this.score,
+    required this.unit,
     required this.color,
   });
 
   final String label;
   final int? score;
+
+  /// 숫자 뒤 단위 — 양·질은 `점`, 포만감은 `%`.
+  final String unit;
   final Color color;
 
   @override
@@ -647,14 +726,11 @@ class _ScoreColumn extends StatelessWidget {
       children: [
         Text(
           label,
-          style: AppTypography.caption.copyWith(
-            fontSize: 9.5,
-            color: AppColors.textTertiary,
-          ),
+          style: AppTypography.cardTitle.copyWith(fontSize: 10.5),
         ),
         const SizedBox(height: 4),
         Text(
-          s == null ? '-' : '$s',
+          s == null ? '-' : '$s$unit',
           style: AppTypography.cardTitle.copyWith(fontSize: 20),
         ),
         const SizedBox(height: 4),
@@ -940,13 +1016,30 @@ class _DoctorNotice extends StatelessWidget {
         color: AppColors.surfaceMuted,
         borderRadius: AppRadius.mdRadius,
       ),
-      child: Text(
-        '투약량 조절이 필요하다고 느끼면 담당 의사와 상의해 주세요.',
-        style: AppTypography.caption.copyWith(
-          fontSize: 10,
-          height: 1.5,
-          color: AppColors.textSecondary,
-        ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 글자 첫 줄 높이(10 × 1.5)에 맞춰 아이콘을 세로 중앙에 둔다.
+          const SizedBox(
+            height: 15,
+            child: Icon(
+              Icons.error_outline,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '투약량 조절이 필요하다고 느끼면 담당 의사와 상의해 주세요.',
+              style: AppTypography.caption.copyWith(
+                fontSize: 10,
+                height: 1.5,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

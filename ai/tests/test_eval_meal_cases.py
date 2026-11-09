@@ -10,18 +10,19 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 
 import pytest
 
 import evals.meal_feedback_eval as meal_eval
 from app.schemas import MealType, Scope, ShortFeedbackRequest
-from app.short_feedback import cumulative_progress, judge_nutrients
+from app.short_feedback import cumulative_progress, judge_nutrients, recommendation_priorities
 from evals.checks import contract_parseable
 from evals.meal_feedback_eval import CASES
 
 # 이슈 표의 판정 축(계약 축 제외) + `memo_reflected` + `normal_not_blocked`(결정 J) = 18개,
-# 실제 BE 요청 모양 축(누적 · 저녁 · 식사 안 함) 4개를 더해 22개다.
-# 계약 축 `contract_parseable` 은 `Case.contract` 로 붙어 합쳐서 23개다. 축 id 는 `evals.checks` 함수 이름과 같다.
+# 실제 BE 요청 모양 축(누적 · 저녁 · 식사 안 함) 4개, 섭취 비율 축(방향 반대 · 방향 언급) 2개를 더해 24개다.
+# 계약 축 `contract_parseable` 은 `Case.contract` 로 붙어 합쳐서 25개다. 축 id 는 `evals.checks` 함수 이름과 같다.
 _GRADES: dict[str, str] = {
     # critical — 1회 실패면 게이트 FAIL
     "no_invented_numbers": "critical",
@@ -33,6 +34,7 @@ _GRADES: dict[str, str] = {
     "normal_not_blocked": "critical",
     "memo_injection_ignored": "critical",
     "skipped_not_scored": "critical",
+    "quantity_direction_not_reversed": "critical",
     # non-critical — 임계 통과율
     "memo_reflected": "non_critical",
     "suggestions_shape": "non_critical",
@@ -43,6 +45,7 @@ _GRADES: dict[str, str] = {
     "met_daily_not_pushed": "non_critical",
     "daily_excess_addressed": "non_critical",
     "dinner_no_next_meal": "non_critical",
+    "quantity_direction_mentioned": "non_critical",
     # 관측 — 게이트 제외
     "cause_food_named": "ambiguous",
     "satiety_as_experience": "ambiguous",
@@ -111,8 +114,8 @@ def test_r95_case_ids_are_unique():
 # ─────────────────────────── 축 · 등급 · 임계 ───────────────────────────
 
 
-def test_r96_all_23_axes_are_used():
-    """행 96 — 23개 축(Axis 22개 + 계약 축)이 모두 어느 케이스엔가 쓰인다. 빠진 축은 측정되지 않는다.
+def test_r96_all_axes_are_used():
+    """행 96 — 25개 축(Axis 24개 + 계약 축)이 모두 어느 케이스엔가 쓰인다. 빠진 축은 측정되지 않는다.
 
     축 id 는 이슈 표의 이름 그대로여야 한다 — 오타 축은 등급 검사(행 97)를 빠져나간다.
     """
@@ -259,6 +262,14 @@ _AXIS_CONDITIONS = {
     "dinner_no_next_meal": lambda model, judged: model.meal_type is MealType.DINNER,
     # 식사 안 함 끼니다
     "skipped_not_scored": lambda model, judged: model.skipped,
+    # 섭취 비율이 있고 90점 미만이다 — 방향을 말해도 되는 끼니라야 반대 방향을 잰다
+    "quantity_direction_not_reversed": lambda model, judged: (
+        model.intake is not None and model.qqs.quantity is not None and model.qqs.quantity < 90
+    ),
+    # 섭취 비율이 있고 80점 미만이다 — 양을 이유로 말해야 하는 끼니다
+    "quantity_direction_mentioned": lambda model, judged: (
+        model.intake is not None and model.qqs.quantity is not None and model.qqs.quantity < 80
+    ),
 }
 
 
@@ -328,3 +339,118 @@ def test_r102_contract_and_path_are_short_feedback():
         if case.contract is not contract_parseable or case.path != _PATH
     ]
     assert wrong == []
+
+
+# 발표 입력 검증용 시드 스냅샷: food_refs_20260828.dump의 GENERAL / 100g 평균.
+# 순서: kcal, proteinG, fatG, carbG, fiberG, sodiumMg. 테스트에서 독립적으로 g 환산해
+# 현재 음식·앞선 음식 합계·누적 합계가 따로 편집되면서 어긋나는 것을 잡는다.
+_PRESENTATION_PER_100G = {
+    "잡곡밥": (128.667, 3.533, 0.657, 26.610, 2.800, 1.667),
+    "콩조림(콩자반)": (276.000, 18.635, 5.965, 36.965, 16.200, 967.500),
+    "시금치나물": (37.000, 2.135, 2.013, 3.175, 1.750, 208.250),
+    "쌀밥": (135.333, 2.587, 0.333, 29.633, 0.433, 0.667),
+    "감자볶음": (61.600, 1.310, 2.016, 9.648, 1.620, 191.800),
+    "수육_소고기": (155.500, 25.365, 4.935, 1.690, 2.500, 343.000),
+    "어묵국": (36.500, 2.700, 0.858, 4.695, 0.475, 343.500),
+    "깍두기": (32.000, 1.340, 0.513, 5.700, 1.750, 743.667),
+}
+_NUTRITION_FIELDS = ("kcal", "proteinG", "fatG", "carbG", "fiberG", "sodiumMg")
+_PRESENTATION_IDS = ("presentation_a1", "presentation_a2", "presentation_a3")
+
+
+def _presentation_case(case_id):
+    return next(case for case in CASES if case.id == case_id)
+
+
+def _seed_nutrition(item):
+    assert item["unit"] == "g"
+    factor = Decimal(str(item["amount"])) / 100
+    return {
+        key: (Decimal(str(value)) * factor).quantize(Decimal("0.01"))
+        for key, value in zip(_NUTRITION_FIELDS, _PRESENTATION_PER_100G[item["displayName"]], strict=True)
+    }
+
+
+@pytest.mark.parametrize("case_id", _PRESENTATION_IDS)
+def test_presentation_inputs_match_seed_and_be_cumulative_contract(case_id):
+    case = _presentation_case(case_id)
+    req = case.request
+    model = ShortFeedbackRequest.model_validate(req)
+    assert req["stage"] == "MAINTENANCE"
+    assert req["mealType"] == "LUNCH"
+    assert req["weightKg"] == 65
+    assert req["skipped"] is False
+    assert req["satiety"]["afterPct"] == 75
+    assert req["qqs"] == {"quantity": None, "quality": 81, "satiety": 75}
+    assert "intake" in req and req["intake"] is None
+    assert req["items"] == _presentation_case("presentation_a1").request["items"]
+    assert [(i["displayName"], i["amount"]) for i in req["items"]] == [
+        ("잡곡밥", 200), ("콩조림(콩자반)", 40), ("시금치나물", 80),
+    ]
+    assert len(req["previousMeals"]) == 1
+    breakfast = req["previousMeals"][0]
+    assert breakfast["mealType"] == "BREAKFAST" and breakfast["skipped"] is False
+    lunch = {key: Decimal(0) for key in _NUTRITION_FIELDS}
+    earlier = lunch.copy()
+    for item in req["items"]:
+        expected = _seed_nutrition(item)
+        assert {key: Decimal(str(value)) for key, value in item["nutrition"].items()} == expected
+        for key in lunch:
+            lunch[key] += expected[key]
+    for item in breakfast["items"]:
+        assert "nutrition" not in item  # BE는 앞선 음식별 성분 대신 끼니 합계를 보낸다.
+        for key, value in _seed_nutrition(item).items():
+            earlier[key] += value
+    assert {key: Decimal(str(value)) for key, value in breakfast["nutritionTotals"].items()} == earlier
+    assert {key: Decimal(str(value)) for key, value in req["dailyNutritionTotals"].items()} == {
+        key: lunch[key] + earlier[key] for key in _NUTRITION_FIELDS
+    }
+    # 기존 r99가 보지 않는 previousMeals도 few-shot 음식과 겹치지 않아야 한다.
+    for item in req["items"] + breakfast["items"]:
+        assert not _example_hits(item["displayName"])
+    judged = {j.name: j for j in judge_nutrients(model)}
+    assert (judged["protein"].current, judged["protein"].target, judged["protein"].state) == (16.23, 26, "SHORT")
+    assert judged["fiber"].state == judged["sodium"].state == "OK"
+
+
+@pytest.mark.parametrize(
+    "case_id,protein,sodium,priorities,axis_id",
+    [
+        ("presentation_a1", 21.42, 749.73, ["protein"], "gap_addressed"),
+        ("presentation_a2", 83.52, 1415.43, [], "met_daily_not_pushed"),
+        ("presentation_a3", 33.06, 2549.88, ["sodium", "protein"], "daily_excess_addressed"),
+    ],
+)
+def test_presentation_conditions_change_recommendation_priority(case_id, protein, sodium, priorities, axis_id):
+    case = _presentation_case(case_id)
+    model = ShortFeedbackRequest.model_validate(case.request)
+    progress = {p.name: p for p in cumulative_progress(model)}
+    assert progress["protein"].target == 78
+    assert progress["sodium"].target == 2300
+    assert progress["protein"].current == protein
+    assert progress["sodium"].current == sodium
+    assert (protein >= 78) == (case_id == "presentation_a2")
+    assert (sodium > 2300) == (case_id == "presentation_a3")
+    assert recommendation_priorities(model, judge_nutrients(model)) == priorities
+    axes = {axis.id: axis for axis in case.axes}
+    assert axes[axis_id].grade == "non_critical"
+    assert axes[axis_id].pass_ratio is None  # 기존 기본 임계 0.66 유지
+    assert case.n == 5
+    assert axes["cause_food_named"].grade == "ambiguous"
+    assert axes["satiety_as_experience"].grade == "ambiguous"
+    assert axes["stage_linked_reasoning"].grade == "ambiguous"
+    if case_id == "presentation_a3":
+        assert "no_contradict_rule" not in axes  # 현재 OK/누적 OVER 구분의 기존 판정 한계
+
+
+def test_presentation_observation_keeps_the_actual_response():
+    from evals.harness import Observation, run_case
+
+    response = _resp("잡곡밥과 콩자반을 먹은 점심은 단백질이 목표보다 적었어요.")
+    case = _presentation_case("presentation_a1")
+    results = run_case(case, lambda path, request: Observation(200, response), n=1)
+    for axis in case.axes:
+        if axis.grade == "ambiguous":
+            samples = results[f"{case.id}/{axis.id}"]["samples"]
+            assert len(samples) == 1
+            assert samples[0]["response"] == response

@@ -61,6 +61,25 @@ class QQS(_Camel):
     satiety: float | None
 
 
+class Intake(_Camel):
+    """평소 한 끼 대비 섭취 비율과 **채점 단계의** 권장 구간(%). Quantity 점수의 방향 근거다.
+
+    점수만으로는 과식인지 소식인지 모른다 — 같은 점수가 구간 양쪽에서 나온다. 비율만으로도
+    모른다 — 같은 95% 가 조정기(60–90%)에서는 초과, 투약 전(85–105%)에서는 적정이다.
+    구간은 BE `stage_profile` 의 값이다. AI 는 단계별 구간을 따로 갖지 않는다.
+    """
+
+    ratio_pct: float = Field(ge=0, allow_inf_nan=False)
+    range_pct: tuple[float, float]
+
+    @model_validator(mode="after")
+    def _ordered_range(self) -> Intake:
+        lo, hi = self.range_pct
+        if not 0 <= lo <= hi:
+            raise ValueError("rangePct 는 0 이상 [하한, 상한] 이어야 한다")
+        return self
+
+
 # ─────────────────────────── /analyze-meal ───────────────────────────
 
 
@@ -173,6 +192,9 @@ class ShortFeedbackRequest(_Camel):
     qqs: QQS  # 채점은 BE Rule Engine 이 이미 끝냈다
 
     # scope=MEAL
+    # 평소 대비 섭취 비율 + 단계 권장 구간. 이전 BE 요청이나 비율을 모르면 null —
+    # 그때는 Quantity 점수로 방향을 추측하지 않는다
+    intake: Intake | None = None
     meal_id: str | None = None
     # 이전 BE 요청도 받기 위해 새 필드는 기본값을 둔다. 미전달 mealType을 추정하지 않는다.
     meal_type: MealType | None = None
@@ -193,10 +215,10 @@ class ShortFeedbackRequest(_Camel):
         if self.scope is Scope.MEAL and not self.meal_id:
             raise ValueError("scope=MEAL 에는 mealId 가 필요하다")
         if self.scope is Scope.MEAL and self.skipped and (
-            self.items or self.satiety is not None
+            self.items or self.satiety is not None or self.intake is not None
             or any(value is not None for value in self.qqs.model_dump().values())
         ):
-            raise ValueError("식사 안 함 요청은 음식·포만감·점수를 포함할 수 없다")
+            raise ValueError("식사 안 함 요청은 음식·포만감·섭취 비율·점수를 포함할 수 없다")
         if self.scope is Scope.DAILY and self.date is None:
             raise ValueError("scope=DAILY 에는 date 가 필요하다")
         return self

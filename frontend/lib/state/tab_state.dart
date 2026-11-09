@@ -43,6 +43,17 @@ class TabState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 이미 [index] 탭이어도 그 탭 화면에 "다시 보인다" 를 알린다.
+  /// 식사 기록 흐름은 화면을 교체(`pushReplacement`)로 이어 가서, 홈이 `await push` 로는
+  /// 흐름이 끝난 때를 알 수 없다. 흐름을 닫을 때 이걸로 홈이 새로 불러오게 한다.
+  void reselect(int index) {
+    if (_currentIndex == index) {
+      notifyListeners();
+    } else {
+      setIndex(index);
+    }
+  }
+
   /// 피드백 탭으로 이동하면서 [kind] 화면을 보여준다.
   void showFeedback(FeedbackKind kind) {
     if (_currentIndex == feedback && _feedbackKind == kind) return;

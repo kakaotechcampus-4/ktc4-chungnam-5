@@ -354,8 +354,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// `＋ 저녁 식사 기록하기` 카드 탭 → 식사 입력 화면(3번). 돌아오면 끼니가
   /// 새로 기록됐을 수 있으니 홈을 다시 불러온다.
   Future<void> _openMealInput() async {
+    // 버튼 라벨(＋ ○○ 식사 기록하기)과 같은 끼니로 시작한다.
+    final nextMealType = _home?.missingMealTypes.firstOrNull;
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const MealInputScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => MealInputScreen(initialMealType: nextMealType),
+      ),
     );
     if (!mounted) return;
     _load();
@@ -474,11 +478,19 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: AppRadius.lgRadius,
         child: Column(
           children: [
-            Center(
-              child: StomachGauge(
-                key: _gaugeKey,
-                satiety: stomach?.satietyPct ?? 0,
-              ),
+            Stack(
+              children: [
+                Center(
+                  child: StomachGauge(
+                    key: _gaugeKey,
+                    satiety: stomach?.satietyPct ?? 0,
+                  ),
+                ),
+                // 위를 누르면 포만감을 고칠 수 있다는 걸 처음 쓰는 사람도 알도록 알린다.
+                // 눌러도 열리지 않는(기준 끼니가 없는) 때는 거짓 안내가 되니 보이지 않는다.
+                if (stomach?.sourceMealId != null)
+                  const Positioned(top: 0, right: 0, child: _SatietyHintBubble()),
+              ],
             ),
             const SizedBox(height: AppSpacing.lg),
 
@@ -516,7 +528,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mealTypeLabel: mealTypeLabel(meal.mealType),
           time: _formatTime(meal.eatenAt),
           foodNames: meal.displayName,
-          quantityLabel: meal.scores?.quantityDisplay,
+          quantity: meal.scores?.quantity,
           quality: meal.scores?.quality,
           satiety: meal.scores?.satiety,
           skipped: meal.skipped,
@@ -535,6 +547,160 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
     ];
   }
+}
+
+/// 위 옆 말풍선 — "위를 눌러서 포만감을 설정해 보세요!".
+///
+/// 나타날 때 살짝 떠오르며 커지고, 글자는 게임 대사처럼 한 글자씩 찍힌다.
+/// 글자는 처음부터 자리를 차지한 채 색만 드러나서 말풍선 크기가 흔들리지 않는다.
+/// 기기가 "애니메이션 줄이기" 이면 움직임 없이 전체 문구를 보여 준다.
+class _SatietyHintBubble extends StatefulWidget {
+  const _SatietyHintBubble();
+
+  static const String message = '위를 눌러서\n포만감을 설정해 보세요!';
+
+  @override
+  State<_SatietyHintBubble> createState() => _SatietyHintBubbleState();
+}
+
+class _SatietyHintBubbleState extends State<_SatietyHintBubble>
+    with SingleTickerProviderStateMixin {
+  static const Duration _delay = Duration(milliseconds: 500);
+  static const Duration _perChar = Duration(milliseconds: 60);
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration:
+        _delay + _perChar * _SatietyHintBubble.message.replaceAll('\n', '').length,
+  );
+
+  /// 말풍선이 나타나는 구간(앞 [_delay] 동안).
+  late final Animation<double> _pop = CurvedAnimation(
+    parent: _controller,
+    curve: Interval(
+      0,
+      _delay.inMilliseconds / _controller.duration!.inMilliseconds,
+      curve: Curves.easeOutBack,
+    ),
+  );
+
+  /// 글자가 찍히는 구간(나타난 뒤부터 끝까지).
+  late final Animation<double> _typing = CurvedAnimation(
+    parent: _controller,
+    curve: Interval(
+      _delay.inMilliseconds / _controller.duration!.inMilliseconds,
+      1,
+    ),
+  );
+
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTypography.body.copyWith(
+      fontSize: 11.5,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textPrimary,
+    );
+    const message = _SatietyHintBubble.message;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final pop = _pop.value.clamp(0.0, 1.0);
+        // 줄바꿈은 글자 수에 세지 않는다. 진행도에 맞춰 보이는 글자만 색을 입힌다.
+        final letters = message.replaceAll('\n', '').length;
+        final shown = (_typing.value * letters).ceil();
+        var count = 0;
+        var cut = message.length;
+        for (var i = 0; i < message.length; i++) {
+          if (message[i] == '\n') continue;
+          if (count == shown) {
+            cut = i;
+            break;
+          }
+          count++;
+        }
+        return Opacity(
+          opacity: pop,
+          child: Transform.translate(
+            offset: Offset(0, (1 - pop) * 6),
+            child: Transform.scale(
+              scale: 0.9 + 0.1 * _pop.value,
+              alignment: Alignment.bottomLeft,
+              child: CustomPaint(
+                painter: const _BubblePainter(),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(13, 9, 13, 9 + _BubblePainter.tail),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: message.substring(0, cut)),
+                        TextSpan(
+                          text: message.substring(cut),
+                          style: const TextStyle(color: Colors.transparent),
+                        ),
+                      ],
+                    ),
+                    style: style,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 아래 왼쪽으로 꼬리가 달린 둥근 말풍선(흰 바탕 · 옅은 테두리 · 가벼운 그림자).
+class _BubblePainter extends CustomPainter {
+  const _BubblePainter();
+
+  /// 꼬리 높이. 글자 영역은 이만큼 위로 비워 둔다.
+  static const double tail = 7;
+  static const double _radius = 14;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final body = Rect.fromLTWH(0, 0, size.width, size.height - tail);
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(body, const Radius.circular(_radius)))
+      ..moveTo(18, body.bottom - 0.5)
+      ..lineTo(12, size.height)
+      ..lineTo(28, body.bottom - 0.5)
+      ..close();
+    canvas.drawShadow(path, AppColors.textPrimary.withValues(alpha: 0.35), 3, false);
+    canvas.drawPath(path, Paint()..color = AppColors.surface);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = AppColors.border
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_BubblePainter old) => false;
 }
 
 class _SectionHeader extends StatelessWidget {

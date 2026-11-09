@@ -57,6 +57,16 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
   String? _errorMessage;
   bool _leaving = false;
 
+  /// 영양정보 없음 안내는 화면에 처음 들어왔을 때 한 번만 띄운다. 고치는 중이나 음식을
+  /// 추가한 뒤에는 다시 띄우지 않고, 아래 요약과 평가받기 버튼 문구가 남은 수를 알린다.
+  bool _missingNoticeDone = false;
+
+  /// 영양정보가 없는 음식. 카드의 빨간 테두리·"영양정보 없음" 과 같은 기준이다.
+  List<MealItem> get _missingItems => [
+    for (final i in _items)
+      if (!(i.matched && i.nutrition != null)) i,
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -94,6 +104,7 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
           ..addEntries(meal.items.map((i) => MapEntry(i.itemId, i)));
         _state = LoadState.ready;
       });
+      _noticeMissingNutrition();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -101,6 +112,24 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
         _state = LoadState.failed;
       });
     }
+  }
+
+  /// 처음 불러왔을 때 영양정보 없는 음식이 있으면 팝업으로 알린다. "입력하기" 면 그
+  /// 음식의 수정 시트를 바로 연다. 처음 한 번만 — 그 뒤 고치는 중에는 다시 묻지 않는다.
+  void _noticeMissingNutrition() {
+    if (_missingNoticeDone) return;
+    _missingNoticeDone = true;
+    final missing = _missingItems;
+    if (missing.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final edit = await context.read<PopupGate>().confirmNutritionMissing(
+        context,
+        mealId: widget.mealId,
+        count: missing.length,
+      );
+      if (edit && mounted) _editItem(missing.first);
+    });
   }
 
   void _replace(MealItem item) {
@@ -405,6 +434,7 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
       children: [
         _buildHeader(),
         if (m.clarifyQuestion != null) _buildClarifyBanner(m.clarifyQuestion!),
+        if (_missingItems.isNotEmpty) _buildMissingBanner(_missingItems.length),
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(
@@ -452,6 +482,39 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
             style: AppTypography.bodySecondary,
           ),
           const SizedBox(width: 8),
+        ],
+      ),
+    );
+  }
+
+  /// 영양정보 없는 음식이 남아 있다는 요약. 팝업을 닫은 뒤에도 남은 수를 알린다.
+  Widget _buildMissingBanner(int count) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        AppSpacing.md,
+        AppSpacing.screenHorizontal,
+        0,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppColors.primaryTint,
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, size: 18, color: AppColors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '영양정보 없는 음식 $count개 — 입력하거나 삭제해 주세요.',
+              style: AppTypography.caption.copyWith(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -668,6 +731,7 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
   }
 
   Widget _buildConfirmButton() {
+    final missing = _missingItems.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.screenHorizontal,
@@ -679,8 +743,11 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
         width: double.infinity,
         height: AppLayout.primaryButtonHeight,
         child: ElevatedButton(
-          // 음식이 하나도 없으면 평가할 게 없다.
-          onPressed: _leaving || _items.isEmpty ? null : _goToEvaluation,
+          // 음식이 하나도 없으면 평가할 게 없다. 영양정보가 없는 음식이 남아 있으면 일부만
+          // 계산돼 점수가 낮게 나올 수 있어서, 입력하거나 삭제할 때까지 잠근다.
+          onPressed: _leaving || _items.isEmpty || missing > 0
+              ? null
+              : _goToEvaluation,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             shape: RoundedRectangleBorder(
@@ -689,7 +756,10 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
           ),
           child: _leaving
               ? const CircularProgressIndicator(color: Colors.white)
-              : Text('확인하고 평가받기', style: AppTypography.buttonLabel),
+              : Text(
+                  missing > 0 ? '영양정보 $missing개 입력 필요' : '확인하고 평가받기',
+                  style: AppTypography.buttonLabel,
+                ),
         ),
       ),
     );

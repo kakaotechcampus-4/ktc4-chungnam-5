@@ -1,0 +1,3146 @@
+{
+  "kind": "partial_eval_report_not_baseline",
+  "started_at": "2026-11-08T20:50:34.925036+09:00",
+  "argv": [
+    "--only",
+    "presentation_a1,presentation_a2,presentation_a3",
+    "--n",
+    "5"
+  ],
+  "channel": "existing eval CLI -> TestClient(app.main) -> configured reasoning gateway",
+  "rule_version": "v3",
+  "prompt_hash": "96201ed9e0282c4ddc6d19a458dabd31d960ddcec10e45c8164804492604cc50",
+  "source_sha256": {
+    "app/short_feedback.py": "ad1cb5004726354af1dce95a8cda9418ff64f3c2dd91ceb2f039e31bdbc695db",
+    "evals/checks.py": "cd65982248194647779b6e6f935f6654200ae2a970bf08705d5be6e1ef94c419",
+    "evals/harness.py": "c98d7713189d803a24d1003bc86ece1000a33817dd738bb02ecef3c0eda6c083",
+    "evals/meal_feedback_eval.py": "74c4087eb6c3eb6d6ea25d07755a171f194052ead93603fc8d7ec731c508e077"
+  },
+  "timeout_seconds": 45.0,
+  "max_retries": 1,
+  "requests": {
+    "presentation_a1": {
+      "scope": "MEAL",
+      "userId": "eval-user",
+      "stage": "MAINTENANCE",
+      "qqs": {
+        "quantity": null,
+        "quality": 81,
+        "satiety": 75
+      },
+      "items": [
+        {
+          "displayName": "잡곡밥",
+          "amount": 200,
+          "unit": "g",
+          "nutrition": {
+            "kcal": 257.33,
+            "proteinG": 7.07,
+            "fatG": 1.31,
+            "carbG": 53.22,
+            "fiberG": 5.6,
+            "sodiumMg": 3.33
+          }
+        },
+        {
+          "displayName": "콩조림(콩자반)",
+          "amount": 40,
+          "unit": "g",
+          "nutrition": {
+            "kcal": 110.4,
+            "proteinG": 7.45,
+            "fatG": 2.39,
+            "carbG": 14.79,
+            "fiberG": 6.48,
+            "sodiumMg": 387.0
+          }
+        },
+        {
+          "displayName": "시금치나물",
+          "amount": 80,
+          "unit": "g",
+          "nutrition": {
+            "kcal": 29.6,
+            "proteinG": 1.71,
+            "fatG": 1.61,
+            "carbG": 2.54,
+            "fiberG": 1.4,
+            "sodiumMg": 166.6
+          }
+        }
+      ],
+      "satiety": {
+        "beforePct": null,
+        "afterPct": 75,
+        "checkins": [],
+        "hungerReturnMinutes": null,
+        "userComment": null
+      },
+      "mealType": "LUNCH",
+      "weightKg": 65,
+      "previousMeals": [
+        {
+          "mealType": "BREAKFAST",
+          "skipped": false,
+          "qqs": {
+            "quantity": null,
+            "quality": 45,
+            "satiety": null
+          },
+          "items": [
+            {
+              "displayName": "쌀밥",
+              "amount": 150,
+              "unit": "g"
+            },
+            {
+              "displayName": "감자볶음",
+              "amount": 100,
+              "unit": "g"
+            }
+          ],
+          "nutritionTotals": {
+            "kcal": 264.6,
+            "proteinG": 5.19,
+            "fatG": 2.52,
+            "carbG": 54.1,
+            "fiberG": 2.27,
+            "sodiumMg": 192.8
+          }
+        }
+      ],
+      "dailyNutritionTotals": {
+        "kcal": 661.93,
+        "proteinG": 21.42,
+        "fatG": 7.83,
+        "carbG": 124.65,
+        "fiberG": 15.75,
+        "sodiumMg": 749.73
+      },
+      "skipped": false,
+      "intake": null,
+      "mealId": "eval-presentation_a1"
+    },
+    "presentation_a2": {
+      "scope": "MEAL",
+      "userId": "eval-user",
+      "stage": "MAINTENANCE",
+      "qqs": {
+        "quantity": null,
+        "quality": 81,
+        "satiety": 75
+      },
+      "items": [
+        {
+          "displayName": "잡곡밥",
+          "amount": 200,
+          "unit": "g",
+          "nutrition": {
+            "kcal": 257.33,
+            "proteinG": 7.07,
+            "fatG": 1.31,
+            "carbG": 53.22,
+            "fiberG": 5.6,
+            "sodiumMg": 3.33
+          }
+        },
+        {
+          "displayName": "콩조림(콩자반)",
+          "amount": 40,
+          "unit": "g",
+          "nutrition": {
+            "kcal": 110.4,
+            "proteinG": 7.45,
+            "fatG": 2.39,
+            "carbG": 14.79,
+            "fiberG": 6.48,
+            "sodiumMg": 387.0
+          }
+        },
+        {
+          "displayName": "시금치나물",
+          "amount": 80,
+          "unit": "g",
+          "nutrition": {
+            "kcal": 29.6,
+            "proteinG": 1.71,
+            "fatG": 1.61,
+            "carbG": 2.54,
+            "fiberG": 1.4,
+            "sodiumMg": 166.6
+          }
+        }
+      ],
+      "satiety": {
+        "beforePct": null,
+        "afterPct": 75,
+        "checkins": [],
+        "hungerReturnMinutes": null,
+        "userComment": null
+      },
+      "mealType": "LUNCH",
+      "weightKg": 65,
+      "previousMeals": [
+        {
+          "mealType": "BREAKFAST",
+          "skipped": false,
+          "qqs": {
+            "quantity": null,
+            "quality": 90,
+            "satiety": null
+          },
+          "items": [
+            {
+              "displayName": "쌀밥",
+              "amount": 150,
+              "unit": "g"
+            },
+            {
+              "displayName": "수육_소고기",
+              "amount": 250,
+              "unit": "g"
+            }
+          ],
+          "nutritionTotals": {
+            "kcal": 591.75,
+            "proteinG": 67.29,
+            "fatG": 12.84,
+            "carbG": 48.67,
+            "fiberG": 6.9,
+            "sodiumMg": 858.5
+          }
+        }
+      ],
+      "dailyNutritionTotals": {
+        "kcal": 989.08,
+        "proteinG": 83.52,
+        "fatG": 18.15,
+        "carbG": 119.22,
+        "fiberG": 20.38,
+        "sodiumMg": 1415.43
+      },
+      "skipped": false,
+      "intake": null,
+      "mealId": "eval-presentation_a2"
+    },
+    "presentation_a3": {
+      "scope": "MEAL",
+      "userId": "eval-user",
+      "stage": "MAINTENANCE",
+      "qqs": {
+        "quantity": null,
+        "quality": 81,
+        "satiety": 75
+      },
+      "items": [
+        {
+          "displayName": "잡곡밥",
+          "amount": 200,
+          "unit": "g",
+          "nutrition": {
+            "kcal": 257.33,
+            "proteinG": 7.07,
+            "fatG": 1.31,
+            "carbG": 53.22,
+            "fiberG": 5.6,
+            "sodiumMg": 3.33
+          }
+        },
+        {
+          "displayName": "콩조림(콩자반)",
+          "amount": 40,
+          "unit": "g",
+          "nutrition": {
+            "kcal": 110.4,
+            "proteinG": 7.45,
+            "fatG": 2.39,
+            "carbG": 14.79,
+            "fiberG": 6.48,
+            "sodiumMg": 387.0
+          }
+        },
+        {
+          "displayName": "시금치나물",
+          "amount": 80,
+          "unit": "g",
+          "nutrition": {
+            "kcal": 29.6,
+            "proteinG": 1.71,
+            "fatG": 1.61,
+            "carbG": 2.54,
+            "fiberG": 1.4,
+            "sodiumMg": 166.6
+          }
+        }
+      ],
+      "satiety": {
+        "beforePct": null,
+        "afterPct": 75,
+        "checkins": [],
+        "hungerReturnMinutes": null,
+        "userComment": null
+      },
+      "mealType": "LUNCH",
+      "weightKg": 65,
+      "previousMeals": [
+        {
+          "mealType": "BREAKFAST",
+          "skipped": false,
+          "qqs": {
+            "quantity": null,
+            "quality": 46,
+            "satiety": null
+          },
+          "items": [
+            {
+              "displayName": "쌀밥",
+              "amount": 150,
+              "unit": "g"
+            },
+            {
+              "displayName": "어묵국",
+              "amount": 450,
+              "unit": "g"
+            },
+            {
+              "displayName": "깍두기",
+              "amount": 60,
+              "unit": "g"
+            }
+          ],
+          "nutritionTotals": {
+            "kcal": 386.45,
+            "proteinG": 16.83,
+            "fatG": 4.67,
+            "carbG": 69.0,
+            "fiberG": 3.84,
+            "sodiumMg": 1992.95
+          }
+        }
+      ],
+      "dailyNutritionTotals": {
+        "kcal": 783.78,
+        "proteinG": 33.06,
+        "fatG": 9.98,
+        "carbG": 139.55,
+        "fiberG": 17.32,
+        "sodiumMg": 2549.88
+      },
+      "skipped": false,
+      "intake": null,
+      "mealId": "eval-presentation_a3"
+    }
+  },
+  "rounds": [
+    {
+      "case_id": "presentation_a1",
+      "round": 1,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·감자 위주 구성에 비해 콩과 나물로 구성이 넓어졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 다음 끼니는 밥이나 반찬의 가짓수를 늘리기보다 단백질 반찬을 중심에 두고 채소를 곁들이면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심의 콩과 나물이 아침의 밥·감자 위주 구성을 보완했지만, 현재 단백질 판정과 기록상 누적 진행을 함께 보면 다음 끼니에는 단백질 반찬을 우선할 만하다. 식후 포만감도 기록되어 있으므로 여러 음식을 추가하기보다 주된 반찬을 바꾸는 방향으로 제안하며, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "달걀찜 한 그릇",
+            "advice": "아침은 밥과 감자 중심이었고 점심에는 콩과 나물이 더해졌으니, 다음 끼니는 반찬 가짓수를 늘리기보다 부드러운 달걀찜을 주된 반찬으로 골라 단백질을 이어 챙기면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "가자미구이 한 토막",
+            "advice": "점심의 잡곡밥과 콩·나물을 먹고 포만감이 있었으니, 다음 끼니는 밥을 더하기보다 간을 약하게 한 가자미구이를 중심에 두면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 7.88
+    },
+    {
+      "case_id": "presentation_a1",
+      "round": 2,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 쌀밥과 감자볶음 위주 구성에서 점심에는 콩과 나물이 더해졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 다음 끼니에는 채소 반찬을 이어가면서 담백한 단백질 음식을 중심 반찬으로 두면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심의 콩과 나물이 아침보다 단백질과 식이섬유를 더했지만, 현재 끼니 판정과 누적 진행을 함께 보면 다음 식사는 단백질 반찬을 우선할 방향이다. 식후 포만감이 있는 만큼 많은 양을 추가하기보다 단백질 중심으로 구성하며, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "흰살생선구이 한 토막",
+            "advice": "아침은 밥과 감자 위주였고 점심에는 콩과 나물이 더해졌으니, 다음 끼니에는 소금과 양념을 적게 한 생선구이를 중심 반찬으로 두어 단백질을 이어 챙기면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "달걀찜 작은 그릇",
+            "advice": "잡곡밥과 콩자반, 나물을 먹고 식후 포만감이 있었으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 작은 달걀찜을 단백질 반찬으로 곁들이면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 6.18
+    },
+    {
+      "case_id": "presentation_a1",
+      "round": 3,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 밥과 감자 위주였던 아침에 비해 점심에는 콩으로 단백질을 더했지만, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 식후 포만감이 있는 만큼 다음 끼니는 밥 양을 늘리기보다 단백질 반찬을 중심에 두면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "아침의 밥·감자 구성에서 점심의 콩·나물로 구성이 보완됐지만, 현재 끼니와 누적 기록을 함께 보면 다음 식사의 우선순위는 단백질 반찬이다. 식후 포만감을 고려해 식사량 자체를 늘리거나 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "생선구이 한 토막",
+            "advice": "아침은 밥과 감자 중심이었고 점심에 콩을 더했으니, 다음 끼니에는 밥을 늘리기보다 생선구이를 주된 반찬으로 두어 단백질을 이어 챙기면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "달걀찜 한 그릇",
+            "advice": "콩자반과 나물을 먹고 식후 포만감도 있었으니, 다음 끼니에는 밥과 반찬의 양을 모두 늘리기보다 달걀찜을 단백질 반찬으로 곁들이면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": false,
+          "note": "측정 못 한 축을 평가: 양 '양을 늘리'(body)",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 6.14
+    },
+    {
+      "case_id": "presentation_a1",
+      "round": 4,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 쌀밥·감자볶음에 비해 콩과 나물이 더해져 구성이 보완됐고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%까지 채워졌어요. 다음 끼니는 밥이나 반찬의 양을 크게 늘리기보다 담백한 단백질 음식을 중심에 두면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "아침의 밥·감자 중심 구성에서 점심에 콩과 나물이 더해졌지만, 현재 단백질 판정과 누적 진행을 함께 보면 다음 끼니에는 단백질 반찬을 우선할 만하다. 식후 포만감도 기록돼 있으므로 곁들임을 여러 가지 추가하기보다 단백질 반찬을 중심으로 구성하고, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "닭가슴살 구이 한 팩",
+            "advice": "아침의 밥·감자에 이어 점심에는 콩과 나물이 더해졌으니, 다음 끼니에는 밥 위주로 구성을 이어가기보다 양념이 적은 닭가슴살을 중심 반찬으로 두면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "달걀찜 한 그릇",
+            "advice": "잡곡밥과 콩·나물을 먹고 식후 포만감이 있었으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 6.09
+    },
+    {
+      "case_id": "presentation_a1",
+      "round": 5,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 밥과 감자볶음 위주였던 아침에 비해 콩과 채소가 더해졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%까지 채워졌어요. 다음 끼니는 식후 포만감을 고려해 양을 크게 늘리기보다 단백질 반찬을 중심에 두면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심의 콩과 나물로 아침보다 구성이 보완됐지만, 현재 단백질 판정과 누적 진행 상황을 함께 보면 다음 끼니는 단백질 반찬을 우선할 방향이다. 식후 포만감이 기록돼 있으므로 밥이나 반찬의 전체 양을 크게 늘리거나 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "생선구이 한 토막",
+            "advice": "아침은 밥과 감자 위주였고 점심에는 콩으로 단백질을 더했으니, 식후 포만감을 고려해 다음 끼니는 밥 양을 늘리기보다 생선구이를 중심 반찬으로 두면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "달걀찜 한 그릇",
+            "advice": "콩자반과 나물로 식이섬유를 챙긴 점심 뒤에는, 포만감을 살피며 다음 끼니에 달걀찜을 단백질 반찬으로 곁들이기 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 5.63
+    },
+    {
+      "case_id": "presentation_a2",
+      "round": 1,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 소고기 수육으로 단백질을 챙긴 데 이어 점심에는 콩과 채소로 식이섬유를 보완했고, 기록에서 확인된 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우는 데 집중하기보다 채소 반찬을 이어가고 양념을 짜지 않게 구성하면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심의 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 아침 수육에서 점심 콩·나물로 이어진 구성을 살려 채소를 곁들이고, 나트륨을 불필요하게 늘리지 않는 조리법을 제안한다.",
+        "suggestions": [
+          {
+            "foodName": "애호박구이 한 접시",
+            "advice": "아침 수육에 이어 점심에는 콩자반과 시금치나물로 식이섬유를 보완했으니, 다음 끼니에도 단백질 반찬을 더 늘리기보다 소금을 적게 넣은 애호박구이로 채소 구성을 이어가면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "양배추찜 한 접시",
+            "advice": "점심에 잡곡밥과 콩, 나물로 식후 포만감이 있었으니, 다음 끼니에는 양배추찜을 곁들이고 짠 양념장은 조금만 쓰는 구성이 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "met_daily_not_pushed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 5.74
+    },
+    {
+      "case_id": "presentation_a2",
+      "round": 2,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥과 콩자반, 시금치나물로 식이섬유를 충분히 챙겼고, 단백질은 끼니 목표보다 적었어요. 다만 아침 수육에서 단백질을 챙긴 데 이어 점심에는 콩과 채소가 더해져, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질 보충을 우선하기보다 채소 반찬을 이어가고 양념은 가볍게 구성하면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 잡곡·콩·나물 구성을 이어 다음 식사에도 채소를 곁들이되, 식후 포만감 기록을 고려해 추가 음식을 많이 붙이는 방향은 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "양배추찜 한 접시",
+            "advice": "아침 수육으로 단백질을 챙겼고 점심 뒤에도 포만감이 있었으니, 다음 끼니에는 단백질 반찬을 더 늘리기보다 양념을 가볍게 한 양배추찜으로 채소 반찬을 이어가면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "met_daily_not_pushed": {
+          "passed": false,
+          "note": "하루 목표에 도달한 영양소를 더 채우라고 했다: 단백질 '다만 아침 수육에서 단백질을 챙긴 데 이어 점심에는 콩과 채소가 더해져'(body)",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 11.03
+    },
+    {
+      "case_id": "presentation_a2",
+      "round": 3,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥과 콩자반, 시금치나물로 식이섬유를 충분히 챙겼고, 단백질은 끼니 목표보다 적었어요. 다만 아침 소고기까지 합치면 기록상 단백질은 하루 목표를 이미 채웠고, 점심의 잡곡과 콩·나물이 식이섬유를 이어 보탰어요. 다음 끼니는 단백질을 따로 보충하기보다 채소 반찬을 이어 곁들이고, 양념을 짜지 않게 하는 방향이 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 식이섬유 구성과 식후 포만감을 고려해 다음 식사에 곁들이기 쉬운 채소를 제안하고, 나트륨 한도가 남았다는 이유로 짠 반찬을 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "구운 버섯·애호박 한 접시",
+            "advice": "아침에는 소고기로 단백질을 챙기고 점심에는 잡곡과 콩·나물로 식이섬유를 보탰으니, 다음 끼니에도 양념을 적게 한 채소 반찬으로 그 흐름을 이어가면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "양배추찜 한 접시",
+            "advice": "잡곡밥과 콩자반을 먹고 식후 포만감도 있었으니, 다음 끼니에는 단백질 식품을 추가하기보다 양배추찜을 곁들이고 장은 조금만 찍어 먹는 구성이 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "met_daily_not_pushed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": false,
+          "note": "OK 판정과 모순: 나트륨 '짠'(reasoning)",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 12.26
+    },
+    {
+      "case_id": "presentation_a2",
+      "round": 4,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 소고기 수육으로 단백질을 챙긴 데 이어 점심에는 식물성 반찬으로 식이섬유를 더했고, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우는 데 집중하기보다 채소를 이어 곁들이고 양념을 가볍게 쓰는 방향이 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 식이섬유와 식후 포만감을 고려해 다음 식사에는 부담 없이 곁들일 채소나 과일을 제안하며, 남은 목표량을 한꺼번에 채우도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "찐 양배추 작은 접시",
+            "advice": "아침 수육으로 단백질을 챙기고 점심에는 콩과 나물로 식이섬유를 더했으니, 다음 끼니에도 양념을 적게 한 양배추로 채소 반찬을 이어가면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "사과 반 개",
+            "advice": "잡곡밥과 콩자반을 먹고 식후 포만감이 있었으니, 다음 식사에서도 배부름을 살피며 사과를 조금 곁들여 식이섬유를 이어 챙기면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "met_daily_not_pushed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 9.77
+    },
+    {
+      "case_id": "presentation_a2",
+      "round": 5,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 수육으로 단백질을 챙긴 데 이어 점심에는 식물성 반찬으로 식이섬유를 더했고, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우기보다 채소나 과일을 곁들이고 양념을 덜어 식이섬유를 이어 챙기는 쪽이 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심의 단백질은 끼니 목표 미만이지만 누적 기록에서는 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심에 확보한 식이섬유를 다음 식사에서도 이어가되, 식후 포만감 기록을 고려해 많은 양을 추가하기보다 곁들이기 쉬운 채소·과일을 제안한다.",
+        "suggestions": [
+          {
+            "foodName": "찐 양배추 한 접시",
+            "advice": "아침 수육에 이어 점심에는 콩과 나물로 식이섬유를 더했으니, 다음 끼니에도 쌈장을 적게 곁들인 양배추로 채소 구성을 이어가면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "사과 반 개",
+            "advice": "잡곡밥과 콩·나물을 먹고 식후 포만감도 기록했으니, 다음 끼니에는 단백질 간식을 따로 더하기보다 사과를 소량 곁들여 식이섬유를 이어 챙기면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "met_daily_not_pushed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_contradict_rule": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 10.49
+    },
+    {
+      "case_id": "presentation_a3",
+      "round": 1,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·국 구성에서 점심에는 콩과 채소로 식이섬유를 더 챙겼지만, 아침 어묵국과 깍두기에 이어 기록에서 확인된 나트륨은 이미 하루 한도를 넘었어요. 식후 포만감도 있는 편이니, 다음 끼니는 양을 크게 늘리기보다 짠 국물과 양념을 줄이고 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심의 단백질 목표 미달과 누적 진행 상황을 함께 고려해 다음 식사에는 단백질 반찬을 우선하되, 남은 목표량을 한 끼에 모두 채우도록 권하지 않는다. 점심 나트륨은 끼니 한도 안이지만 누적 한도를 넘었으므로 국물과 짠 양념을 줄이며, 식후 포만감을 고려해 많은 양을 추가하는 방향은 피한다.",
+        "suggestions": [
+          {
+            "foodName": "양념 없이 구운 닭안심 한 접시",
+            "advice": "아침의 국과 깍두기로 쌓인 나트륨을 고려하고, 콩자반을 곁들인 점심 뒤에도 포만감이 있었으니 다음 끼니에는 밥이나 반찬 가짓수를 늘리기보다 양념 없이 구운 닭안심을 주된 반찬으로 두면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "달걀찜 작은 그릇",
+            "advice": "잡곡밥과 콩·나물로 식이섬유와 포만감은 챙겼으니, 다음 끼니에는 짠 국 대신 소금과 액젓을 적게 넣은 달걀찜으로 단백질을 이어 챙기면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "daily_excess_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 7.78
+    },
+    {
+      "case_id": "presentation_a3",
+      "round": 2,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 국·깍두기 구성에서 점심에는 콩과 나물로 식이섬유를 더 챙겼고 나트륨도 줄었지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 짠 국물과 양념을 줄이고, 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심은 식이섬유를 보완했고 나트륨도 끼니 한도 안이지만, 아침부터 누적된 나트륨이 하루 한도를 넘어 다음 식사에서도 짠 국물과 양념을 줄이는 것이 우선이다. 점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표에 도달하지 않았으므로 담백한 단백질 반찬을 제안하되, 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "양념 없이 구운 닭안심 한 접시",
+            "advice": "아침의 국과 깍두기로 나트륨이 쌓였고 점심은 콩자반을 곁들여도 단백질이 끼니 목표보다 적었으니, 다음 끼니에는 국물 대신 양념 없이 구운 닭안심을 주된 반찬으로 두면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "달걀찜 한 그릇",
+            "advice": "점심은 잡곡밥과 콩·나물로 식이섬유를 챙기고 식후 포만감도 기록했으니, 다음에는 반찬 가짓수를 늘리기보다 소금과 액젓을 적게 넣은 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "daily_excess_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 6.14
+    },
+    {
+      "case_id": "presentation_a3",
+      "round": 3,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 국·깍두기 구성에서 점심의 콩·나물 구성으로 바뀌며 식이섬유를 더 챙겼고 나트륨도 줄었지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 짠 국물과 조림 양념을 줄이고, 담백한 단백질 반찬을 중심으로 이어가면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표까지 남아 있어, 다음 끼니에는 담백한 단백질 반찬을 우선 제안한다. 점심 나트륨은 끼니 한도 안이지만 아침부터 누적된 양이 하루 한도를 넘었으므로 국물과 짠 양념을 줄이며, 남은 단백질을 한 끼에 모두 채우도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "구운 닭가슴살 한 팩",
+            "advice": "아침 국과 깍두기에서 쌓인 나트륨을 고려하면서 점심 콩반찬으로 채우지 못한 단백질을 이어 챙기려면, 다음 끼니에는 소스 없는 제품을 반찬으로 곁들이기 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "달걀찜 한 그릇",
+            "advice": "점심은 콩과 나물로 식이섬유를 충분히 챙기고 식후 포만감도 기록했으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 소금과 새우젓을 적게 넣은 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "daily_excess_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 6.56
+    },
+    {
+      "case_id": "presentation_a3",
+      "round": 4,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 흰밥·국 중심 구성에서 점심에는 콩과 채소가 더해졌지만, 어묵국과 깍두기로 쌓인 나트륨은 기록상 하루 한도를 넘었어요. 다음 끼니는 식후 포만감도 고려해 양을 크게 늘리기보다, 국물과 짠 양념을 줄인 단백질 반찬을 중심으로 구성하면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심의 단백질 목표 미달과 누적 단백질 진행 상황을 고려해 다음 식사에는 담백한 단백질 반찬을 우선한다. 점심 나트륨은 끼니 한도 안이지만 누적량은 하루 한도를 넘었으므로 국물과 짠 양념을 줄이고, 남은 단백질 목표량을 한 끼에 모두 채우도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "양념 없는 닭가슴살 한 팩",
+            "advice": "점심은 콩과 나물로 식후 포만감이 있었으니, 다음 끼니에는 밥 양을 늘리기보다 양념 없는 닭가슴살을 단백질 반찬으로 곁들이면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "흰살생선찜 한 토막",
+            "advice": "아침 국과 깍두기에서 쌓인 나트륨을 고려하면서 점심에 적었던 단백질을 보완하도록, 다음 끼니에는 소금과 간장을 덜 쓴 생선찜을 골라 보면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "daily_excess_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 6.43
+    },
+    {
+      "case_id": "presentation_a3",
+      "round": 5,
+      "status_code": 200,
+      "response": {
+        "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·국·김치 구성에서 점심에는 콩과 나물로 식이섬유를 보완했지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 식후 포만감을 고려해 양을 크게 늘리기보다, 짠 국물이나 조림 대신 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+        "modelVersion": "reasoning-gateway",
+        "safetyStatus": "SAFE",
+        "reasoning": "점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표에 아직 도달하지 않아, 다음 식사에는 담백한 단백질 반찬을 우선한다. 점심 나트륨은 끼니 한도 안이지만 아침부터 누적된 나트륨이 하루 한도를 넘었으므로 국물과 짠 양념을 줄이며, 남은 단백질을 한 끼에 모두 채우거나 식사량을 크게 늘리도록 권하지 않는다.",
+        "suggestions": [
+          {
+            "foodName": "양념 없이 구운 닭안심 한 접시",
+            "advice": "아침의 어묵국과 깍두기로 쌓인 나트륨을 고려하고, 점심은 콩자반을 곁들여도 단백질이 적었으니 다음 끼니에는 짠 양념 없는 닭안심을 주된 반찬으로 고르면 좋아요.",
+            "candidateFoodRefId": null
+          },
+          {
+            "foodName": "달걀찜 작은 그릇",
+            "advice": "잡곡밥과 콩·나물을 먹고 포만감이 있었으니, 다음 끼니에는 밥이나 반찬 수를 늘리기보다 소금과 새우젓을 적게 넣은 달걀찜으로 단백질을 챙기면 좋아요.",
+            "candidateFoodRefId": null
+          }
+        ]
+      },
+      "contract": {
+        "passed": true,
+        "note": ""
+      },
+      "axes": {
+        "no_invented_numbers": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "no_medical_judgement": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "normal_not_blocked": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "suggestions_shape": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_imperative": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "no_cliche": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "example_no_leak": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "daily_excess_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "gap_addressed": {
+          "passed": true,
+          "note": "",
+          "grade": "non_critical"
+        },
+        "unscored_axis_silent": {
+          "passed": true,
+          "note": "",
+          "grade": "critical"
+        },
+        "cause_food_named": {
+          "passed": true,
+          "note": "",
+          "grade": "ambiguous"
+        },
+        "satiety_as_experience": {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "grade": "ambiguous"
+        },
+        "stage_linked_reasoning": {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "grade": "ambiguous"
+        }
+      },
+      "elapsed_seconds": 6.95
+    }
+  ],
+  "results": {
+    "presentation_a1/contract_parseable": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/no_invented_numbers": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/no_medical_judgement": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/normal_not_blocked": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/suggestions_shape": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/no_imperative": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": 0.9,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/no_cliche": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/example_no_leak": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/gap_addressed": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/no_contradict_rule": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a1/unscored_axis_silent": {
+      "passed": 4,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [
+        "측정 못 한 축을 평가: 양 '양을 늘리'(body)"
+      ],
+      "samples": []
+    },
+    "presentation_a1/cause_food_named": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "ambiguous",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": [
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·감자 위주 구성에 비해 콩과 나물로 구성이 넓어졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 다음 끼니는 밥이나 반찬의 가짓수를 늘리기보다 단백질 반찬을 중심에 두고 채소를 곁들이면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 콩과 나물이 아침의 밥·감자 위주 구성을 보완했지만, 현재 단백질 판정과 기록상 누적 진행을 함께 보면 다음 끼니에는 단백질 반찬을 우선할 만하다. 식후 포만감도 기록되어 있으므로 여러 음식을 추가하기보다 주된 반찬을 바꾸는 방향으로 제안하며, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "아침은 밥과 감자 중심이었고 점심에는 콩과 나물이 더해졌으니, 다음 끼니는 반찬 가짓수를 늘리기보다 부드러운 달걀찜을 주된 반찬으로 골라 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "가자미구이 한 토막",
+                "advice": "점심의 잡곡밥과 콩·나물을 먹고 포만감이 있었으니, 다음 끼니는 밥을 더하기보다 간을 약하게 한 가자미구이를 중심에 두면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 쌀밥과 감자볶음 위주 구성에서 점심에는 콩과 나물이 더해졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 다음 끼니에는 채소 반찬을 이어가면서 담백한 단백질 음식을 중심 반찬으로 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 콩과 나물이 아침보다 단백질과 식이섬유를 더했지만, 현재 끼니 판정과 누적 진행을 함께 보면 다음 식사는 단백질 반찬을 우선할 방향이다. 식후 포만감이 있는 만큼 많은 양을 추가하기보다 단백질 중심으로 구성하며, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "흰살생선구이 한 토막",
+                "advice": "아침은 밥과 감자 위주였고 점심에는 콩과 나물이 더해졌으니, 다음 끼니에는 소금과 양념을 적게 한 생선구이를 중심 반찬으로 두어 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 작은 그릇",
+                "advice": "잡곡밥과 콩자반, 나물을 먹고 식후 포만감이 있었으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 작은 달걀찜을 단백질 반찬으로 곁들이면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 밥과 감자 위주였던 아침에 비해 점심에는 콩으로 단백질을 더했지만, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 식후 포만감이 있는 만큼 다음 끼니는 밥 양을 늘리기보다 단백질 반찬을 중심에 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "아침의 밥·감자 구성에서 점심의 콩·나물로 구성이 보완됐지만, 현재 끼니와 누적 기록을 함께 보면 다음 식사의 우선순위는 단백질 반찬이다. 식후 포만감을 고려해 식사량 자체를 늘리거나 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "생선구이 한 토막",
+                "advice": "아침은 밥과 감자 중심이었고 점심에 콩을 더했으니, 다음 끼니에는 밥을 늘리기보다 생선구이를 주된 반찬으로 두어 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "콩자반과 나물을 먹고 식후 포만감도 있었으니, 다음 끼니에는 밥과 반찬의 양을 모두 늘리기보다 달걀찜을 단백질 반찬으로 곁들이면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 쌀밥·감자볶음에 비해 콩과 나물이 더해져 구성이 보완됐고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%까지 채워졌어요. 다음 끼니는 밥이나 반찬의 양을 크게 늘리기보다 담백한 단백질 음식을 중심에 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "아침의 밥·감자 중심 구성에서 점심에 콩과 나물이 더해졌지만, 현재 단백질 판정과 누적 진행을 함께 보면 다음 끼니에는 단백질 반찬을 우선할 만하다. 식후 포만감도 기록돼 있으므로 곁들임을 여러 가지 추가하기보다 단백질 반찬을 중심으로 구성하고, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "닭가슴살 구이 한 팩",
+                "advice": "아침의 밥·감자에 이어 점심에는 콩과 나물이 더해졌으니, 다음 끼니에는 밥 위주로 구성을 이어가기보다 양념이 적은 닭가슴살을 중심 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "잡곡밥과 콩·나물을 먹고 식후 포만감이 있었으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 밥과 감자볶음 위주였던 아침에 비해 콩과 채소가 더해졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%까지 채워졌어요. 다음 끼니는 식후 포만감을 고려해 양을 크게 늘리기보다 단백질 반찬을 중심에 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 콩과 나물로 아침보다 구성이 보완됐지만, 현재 단백질 판정과 누적 진행 상황을 함께 보면 다음 끼니는 단백질 반찬을 우선할 방향이다. 식후 포만감이 기록돼 있으므로 밥이나 반찬의 전체 양을 크게 늘리거나 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "생선구이 한 토막",
+                "advice": "아침은 밥과 감자 위주였고 점심에는 콩으로 단백질을 더했으니, 식후 포만감을 고려해 다음 끼니는 밥 양을 늘리기보다 생선구이를 중심 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "콩자반과 나물로 식이섬유를 챙긴 점심 뒤에는, 포만감을 살피며 다음 끼니에 달걀찜을 단백질 반찬으로 곁들이기 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "presentation_a1/satiety_as_experience": {
+      "passed": 0,
+      "n": 5,
+      "errors": 0,
+      "grade": "ambiguous",
+      "pass_ratio": null,
+      "notes": [
+        "포만감을 겪은 일로 쓰지 않았다",
+        "포만감을 겪은 일로 쓰지 않았다"
+      ],
+      "samples": [
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·감자 위주 구성에 비해 콩과 나물로 구성이 넓어졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 다음 끼니는 밥이나 반찬의 가짓수를 늘리기보다 단백질 반찬을 중심에 두고 채소를 곁들이면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 콩과 나물이 아침의 밥·감자 위주 구성을 보완했지만, 현재 단백질 판정과 기록상 누적 진행을 함께 보면 다음 끼니에는 단백질 반찬을 우선할 만하다. 식후 포만감도 기록되어 있으므로 여러 음식을 추가하기보다 주된 반찬을 바꾸는 방향으로 제안하며, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "아침은 밥과 감자 중심이었고 점심에는 콩과 나물이 더해졌으니, 다음 끼니는 반찬 가짓수를 늘리기보다 부드러운 달걀찜을 주된 반찬으로 골라 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "가자미구이 한 토막",
+                "advice": "점심의 잡곡밥과 콩·나물을 먹고 포만감이 있었으니, 다음 끼니는 밥을 더하기보다 간을 약하게 한 가자미구이를 중심에 두면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 쌀밥과 감자볶음 위주 구성에서 점심에는 콩과 나물이 더해졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 다음 끼니에는 채소 반찬을 이어가면서 담백한 단백질 음식을 중심 반찬으로 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 콩과 나물이 아침보다 단백질과 식이섬유를 더했지만, 현재 끼니 판정과 누적 진행을 함께 보면 다음 식사는 단백질 반찬을 우선할 방향이다. 식후 포만감이 있는 만큼 많은 양을 추가하기보다 단백질 중심으로 구성하며, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "흰살생선구이 한 토막",
+                "advice": "아침은 밥과 감자 위주였고 점심에는 콩과 나물이 더해졌으니, 다음 끼니에는 소금과 양념을 적게 한 생선구이를 중심 반찬으로 두어 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 작은 그릇",
+                "advice": "잡곡밥과 콩자반, 나물을 먹고 식후 포만감이 있었으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 작은 달걀찜을 단백질 반찬으로 곁들이면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 밥과 감자 위주였던 아침에 비해 점심에는 콩으로 단백질을 더했지만, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 식후 포만감이 있는 만큼 다음 끼니는 밥 양을 늘리기보다 단백질 반찬을 중심에 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "아침의 밥·감자 구성에서 점심의 콩·나물로 구성이 보완됐지만, 현재 끼니와 누적 기록을 함께 보면 다음 식사의 우선순위는 단백질 반찬이다. 식후 포만감을 고려해 식사량 자체를 늘리거나 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "생선구이 한 토막",
+                "advice": "아침은 밥과 감자 중심이었고 점심에 콩을 더했으니, 다음 끼니에는 밥을 늘리기보다 생선구이를 주된 반찬으로 두어 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "콩자반과 나물을 먹고 식후 포만감도 있었으니, 다음 끼니에는 밥과 반찬의 양을 모두 늘리기보다 달걀찜을 단백질 반찬으로 곁들이면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 쌀밥·감자볶음에 비해 콩과 나물이 더해져 구성이 보완됐고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%까지 채워졌어요. 다음 끼니는 밥이나 반찬의 양을 크게 늘리기보다 담백한 단백질 음식을 중심에 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "아침의 밥·감자 중심 구성에서 점심에 콩과 나물이 더해졌지만, 현재 단백질 판정과 누적 진행을 함께 보면 다음 끼니에는 단백질 반찬을 우선할 만하다. 식후 포만감도 기록돼 있으므로 곁들임을 여러 가지 추가하기보다 단백질 반찬을 중심으로 구성하고, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "닭가슴살 구이 한 팩",
+                "advice": "아침의 밥·감자에 이어 점심에는 콩과 나물이 더해졌으니, 다음 끼니에는 밥 위주로 구성을 이어가기보다 양념이 적은 닭가슴살을 중심 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "잡곡밥과 콩·나물을 먹고 식후 포만감이 있었으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 밥과 감자볶음 위주였던 아침에 비해 콩과 채소가 더해졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%까지 채워졌어요. 다음 끼니는 식후 포만감을 고려해 양을 크게 늘리기보다 단백질 반찬을 중심에 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 콩과 나물로 아침보다 구성이 보완됐지만, 현재 단백질 판정과 누적 진행 상황을 함께 보면 다음 끼니는 단백질 반찬을 우선할 방향이다. 식후 포만감이 기록돼 있으므로 밥이나 반찬의 전체 양을 크게 늘리거나 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "생선구이 한 토막",
+                "advice": "아침은 밥과 감자 위주였고 점심에는 콩으로 단백질을 더했으니, 식후 포만감을 고려해 다음 끼니는 밥 양을 늘리기보다 생선구이를 중심 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "콩자반과 나물로 식이섬유를 챙긴 점심 뒤에는, 포만감을 살피며 다음 끼니에 달걀찜을 단백질 반찬으로 곁들이기 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "presentation_a1/stage_linked_reasoning": {
+      "passed": 0,
+      "n": 5,
+      "errors": 0,
+      "grade": "ambiguous",
+      "pass_ratio": null,
+      "notes": [
+        "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+        "reasoning 이 MAINTENANCE 단계와 이어지지 않는다"
+      ],
+      "samples": [
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·감자 위주 구성에 비해 콩과 나물로 구성이 넓어졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 다음 끼니는 밥이나 반찬의 가짓수를 늘리기보다 단백질 반찬을 중심에 두고 채소를 곁들이면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 콩과 나물이 아침의 밥·감자 위주 구성을 보완했지만, 현재 단백질 판정과 기록상 누적 진행을 함께 보면 다음 끼니에는 단백질 반찬을 우선할 만하다. 식후 포만감도 기록되어 있으므로 여러 음식을 추가하기보다 주된 반찬을 바꾸는 방향으로 제안하며, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "아침은 밥과 감자 중심이었고 점심에는 콩과 나물이 더해졌으니, 다음 끼니는 반찬 가짓수를 늘리기보다 부드러운 달걀찜을 주된 반찬으로 골라 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "가자미구이 한 토막",
+                "advice": "점심의 잡곡밥과 콩·나물을 먹고 포만감이 있었으니, 다음 끼니는 밥을 더하기보다 간을 약하게 한 가자미구이를 중심에 두면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 쌀밥과 감자볶음 위주 구성에서 점심에는 콩과 나물이 더해졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 다음 끼니에는 채소 반찬을 이어가면서 담백한 단백질 음식을 중심 반찬으로 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 콩과 나물이 아침보다 단백질과 식이섬유를 더했지만, 현재 끼니 판정과 누적 진행을 함께 보면 다음 식사는 단백질 반찬을 우선할 방향이다. 식후 포만감이 있는 만큼 많은 양을 추가하기보다 단백질 중심으로 구성하며, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "흰살생선구이 한 토막",
+                "advice": "아침은 밥과 감자 위주였고 점심에는 콩과 나물이 더해졌으니, 다음 끼니에는 소금과 양념을 적게 한 생선구이를 중심 반찬으로 두어 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 작은 그릇",
+                "advice": "잡곡밥과 콩자반, 나물을 먹고 식후 포만감이 있었으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 작은 달걀찜을 단백질 반찬으로 곁들이면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 밥과 감자 위주였던 아침에 비해 점심에는 콩으로 단백질을 더했지만, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%예요. 식후 포만감이 있는 만큼 다음 끼니는 밥 양을 늘리기보다 단백질 반찬을 중심에 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "아침의 밥·감자 구성에서 점심의 콩·나물로 구성이 보완됐지만, 현재 끼니와 누적 기록을 함께 보면 다음 식사의 우선순위는 단백질 반찬이다. 식후 포만감을 고려해 식사량 자체를 늘리거나 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "생선구이 한 토막",
+                "advice": "아침은 밥과 감자 중심이었고 점심에 콩을 더했으니, 다음 끼니에는 밥을 늘리기보다 생선구이를 주된 반찬으로 두어 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "콩자반과 나물을 먹고 식후 포만감도 있었으니, 다음 끼니에는 밥과 반찬의 양을 모두 늘리기보다 달걀찜을 단백질 반찬으로 곁들이면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 쌀밥·감자볶음에 비해 콩과 나물이 더해져 구성이 보완됐고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%까지 채워졌어요. 다음 끼니는 밥이나 반찬의 양을 크게 늘리기보다 담백한 단백질 음식을 중심에 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "아침의 밥·감자 중심 구성에서 점심에 콩과 나물이 더해졌지만, 현재 단백질 판정과 누적 진행을 함께 보면 다음 끼니에는 단백질 반찬을 우선할 만하다. 식후 포만감도 기록돼 있으므로 곁들임을 여러 가지 추가하기보다 단백질 반찬을 중심으로 구성하고, 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "닭가슴살 구이 한 팩",
+                "advice": "아침의 밥·감자에 이어 점심에는 콩과 나물이 더해졌으니, 다음 끼니에는 밥 위주로 구성을 이어가기보다 양념이 적은 닭가슴살을 중심 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "잡곡밥과 콩·나물을 먹고 식후 포만감이 있었으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 밥과 감자볶음 위주였던 아침에 비해 콩과 채소가 더해졌고, 기록에서 확인된 누적 단백질은 하루 목표의 27.5%까지 채워졌어요. 다음 끼니는 식후 포만감을 고려해 양을 크게 늘리기보다 단백질 반찬을 중심에 두면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 콩과 나물로 아침보다 구성이 보완됐지만, 현재 단백질 판정과 누적 진행 상황을 함께 보면 다음 끼니는 단백질 반찬을 우선할 방향이다. 식후 포만감이 기록돼 있으므로 밥이나 반찬의 전체 양을 크게 늘리거나 하루 목표까지 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "생선구이 한 토막",
+                "advice": "아침은 밥과 감자 위주였고 점심에는 콩으로 단백질을 더했으니, 식후 포만감을 고려해 다음 끼니는 밥 양을 늘리기보다 생선구이를 중심 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "콩자반과 나물로 식이섬유를 챙긴 점심 뒤에는, 포만감을 살피며 다음 끼니에 달걀찜을 단백질 반찬으로 곁들이기 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "presentation_a2/contract_parseable": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a2/no_invented_numbers": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a2/no_medical_judgement": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a2/normal_not_blocked": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a2/suggestions_shape": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a2/no_imperative": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": 0.9,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a2/no_cliche": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a2/example_no_leak": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a2/met_daily_not_pushed": {
+      "passed": 4,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [
+        "하루 목표에 도달한 영양소를 더 채우라고 했다: 단백질 '다만 아침 수육에서 단백질을 챙긴 데 이어 점심에는 콩과 채소가 더해져'(body)"
+      ],
+      "samples": []
+    },
+    "presentation_a2/no_contradict_rule": {
+      "passed": 4,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [
+        "OK 판정과 모순: 나트륨 '짠'(reasoning)"
+      ],
+      "samples": []
+    },
+    "presentation_a2/unscored_axis_silent": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a2/cause_food_named": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "ambiguous",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": [
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 소고기 수육으로 단백질을 챙긴 데 이어 점심에는 콩과 채소로 식이섬유를 보완했고, 기록에서 확인된 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우는 데 집중하기보다 채소 반찬을 이어가고 양념을 짜지 않게 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 아침 수육에서 점심 콩·나물로 이어진 구성을 살려 채소를 곁들이고, 나트륨을 불필요하게 늘리지 않는 조리법을 제안한다.",
+            "suggestions": [
+              {
+                "foodName": "애호박구이 한 접시",
+                "advice": "아침 수육에 이어 점심에는 콩자반과 시금치나물로 식이섬유를 보완했으니, 다음 끼니에도 단백질 반찬을 더 늘리기보다 소금을 적게 넣은 애호박구이로 채소 구성을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "양배추찜 한 접시",
+                "advice": "점심에 잡곡밥과 콩, 나물로 식후 포만감이 있었으니, 다음 끼니에는 양배추찜을 곁들이고 짠 양념장은 조금만 쓰는 구성이 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥과 콩자반, 시금치나물로 식이섬유를 충분히 챙겼고, 단백질은 끼니 목표보다 적었어요. 다만 아침 수육에서 단백질을 챙긴 데 이어 점심에는 콩과 채소가 더해져, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질 보충을 우선하기보다 채소 반찬을 이어가고 양념은 가볍게 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 잡곡·콩·나물 구성을 이어 다음 식사에도 채소를 곁들이되, 식후 포만감 기록을 고려해 추가 음식을 많이 붙이는 방향은 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양배추찜 한 접시",
+                "advice": "아침 수육으로 단백질을 챙겼고 점심 뒤에도 포만감이 있었으니, 다음 끼니에는 단백질 반찬을 더 늘리기보다 양념을 가볍게 한 양배추찜으로 채소 반찬을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥과 콩자반, 시금치나물로 식이섬유를 충분히 챙겼고, 단백질은 끼니 목표보다 적었어요. 다만 아침 소고기까지 합치면 기록상 단백질은 하루 목표를 이미 채웠고, 점심의 잡곡과 콩·나물이 식이섬유를 이어 보탰어요. 다음 끼니는 단백질을 따로 보충하기보다 채소 반찬을 이어 곁들이고, 양념을 짜지 않게 하는 방향이 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 식이섬유 구성과 식후 포만감을 고려해 다음 식사에 곁들이기 쉬운 채소를 제안하고, 나트륨 한도가 남았다는 이유로 짠 반찬을 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "구운 버섯·애호박 한 접시",
+                "advice": "아침에는 소고기로 단백질을 챙기고 점심에는 잡곡과 콩·나물로 식이섬유를 보탰으니, 다음 끼니에도 양념을 적게 한 채소 반찬으로 그 흐름을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "양배추찜 한 접시",
+                "advice": "잡곡밥과 콩자반을 먹고 식후 포만감도 있었으니, 다음 끼니에는 단백질 식품을 추가하기보다 양배추찜을 곁들이고 장은 조금만 찍어 먹는 구성이 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 소고기 수육으로 단백질을 챙긴 데 이어 점심에는 식물성 반찬으로 식이섬유를 더했고, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우는 데 집중하기보다 채소를 이어 곁들이고 양념을 가볍게 쓰는 방향이 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 식이섬유와 식후 포만감을 고려해 다음 식사에는 부담 없이 곁들일 채소나 과일을 제안하며, 남은 목표량을 한꺼번에 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "찐 양배추 작은 접시",
+                "advice": "아침 수육으로 단백질을 챙기고 점심에는 콩과 나물로 식이섬유를 더했으니, 다음 끼니에도 양념을 적게 한 양배추로 채소 반찬을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "사과 반 개",
+                "advice": "잡곡밥과 콩자반을 먹고 식후 포만감이 있었으니, 다음 식사에서도 배부름을 살피며 사과를 조금 곁들여 식이섬유를 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 수육으로 단백질을 챙긴 데 이어 점심에는 식물성 반찬으로 식이섬유를 더했고, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우기보다 채소나 과일을 곁들이고 양념을 덜어 식이섬유를 이어 챙기는 쪽이 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질은 끼니 목표 미만이지만 누적 기록에서는 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심에 확보한 식이섬유를 다음 식사에서도 이어가되, 식후 포만감 기록을 고려해 많은 양을 추가하기보다 곁들이기 쉬운 채소·과일을 제안한다.",
+            "suggestions": [
+              {
+                "foodName": "찐 양배추 한 접시",
+                "advice": "아침 수육에 이어 점심에는 콩과 나물로 식이섬유를 더했으니, 다음 끼니에도 쌈장을 적게 곁들인 양배추로 채소 구성을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "사과 반 개",
+                "advice": "잡곡밥과 콩·나물을 먹고 식후 포만감도 기록했으니, 다음 끼니에는 단백질 간식을 따로 더하기보다 사과를 소량 곁들여 식이섬유를 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "presentation_a2/satiety_as_experience": {
+      "passed": 0,
+      "n": 5,
+      "errors": 0,
+      "grade": "ambiguous",
+      "pass_ratio": null,
+      "notes": [
+        "포만감을 겪은 일로 쓰지 않았다",
+        "포만감을 겪은 일로 쓰지 않았다"
+      ],
+      "samples": [
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 소고기 수육으로 단백질을 챙긴 데 이어 점심에는 콩과 채소로 식이섬유를 보완했고, 기록에서 확인된 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우는 데 집중하기보다 채소 반찬을 이어가고 양념을 짜지 않게 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 아침 수육에서 점심 콩·나물로 이어진 구성을 살려 채소를 곁들이고, 나트륨을 불필요하게 늘리지 않는 조리법을 제안한다.",
+            "suggestions": [
+              {
+                "foodName": "애호박구이 한 접시",
+                "advice": "아침 수육에 이어 점심에는 콩자반과 시금치나물로 식이섬유를 보완했으니, 다음 끼니에도 단백질 반찬을 더 늘리기보다 소금을 적게 넣은 애호박구이로 채소 구성을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "양배추찜 한 접시",
+                "advice": "점심에 잡곡밥과 콩, 나물로 식후 포만감이 있었으니, 다음 끼니에는 양배추찜을 곁들이고 짠 양념장은 조금만 쓰는 구성이 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥과 콩자반, 시금치나물로 식이섬유를 충분히 챙겼고, 단백질은 끼니 목표보다 적었어요. 다만 아침 수육에서 단백질을 챙긴 데 이어 점심에는 콩과 채소가 더해져, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질 보충을 우선하기보다 채소 반찬을 이어가고 양념은 가볍게 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 잡곡·콩·나물 구성을 이어 다음 식사에도 채소를 곁들이되, 식후 포만감 기록을 고려해 추가 음식을 많이 붙이는 방향은 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양배추찜 한 접시",
+                "advice": "아침 수육으로 단백질을 챙겼고 점심 뒤에도 포만감이 있었으니, 다음 끼니에는 단백질 반찬을 더 늘리기보다 양념을 가볍게 한 양배추찜으로 채소 반찬을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥과 콩자반, 시금치나물로 식이섬유를 충분히 챙겼고, 단백질은 끼니 목표보다 적었어요. 다만 아침 소고기까지 합치면 기록상 단백질은 하루 목표를 이미 채웠고, 점심의 잡곡과 콩·나물이 식이섬유를 이어 보탰어요. 다음 끼니는 단백질을 따로 보충하기보다 채소 반찬을 이어 곁들이고, 양념을 짜지 않게 하는 방향이 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 식이섬유 구성과 식후 포만감을 고려해 다음 식사에 곁들이기 쉬운 채소를 제안하고, 나트륨 한도가 남았다는 이유로 짠 반찬을 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "구운 버섯·애호박 한 접시",
+                "advice": "아침에는 소고기로 단백질을 챙기고 점심에는 잡곡과 콩·나물로 식이섬유를 보탰으니, 다음 끼니에도 양념을 적게 한 채소 반찬으로 그 흐름을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "양배추찜 한 접시",
+                "advice": "잡곡밥과 콩자반을 먹고 식후 포만감도 있었으니, 다음 끼니에는 단백질 식품을 추가하기보다 양배추찜을 곁들이고 장은 조금만 찍어 먹는 구성이 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 소고기 수육으로 단백질을 챙긴 데 이어 점심에는 식물성 반찬으로 식이섬유를 더했고, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우는 데 집중하기보다 채소를 이어 곁들이고 양념을 가볍게 쓰는 방향이 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 식이섬유와 식후 포만감을 고려해 다음 식사에는 부담 없이 곁들일 채소나 과일을 제안하며, 남은 목표량을 한꺼번에 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "찐 양배추 작은 접시",
+                "advice": "아침 수육으로 단백질을 챙기고 점심에는 콩과 나물로 식이섬유를 더했으니, 다음 끼니에도 양념을 적게 한 양배추로 채소 반찬을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "사과 반 개",
+                "advice": "잡곡밥과 콩자반을 먹고 식후 포만감이 있었으니, 다음 식사에서도 배부름을 살피며 사과를 조금 곁들여 식이섬유를 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 수육으로 단백질을 챙긴 데 이어 점심에는 식물성 반찬으로 식이섬유를 더했고, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우기보다 채소나 과일을 곁들이고 양념을 덜어 식이섬유를 이어 챙기는 쪽이 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질은 끼니 목표 미만이지만 누적 기록에서는 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심에 확보한 식이섬유를 다음 식사에서도 이어가되, 식후 포만감 기록을 고려해 많은 양을 추가하기보다 곁들이기 쉬운 채소·과일을 제안한다.",
+            "suggestions": [
+              {
+                "foodName": "찐 양배추 한 접시",
+                "advice": "아침 수육에 이어 점심에는 콩과 나물로 식이섬유를 더했으니, 다음 끼니에도 쌈장을 적게 곁들인 양배추로 채소 구성을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "사과 반 개",
+                "advice": "잡곡밥과 콩·나물을 먹고 식후 포만감도 기록했으니, 다음 끼니에는 단백질 간식을 따로 더하기보다 사과를 소량 곁들여 식이섬유를 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "presentation_a2/stage_linked_reasoning": {
+      "passed": 0,
+      "n": 5,
+      "errors": 0,
+      "grade": "ambiguous",
+      "pass_ratio": null,
+      "notes": [
+        "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+        "reasoning 이 MAINTENANCE 단계와 이어지지 않는다"
+      ],
+      "samples": [
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 소고기 수육으로 단백질을 챙긴 데 이어 점심에는 콩과 채소로 식이섬유를 보완했고, 기록에서 확인된 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우는 데 집중하기보다 채소 반찬을 이어가고 양념을 짜지 않게 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 아침 수육에서 점심 콩·나물로 이어진 구성을 살려 채소를 곁들이고, 나트륨을 불필요하게 늘리지 않는 조리법을 제안한다.",
+            "suggestions": [
+              {
+                "foodName": "애호박구이 한 접시",
+                "advice": "아침 수육에 이어 점심에는 콩자반과 시금치나물로 식이섬유를 보완했으니, 다음 끼니에도 단백질 반찬을 더 늘리기보다 소금을 적게 넣은 애호박구이로 채소 구성을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "양배추찜 한 접시",
+                "advice": "점심에 잡곡밥과 콩, 나물로 식후 포만감이 있었으니, 다음 끼니에는 양배추찜을 곁들이고 짠 양념장은 조금만 쓰는 구성이 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥과 콩자반, 시금치나물로 식이섬유를 충분히 챙겼고, 단백질은 끼니 목표보다 적었어요. 다만 아침 수육에서 단백질을 챙긴 데 이어 점심에는 콩과 채소가 더해져, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질 보충을 우선하기보다 채소 반찬을 이어가고 양념은 가볍게 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 잡곡·콩·나물 구성을 이어 다음 식사에도 채소를 곁들이되, 식후 포만감 기록을 고려해 추가 음식을 많이 붙이는 방향은 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양배추찜 한 접시",
+                "advice": "아침 수육으로 단백질을 챙겼고 점심 뒤에도 포만감이 있었으니, 다음 끼니에는 단백질 반찬을 더 늘리기보다 양념을 가볍게 한 양배추찜으로 채소 반찬을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥과 콩자반, 시금치나물로 식이섬유를 충분히 챙겼고, 단백질은 끼니 목표보다 적었어요. 다만 아침 소고기까지 합치면 기록상 단백질은 하루 목표를 이미 채웠고, 점심의 잡곡과 콩·나물이 식이섬유를 이어 보탰어요. 다음 끼니는 단백질을 따로 보충하기보다 채소 반찬을 이어 곁들이고, 양념을 짜지 않게 하는 방향이 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 식이섬유 구성과 식후 포만감을 고려해 다음 식사에 곁들이기 쉬운 채소를 제안하고, 나트륨 한도가 남았다는 이유로 짠 반찬을 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "구운 버섯·애호박 한 접시",
+                "advice": "아침에는 소고기로 단백질을 챙기고 점심에는 잡곡과 콩·나물로 식이섬유를 보탰으니, 다음 끼니에도 양념을 적게 한 채소 반찬으로 그 흐름을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "양배추찜 한 접시",
+                "advice": "잡곡밥과 콩자반을 먹고 식후 포만감도 있었으니, 다음 끼니에는 단백질 식품을 추가하기보다 양배추찜을 곁들이고 장은 조금만 찍어 먹는 구성이 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 소고기 수육으로 단백질을 챙긴 데 이어 점심에는 식물성 반찬으로 식이섬유를 더했고, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우는 데 집중하기보다 채소를 이어 곁들이고 양념을 가볍게 쓰는 방향이 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심 단백질은 끼니 목표 미만이지만 누적 기록에서 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심의 식이섬유와 식후 포만감을 고려해 다음 식사에는 부담 없이 곁들일 채소나 과일을 제안하며, 남은 목표량을 한꺼번에 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "찐 양배추 작은 접시",
+                "advice": "아침 수육으로 단백질을 챙기고 점심에는 콩과 나물로 식이섬유를 더했으니, 다음 끼니에도 양념을 적게 한 양배추로 채소 반찬을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "사과 반 개",
+                "advice": "잡곡밥과 콩자반을 먹고 식후 포만감이 있었으니, 다음 식사에서도 배부름을 살피며 사과를 조금 곁들여 식이섬유를 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했고, 단백질은 끼니 목표보다 적었어요. 아침 수육으로 단백질을 챙긴 데 이어 점심에는 식물성 반찬으로 식이섬유를 더했고, 기록상 단백질은 이미 하루 목표에 도달했어요. 다음 끼니는 단백질을 더 채우기보다 채소나 과일을 곁들이고 양념을 덜어 식이섬유를 이어 챙기는 쪽이 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질은 끼니 목표 미만이지만 누적 기록에서는 하루 목표에 도달했으므로 추가 단백질 보충을 우선하지 않는다. 점심에 확보한 식이섬유를 다음 식사에서도 이어가되, 식후 포만감 기록을 고려해 많은 양을 추가하기보다 곁들이기 쉬운 채소·과일을 제안한다.",
+            "suggestions": [
+              {
+                "foodName": "찐 양배추 한 접시",
+                "advice": "아침 수육에 이어 점심에는 콩과 나물로 식이섬유를 더했으니, 다음 끼니에도 쌈장을 적게 곁들인 양배추로 채소 구성을 이어가면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "사과 반 개",
+                "advice": "잡곡밥과 콩·나물을 먹고 식후 포만감도 기록했으니, 다음 끼니에는 단백질 간식을 따로 더하기보다 사과를 소량 곁들여 식이섬유를 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "presentation_a3/contract_parseable": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/no_invented_numbers": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/no_medical_judgement": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/normal_not_blocked": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/suggestions_shape": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/no_imperative": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": 0.9,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/no_cliche": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/example_no_leak": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/daily_excess_addressed": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/gap_addressed": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "non_critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/unscored_axis_silent": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "critical",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": []
+    },
+    "presentation_a3/cause_food_named": {
+      "passed": 5,
+      "n": 5,
+      "errors": 0,
+      "grade": "ambiguous",
+      "pass_ratio": null,
+      "notes": [],
+      "samples": [
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·국 구성에서 점심에는 콩과 채소로 식이섬유를 더 챙겼지만, 아침 어묵국과 깍두기에 이어 기록에서 확인된 나트륨은 이미 하루 한도를 넘었어요. 식후 포만감도 있는 편이니, 다음 끼니는 양을 크게 늘리기보다 짠 국물과 양념을 줄이고 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질 목표 미달과 누적 진행 상황을 함께 고려해 다음 식사에는 단백질 반찬을 우선하되, 남은 목표량을 한 끼에 모두 채우도록 권하지 않는다. 점심 나트륨은 끼니 한도 안이지만 누적 한도를 넘었으므로 국물과 짠 양념을 줄이며, 식후 포만감을 고려해 많은 양을 추가하는 방향은 피한다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없이 구운 닭안심 한 접시",
+                "advice": "아침의 국과 깍두기로 쌓인 나트륨을 고려하고, 콩자반을 곁들인 점심 뒤에도 포만감이 있었으니 다음 끼니에는 밥이나 반찬 가짓수를 늘리기보다 양념 없이 구운 닭안심을 주된 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 작은 그릇",
+                "advice": "잡곡밥과 콩·나물로 식이섬유와 포만감은 챙겼으니, 다음 끼니에는 짠 국 대신 소금과 액젓을 적게 넣은 달걀찜으로 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 국·깍두기 구성에서 점심에는 콩과 나물로 식이섬유를 더 챙겼고 나트륨도 줄었지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 짠 국물과 양념을 줄이고, 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심은 식이섬유를 보완했고 나트륨도 끼니 한도 안이지만, 아침부터 누적된 나트륨이 하루 한도를 넘어 다음 식사에서도 짠 국물과 양념을 줄이는 것이 우선이다. 점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표에 도달하지 않았으므로 담백한 단백질 반찬을 제안하되, 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없이 구운 닭안심 한 접시",
+                "advice": "아침의 국과 깍두기로 나트륨이 쌓였고 점심은 콩자반을 곁들여도 단백질이 끼니 목표보다 적었으니, 다음 끼니에는 국물 대신 양념 없이 구운 닭안심을 주된 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "점심은 잡곡밥과 콩·나물로 식이섬유를 챙기고 식후 포만감도 기록했으니, 다음에는 반찬 가짓수를 늘리기보다 소금과 액젓을 적게 넣은 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 국·깍두기 구성에서 점심의 콩·나물 구성으로 바뀌며 식이섬유를 더 챙겼고 나트륨도 줄었지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 짠 국물과 조림 양념을 줄이고, 담백한 단백질 반찬을 중심으로 이어가면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표까지 남아 있어, 다음 끼니에는 담백한 단백질 반찬을 우선 제안한다. 점심 나트륨은 끼니 한도 안이지만 아침부터 누적된 양이 하루 한도를 넘었으므로 국물과 짠 양념을 줄이며, 남은 단백질을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "구운 닭가슴살 한 팩",
+                "advice": "아침 국과 깍두기에서 쌓인 나트륨을 고려하면서 점심 콩반찬으로 채우지 못한 단백질을 이어 챙기려면, 다음 끼니에는 소스 없는 제품을 반찬으로 곁들이기 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "점심은 콩과 나물로 식이섬유를 충분히 챙기고 식후 포만감도 기록했으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 소금과 새우젓을 적게 넣은 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 흰밥·국 중심 구성에서 점심에는 콩과 채소가 더해졌지만, 어묵국과 깍두기로 쌓인 나트륨은 기록상 하루 한도를 넘었어요. 다음 끼니는 식후 포만감도 고려해 양을 크게 늘리기보다, 국물과 짠 양념을 줄인 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질 목표 미달과 누적 단백질 진행 상황을 고려해 다음 식사에는 담백한 단백질 반찬을 우선한다. 점심 나트륨은 끼니 한도 안이지만 누적량은 하루 한도를 넘었으므로 국물과 짠 양념을 줄이고, 남은 단백질 목표량을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없는 닭가슴살 한 팩",
+                "advice": "점심은 콩과 나물로 식후 포만감이 있었으니, 다음 끼니에는 밥 양을 늘리기보다 양념 없는 닭가슴살을 단백질 반찬으로 곁들이면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "흰살생선찜 한 토막",
+                "advice": "아침 국과 깍두기에서 쌓인 나트륨을 고려하면서 점심에 적었던 단백질을 보완하도록, 다음 끼니에는 소금과 간장을 덜 쓴 생선찜을 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": true,
+          "note": "",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·국·김치 구성에서 점심에는 콩과 나물로 식이섬유를 보완했지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 식후 포만감을 고려해 양을 크게 늘리기보다, 짠 국물이나 조림 대신 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표에 아직 도달하지 않아, 다음 식사에는 담백한 단백질 반찬을 우선한다. 점심 나트륨은 끼니 한도 안이지만 아침부터 누적된 나트륨이 하루 한도를 넘었으므로 국물과 짠 양념을 줄이며, 남은 단백질을 한 끼에 모두 채우거나 식사량을 크게 늘리도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없이 구운 닭안심 한 접시",
+                "advice": "아침의 어묵국과 깍두기로 쌓인 나트륨을 고려하고, 점심은 콩자반을 곁들여도 단백질이 적었으니 다음 끼니에는 짠 양념 없는 닭안심을 주된 반찬으로 고르면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 작은 그릇",
+                "advice": "잡곡밥과 콩·나물을 먹고 포만감이 있었으니, 다음 끼니에는 밥이나 반찬 수를 늘리기보다 소금과 새우젓을 적게 넣은 달걀찜으로 단백질을 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "presentation_a3/satiety_as_experience": {
+      "passed": 0,
+      "n": 5,
+      "errors": 0,
+      "grade": "ambiguous",
+      "pass_ratio": null,
+      "notes": [
+        "포만감을 겪은 일로 쓰지 않았다",
+        "포만감을 겪은 일로 쓰지 않았다"
+      ],
+      "samples": [
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·국 구성에서 점심에는 콩과 채소로 식이섬유를 더 챙겼지만, 아침 어묵국과 깍두기에 이어 기록에서 확인된 나트륨은 이미 하루 한도를 넘었어요. 식후 포만감도 있는 편이니, 다음 끼니는 양을 크게 늘리기보다 짠 국물과 양념을 줄이고 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질 목표 미달과 누적 진행 상황을 함께 고려해 다음 식사에는 단백질 반찬을 우선하되, 남은 목표량을 한 끼에 모두 채우도록 권하지 않는다. 점심 나트륨은 끼니 한도 안이지만 누적 한도를 넘었으므로 국물과 짠 양념을 줄이며, 식후 포만감을 고려해 많은 양을 추가하는 방향은 피한다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없이 구운 닭안심 한 접시",
+                "advice": "아침의 국과 깍두기로 쌓인 나트륨을 고려하고, 콩자반을 곁들인 점심 뒤에도 포만감이 있었으니 다음 끼니에는 밥이나 반찬 가짓수를 늘리기보다 양념 없이 구운 닭안심을 주된 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 작은 그릇",
+                "advice": "잡곡밥과 콩·나물로 식이섬유와 포만감은 챙겼으니, 다음 끼니에는 짠 국 대신 소금과 액젓을 적게 넣은 달걀찜으로 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 국·깍두기 구성에서 점심에는 콩과 나물로 식이섬유를 더 챙겼고 나트륨도 줄었지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 짠 국물과 양념을 줄이고, 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심은 식이섬유를 보완했고 나트륨도 끼니 한도 안이지만, 아침부터 누적된 나트륨이 하루 한도를 넘어 다음 식사에서도 짠 국물과 양념을 줄이는 것이 우선이다. 점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표에 도달하지 않았으므로 담백한 단백질 반찬을 제안하되, 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없이 구운 닭안심 한 접시",
+                "advice": "아침의 국과 깍두기로 나트륨이 쌓였고 점심은 콩자반을 곁들여도 단백질이 끼니 목표보다 적었으니, 다음 끼니에는 국물 대신 양념 없이 구운 닭안심을 주된 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "점심은 잡곡밥과 콩·나물로 식이섬유를 챙기고 식후 포만감도 기록했으니, 다음에는 반찬 가짓수를 늘리기보다 소금과 액젓을 적게 넣은 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 국·깍두기 구성에서 점심의 콩·나물 구성으로 바뀌며 식이섬유를 더 챙겼고 나트륨도 줄었지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 짠 국물과 조림 양념을 줄이고, 담백한 단백질 반찬을 중심으로 이어가면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표까지 남아 있어, 다음 끼니에는 담백한 단백질 반찬을 우선 제안한다. 점심 나트륨은 끼니 한도 안이지만 아침부터 누적된 양이 하루 한도를 넘었으므로 국물과 짠 양념을 줄이며, 남은 단백질을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "구운 닭가슴살 한 팩",
+                "advice": "아침 국과 깍두기에서 쌓인 나트륨을 고려하면서 점심 콩반찬으로 채우지 못한 단백질을 이어 챙기려면, 다음 끼니에는 소스 없는 제품을 반찬으로 곁들이기 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "점심은 콩과 나물로 식이섬유를 충분히 챙기고 식후 포만감도 기록했으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 소금과 새우젓을 적게 넣은 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 흰밥·국 중심 구성에서 점심에는 콩과 채소가 더해졌지만, 어묵국과 깍두기로 쌓인 나트륨은 기록상 하루 한도를 넘었어요. 다음 끼니는 식후 포만감도 고려해 양을 크게 늘리기보다, 국물과 짠 양념을 줄인 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질 목표 미달과 누적 단백질 진행 상황을 고려해 다음 식사에는 담백한 단백질 반찬을 우선한다. 점심 나트륨은 끼니 한도 안이지만 누적량은 하루 한도를 넘었으므로 국물과 짠 양념을 줄이고, 남은 단백질 목표량을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없는 닭가슴살 한 팩",
+                "advice": "점심은 콩과 나물로 식후 포만감이 있었으니, 다음 끼니에는 밥 양을 늘리기보다 양념 없는 닭가슴살을 단백질 반찬으로 곁들이면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "흰살생선찜 한 토막",
+                "advice": "아침 국과 깍두기에서 쌓인 나트륨을 고려하면서 점심에 적었던 단백질을 보완하도록, 다음 끼니에는 소금과 간장을 덜 쓴 생선찜을 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "포만감을 겪은 일로 쓰지 않았다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·국·김치 구성에서 점심에는 콩과 나물로 식이섬유를 보완했지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 식후 포만감을 고려해 양을 크게 늘리기보다, 짠 국물이나 조림 대신 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표에 아직 도달하지 않아, 다음 식사에는 담백한 단백질 반찬을 우선한다. 점심 나트륨은 끼니 한도 안이지만 아침부터 누적된 나트륨이 하루 한도를 넘었으므로 국물과 짠 양념을 줄이며, 남은 단백질을 한 끼에 모두 채우거나 식사량을 크게 늘리도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없이 구운 닭안심 한 접시",
+                "advice": "아침의 어묵국과 깍두기로 쌓인 나트륨을 고려하고, 점심은 콩자반을 곁들여도 단백질이 적었으니 다음 끼니에는 짠 양념 없는 닭안심을 주된 반찬으로 고르면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 작은 그릇",
+                "advice": "잡곡밥과 콩·나물을 먹고 포만감이 있었으니, 다음 끼니에는 밥이나 반찬 수를 늘리기보다 소금과 새우젓을 적게 넣은 달걀찜으로 단백질을 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "presentation_a3/stage_linked_reasoning": {
+      "passed": 0,
+      "n": 5,
+      "errors": 0,
+      "grade": "ambiguous",
+      "pass_ratio": null,
+      "notes": [
+        "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+        "reasoning 이 MAINTENANCE 단계와 이어지지 않는다"
+      ],
+      "samples": [
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·국 구성에서 점심에는 콩과 채소로 식이섬유를 더 챙겼지만, 아침 어묵국과 깍두기에 이어 기록에서 확인된 나트륨은 이미 하루 한도를 넘었어요. 식후 포만감도 있는 편이니, 다음 끼니는 양을 크게 늘리기보다 짠 국물과 양념을 줄이고 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질 목표 미달과 누적 진행 상황을 함께 고려해 다음 식사에는 단백질 반찬을 우선하되, 남은 목표량을 한 끼에 모두 채우도록 권하지 않는다. 점심 나트륨은 끼니 한도 안이지만 누적 한도를 넘었으므로 국물과 짠 양념을 줄이며, 식후 포만감을 고려해 많은 양을 추가하는 방향은 피한다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없이 구운 닭안심 한 접시",
+                "advice": "아침의 국과 깍두기로 쌓인 나트륨을 고려하고, 콩자반을 곁들인 점심 뒤에도 포만감이 있었으니 다음 끼니에는 밥이나 반찬 가짓수를 늘리기보다 양념 없이 구운 닭안심을 주된 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 작은 그릇",
+                "advice": "잡곡밥과 콩·나물로 식이섬유와 포만감은 챙겼으니, 다음 끼니에는 짠 국 대신 소금과 액젓을 적게 넣은 달걀찜으로 단백질을 이어 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 국·깍두기 구성에서 점심에는 콩과 나물로 식이섬유를 더 챙겼고 나트륨도 줄었지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 짠 국물과 양념을 줄이고, 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심은 식이섬유를 보완했고 나트륨도 끼니 한도 안이지만, 아침부터 누적된 나트륨이 하루 한도를 넘어 다음 식사에서도 짠 국물과 양념을 줄이는 것이 우선이다. 점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표에 도달하지 않았으므로 담백한 단백질 반찬을 제안하되, 남은 양을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없이 구운 닭안심 한 접시",
+                "advice": "아침의 국과 깍두기로 나트륨이 쌓였고 점심은 콩자반을 곁들여도 단백질이 끼니 목표보다 적었으니, 다음 끼니에는 국물 대신 양념 없이 구운 닭안심을 주된 반찬으로 두면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "점심은 잡곡밥과 콩·나물로 식이섬유를 챙기고 식후 포만감도 기록했으니, 다음에는 반찬 가짓수를 늘리기보다 소금과 액젓을 적게 넣은 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 국·깍두기 구성에서 점심의 콩·나물 구성으로 바뀌며 식이섬유를 더 챙겼고 나트륨도 줄었지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 짠 국물과 조림 양념을 줄이고, 담백한 단백질 반찬을 중심으로 이어가면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표까지 남아 있어, 다음 끼니에는 담백한 단백질 반찬을 우선 제안한다. 점심 나트륨은 끼니 한도 안이지만 아침부터 누적된 양이 하루 한도를 넘었으므로 국물과 짠 양념을 줄이며, 남은 단백질을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "구운 닭가슴살 한 팩",
+                "advice": "아침 국과 깍두기에서 쌓인 나트륨을 고려하면서 점심 콩반찬으로 채우지 못한 단백질을 이어 챙기려면, 다음 끼니에는 소스 없는 제품을 반찬으로 곁들이기 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 한 그릇",
+                "advice": "점심은 콩과 나물로 식이섬유를 충분히 챙기고 식후 포만감도 기록했으니, 다음 끼니에는 반찬 가짓수를 늘리기보다 소금과 새우젓을 적게 넣은 달걀찜을 단백질 반찬으로 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 흰밥·국 중심 구성에서 점심에는 콩과 채소가 더해졌지만, 어묵국과 깍두기로 쌓인 나트륨은 기록상 하루 한도를 넘었어요. 다음 끼니는 식후 포만감도 고려해 양을 크게 늘리기보다, 국물과 짠 양념을 줄인 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질 목표 미달과 누적 단백질 진행 상황을 고려해 다음 식사에는 담백한 단백질 반찬을 우선한다. 점심 나트륨은 끼니 한도 안이지만 누적량은 하루 한도를 넘었으므로 국물과 짠 양념을 줄이고, 남은 단백질 목표량을 한 끼에 모두 채우도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없는 닭가슴살 한 팩",
+                "advice": "점심은 콩과 나물로 식후 포만감이 있었으니, 다음 끼니에는 밥 양을 늘리기보다 양념 없는 닭가슴살을 단백질 반찬으로 곁들이면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "흰살생선찜 한 토막",
+                "advice": "아침 국과 깍두기에서 쌓인 나트륨을 고려하면서 점심에 적었던 단백질을 보완하도록, 다음 끼니에는 소금과 간장을 덜 쓴 생선찜을 골라 보면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        },
+        {
+          "passed": false,
+          "note": "reasoning 이 MAINTENANCE 단계와 이어지지 않는다",
+          "response": {
+            "body": "점심은 잡곡밥에 콩자반과 시금치나물을 곁들여 식이섬유는 충분했지만, 단백질은 끼니 목표보다 적었어요. 아침의 밥·국·김치 구성에서 점심에는 콩과 나물로 식이섬유를 보완했지만, 기록에서 확인된 누적 나트륨은 이미 하루 한도를 넘었어요. 다음 끼니는 식후 포만감을 고려해 양을 크게 늘리기보다, 짠 국물이나 조림 대신 담백한 단백질 반찬을 중심으로 구성하면 좋아요.",
+            "modelVersion": "reasoning-gateway",
+            "safetyStatus": "SAFE",
+            "reasoning": "점심의 단백질이 끼니 목표보다 적고 누적 기록에서도 하루 목표에 아직 도달하지 않아, 다음 식사에는 담백한 단백질 반찬을 우선한다. 점심 나트륨은 끼니 한도 안이지만 아침부터 누적된 나트륨이 하루 한도를 넘었으므로 국물과 짠 양념을 줄이며, 남은 단백질을 한 끼에 모두 채우거나 식사량을 크게 늘리도록 권하지 않는다.",
+            "suggestions": [
+              {
+                "foodName": "양념 없이 구운 닭안심 한 접시",
+                "advice": "아침의 어묵국과 깍두기로 쌓인 나트륨을 고려하고, 점심은 콩자반을 곁들여도 단백질이 적었으니 다음 끼니에는 짠 양념 없는 닭안심을 주된 반찬으로 고르면 좋아요.",
+                "candidateFoodRefId": null
+              },
+              {
+                "foodName": "달걀찜 작은 그릇",
+                "advice": "잡곡밥과 콩·나물을 먹고 포만감이 있었으니, 다음 끼니에는 밥이나 반찬 수를 늘리기보다 소금과 새우젓을 적게 넣은 달걀찜으로 단백질을 챙기면 좋아요.",
+                "candidateFoodRefId": null
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "exit_code": 1,
+  "finished_at": "2026-11-08T20:52:30.138128+09:00"
+}

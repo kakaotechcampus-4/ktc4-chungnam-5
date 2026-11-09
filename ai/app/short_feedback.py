@@ -9,7 +9,9 @@ BE 합계를 그대로 쓴다. 별도 누적 피드백 필드나 추가 DAILY �
 
 목표·판정·충족률은 Python에서 계산한다. 단백질은 체중·단계, 식이섬유는 단계,
 나트륨은 공통 한도를 쓴다. 체중이 없으면 단백질 목표를 추정하지 않는다.
-평소 열량은 여전히 없으므로 Quantity 점수로 과식/소식 방향을 추측하지 않는다.
+양은 BE가 보낸 평소 대비 섭취 비율과 단계 권장 구간(`intake`)으로 적는다. 정도는 점수(90 이상 적정 ·
+80–89 약간 · 80 미만 많음/적음), 방향은 비율이 정한다.
+구간은 BE 값이라 여기서 단계별 기준을 갖지 않는다. `intake`가 없으면 점수로 방향을 추측하지 않는다.
 
 `modelVersion`/`safetyStatus` 로 감싸 `ShortFeedbackResponse` 를 완성하는 건 `main.py` 의 일이다
 (`food_analyzer.py` 와 같은 분담). 이 파일은 본문·근거·제안만 책임진다.
@@ -28,7 +30,7 @@ from typing import Any, Final, Literal
 import httpx
 
 from app.schemas import (
-    FeedbackItem, MealFood, MealType, Scope, ShortFeedbackRequest, Stage, Suggestion,
+    FeedbackItem, Intake, MealFood, MealType, Scope, ShortFeedbackRequest, Stage, Suggestion,
 )
 from app.config import get_settings
 
@@ -354,13 +356,53 @@ def _score_line(label: str, score: float | None, note: str = "") -> str:
     return f"- {label}: {_fmt_score(score)}{note}"
 
 
-def _quantity_note(score: float | None) -> str:
-    # 점수만으로는 과식인지 소식인지 모른다 — BE 가 평소 대비 비율(intake_ratio_pct)을 주지 않는다.
+_QUANTITY_NEAR: Final = 90
+"""이 점수 이상이면 구간 끝을 조금 넘었어도 적정으로 본다 — 언급하지 않는다."""
+_QUANTITY_MILD: Final = 80
+"""이 점수 이상이면 '약간' 이다 — 가볍게 한마디만. 아래면 점수를 낮춘 이유로 설명한다.
+
+사진 섭취량 추정에 ±30% 안팎의 오차가 있어 구간을 몇 % 넘은 정도로 "많이 드셨어요" 라고
+단정하지 않는다. 조정기(60–90%)라면 적정은 약 58.4–94.9%, 약간은 약 56.7–100.6% 까지다.
+"""
+
+
+def _quantity_note(score: float | None, intake: Intake | None) -> str:
     if score is None:
         return ""
     if score >= 100:
         return " — 평소 대비 이 단계의 권장 구간 안"
-    return " — 권장 구간을 벗어났다. 많이 먹었는지 적게 먹었는지는 모르니 방향을 말하지 않는다"
+    if intake is None:
+        # 점수만으로는 과식인지 소식인지 모른다 — 같은 점수가 구간 양쪽에서 나온다.
+        return " — 권장 구간을 벗어났다. 많이 먹었는지 적게 먹었는지는 모르니 방향을 말하지 않는다"
+    if score >= _QUANTITY_NEAR:
+        return " — 거의 적정. 양은 언급하지 않는다"
+    return " — 권장 구간을 벗어났다. 방향은 [영양 판정]의 양 줄을 따른다"
+
+
+def _quantity_judgement(score: float, intake: Intake) -> tuple[str, str]:
+    """(판정어, 모델에게 줄 지시). 정도는 점수가, 방향은 비율이 정한다.
+
+    방향은 구간 가운데를 기준으로 나눈다. 90 점 미만이면 비율이 구간에서 몇 % 이상
+    벗어나 있어 하한 · 상한 비교와 결과가 같다.
+    """
+    if score >= _QUANTITY_NEAR:
+        return "적정", "양은 언급하지 않는다"
+    lo, hi = intake.range_pct
+    more = intake.ratio_pct >= (lo + hi) / 2
+    if score >= _QUANTITY_MILD:
+        return ("약간 많음" if more else "약간 적음"), "가볍게 한마디만 한다"
+    return ("많음" if more else "적음"), "양이 점수를 낮춘 이유로 설명한다"
+
+
+def _quantity_line(score: float | None, intake: Intake | None) -> str | None:
+    if score is None or intake is None:
+        return None
+    lo, hi = intake.range_pct
+    state, instruction = _quantity_judgement(score, intake)
+    return (
+        f"- 양: {state} (평소 한 끼의 {intake.ratio_pct:g}% / 이 단계 권장 {lo:g}–{hi:g}%)"
+        f" — {instruction}"
+    )
 
 
 def _judgement_line(j: NutrientJudgement) -> str:
@@ -467,18 +509,23 @@ def build_meal_prompt(req: ShortFeedbackRequest, judgements: list[NutrientJudgem
     gaps = [j for j in judgements if j.state != "OK"]
     priorities = recommendation_priorities(req, judgements)
     focus = [g.name for g in gaps]
+    quantity_line = _quantity_line(req.qqs.quantity, req.intake)
+    judgement_lines = [
+        *([quantity_line] if quantity_line else []),
+        *(_judgement_line(j) for j in judgements),
+    ]
     lines = [
         f"[투약 단계] {req.stage.value} — {STAGE_RISK[req.stage]}",
         f"[현재 끼니] {req.meal_type.value if req.meal_type else '종류 미전달'}",
         f"[식사 상태] {'식사 안 함(명시적 결식)' if req.skipped else '먹음'}",
         "",
         "[점수] 0~100. 세 축은 따로 본다. 합치거나 평균 내지 않는다",
-        _score_line("양(Quantity)", req.qqs.quantity, _quantity_note(req.qqs.quantity)),
+        _score_line("양(Quantity)", req.qqs.quantity, _quantity_note(req.qqs.quantity, req.intake)),
         _score_line("질(Quality)", req.qqs.quality),
         _score_line("포만감(Satiety)", req.qqs.satiety),
         "",
         "[영양 판정]",
-        *([_judgement_line(j) for j in judgements] or ["- 판정할 수 있는 영양소 없음"]),
+        *(judgement_lines or ["- 판정할 수 있는 영양소 없음"]),
         "",
         "[먹은 음식]",
         *[_item_line(item, focus) for item in req.items],

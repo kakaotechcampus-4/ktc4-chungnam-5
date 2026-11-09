@@ -16,8 +16,11 @@
 - **절 범위** — body 는 이번 끼니를 말하는 자리라 모든 절을 본다. reasoning(단계와 잇는 일반 설명)과
   advice(제안 음식 설명)는 **과거형 절만** 이번 끼니에 대한 평가로 본다
   ("곁들이면 든든해요" 는 제안 음식 설명, "배고프셨을 거예요" 는 이번 끼니 평가).
-  예외: "양이 많은 편이에요" 같은 양 상태 서술은 시제와 관계없이 모든 절에서 본다(`quantity_no_direction`)
+  예외: "양이 많은 편이에요" 같은 양 상태 서술은 시제와 관계없이 모든 절에서 본다(`quantity_no_direction` ·
+  `quantity_direction_*`)
 - **거절 · 불확실** — "알 수 없어요", "기록이 없어" 같은 표현이 같은 절에 있으면 단정이 아니다
+- 누적 보충·null 양·영양 모순의 세 축은 근거와 권고를 추가로 나눠 본다.
+  과거 섭취 설명, 다음 식사의 양 조절 행동, 거절한 음식의 수식어는 현재 끼니 평가와 구분한다.
 """
 
 from __future__ import annotations
@@ -42,6 +45,8 @@ from app.short_feedback import (
     _FORBIDDEN,
     _LABELS,
     _MEAL_EXAMPLE_GOOD,
+    _QUANTITY_MILD,
+    _QUANTITY_NEAR,
     _UNITS,
     MEAL_SYSTEM_PROMPT,
     STAGE_RISK,
@@ -149,6 +154,26 @@ def _all_clauses(resp: object, texts: TextReader = _texts) -> Iterator[tuple[str
 def _meal_clauses(resp: object) -> Iterator[tuple[str, str]]:
     """이번 끼니에 대한 평가로 볼 절 — body 는 전부, reasoning · advice 는 과거형 절만."""
     return ((field, clause) for field, clause in _all_clauses(resp) if field == "body" or _is_past(clause))
+
+
+# 이 세 문맥 축에서만 쓰는 작은 서술 단위다. 공통 _clauses/_is_past를 바꾸면
+# 의료·결식·DAILY 등의 기존 판정도 바뀌므로 공유 판정에는 적용하지 않는다.
+_FUTURE_MEAL = re.compile(r"다음\s*(?:끼니|식사|식단|메뉴)|내일|앞으로")
+_CURRENT_MEAL = re.compile(r"이번\s*(?:끼니|식사|점심|저녁)|현재(?:\s|$)")
+_CONTEXT_SPLIT = re.compile(
+    # 연결어를 지우면 '높아서'가 '높'으로 잘려 실제 초과 주장을 놓친다.
+    r"(?:(?<=으니)|(?<=으니까)|(?<=으므로)|(?<=어서)|(?<=아서)|(?<=하니)|(?<=이니))\s+"
+    r"|\s+(?=다음\s*(?:끼니|식사|식단|메뉴)|내일|이번\s*(?:끼니|식사|점심|저녁))"
+)
+
+
+def _context_clauses(resp: object, fields: Sequence[str] = _JUDGED) -> Iterator[tuple[str, str]]:
+    """과거 근거와 뒤의 권고를 분리한다. '끼니' 같은 명사를 -니로 자르지 않는다."""
+    for field, text in _texts(resp, fields):
+        for clause in _clauses(text):
+            for part in _CONTEXT_SPLIT.split(clause):
+                if part.strip():
+                    yield field, part.strip()
 
 
 # 거절 · 불확실 — 규칙을 지킨 문장이다. 같은 절에 있으면 단정으로 보지 않는다.
@@ -317,11 +342,12 @@ _GENERAL_END = re.compile(r"(?:면|어도|아도|더라도|수록|어지는|아�
 _GENERAL_TAIL = re.compile(r"\s*(?:쉬|쉽)")
 
 # 양 축 평가 — 방향 + "양이 적당했어요" 같은 평가 + 양 축 이름
-_QUANTITY_EVAL = re.compile(
-    _DIRECTION_ACT
-    + "|"
-    + _AMOUNT_STATE_CORE
+_QUANTITY_STATE = re.compile(
+    _AMOUNT_STATE_CORE
     + r"|(?<![가-힣])양(?:이|은|도)\s*(?:적당|괜찮|알맞|충분|적절|딱|권장|부족)"
+)
+_QUANTITY_EVAL = re.compile(
+    _DIRECTION_ACT + "|" + _QUANTITY_STATE.pattern
     + r"|섭취량|식사량|(?:먹은|드신)\s*양"
 )
 
@@ -338,18 +364,57 @@ def _meal_hits(resp: dict, pattern: re.Pattern[str]) -> list[str]:
     ]
 
 
+_QUANTITY_ACTION = re.compile(
+    r"(?:양을\s*|(?:식사량|섭취량)(?:을|은)?\s*(?:(?:크게|더|많이|조금)\s*)?)"
+    r"(?:늘리|늘려|줄이|줄여)"
+)
+
+
+def _future_quantity_action(clause: str, start: int) -> bool:
+    """미래의 양 조절 행동만 면제한다. 같은 절의 현재 양 상태 평가는 남긴다."""
+    action = _QUANTITY_ACTION.match(clause, start)
+    if action is None:
+        return False
+    # '다음 끼니'가 앞에 있어도 '이번 점심 양을 늘리셨어요'는 현재/과거 평가다.
+    verb_end = clause[action.end():].split()
+    if verb_end and _is_past(verb_end[0]):
+        return False
+    before = clause[:start]
+    future = list(_FUTURE_MEAL.finditer(before))
+    current = list(_CURRENT_MEAL.finditer(before))
+    return bool(future and (not current or future[-1].start() > current[-1].start()))
+
+
+def _unscored_quantity_hits(resp: dict) -> list[str]:
+    found = []
+    for field, clause in _context_clauses(resp):
+        # 현재형 양 상태도 검사한다. advice라는 이유로 '이번 양이 많아요'를 놓치지 않는다.
+        if (
+            field != "body" and not _is_past(clause)
+            and not _QUANTITY_STATE.search(clause) and not _CURRENT_MEAL.search(clause)
+        ):
+            continue
+        if _UNCERTAIN.search(clause):
+            continue
+        for match in _QUANTITY_EVAL.finditer(clause):
+            if not _future_quantity_action(clause, match.start()):
+                found.append(f"'{match.group(0)}'({field})")
+    return found
+
+
 @_with_request
 def unscored_axis_silent(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     """qqs 에서 null 인 축을 평가하지 않았는가.
 
     양 · 포만감 축을 본다. 질 축은 영양 판정 축(`no_contradict_rule` · `unjudged_nutrient_silent`)이
-    다룬다(결정 D).
+    다룬다(결정 D). 양은 현재 평가와 명시적인 다음 식사 행동을 구분하며,
+    같은 문장에 양 평가가 함께 있으면 다음 식사 제안이 이를 면제하지 않는다.
     """
     found: list[str] = []
     if model.qqs.satiety is None:
         found += [f"포만감 {h}" for h in _meal_hits(resp, _SATIETY_EVAL)]
     if model.qqs.quantity is None:
-        found += [f"양 {h}" for h in _meal_hits(resp, _QUANTITY_EVAL)]
+        found += [f"양 {h}" for h in _unscored_quantity_hits(resp)]
     return _verdict("측정 못 한 축을 평가", found)
 
 
@@ -361,16 +426,8 @@ def _amount_states(clause: str) -> Iterator[str]:
         yield m.group(0)
 
 
-@_with_request
-def quantity_no_direction(resp: dict, model: ShortFeedbackRequest) -> Verdict:
-    """quantity < 100 일 때 과식 · 소식 방향을 말하지 않았는가.
-
-    먹은 행동("많이 드셨어요")은 이번 끼니 절(body 전부 · reasoning · advice 의 과거형)에서,
-    양 상태 서술("양이 많은 편이에요")은 시제와 관계없이 모든 절에서 본다.
-    """
-    quantity = model.qqs.quantity
-    if quantity is None or quantity >= 100:
-        return True, "대상 아님 (quantity 가 null 이거나 100)"
+def _direction_hits(resp: dict) -> list[str]:
+    """이번 끼니 양의 방향을 단정한 곳 — 먹은 행동(이번 끼니 절)과 양 상태 서술(모든 절)."""
     found = _meal_hits(resp, _DIRECTION_ACT_RE)
     found += [
         f"'{word}'({field})"
@@ -378,7 +435,109 @@ def quantity_no_direction(resp: dict, model: ShortFeedbackRequest) -> Verdict:
         if not _UNCERTAIN.search(clause)
         for word in _amount_states(clause)
     ]
-    return _verdict("양의 방향을 단정", found)
+    return found
+
+
+@_with_request
+def quantity_no_direction(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """양의 방향을 말하면 안 되는 끼니에서 과식 · 소식 방향을 말하지 않았는가.
+
+    대상은 둘이다.
+    - 섭취 비율(`intake`)이 없고 quantity < 100 — 점수만으로는 방향을 알 수 없다
+    - 비율이 있고 quantity ≥ 90 — 거의 적정이라 양을 언급하지 않는다(프롬프트 판정 줄 "양은 언급하지 않는다")
+    비율이 있고 90 미만이면 방향을 말해도 된다. 맞는 방향인지는 `quantity_direction_not_reversed` 가 본다.
+
+    먹은 행동("많이 드셨어요")은 이번 끼니 절(body 전부 · reasoning · advice 의 과거형)에서,
+    양 상태 서술("양이 많은 편이에요")은 시제와 관계없이 모든 절에서 본다.
+    """
+    quantity = model.qqs.quantity
+    if quantity is None:
+        return True, "대상 아님 (quantity 가 null)"
+    if model.intake is None and quantity >= 100:
+        return True, "대상 아님 (비율 없이 quantity 100)"
+    if model.intake is not None and quantity < _QUANTITY_NEAR:
+        return True, f"대상 아님 (비율 있음 · quantity < {_QUANTITY_NEAR})"
+    return _verdict("양의 방향을 단정", _direction_hits(resp))
+
+
+# 방향별 표현 — `_DIRECTION_ACT` · `_AMOUNT_WORDS` 를 많이 · 적게 쪽으로 나눈 것이다. 주어 없는 비교
+# ("평소보다 많았어요")와 "식사량 · 섭취량" 주어, "양을 줄이 · 늘리"(반대 방향을 함의)도 함께 본다.
+# "양이 조금 적었어요" 처럼 정도 부사가 끼어도 같은 방향이다
+_DEGREE = r"(?:(?:조금|좀|약간|다소|살짝|꽤|많이)\s*)?"
+_MORE = re.compile(
+    r"(?:많이|배불리|과하게|넉넉히|평소보다\s*더)\s*(?:드셨|드신|먹었|먹은|드셔서|잡수)"
+    r"|(?<![가-힣])더\s*(?:드셨|먹었)"
+    r"|(?:과식|폭식)(?:을\s*)?(?:하셨|했|하신|한\s|이었|이에|이네|이라|인\s)"
+    r"|많은\s*양|(?<![가-힣])양을\s*(?:줄이|줄여)"
+    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _DEGREE + r"(?:많|넘치|과하|넉넉)"
+    r"|평소보다\s*" + _DEGREE + r"(?:많|넉넉|과하)"
+)
+_LESS = re.compile(
+    r"(?:적게|조금만|평소보다\s*덜)\s*(?:드셨|드신|먹었|먹은|드셔서|잡수)"
+    r"|(?<![가-힣])덜\s*(?:드셨|먹었)"
+    r"|소식(?:을\s*)?(?:하셨|했|하신|한\s|이었|이에|이네|이라|인\s)"
+    r"|적은\s*양|(?<![가-힣])양을\s*(?:늘리|늘려)"
+    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _DEGREE + r"(?:적(?!당|절)|모자|부족)"
+    r"|평소보다\s*" + _DEGREE + r"(?:적(?!당|절)|모자)"
+)
+
+
+def _general(clause: str, match: re.Match[str]) -> bool:
+    """조건 · 양보 · 경향의 일반 진술인가 — "양이 적으면", "양이 적어도", "적게 먹기 쉬운 때"."""
+    end = match.end() + len(re.match(r"[가-힣]*", clause[match.end():]).group(0))
+    return bool(_GENERAL_END.search(clause[match.start():end]) or _GENERAL_TAIL.match(clause, end))
+
+
+def _hits(resp: dict, pattern: re.Pattern[str]) -> list[str]:
+    """`pattern` 이 걸린 곳 — 모든 절에서, 불확실 · 일반 진술 절은 뺀다."""
+    return [
+        f"'{m.group(0)}'({field})"
+        for field, clause in _all_clauses(resp)
+        if not _UNCERTAIN.search(clause)
+        for m in pattern.finditer(clause)
+        if not _general(clause, m)
+    ]
+
+
+def _intake_direction(model: ShortFeedbackRequest) -> bool | None:
+    """비율이 구간 가운데 이상이면 True(많이), 아래면 False(적게). 비율이 없으면 None.
+
+    앱 프롬프트(`short_feedback._quantity_judgement`)와 같은 기준이다. 90점 미만이면 비율이 구간 밖이라
+    하한 · 상한 비교와 같은 결과다.
+    """
+    if model.intake is None:
+        return None
+    lo, hi = model.intake.range_pct
+    return model.intake.ratio_pct >= (lo + hi) / 2
+
+
+@_with_request
+def quantity_direction_not_reversed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """비율이 있고 quantity < 90 일 때 비율과 반대 방향을 말하지 않았는가.
+
+    많이 먹은 끼니에 "적게 드셨어요" 는 사실과 반대다. 같은 방향 · 언급 없음 · 불확실 문장은 통과한다.
+    """
+    more = _intake_direction(model)
+    quantity = model.qqs.quantity
+    if more is None or quantity is None or quantity >= _QUANTITY_NEAR:
+        return True, f"대상 아님 (비율 없음 · quantity 가 null 이거나 {_QUANTITY_NEAR} 이상)"
+    return _verdict("양의 방향을 반대로 말함", _hits(resp, _LESS if more else _MORE))
+
+
+@_with_request
+def quantity_direction_mentioned(resp: dict, model: ShortFeedbackRequest) -> Verdict:
+    """비율이 있고 quantity < 80 일 때 양을 비율과 같은 방향으로 말했는가.
+
+    프롬프트는 "양이 점수를 낮춘 이유로 설명한다" 고 지시한다. 말하지 않으면 사용자는 양 점수가
+    왜 낮은지 모른다. 어휘 목록으로 판정해 바꿔 말한 표현은 놓칠 수 있다 — 그래서 non-critical 이다.
+    """
+    more = _intake_direction(model)
+    quantity = model.qqs.quantity
+    if more is None or quantity is None or quantity >= _QUANTITY_MILD:
+        return True, f"대상 아님 (비율 없음 · quantity 가 null 이거나 {_QUANTITY_MILD} 이상)"
+    if _hits(resp, _MORE if more else _LESS):
+        return True, ""
+    return False, f"양의 방향({'많이' if more else '적게'})을 말하지 않음"
 
 
 # ─────────────────────────── 영양 판정 축 ───────────────────────────
@@ -452,7 +611,23 @@ def _nutrient_segments(
         yield name, before, clause[spans[j][1] : stop]
 
 
-def _claims(before: str, after: str) -> list[tuple[str, bool, str]]:
+_FOOD_MODIFIER = re.compile(r"(?:짠|높은|많은|과한|부족한|적은|낮은|풍부한|충분한)$")
+_REJECTED_OBJECT = re.compile(
+    r"\s+(?:[가-힣]+(?:의|한)\s+){0,2}[가-힣]+(?:을|를)\s+"
+    r"(?:(?:더|굳이|추가로)\s+)?(?:권하|추천하|제안하)지\s*(?:는\s*)?않"
+)
+
+
+def _rejected_food_modifier(text: str, start: int, end: int) -> bool:
+    """'짠 반찬을 권하지 않는다'의 음식 수식은 섭취 사실에 대한 주장이 아니다.
+
+    형용사+목적어+거절 동사만 묶는다. '나트륨이 많았고 반찬을 권하지 않는다'의
+    앞선 사실 주장을 뒤의 거절이 덮어쓰지 않으며, '충분하지 않다'의 부정과도 다르다.
+    """
+    return bool(_FOOD_MODIFIER.fullmatch(text[start:end]) and _REJECTED_OBJECT.match(text, end))
+
+
+def _claims(before: str, after: str, *, exclude_rejected_food: bool = False) -> list[tuple[str, bool, str]]:
     """(방향, 부정됨?, 어휘) — 앞 수식("부족한 식이섬유")과 뒤 서술에서 찾은 평가."""
     found = []
     if m := _ADNOMINAL.search(before):
@@ -461,6 +636,8 @@ def _claims(before: str, after: str) -> list[tuple[str, bool, str]]:
             found.append((kind, False, word))
     for kind, pattern in _POLARITY.items():
         for m in pattern.finditer(after):
+            if exclude_rejected_food and _rejected_food_modifier(after, m.start(), m.end()):
+                continue
             negated = bool(_NEG_AFTER.match(after, m.end()) or _NEG_BEFORE.search(after[: m.start()]))
             found.append((kind, negated, m.group(0)))
     return found
@@ -474,14 +651,17 @@ def no_contradict_rule(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     "부족하지 않았어요" 처럼 부정된 단정은 OK 와 같은 말이라 통과, "충분하지 않았어요" 는 실패.
     영양소 이름 대신 근연어로 쓴 단정("채소가 부족했어요", "국물이 짰어요")도 같은 단정이다 —
     `gap_addressed` 가 근연어를 "다뤘다" 로 보는 것과 맞춘다.
+    거절한 음식의 수식어("짠 반찬을 권하지 않는다")는 현재 섭취에 대한 단정에서 제외한다.
     """
     ok_names = {j.name for j in judge_nutrients(model) if j.state == "OK"}
     found: list[str] = []
-    for field, clause in _meal_clauses(resp):
+    for field, clause in _context_clauses(resp):
+        if field != "body" and not _is_past(clause) and not _CURRENT_MEAL.search(clause):
+            continue
         for name, before, after in _nutrient_segments(clause, _RELATED_PATTERNS):
             if name not in ok_names or _UNCERTAIN.search(after):
                 continue
-            for kind, negated, word in _claims(before, after):
+            for kind, negated, word in _claims(before, after, exclude_rejected_food=True):
                 gap = kind == _GAP_DIRECTION[name] and not negated
                 if gap or (kind == "ENOUGH" and negated):
                     found.append(f"{_LABELS[name]} '{word}'({field})")
@@ -935,13 +1115,35 @@ _PUSH = re.compile(r"채우|채워|챙기|챙겨|보충|더하|더해|늘리|늘
 # "단백질 반찬을 더하기보다 채소를", "단백질을 채우는 대신"
 _PUSH_EXEMPT = re.compile(r"이미|않|없|굳이|충분|(?:기|는)\s*(?:보다|대신)")
 
+# 과거 동사 어미만으로 구별되지 않는 '점심에도 더해(져),' 같은 섭취 설명.
+# 음식명·케이스 ID가 아니라 시점과 서술 어미를 본다. '내일 아침'은 미래다.
+_INTAKE_CONTEXT = re.compile(r"아침|점심|저녁|앞선\s*(?:끼니|식사)|이전\s*(?:끼니|식사)|이번\s*(?:끼니|식사)")
+_INTAKE_LINK = re.compile(r"(?:더해(?:져)?|보태(?:져)?|곁들여|채워|챙겨)(?:서)?$")
+_RECOMMENDATION = re.compile(r"세요|십시오|좋(?:아요|겠)|권장|권하|권해|추천|제안|해야|해요$")
+
+
+def _past_intake_description(clause: str, segment: str) -> bool:
+    """영양소의 서술 구간을 본다. 앞의 과거 식사 사실이 뒤의 새 권고를 면제하지 않는다."""
+    if _RECOMMENDATION.search(segment) or _FUTURE_MEAL.search(segment):
+        return False
+    if _is_past(segment):
+        return True
+    # '단백질을 챙기고 ... 식이섬유를 더했으니'처럼 완료 시제가 마지막
+    # 영양소의 동사에만 붙는 나열. 새 행동 권고가 섞이면 절 전체를 면제하지 않는다.
+    if _is_past(clause) and not _RECOMMENDATION.search(clause) and not _FUTURE_MEAL.search(clause):
+        return True
+    return bool(
+        _INTAKE_CONTEXT.search(clause) and not _FUTURE_MEAL.search(clause)
+        and _INTAKE_LINK.search(segment)
+    )
+
 
 @_with_request
 def met_daily_not_pushed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     """누적 기록에서 하루 목표에 이미 도달한 영양소를 다음 끼니에 더 채우라고 하지 않았는가.
 
     대상은 누적 합계(`dailyNutritionTotals`)로 하루 목표 이상인 단백질 · 식이섬유다. 화면에 나가는 body ·
-    advice 의 과거형이 아닌 절에서, 그 영양소 이름을 서술하는 구간(`_nutrient_segments` — 다음 영양소 이름
+    advice 에서, 그 영양소 이름을 서술하는 구간(`_nutrient_segments` — 다음 영양소 이름
     앞까지)에 채우기 동사가 있으면 실패다. "단백질 부담은 가볍게 하면서 식이섬유를 더하는" 의 "더하" 는
     식이섬유 구간이라 단백질을 민 것이 아니다. reasoning 은 "보충은 우선하지 않는다" 처럼 하지 않을 방향을
     적는 자리라 보지 않는다.
@@ -952,14 +1154,23 @@ def met_daily_not_pushed(resp: dict, model: ShortFeedbackRequest) -> Verdict:
     ]
     if not met:
         return True, "대상 아님 (하루 목표에 도달한 영양소 없음)"
-    found = [
-        f"{_LABELS[name]} '{clause}'({field})"
-        for field, text in _texts(resp, ("body", "advice"))
-        for clause in _clauses(text)
-        if not _is_past(clause) and not _UNCERTAIN.search(clause)
-        for name, _before, after in _nutrient_segments(clause)
-        if name in met and _PUSH.search(after) and not _PUSH_EXEMPT.search(after)
-    ]
+    found = []
+    for field, text in _texts(resp, ("body", "advice")):
+        for clause in _clauses(text):
+            for name, _before, after in _nutrient_segments(clause):
+                if name not in met:
+                    continue
+                # 영양소 이름은 유지하면서 '채웠으니 더 보충하세요'의 두 행동을 나눈다.
+                for part in _CONTEXT_SPLIT.split(after):
+                    if not _PUSH.search(part) or _UNCERTAIN.search(part) or _past_intake_description(clause, part):
+                        continue
+                    exempt = _PUSH_EXEMPT.search(part)
+                    # '이미/충분/굳이' 자체는 명시적 추가 보충 권고의 부정이 아니다.
+                    if exempt and not (
+                        exempt.group(0) in {"이미", "충분", "굳이"} and _RECOMMENDATION.search(part)
+                    ):
+                        continue
+                    found.append(f"{_LABELS[name]} '{clause}'({field})")
     return _verdict("하루 목표에 도달한 영양소를 더 채우라고 했다", found)
 
 

@@ -612,6 +612,9 @@ void main() {
     await tester.tap(find.text('나중에')); // 컨디션 팝업
     await tester.pumpAndSettle();
 
+    // 위를 누르면 포만감을 고칠 수 있다는 말풍선이 위 옆에 보인다.
+    expect(find.text('위를 눌러서\n포만감을 설정해 보세요!'), findsOneWidget);
+
     await tester.tap(find.byType(StomachGauge));
     await tester.pumpAndSettle();
     expect(find.text('지금 얼마나 부르세요?'), findsOneWidget);
@@ -868,20 +871,35 @@ void main() {
     expect(_popupTitle, findsNothing);
   });
 
-  /// 식사 흐름 화면 하나를 가짜 서버로 띄운다.
-  Future<FakeApi> pumpMealScreen(WidgetTester tester, Widget screen) async {
+  /// 식사 흐름 화면 하나를 가짜 서버로 띄운다. [setup] 은 화면을 띄우기 전에 가짜 응답을 정한다.
+  Future<FakeApi> pumpMealScreen(
+    WidgetTester tester,
+    Widget screen, {
+    void Function(FakeApi api)? setup,
+  }) async {
     _useDesignSize(tester);
     SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
     final session = await UserSession.load();
     final api = FakeApi();
+    setup?.call(api);
     await tester.pumpWidget(
-      Provider(
-        create: (_) => ApiClient(session: session, dio: api.dio),
+      MultiProvider(
+        providers: [
+          Provider(create: (_) => ApiClient(session: session, dio: api.dio)),
+          Provider(create: (_) => PopupGate()),
+        ],
         child: MaterialApp(home: screen),
       ),
     );
     await _settle(tester);
     return api;
+  }
+
+  /// 음식 확인 화면의 "영양정보 없음" 안내를 닫는다. 이 안내와 상관없는 시험이 쓴다.
+  Future<void> closeNutritionNotice(WidgetTester tester) async {
+    if (find.textContaining('영양정보가 없는 음식이').evaluate().isEmpty) return;
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
   }
 
   testWidgets('review sends amount edits together after a pause', (
@@ -891,6 +909,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     expect(find.text('250g'), findsOneWidget);
     // 매칭 안 된 음식은 영양정보 없음으로 표시한다.
     expect(find.text('영양정보 없음'), findsOneWidget);
@@ -914,6 +933,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     await tester.tap(find.text('수정').first);
     await tester.pumpAndSettle();
     expect(find.text('음식 수정'), findsOneWidget);
@@ -948,6 +968,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     await tester.tap(find.text('수정').first);
     await tester.pumpAndSettle();
 
@@ -988,6 +1009,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     // 두 번째 음식은 '삶은 계란 2개' — 개는 영양을 계산할 수 없다.
     await tester.tap(find.text('수정').at(1));
     await tester.pumpAndSettle();
@@ -1017,6 +1039,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     api.on(
       'PATCH /meals/{meal_id}/items',
       (_) => (500, fakeError('INTERNAL_ERROR')),
@@ -1028,12 +1051,29 @@ void main() {
     expect(find.textContaining('되돌렸어요'), findsOneWidget);
   });
 
+  /// 음식이 모두 영양정보가 있는 끼니. mock 은 두 번째 음식이 매칭되지 않은 상태다.
+  Map<String, dynamic> allMatchedMeal() {
+    final meal = Map<String, dynamic>.from(
+      _mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map,
+    )..['eatenAt'] = '2026-10-06T12:40:00+09:00';
+    final items = (meal['items'] as List).cast<Map<String, dynamic>>();
+    meal['items'] = [
+      for (final i in items)
+        {...i, 'matched': true, 'nutrition': items.first['nutrition']},
+    ];
+    return meal;
+  }
+
   testWidgets('review moves on without confirming', (
     WidgetTester tester,
   ) async {
     final api = await pumpMealScreen(
       tester,
       const MealReviewScreen(mealId: 'm1'),
+      setup: (api) => api.on(
+        'GET /meals/{meal_id}',
+        (_) => (200, fakeOk(allMatchedMeal())),
+      ),
     );
     expect(find.text('식사 후 포만감'), findsNothing);
     await tester.scrollUntilVisible(find.text('확인하고 평가받기'), 100);
@@ -1043,6 +1083,111 @@ void main() {
     expect(api.requests.where((r) => r.path.endsWith('/confirm')), isEmpty);
     expect(find.text('식사 평가'), findsOneWidget);
     expect(find.text('포만감을 입력하면 계산돼요'), findsNWidgets(2));
+  });
+
+  // 영양정보가 없는 음식이 있으면 평가받기를 잠그고, 들어올 때 한 번 알린다.
+  testWidgets('review warns once about foods without nutrition', (
+    WidgetTester tester,
+  ) async {
+    await pumpMealScreen(tester, const MealReviewScreen(mealId: 'm1'));
+    expect(find.text('영양정보가 없는 음식이 1개 있어요'), findsOneWidget);
+
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+    // 닫은 뒤에는 요약과 버튼 문구가 남은 수를 알린다. 팝업은 다시 뜨지 않는다.
+    expect(find.textContaining('영양정보가 없는 음식이'), findsNothing);
+    expect(find.textContaining('영양정보 없는 음식 1개'), findsOneWidget);
+    expect(find.text('영양정보 1개 입력 필요'), findsOneWidget);
+    expect(find.text('확인하고 평가받기'), findsNothing);
+    final button = find.widgetWithText(ElevatedButton, '영양정보 1개 입력 필요');
+    expect(tester.widget<ElevatedButton>(button).onPressed, isNull);
+  });
+
+  testWidgets('the nutrition notice opens the edit sheet of the first food', (
+    WidgetTester tester,
+  ) async {
+    await pumpMealScreen(tester, const MealReviewScreen(mealId: 'm1'));
+    await tester.tap(find.text('입력하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('음식 수정'), findsOneWidget);
+    // 영양정보가 없는 음식(삶은 계란 2개)의 시트다.
+    expect(find.textContaining('삶은 계란'), findsWidgets);
+  });
+
+  testWidgets('review with every food matched has no notice and can move on', (
+    WidgetTester tester,
+  ) async {
+    await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+      setup: (api) => api.on(
+        'GET /meals/{meal_id}',
+        (_) => (200, fakeOk(allMatchedMeal())),
+      ),
+    );
+    expect(find.textContaining('영양정보가 없는 음식이'), findsNothing);
+    expect(find.textContaining('영양정보 없는 음식'), findsNothing);
+    final button = find.widgetWithText(ElevatedButton, '확인하고 평가받기');
+    expect(tester.widget<ElevatedButton>(button).onPressed, isNotNull);
+  });
+
+  testWidgets('deleting the food without nutrition unlocks the button', (
+    WidgetTester tester,
+  ) async {
+    await pumpMealScreen(tester, const MealReviewScreen(mealId: 'm1'));
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+
+    // 두 번째 음식(영양정보 없음)을 지운다 — 카드의 x 버튼.
+    await tester.tap(find.byIcon(Icons.close).last);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('영양정보 없는 음식'), findsNothing);
+    final button = find.widgetWithText(ElevatedButton, '확인하고 평가받기');
+    expect(tester.widget<ElevatedButton>(button).onPressed, isNotNull);
+    // 한 번 닫은 안내는 다시 뜨지 않는다.
+    expect(find.textContaining('영양정보가 없는 음식이'), findsNothing);
+  });
+
+  testWidgets('entering the nutrition unlocks the button', (
+    WidgetTester tester,
+  ) async {
+    var saved = false;
+    await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+      setup: (api) => api
+        ..on('PUT /meals/{meal_id}/items/{item_id}/nutrition', (_) {
+          saved = true;
+          return (200, fakeOk({'nutrition': {'kcal': 123.0}}));
+        })
+        ..on(
+          'GET /meals/{meal_id}',
+          (_) => (
+            200,
+            fakeOk(
+              saved
+                  ? allMatchedMeal()
+                  : (Map<String, dynamic>.from(
+                      _mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map,
+                    )..['eatenAt'] = '2026-10-06T12:40:00+09:00'),
+            ),
+          ),
+        ),
+    );
+    await tester.tap(find.text('입력하기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('직접 입력하기'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(1), '123');
+    await tester.pump();
+    await tester.tap(find.text('저장'));
+    await _settle(tester);
+
+    expect(saved, isTrue);
+    expect(find.textContaining('영양정보 없는 음식'), findsNothing);
+    final button = find.widgetWithText(ElevatedButton, '확인하고 평가받기');
+    expect(tester.widget<ElevatedButton>(button).onPressed, isNotNull);
   });
 
   testWidgets('evaluation confirms with the satiety and shows the scores', (
@@ -1059,8 +1204,8 @@ void main() {
       (r) => r.path.endsWith('/confirm'),
     );
     expect(confirm.data, {'satietyAfterPct': 50});
-    expect(find.text('76'), findsOneWidget); // 양
-    expect(find.text('80'), findsOneWidget); // 질
+    expect(find.text('76점'), findsOneWidget); // 양
+    expect(find.text('80점'), findsOneWidget); // 질
     expect(find.textContaining('단백질 부족'), findsOneWidget);
     expect(find.text('다음 끼니 제안 보기'), findsOneWidget);
   });
@@ -1095,7 +1240,10 @@ void main() {
     await tester.tap(find.text('현미밥, 된장국, 두부조림'));
     await _settle(tester);
     expect(find.text('끼니 피드백'), findsOneWidget);
-    expect(find.text('이번 끼니'), findsOneWidget);
+    expect(find.text('이번 끼니 결과'), findsOneWidget);
+    // 양·질은 `점`, 포만감은 `%` 단위가 붙는다.
+    expect(find.textContaining(RegExp(r'^\d+점$')), findsNWidgets(2));
+    expect(find.textContaining(RegExp(r'^\d+%$')), findsOneWidget);
     expect(find.text('영양소 상태'), findsOneWidget);
     expect(find.text('두부 반 모'), findsOneWidget);
     // 하루 요약은 따로 보여 주지 않고, 요약을 만들어 달라고도 하지 않는다.
@@ -1444,8 +1592,11 @@ void main() {
         ),
       );
     await tester.pumpWidget(
-      Provider(
-        create: (_) => ApiClient(session: session, dio: api.dio),
+      MultiProvider(
+        providers: [
+          Provider(create: (_) => ApiClient(session: session, dio: api.dio)),
+          Provider(create: (_) => PopupGate()),
+        ],
         child: const MaterialApp(
           home: MealAnalysisScreen(
             meal: MealCreated(
@@ -1503,6 +1654,7 @@ void main() {
     );
     await tester.tap(find.text('열기'));
     await _settle(tester);
+    await closeNutritionNotice(tester);
     return api;
   }
 
@@ -1562,6 +1714,7 @@ void main() {
       tester,
       const MealReviewScreen(mealId: 'm1'),
     );
+    await closeNutritionNotice(tester);
     final meal = Map<String, dynamic>.from(
       _mockBody('GET /api/v1/meals/{meal_id}')['data'] as Map,
     )..['eatenAt'] = '2026-10-06T12:40:00+09:00';
@@ -1801,6 +1954,234 @@ void main() {
     // 저녁이라 제안·챗봇 버튼이 없다.
     expect(find.text('이런 음식은 어때요?'), findsNothing);
     expect(find.text('챗봇으로 다른 음식 추천받기'), findsNothing);
+  });
+
+  /// 끼니 피드백 화면(7번)을 다른 화면 위에 띄운다 — 삭제 뒤 돌아갈 곳이 있어야 닫힘을 볼 수 있다.
+  Future<FakeApi> pumpFeedbackOnTop(
+    WidgetTester tester, {
+    bool skipped = false,
+    FakeApi? api,
+  }) async {
+    _useDesignSize(tester);
+    SharedPreferences.setMockInitialValues({'session.userId': 'test-user'});
+    final session = await UserSession.load();
+    final fake = api ?? FakeApi();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider(create: (_) => ApiClient(session: session, dio: fake.dio)),
+          Provider(create: (_) => PopupGate()),
+          ChangeNotifierProvider(create: (_) => TabState()),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => NextMealSuggestionScreen(
+                      mealId: 'm1',
+                      skipped: skipped,
+                    ),
+                  ),
+                ),
+                child: const Text('열기'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('열기'));
+    await _settle(tester);
+    return fake;
+  }
+
+  testWidgets('the meal feedback screen deletes the meal after confirming', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpFeedbackOnTop(tester);
+    await tester.tap(find.byTooltip('끼니 삭제'));
+    await tester.pumpAndSettle();
+    expect(find.text('식사 기록을 삭제할까요?'), findsOneWidget);
+    // 확인 전에는 지우지 않는다.
+    expect(api.requests.where((r) => r.method == 'DELETE'), isEmpty);
+
+    await tester.tap(find.text('삭제'));
+    await _settle(tester);
+
+    final delete = api.requests.singleWhere((r) => r.method == 'DELETE');
+    expect(delete.path, '/meals/m1');
+    expect(find.byType(NextMealSuggestionScreen), findsNothing);
+    expect(find.text('열기'), findsOneWidget);
+  });
+
+  testWidgets('cancelling the delete keeps the meal feedback screen', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpFeedbackOnTop(tester);
+    await tester.tap(find.byTooltip('끼니 삭제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('취소'));
+    await _settle(tester);
+
+    expect(api.requests.where((r) => r.method == 'DELETE'), isEmpty);
+    expect(find.byType(NextMealSuggestionScreen), findsOneWidget);
+  });
+
+  testWidgets('a failed delete is told and the screen stays', (
+    WidgetTester tester,
+  ) async {
+    final api = FakeApi()
+      ..on('DELETE /meals/{meal_id}', (_) => (500, fakeError('INTERNAL_ERROR')));
+    await pumpFeedbackOnTop(tester, api: api);
+    await tester.tap(find.byTooltip('끼니 삭제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('삭제'));
+    await _settle(tester);
+
+    expect(find.textContaining('삭제하지 못했어요'), findsOneWidget);
+    expect(find.byType(NextMealSuggestionScreen), findsOneWidget);
+    // 다시 시도할 수 있다.
+    expect(find.byTooltip('끼니 삭제'), findsOneWidget);
+  });
+
+  testWidgets('a skipped meal can be deleted from its feedback screen', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpFeedbackOnTop(tester, skipped: true);
+    await tester.tap(find.byTooltip('끼니 삭제'));
+    await tester.pumpAndSettle();
+    // 확인 팝업이 어떤 끼니인지 보여 준다.
+    expect(find.textContaining('식사 안 함'), findsWidgets);
+    await tester.tap(find.text('삭제'));
+    await _settle(tester);
+
+    expect(api.requests.where((r) => r.method == 'DELETE'), hasLength(1));
+    expect(find.byType(NextMealSuggestionScreen), findsNothing);
+  });
+
+  // 식사 입력 화면의 기본 끼니·시각. 확인 팝업의 "점심 · 12:00" 으로 선택된 값을 본다.
+  testWidgets('meal input starts on the meal it was opened for', (
+    WidgetTester tester,
+  ) async {
+    await pumpSkipFlow(
+      tester,
+      const MealInputScreen(initialMealType: 'LUNCH'),
+      api: skippedMealApi(),
+    );
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('점심 · '), findsOneWidget);
+  });
+
+  testWidgets('meal input for a past day starts at the meal representative time', (
+    WidgetTester tester,
+  ) async {
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month, now.day - 3);
+    await pumpSkipFlow(
+      tester,
+      MealInputScreen(initialDate: day, initialMealType: 'BREAKFAST'),
+      api: skippedMealApi(),
+    );
+    final label =
+        '${day.year}년 ${day.month.toString().padLeft(2, '0')}월 '
+        '${day.day.toString().padLeft(2, '0')}일';
+    expect(find.text(label), findsOneWidget);
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('아침 · 08:00'), findsOneWidget);
+  });
+
+  testWidgets('the meal button the user picked is kept', (
+    WidgetTester tester,
+  ) async {
+    await pumpSkipFlow(
+      tester,
+      const MealInputScreen(),
+      api: skippedMealApi(),
+    );
+    await tester.tap(find.text('점심'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('점심 · '), findsOneWidget);
+  });
+
+  testWidgets('home record button opens the input on the same meal as its label', (
+    WidgetTester tester,
+  ) async {
+    _useDesignSize(tester);
+    final home = fakeExample('GET /api/v1/home');
+    final today = (home['data'] as Map<String, dynamic>)['today'] as Map;
+    today['missingMealTypes'] = ['LUNCH', 'DINNER'];
+    final api = FakeApi()..on('GET /home', (_) => (200, home));
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('＋ 점심 식사 기록하기'), 100);
+    await tester.tap(find.text('＋ 점심 식사 기록하기'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    // 저녁이 기본이던 때는 "저녁" 이었다.
+    expect(find.textContaining('점심 · '), findsOneWidget);
+  });
+
+  /// 기록 탭(단기 피드백)을 열고 [monthDelta] 만큼 달을 옮겨 그달 15일을 누른다.
+  /// 선택한 날의 식사 목록은 비어 있다.
+  Future<void> openHistoryDay(WidgetTester tester, int monthDelta) async {
+    _useDesignSize(tester);
+    final list = fakeExample('GET /api/v1/meals');
+    (list['data'] as Map<String, dynamic>)['items'] = <Object?>[];
+    final api = skippedMealApi()..on('GET /meals', (_) => (200, list));
+    await _pumpApp(tester, api: api);
+    await tester.tap(find.text('나중에')); // 컨디션 팝업
+    await tester.pumpAndSettle();
+    await _openFeedback(tester, '단기 피드백');
+    for (var i = 0; i < monthDelta.abs(); i++) {
+      await tester.tap(find.text(monthDelta < 0 ? '‹' : '›'));
+      await _settle(tester);
+    }
+    await tester.tap(find.text('15').first);
+    await _settle(tester);
+  }
+
+  testWidgets('a past day in the calendar opens the input for that day', (
+    WidgetTester tester,
+  ) async {
+    await openHistoryDay(tester, -1);
+    // 그날 아무것도 없으면 첫 끼니(아침)로, 하드코딩된 "저녁" 이 아니다.
+    expect(find.text('＋ 아침 식사 기록하기'), findsOneWidget);
+    expect(find.text('＋ 저녁 식사 기록하기'), findsNothing);
+
+    await tester.tap(find.text('＋ 아침 식사 기록하기'));
+    await tester.pumpAndSettle();
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month - 1, 15);
+    expect(
+      find.text('${day.year}년 ${day.month.toString().padLeft(2, '0')}월 15일'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('이번 끼니 안 먹었어요'));
+    await tester.tap(find.text('이번 끼니 안 먹었어요'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('아침 · 08:00'), findsOneWidget);
+  });
+
+  testWidgets('a day beyond the input date range has no record button', (
+    WidgetTester tester,
+  ) async {
+    // 입력 화면의 날짜 선택기는 365일 전까지다. 그보다 오래된 날을 넘기면 조용히 오늘로 바뀐다.
+    await openHistoryDay(tester, -13);
+    expect(find.textContaining('식사 기록하기'), findsNothing);
+    expect(find.text('아직 기록된 식사가 없어요'), findsOneWidget);
   });
 
   testWidgets('cancelling the skip confirmation registers nothing', (

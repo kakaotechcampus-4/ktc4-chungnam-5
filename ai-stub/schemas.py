@@ -64,6 +64,25 @@ class QQS(_Camel):
     satiety: float | None
 
 
+class Intake(_Camel):
+    """평소 한 끼 대비 섭취 비율과 **채점 단계의** 권장 구간(%). Quantity 점수의 방향 근거다.
+
+    점수만으로는 과식인지 소식인지 모른다 — 같은 점수가 구간 양쪽에서 나온다. 비율만으로도
+    모른다 — 같은 95% 가 조정기(60–90%)에서는 초과, 투약 전(85–105%)에서는 적정이다.
+    구간은 BE `stage_profile` 의 값이다. AI 는 단계별 구간을 따로 갖지 않는다.
+    """
+
+    ratio_pct: float = Field(ge=0, allow_inf_nan=False)
+    range_pct: tuple[float, float]
+
+    @model_validator(mode="after")
+    def _ordered_range(self) -> Intake:
+        lo, hi = self.range_pct
+        if not 0 <= lo <= hi:
+            raise ValueError("rangePct 는 0 이상 [하한, 상한] 이어야 한다")
+        return self
+
+
 # ─────────────────────────── /analyze-meal ───────────────────────────
 
 
@@ -168,6 +187,9 @@ class ShortFeedbackRequest(_Camel):
     user_id: str
     stage: Stage
     qqs: QQS  # 채점은 BE Rule Engine 이 이미 끝냈다. 식사 안 함이면 세 축 모두 null
+    # 평소 대비 섭취 비율 + 채점 단계의 권장 구간. 열량이나 평소 섭취량을 몰라 비율이
+    # 없으면 null, 식사 안 함도 null 이다
+    intake: Intake | None = None
 
     # scope=MEAL
     meal_id: str | None = None

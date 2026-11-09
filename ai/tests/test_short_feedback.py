@@ -137,9 +137,88 @@ def test_meal_prompt_hides_unscored_axis():
     assert "MAINTENANCE" in prompt
 
 
-def test_meal_prompt_forbids_quantity_direction_when_off_band():
+def test_meal_prompt_forbids_quantity_direction_without_intake():
+    """비율을 안 보낸 요청(이전 BE)은 점수만으로 방향을 추측하지 않는다."""
     req = _meal(qqs={"quantity": 50, "quality": 80, "satiety": 68})
     assert "방향을 말하지 않는다" in build_meal_prompt(req, [])
+
+
+def _intake_prompt(quantity, ratio, rng=(60, 90), stage="TITRATION") -> str:
+    req = _meal(
+        stage=stage,
+        qqs={"quantity": quantity, "quality": 80, "satiety": 68},
+        intake={"ratioPct": ratio, "rangePct": list(rng)},
+    )
+    return build_meal_prompt(req, [])
+
+
+@pytest.mark.parametrize(
+    "quantity, ratio, state, instruction",
+    [
+        (100, 75, "적정", "양은 언급하지 않는다"),
+        (95, 92.3, "적정", "양은 언급하지 않는다"),
+        (85, 97.6, "약간 많음", "가볍게 한마디만 한다"),
+        (85, 57.8, "약간 적음", "가볍게 한마디만 한다"),
+        (56, 120, "많음", "양이 점수를 낮춘 이유로 설명한다"),
+        (32, 45, "적음", "양이 점수를 낮춘 이유로 설명한다"),
+    ],
+)
+def test_meal_prompt_judges_quantity_by_score_tier(quantity, ratio, state, instruction):
+    """점수 90 이상은 적정, 80–89 는 약간, 80 미만은 많음 · 적음이다. 방향은 비율이 정한다."""
+    prompt = _intake_prompt(quantity, ratio)
+    assert f"- 양: {state} (평소 한 끼의 {ratio:g}% / 이 단계 권장 60–90%) — {instruction}" in prompt
+    assert "방향을 말하지 않는다" not in prompt
+
+
+@pytest.mark.parametrize(
+    "quantity, state",
+    [(90, "적정"), (89, "약간 많음"), (80, "약간 많음"), (79, "많음")],
+)
+def test_quantity_tier_boundaries(quantity, state):
+    assert f"- 양: {state} (" in _intake_prompt(quantity, 100)
+
+
+def test_same_ratio_is_judged_by_the_stage_range():
+    """같은 비율이라도 단계 구간에 따라 방향이 다르다 — 조정기 상한 위면 많음, 투약 전 하한 아래면 적음."""
+    assert "- 양: 많음" in _intake_prompt(64, 112.5)
+    assert "- 양: 적음" in _intake_prompt(64, 68, rng=(85, 105), stage="PRE_DOSE")
+
+
+def test_near_band_score_line_does_not_say_off_band():
+    """90점 이상이면 점수 줄도 '벗어났다' 고 하지 않는다 — 판정 줄과 같은 말을 한다."""
+    prompt = _intake_prompt(95, 92.3)
+    assert "거의 적정" in prompt
+    assert "권장 구간을 벗어났다" not in prompt
+
+
+def test_quantity_line_comes_with_no_nutrient_judgement():
+    """영양소를 하나도 판정 못 해도 양 판정은 남는다."""
+    prompt = _intake_prompt(56, 120)
+    assert "- 양: 많음" in prompt
+    assert "판정할 수 있는 영양소 없음" not in prompt
+
+
+def test_unscored_quantity_has_no_quantity_line():
+    req = _meal(
+        qqs={"quantity": None, "quality": 80, "satiety": 68},
+        intake={"ratioPct": 120, "rangePct": [60, 90]},
+    )
+    assert "- 양:" not in build_meal_prompt(req, [])
+
+
+def test_skipped_meal_rejects_intake():
+    with pytest.raises(ValueError):
+        _meal(
+            qqs={"quantity": None, "quality": None, "satiety": None},
+            skipped=True,
+            intake={"ratioPct": 0, "rangePct": [60, 90]},
+        )
+
+
+@pytest.mark.parametrize("rng", [[90, 60], [60], [-1, 90]])
+def test_malformed_intake_range_is_rejected(rng):
+    with pytest.raises(ValueError):
+        _meal(intake={"ratioPct": 80, "rangePct": rng})
 
 
 def test_meal_prompt_targets_suggestions_at_gaps():

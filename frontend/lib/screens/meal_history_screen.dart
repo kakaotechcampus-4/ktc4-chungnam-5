@@ -9,6 +9,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'meal_defaults.dart';
 import 'meal_input_screen.dart';
 import 'meal_review_screen.dart';
 import 'next_meal_suggestion_screen.dart';
@@ -366,11 +367,35 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     _loadMeals();
   }
 
+  /// 선택한 날에 기록할 끼니(서버 값). 그날 기록된 끼니(식사 안 함 포함)를 뺀 기본값이다.
+  /// 세 끼니가 다 기록됐으면 null.
+  String? get _nextMealType => defaultMealType(
+    now: DateTime.now(),
+    day: _selectedDay,
+    recorded: {for (final m in _meals) m.mealType},
+  );
+
+  /// 식사 기록 버튼 문구. 어느 끼니를 기록하게 될지 보여 준다.
+  String get _addMealLabel {
+    final type = _nextMealType;
+    return type == null ? '＋ 식사 기록하기' : '＋ ${mealTypeLabel(type)} 식사 기록하기';
+  }
+
+  /// 선택한 날에 식사를 기록할 수 있는지. 입력 화면의 날짜 선택기는 오늘부터 365일 전까지라
+  /// 그보다 오래된 날은 넘겨 봐야 조용히 오늘로 바뀐다 — 처음부터 버튼을 숨긴다.
+  /// (달력은 미래 날짜를 누를 수 없지만, 같은 규칙으로 막아 둔다.)
+  bool get _canAddMeal => canRecordOn(_selectedDay, DateTime.now());
+
   /// 식사 기록 버튼 → 식사 입력 화면(3번). 돌아오면 끼니가 새로 기록됐을 수
   /// 있으니 달력과 선택한 날의 목록을 다시 불러온다.
   Future<void> _openMealInput() async {
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const MealInputScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => MealInputScreen(
+          initialDate: _selectedDay,
+          initialMealType: _nextMealType,
+        ),
+      ),
     );
     if (!mounted) return;
     _loadCalendar();
@@ -577,8 +602,10 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
         if (_meals.isEmpty) {
           return [
             const EmptyBlock(message: '아직 기록된 식사가 없어요'),
-            const SizedBox(height: AppSpacing.cardGap),
-            AddMealCard(label: '＋ 식사 기록하기', onTap: _openMealInput),
+            if (_canAddMeal) ...[
+              const SizedBox(height: AppSpacing.cardGap),
+              AddMealCard(label: _addMealLabel, onTap: _openMealInput),
+            ],
           ];
         }
         return [
@@ -595,7 +622,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                 mealTypeLabel: mealTypeLabel(meal.mealType),
                 time: _formatTime(meal.eatenAt),
                 foodNames: meal.displayName,
-                quantityLabel: meal.scores?.quantityDisplay,
+                quantity: meal.scores?.quantity,
                 quality: meal.scores?.quality,
                 satiety: meal.scores?.satiety,
                 skipped: meal.skipped,
@@ -606,7 +633,8 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
-          AddMealCard(label: '＋ 저녁 식사 기록하기', onTap: _openMealInput),
+          if (_canAddMeal)
+            AddMealCard(label: _addMealLabel, onTap: _openMealInput),
         ];
     }
   }
