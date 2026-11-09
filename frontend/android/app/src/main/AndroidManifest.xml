@@ -3,7 +3,7 @@
          넣어서, 빠지면 flutter run 은 되고 build apk 결과물은 서버에 못 붙는다. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="frontend"
+        android:label="든든지기"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
