@@ -1868,3 +1868,63 @@ def test_m13_pair_recommending_more_still_fails():
     """m13 짝 — "-기보다" 없이 늘리라고 하면 여전히 반대 방향이다."""
     resp = _resp(body="다음 끼니는 양을 늘리고 단백질을 곁들이면 좋아요.")
     assert quantity_direction_not_reversed(resp, _req(**_OVER))[0] is False
+
+# ─────────────────────────── PR 리뷰 반례(2026-11-09) — 면제 범위를 좁힌다 ───────────────────────────
+# m6 · m7 · m10 의 면제가 넓어 기존에 잡히던 위반이 통과하던 것을 고정한다. 짝은 m6 · m7 · m10 의 허용 테스트다.
+
+
+def test_r1_same_nutrient_after_go_connective_still_contradicts():
+    """r1 — "-고" 뒤에 다른 주어가 없으면 같은 영양소의 서술이다. "있고 끼니 한도를 넘었어요" 는 나트륨 모순이다."""
+    resp = _resp(body="나트륨이 국물에 집중되어 있고 끼니 한도를 넘었어요.")
+    assert no_contradict_rule(resp, _all_ok())[0] is False
+
+
+@pytest.mark.parametrize(
+    "resp, req",
+    [
+        (_resp(body="특히 부족한 단백질을 보충하면 좋아요."), _req()),
+        (_resp(body="여전히 부족한 식이섬유를 채워 주세요."), None),
+    ],
+    ids=["teukhi-unjudged", "yeojeonhi-ok"],
+)
+def test_r2_adverb_before_adjective_is_not_its_own_subject(resp, req):
+    """r2 — "특히 · 여전히 부족한" 의 앞말은 부사다. 영양소의 부족 단정이다."""
+    if req is None:
+        assert no_contradict_rule(resp, _all_ok())[0] is False
+    else:
+        assert unjudged_nutrient_silent(resp, req)[0] is False
+
+
+def test_r3_one_card_pushing_strongly_still_fails():
+    """r3 — 우선하지 않는다고 밝혀도, 카드 1장이 "많이 보충" 처럼 적극적으로 밀면 실패다."""
+    resp = _resp(
+        body="단백질을 더 늘리기보다 채소를 챙겨요.",
+        suggestions=_cards("다음 끼니에는 단백질을 많이 보충하면 좋아요."),
+    )
+    assert met_daily_not_pushed(resp, _protein_met())[0] is False
+
+
+def test_r4_redirect_away_from_reducing_is_not_deprioritizing():
+    """r4 — "줄이기보다 유지해요" 는 더 채우기를 우선하지 않는다는 말이 아니다. 뒤의 보충 카드는 면제되지 않는다."""
+    resp = _resp(
+        body="단백질을 줄이기보다 유지해요.",
+        suggestions=_cards("다음 끼니에는 단백질 반찬을 곁들이면 좋아요."),
+    )
+    assert met_daily_not_pushed(resp, _protein_met())[0] is False
+
+
+def test_r3b_one_card_filling_without_light_wording_fails():
+    """r3b — 카드 1장이어도 "보충하기 좋아요" 처럼 채우는 동사를 가벼운 표현 없이 쓰면 실패다."""
+    resp = _resp(body="단백질을 더 늘리기보다 채소를 챙겨요.", suggestions=_cards("달걀로 단백질을 보충하기 좋아요."))
+    assert met_daily_not_pushed(resp, _protein_met())[0] is False
+
+
+@pytest.mark.parametrize(
+    "card",
+    ["두부구이로 단백질 반찬을 바꿔 곁들이기 좋아요.", "달걀로 단백질을 가볍게 보충하기 좋아요."],
+    ids=["accompany-verb", "filling-with-light"],
+)
+def test_r3b_pair_light_card_passes(card):
+    """r3b 짝 — 곁들이는 동사이거나, 채우는 동사라도 가벼운 표현이 함께 있으면 1장은 허용한다."""
+    resp = _resp(body="단백질을 더 늘리기보다 채소를 챙겨요.", suggestions=_cards(card))
+    assert met_daily_not_pushed(resp, _protein_met())[0] is True
