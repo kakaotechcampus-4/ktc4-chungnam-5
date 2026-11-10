@@ -698,9 +698,8 @@ def _as_float(value: Decimal | None) -> float | None:
 def _build_nutrients(totals: NutrientTotals) -> list[NutrientStatus]:
     """평가 도메인의 성분 합계(`evaluation_crud.sum_nutrients`)를 이 응답 모양으로 옮긴다.
 
-    **결측이 있으면 합계를 안 내보낸다** — `totals.missing`(성분값이 비어 있던
-    항목 수)이 0 이 아니면 그 성분만 부분합인데, 숫자를 그대로 주면 완전한 값처럼
-    읽힌다(`crud/evaluation.py::NutrientTotals` 참고).
+    성분 컬럼만 비어 있던 음식은 0 으로 더해져 있다(`crud/evaluation.py::_scaled`).
+    합산된 음식이 없으면 None 이다.
 
     `target`·`state`는 단계별 목표치가 아직 팀 미확정이라 항상 None —
     `services/evaluation/stage_profile.py` 와 같은 이유다.
@@ -709,7 +708,7 @@ def _build_nutrients(totals: NutrientTotals) -> list[NutrientStatus]:
         NutrientStatus(
             code=code.value,
             label=label,
-            current=None if totals.missing.get(key) else _as_float(getattr(totals, key)),
+            current=_as_float(getattr(totals, key)),
             target=None,
             unit=unit,
             state=None,
@@ -882,8 +881,8 @@ def meal_nutrition(
 
     **비어 있는 영양정보는 0 으로 친다** — 성분을 못 구한 항목도, 특정 성분만 빈
     항목도 그 값을 0 으로 더한다. 그래서 확정된 식사의 합계는 NULL 이 아니다.
-    ⚠️ 대가로 합계가 실제보다 작을 수 있고, 이 값만 봐서는 그걸 알 수 없다 — 화면은
-    여전히 결측이 있으면 합계를 숨긴다(`crud/evaluation.py::NutrientTotals`).
+    ⚠️ 대가로 합계가 실제보다 작을 수 있고, 이 값만 봐서는 그걸 알 수 없다. 화면 ·
+    채점도 영양소 컬럼만 빈 음식은 0 으로 더한다. 열량은 예외다(`crud/evaluation.py::_scaled`).
 
     `public_db_by_item` 을 인자로 받는 건 `item_nutrition` 과 같은 이유다 — 공공 DB
     환산은 `services/nutrition.py` 의 일이다(README 절대 규칙 5).

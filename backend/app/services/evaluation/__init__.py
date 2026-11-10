@@ -227,14 +227,17 @@ def _targets(
 def _usable(totals: NutrientTotals, key: str) -> Decimal | None:
     """채점에 쓰는 성분 합계. **화면의 `current` 와 같은 기준이다.**
 
-    합산된 음식 중 그 성분 컬럼이 비어 있던 게 있으면(`missing`) None — 화면도 그
-    합계를 안 내보낸다.
+    영양소 컬럼만 비어 있던 음식은 0 으로 더해져 있다(`crud/evaluation.py::_scaled`).
+    열량은 하나라도 비어 있으면 None(`NutrientTotals.kcal_missing`), 나트륨은 값이 있는
+    음식이 하나도 없으면 None 이다(`NutrientTotals.sodium_known`). 합산된 음식이 없어도 None 이다.
 
     **빠진 음식(`excluded > 0`)이 있어도 있는 것만으로 쓴다** (2026-09-30 결정).
     그 경우 응답에 `NUTRITION_NOT_MATCHED` 경고가 이미 붙는다
     (`api/v1/endpoints/evaluations.py::_respond`). 감수하는 것: 빠진 만큼 낮게 나온다.
     """
-    if totals.missing.get(key):
+    if key == "kcal" and totals.kcal_missing:
+        return None
+    if key == "sodium_mg" and not totals.sodium_known:
         return None
     return getattr(totals, key)
 
@@ -305,12 +308,7 @@ def _build_view(
             NutrientRow(
                 code=code,
                 label=label,
-                # **결측이 있으면 합계를 안 내보낸다.** (기존 주석 유지)
-                current=(
-                    None
-                    if totals.missing.get(key)
-                    else _as_float(getattr(totals, key))
-                ),
+                current=_as_float(_usable(totals, key)),
                 target=_as_float(_shown_target(getattr(targets, key))),
                 unit=unit,
                 # 상태는 **화면에 보이는 목표**와 비교한다. 반올림 전 값과 비교하면

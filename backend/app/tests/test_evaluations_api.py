@@ -263,15 +263,58 @@ def test_evaluation_view_equals_confirm_with_targets(client: TestClient, db: Ses
     assert {k: v for k, v in confirmed.items() if k != "feedbackStatus"} == fetched
 
 
-def test_missing_fiber_is_dropped_not_zeroed(client: TestClient, db: Session) -> None:
-    """공공 DB 에 식이섬유가 비어 있으면 그 항목만 뺀다 — (0.5×0.5 + 0.3×1) / 0.8 = 69 (Review Focus 3)."""
+def test_missing_fiber_counts_as_zero(client: TestClient, db: Session) -> None:
+    """공공 DB 에 식이섬유가 비어 있으면 0g 으로 본다 — 0.5×0.5 + 0.2×0 + 0.3×1 = 55 (Review Focus 3)."""
     user, meal = _meal_with(db, **{**_BALANCED, "fiber_g": None})
 
     data = _confirm(client, user, meal)
 
-    assert data["scores"]["quality"] == 69
+    assert data["scores"]["quality"] == 55
     fiber = next(r for r in data["nutrients"] if r["code"] == "FIBER")
-    assert fiber["current"] is None and fiber["state"] is None
+    assert fiber["current"] == 0.0 and fiber["state"] == "SHORT"
+
+
+def test_sodium_missing_in_every_food_is_unknown_not_zero(
+    client: TestClient, db: Session
+) -> None:
+    """나트륨은 모든 음식에 값이 없으면 정보 없음이다 — 0mg 로 치면 짠 음식이 만점을 받는다.
+
+    빼고 다시 나눈다: (0.5×0.5 + 0.2×0.48) / 0.7 = 49.
+    """
+    user, meal = _meal_with(db, **{**_BALANCED, "sodium_mg": None})
+
+    data = _confirm(client, user, meal)
+
+    assert data["scores"]["quality"] == 49
+    sodium = next(r for r in data["nutrients"] if r["code"] == "SODIUM")
+    assert sodium["current"] is None and sodium["state"] is None
+
+
+def test_sodium_missing_in_some_foods_counts_as_zero(
+    client: TestClient, db: Session
+) -> None:
+    """나트륨 값이 있는 음식이 하나라도 있으면 빈 음식은 0mg 로 더한다."""
+    user = make_user(db)
+    make_weight(db, user_id=user.id)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
+    make_food_ref(
+        db, food_ref_id="KFD_SOUP", name="국", serving_size=Decimal("100"),
+        protein_g=Decimal("5"), sodium_mg=Decimal("400"),
+    )
+    make_food_ref(
+        db, food_ref_id="KFD_RICE", name="밥", serving_size=Decimal("100"),
+        protein_g=Decimal("3"), sodium_mg=None,  # 공공 DB 결측
+    )
+    for food_ref_id in ("KFD_SOUP", "KFD_RICE"):
+        make_meal_item(
+            db, meal_id=meal.id, food_ref_id=food_ref_id,
+            confirmed_amount=Decimal("100"), confirmed_unit="g",
+        )
+
+    data = _confirm(client, user, meal)
+
+    sodium = next(r for r in data["nutrients"] if r["code"] == "SODIUM")
+    assert sodium["current"] == 400.0 and sodium["state"] == "OK"
 
 
 def test_excluded_item_is_scored_on_the_rest_with_warning(
@@ -581,17 +624,15 @@ def test_matched_item_without_amount_is_not_counted(
     assert data["evidence"]["nutritionSources"] == []
 
 
-def test_missing_nutrient_column_is_not_a_partial_sum(
+def test_missing_nutrient_column_counts_as_zero(
     client: TestClient, db: Session
 ) -> None:
-    """성분 값이 비어 있는 음식이 섞이면 그 성분은 합계를 내보내지 않는다.
+    """성분 값이 비어 있는 음식이 섞이면 그 음식의 그 성분은 0 으로 더한다.
 
     `food_refs` 의 성분 컬럼은 전부 nullable 이고, 공공 DB 에 식이섬유·나트륨이
-    비어 있는 행이 흔하다(시드 로더가 파싱 실패를 NULL 로 넣는다).
-
-    SQL 의 `SUM` 은 NULL 입력 행을 조용히 건너뛴다. 항목 단위로는 둘 다 "계산됨"
-    (`counted=2`)이라 경고가 안 붙는데, 단백질만 한 항목 몫이 빠진다 — **같은 응답
-    안에서 단백질은 부분합이고 식이섬유는 완전한** 상태가 되고 겉으로는 구분이 안 된다.
+    비어 있는 행이 흔하다(시드 로더가 파싱 실패를 NULL 로 넣는다). 합계를 숨기면
+    대부분의 끼니가 "정보 없음" 이 되므로, 끼니 합계(`meals.total_*`)와 같은 규칙으로
+    0 으로 더한다. 조회 화면(`GET /meals/{mealId}`)도 같은 숫자다.
     """
     user = make_user(db)
     meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
@@ -626,8 +667,45 @@ def test_missing_nutrient_column_is_not_a_partial_sum(
     ).json()["data"]
     current = {row["code"]: row["current"] for row in data["nutrients"]}
 
-    assert current["PROTEIN"] is None, "결측이 있으면 부분합(9)을 내보내면 안 된다"
+    assert current["PROTEIN"] == 9.0, "비어 있는 김의 단백질은 0 으로 더한다"
     assert current["FIBER"] == 4.0, "둘 다 값이 있는 성분은 그대로 합산한다"
+
+    detail = client.get(f"/api/v1/meals/{meal.id}", headers=_h(user.id)).json()["data"]
+    shown = {row["code"]: row["current"] for row in detail["nutrients"]}
+    assert shown["PROTEIN"] == 9.0 and shown["FIBER"] == 4.0
+
+
+def test_missing_kcal_in_one_food_leaves_quantity_null(
+    client: TestClient, db: Session
+) -> None:
+    """열량은 0 으로 더하지 않는다 — 한 음식이라도 비어 있으면 Quantity 는 null 이다.
+
+    0kcal 로 치면 평소 대비 비율이 실제보다 낮게 나와 "적게 먹음" 으로 매겨진다.
+    영양소(단백질)는 같은 상황에서 0 으로 더해 숫자가 나간다.
+    """
+    user = make_user(db)
+    make_weight(db, user_id=user.id)
+    meal = make_meal(db, user_id=user.id, status=MealStatus.REVIEW_REQUIRED)
+    make_food_ref(
+        db, food_ref_id="KFD_RICE", name="밥", serving_size=Decimal("100"),
+        calories=Decimal("300"), protein_g=Decimal("9"),
+    )
+    make_food_ref(
+        db, food_ref_id="KFD_GIM", name="김", serving_size=Decimal("100"),
+        calories=None, protein_g=None,  # 공공 DB 결측
+    )
+    for food_ref_id in ("KFD_RICE", "KFD_GIM"):
+        make_meal_item(
+            db, meal_id=meal.id, food_ref_id=food_ref_id,
+            confirmed_amount=Decimal("100"), confirmed_unit="g",
+        )
+
+    data = _confirm(client, user, meal)
+
+    assert data["scores"]["quantity"] is None
+    assert evaluation_crud.get_by_meal(db, meal.id).intake_ratio_pct is None
+    protein = next(r for r in data["nutrients"] if r["code"] == "PROTEIN")
+    assert protein["current"] == 9.0
 
 
 def test_confirmed_amount_never_falls_back_to_the_ai_guess(

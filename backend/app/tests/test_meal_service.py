@@ -340,17 +340,10 @@ def test_build_nutrients_reports_full_sums():
     assert protein.state is None
 
 
-def test_build_nutrients_hides_partial_sum_when_missing():
-    """성분별 결측(missing)이 있으면 그 성분은 부분합이라 current 를 None 으로 감춘다."""
-    totals = NutrientTotals(
-        protein_g=Decimal("20.5"),
-        fiber_g=None,
-        sodium_mg=Decimal("450"),
-        counted=2,
-        missing={"fiber_g": 1},
-    )
+def test_build_nutrients_reports_none_when_nothing_was_summed():
+    """합산된 음식이 없으면(합계 None) current 도 None 이다 — 0 과 구분한다."""
+    totals = NutrientTotals(protein_g=None, fiber_g=None, sodium_mg=None, counted=0)
 
     nutrients = _build_nutrients(totals)
 
-    fiber = next(n for n in nutrients if n.code == "FIBER")
-    assert fiber.current is None
+    assert [n.current for n in nutrients] == [None, None, None]
