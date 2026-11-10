@@ -1,0 +1,29 @@
+{
+  "verified_at_utc": "2026-11-08T16:26:48.301772+00:00",
+  "branch": "ai/6-feat-food-db-matching",
+  "pytest": {
+    "command": "python -m pytest tests/test_food_analyzer.py tests/test_eval_food_name_ab.py tests/test_eval_score_food_name_ab.py tests/test_eval_food_db_replay.py -q",
+    "passed": 47,
+    "failed": 0
+  },
+  "git_diff_check_passed": true,
+  "known_local_secret_values_absent": true,
+  "analysis_source_hashes_match": true,
+  "changed_tracked_files": [
+    "ai/app/food_analyzer.py",
+    "ai/evals/README.md"
+  ],
+  "new_files": [
+    "ai/evals/fixtures/food_name_matching/coleslaw.jpg",
+    "ai/evals/fixtures/food_name_matching/fried_eggs.jpg",
+    "ai/evals/fixtures/food_name_matching/manifest.json",
+    "ai/evals/fixtures/food_name_matching/potato_salad.jpg",
+    "ai/evals/fixtures/food_name_matching/sources.json",
+    "ai/evals/food_name_ab.py",
+    "ai/evals/score_food_name_ab.py",
+    "ai/tests/test_eval_food_name_ab.py",
+    "ai/tests/test_eval_score_food_name_ab.py"
+  ],
+  "committed": false,
+  "pushed": false
+}

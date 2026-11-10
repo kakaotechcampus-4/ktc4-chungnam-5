@@ -1,0 +1,529 @@
+{
+  "created_at_utc": "2026-11-08T16:19:05.267208+00:00",
+  "reviewer": "p0_public_photos",
+  "review_type": "independent raw response semantic review, not human-verified overall accuracy",
+  "files_read_for_this_review": [
+    "raw_responses.json",
+    "ai/evals/fixtures/food_name_matching/manifest.json"
+  ],
+  "actual_db_results_read": false,
+  "prior_exposure": "Reviewer curated source photos and pre-run P0 candidate labels. No live-run DB outcomes read.",
+  "source_sha256": {
+    "raw_responses.json": "021d20c2bf1aa02e1ca7119caba721b61c3f798430d17b0837c696b2b8fe1f1b",
+    "manifest.json": "24a5a0ef4db335bd3bae8a855686a5956c82e841b18780c0e417b9faf5ed7dda"
+  },
+  "frozen_labels_modified": false,
+  "summary": {
+    "reviewed_records": 30,
+    "heldout_records": 18,
+    "regression_records": 12,
+    "parse_failures_in_reviewed_records": 0,
+    "records_with_multiple_items": 0,
+    "observed_new_composite_splitting": 0,
+    "observed_empty_responses": 0,
+    "core_names_changed_between_arms": false,
+    "holdout_source_label_agreement_per_arm": {
+      "baseline": "6/9",
+      "candidate": "6/9"
+    },
+    "regression_dish_identity_agreement_per_arm": {
+      "baseline": "6/6",
+      "candidate": "6/6"
+    },
+    "interpretation": "No heldout recognition-name improvement or detected regression in this small3-image sample; DB target-hit outcomes are separate and were not inspected for this review."
+  },
+  "cases": {
+    "piece_of_pizza": {
+      "arms": {
+        "baseline": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "포테이토피자",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.92,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "포테이토피자",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.92,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "포테이토피자",
+                "estimatedAmount": 105.0,
+                "unit": "g",
+                "confidence": 0.92,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ],
+        "candidate": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "포테이토피자",
+                "estimatedAmount": 115.0,
+                "unit": "g",
+                "confidence": 0.92,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "포테이토피자",
+                "estimatedAmount": 110.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "포테이토피자",
+                "estimatedAmount": 110.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ]
+      },
+      "recognition": "Both arms name the dish 포테이토피자 in3/3; supported by visible toppings and frozen label.",
+      "quantity_observation": "baseline100,100,105g; candidate115,110,110g; no measured ground-truth mass. All remain g.",
+      "semantic_status": "supported_dish_identity_no_detected_regression"
+    },
+    "whole_cake": {
+      "arms": {
+        "baseline": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "치즈케이크",
+                "estimatedAmount": 1.0,
+                "unit": "개",
+                "confidence": 0.98,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "치즈케이크",
+                "estimatedAmount": 1.0,
+                "unit": "개",
+                "confidence": 0.98,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "치즈케이크",
+                "estimatedAmount": 1.0,
+                "unit": "개",
+                "confidence": 0.98,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ],
+        "candidate": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "치즈케이크",
+                "estimatedAmount": 1.0,
+                "unit": "판",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "치즈케이크",
+                "estimatedAmount": 1.0,
+                "unit": "개",
+                "confidence": 0.98,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "치즈케이크",
+                "estimatedAmount": 1.0,
+                "unit": "개",
+                "confidence": 0.98,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ]
+      },
+      "recognition": "Both arms name the dish 치즈케이크 in3/3; CHEESE CAKE marking supports identity.",
+      "quantity_observation": "All estimatedAmount1; baseline units개,개,개; candidate판,개,개. Both are allowed natural units; consumed fraction unknown.",
+      "semantic_status": "supported_dish_identity_no_detected_regression"
+    },
+    "coleslaw": {
+      "arms": {
+        "baseline": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "무샐러드",
+                "estimatedAmount": 90.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "무샐러드",
+                "estimatedAmount": 80.0,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "무샐러드",
+                "estimatedAmount": 80.0,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ],
+        "candidate": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "무샐러드",
+                "estimatedAmount": 80.0,
+                "unit": "g",
+                "confidence": 0.8,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "무샐러드",
+                "estimatedAmount": 80.0,
+                "unit": "g",
+                "confidence": 0.82,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "무샐러드",
+                "estimatedAmount": 80.0,
+                "unit": "g",
+                "confidence": 0.85,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ]
+      },
+      "recognition": "Both arms name the dish 무샐러드 in3/3, differing from frozen source-based 코울슬로/양배추샐러드 label.",
+      "quantity_observation": "baseline90,80,80g; candidate80,80,80g; actual mass unavailable.",
+      "semantic_status": "source_label_mismatch_in_both_arms",
+      "uncertainty": "Source title says Coleslaw, but recipe/ingredient verification is absent and pale strips are visually ambiguous. Do not treat model agreement as proof labels wrong or relabel after outputs; do not claim a visually certain radish-versus-cabbage error."
+    },
+    "fried_eggs": {
+      "arms": {
+        "baseline": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "달걀프라이",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.98,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "달걀프라이",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.96,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "달걀프라이",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ],
+        "candidate": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "달걀프라이",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "달걀프라이",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.95,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "달걀프라이",
+                "estimatedAmount": 100.0,
+                "unit": "g",
+                "confidence": 0.98,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ]
+      },
+      "recognition": "Both arms name the dish 달걀프라이 in3/3; two visible fried eggs support this composite batch item.",
+      "quantity_observation": "All100g. Actual total mass not measured.",
+      "semantic_status": "supported_dish_identity_no_detected_regression"
+    },
+    "potato_salad": {
+      "arms": {
+        "baseline": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "감자샐러드",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "감자샐러드",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "감자샐러드",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.92,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ],
+        "candidate": [
+          {
+            "run": 1,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "감자샐러드",
+                "estimatedAmount": 200.0,
+                "unit": "g",
+                "confidence": 0.88,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "감자샐러드",
+                "estimatedAmount": 250.0,
+                "unit": "g",
+                "confidence": 0.92,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          },
+          {
+            "run": 3,
+            "error": null,
+            "items": [
+              {
+                "originalFoodName": "감자샐러드",
+                "estimatedAmount": 250.0,
+                "unit": "g",
+                "confidence": 0.9,
+                "candidateFoodRefId": null,
+                "clarifyQuestion": null
+              }
+            ]
+          }
+        ]
+      },
+      "recognition": "Both arms name the dish 감자샐러드 in3/3; source description supports broad identity. Neither adds unverified ingredient-specific qualifiers.",
+      "quantity_observation": "baseline200,200,200g; candidate200,250,250g. Actual mass unavailable; the250g estimates are not proven errors.",
+      "semantic_status": "supported_dish_identity_no_detected_regression"
+    }
+  },
+  "limitations": [
+    "No measured gram ground truth. Quantity differences are observations, not verified accuracy changes or causal effects.",
+    "All focused outputs contain1item representing dish or egg batch. This does not prove correct portion attribution.",
+    "Source-label agreement is separate from selected BE-ID agreement and exact nutritional equivalence.",
+    "Development baseline run2 ValidationError is outside this focused30-record review and must remain in overall denominator.",
+    "Only3 heldout photos and3 repetitions each; no population-wide accuracy or significance claim."
+  ],
+  "development_supplement": {
+    "records_reviewed": 6,
+    "baseline_parse_error": "run2 raw JSON is cut off inside an item; retain ValidationError and failed denominator. This review does not infer provider finish reason.",
+    "cabbage_name": "Valid baseline runs: 양배추샐러드 then 샐러드. Candidate3runs: 양배추샐러드 throughout. Baseline failed rawtext also includes 양배추샐러드 but is not a successful response.",
+    "persistent_target_specificity": "All valid runs retain 불고기비빔밥 rather than explicit beef naming. Candidate3runs call tofu 양념두부, not the user-confirmed 두부부침 preparation. Identity compatibility and exact DB target hits must be separated.",
+    "other_uncertainty": "Both arms still name covered rice-bowl contents and unverified red side dishes (양념게장/더덕무침) or acidic seaweed preparation (미역초무침). No reliable improvement in these uncertain items is established.",
+    "multiplicity": "Candidate run1 outputs2bibimbap bowls and3soup bowls, which matches visible multiplicity; do not count repeated dish names as proven duplicates. Other runs aggregate or omit separate bowls. No per-person consumed-portion ground truth is available.",
+    "quantity": "Portion totals change substantially when bowls are split versus grouped. No measured ground truth permits declaring one arm more accurate."
+  }
+}

@@ -22,6 +22,11 @@ from pathlib import Path
 
 from app.schemas import ShortFeedbackRequest
 from app.short_feedback import BE_RULE_VERSION, MEAL_SYSTEM_PROMPT, build_meal_prompt, judge_nutrients
+
+# 골든셋 케이스 · 판정 규칙의 버전. 케이스나 `checks.py` 판정을 바꾸면 올리고 baseline 을 다시 저장한다.
+# BE 채점 규칙 버전(`BE_RULE_VERSION`)도 함께 적는다 — 둘 중 하나가 달라도 baseline 끼리 비교하지 않는다.
+# v1: 첫 baseline(판정 오탐 9가지 수정) · v2: 리뷰 반영 면제 축소 · 판정 일관성 수정(실측 오탐 · 2026-11-09)
+RULE_VERSION: str = f"meal-cases-v2+be-{BE_RULE_VERSION}"
 from evals import checks, harness
 from evals.harness import Axis, Case, Check, Grade
 
@@ -699,7 +704,7 @@ def _prompt_hash() -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """`harness.cli_main` 에 위임한다 — 규칙 버전은 `BE_RULE_VERSION`, 해시는 MEAL 프롬프트.
+    """`harness.cli_main` 에 위임한다 — 규칙 버전은 `RULE_VERSION`, 해시는 MEAL 프롬프트.
 
     채널(`default_post`)과 키 확인(`has_api_key`)은 호출 시점에 만든다 — import 만으로 `.env` 를 읽지 않는다.
     """
@@ -708,7 +713,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         cases=CASES,
         post_factory=harness.default_post,
         has_key=harness.has_api_key,
-        rule_version=BE_RULE_VERSION,
+        rule_version=RULE_VERSION,
         prompt_hash=_prompt_hash(),
         crash_log=CRASH_LOG,
     )

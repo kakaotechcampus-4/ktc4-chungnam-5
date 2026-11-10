@@ -1,0 +1,1583 @@
+{
+  "measured_at_utc": "2026-11-08T15:38:53.757278+00:00",
+  "scope": "Read-only hypothetical query diagnosis; no model rerun, no accuracy improvement claim",
+  "groups": [
+    {
+      "purpose": "visible cabbage salad naming; same photo across saved repetitions",
+      "queries": [
+        {
+          "query": "샐러드",
+          "selected_id": "D414-724000000-0001",
+          "top5": [
+            {
+              "foodRefId": "D414-724000000-0001",
+              "name": "햄샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 124.75,
+                "proteinG": 4.025,
+                "fatG": 5.443,
+                "carbG": 15.168,
+                "fiberG": 1.425,
+                "sodiumMg": 199.5
+              }
+            },
+            {
+              "foodRefId": "D414-664000000-0001",
+              "name": "감자샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 162.0,
+                "proteinG": 2.725,
+                "fatG": 10.058,
+                "carbG": 15.605,
+                "fiberG": 2.3,
+                "sodiumMg": 310.0
+              }
+            },
+            {
+              "foodRefId": "D414-608000000-0001",
+              "name": "과일샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 87.5,
+                "proteinG": 0.578,
+                "fatG": 5.37,
+                "carbG": 10.218,
+                "fiberG": 1.65,
+                "sodiumMg": 37.75
+              }
+            },
+            {
+              "foodRefId": "D301-007270000-0001",
+              "name": "김밥_샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 139.5,
+                "proteinG": 3.625,
+                "fatG": 4.355,
+                "carbG": 21.36,
+                "fiberG": 1.4,
+                "sodiumMg": 261.0
+              }
+            },
+            {
+              "foodRefId": "D414-668000000-0001",
+              "name": "달걀 샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 139.667,
+                "proteinG": 5.633,
+                "fatG": 10.383,
+                "carbG": 5.71,
+                "fiberG": 0.7,
+                "sodiumMg": 189.667
+              }
+            }
+          ]
+        },
+        {
+          "query": "채소샐러드",
+          "selected_id": "P123-226020200-0112",
+          "top5": [
+            {
+              "foodRefId": "P123-226020200-0112",
+              "name": "구운채소샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 63.5,
+                "proteinG": 1.735,
+                "fatG": 3.15,
+                "carbG": 7.09,
+                "fiberG": null,
+                "sodiumMg": 115.0
+              }
+            },
+            {
+              "foodRefId": "P123-226020200-0194",
+              "name": "라이트슈퍼곡물&구운채소샐러드세트",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 151.0,
+                "proteinG": 4.72,
+                "fatG": 8.81,
+                "carbG": 15.72,
+                "fiberG": null,
+                "sodiumMg": 182.0
+              }
+            },
+            {
+              "foodRefId": "P123-226020200-1582",
+              "name": "COLIN’S DINING 구운채소샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 105.0,
+                "proteinG": 1.16,
+                "fatG": 8.6,
+                "carbG": 5.84,
+                "fiberG": null,
+                "sodiumMg": 260.0
+              }
+            },
+            {
+              "foodRefId": "P123-213020300-0142",
+              "name": "곰곰샐러드도시락귀리닭가슴살미니볼&과일채소샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 111.0,
+                "proteinG": 12.11,
+                "fatG": 2.37,
+                "carbG": 10.0,
+                "fiberG": null,
+                "sodiumMg": 133.0
+              }
+            },
+            {
+              "foodRefId": "P123-213020300-0144",
+              "name": "곰곰샐러드도시락치즈닭가슴살미니볼&과일채소샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 111.0,
+                "proteinG": 12.63,
+                "fatG": 3.16,
+                "carbG": 7.89,
+                "fiberG": null,
+                "sodiumMg": 167.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "양배추샐러드",
+          "selected_id": "D414-701000000-0001",
+          "top5": [
+            {
+              "foodRefId": "D414-701000000-0001",
+              "name": "양배추 샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 99.0,
+                "proteinG": 0.9,
+                "fatG": 8.95,
+                "carbG": 4.32,
+                "fiberG": 1.3,
+                "sodiumMg": 145.0
+              }
+            },
+            {
+              "foodRefId": "P114-400020100-0188",
+              "name": "당근양배추샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 79.0,
+                "proteinG": 3.31,
+                "fatG": 5.54,
+                "carbG": 3.88,
+                "fiberG": null,
+                "sodiumMg": 559.0
+              }
+            },
+            {
+              "foodRefId": "P123-226020200-0693",
+              "name": "놀라운양배추샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 35.0,
+                "proteinG": 1.47,
+                "fatG": 0.39,
+                "carbG": 6.37,
+                "fiberG": null,
+                "sodiumMg": 30.0
+              }
+            },
+            {
+              "foodRefId": "D114-640220000-0001",
+              "name": "샐러드_양배추",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 150.0,
+                "proteinG": 2.69,
+                "fatG": 11.71,
+                "carbG": 8.47,
+                "fiberG": 2.6,
+                "sodiumMg": 97.0
+              }
+            },
+            {
+              "foodRefId": "D514-700000000-0001",
+              "name": "양배추 사과 샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 137.667,
+                "proteinG": 0.9,
+                "fatG": 10.72,
+                "carbG": 10.613,
+                "fiberG": 2.0,
+                "sodiumMg": 73.333
+              }
+            }
+          ]
+        },
+        {
+          "query": "양배추 샐러드",
+          "selected_id": "D114-640220000-0001",
+          "top5": [
+            {
+              "foodRefId": "D114-640220000-0001",
+              "name": "샐러드_양배추",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 150.0,
+                "proteinG": 2.69,
+                "fatG": 11.71,
+                "carbG": 8.47,
+                "fiberG": 2.6,
+                "sodiumMg": 97.0
+              }
+            },
+            {
+              "foodRefId": "D414-701000000-0001",
+              "name": "양배추 샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 99.0,
+                "proteinG": 0.9,
+                "fatG": 8.95,
+                "carbG": 4.32,
+                "fiberG": 1.3,
+                "sodiumMg": 145.0
+              }
+            },
+            {
+              "foodRefId": "D514-700000000-0001",
+              "name": "양배추 사과 샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 137.667,
+                "proteinG": 0.9,
+                "fatG": 10.72,
+                "carbG": 10.613,
+                "fiberG": 2.0,
+                "sodiumMg": 73.333
+              }
+            },
+            {
+              "foodRefId": "D514-703000000-0001",
+              "name": "양배추오이  샐러드",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 188.0,
+                "proteinG": 1.8,
+                "fatG": 17.09,
+                "carbG": 8.2,
+                "fiberG": 2.3,
+                "sodiumMg": 120.0
+              }
+            },
+            {
+              "foodRefId": "D314-640224600-0001",
+              "name": "샐러드_양배추_코올슬로",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 153.0,
+                "proteinG": 0.95,
+                "fatG": 9.91,
+                "carbG": 14.89,
+                "fiberG": 1.9,
+                "sodiumMg": 203.0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "purpose": "spacing-only effect; does not establish photo subtype correctness",
+      "queries": [
+        {
+          "query": "불고기비빔밥",
+          "selected_id": "P123-201020300-5316",
+          "top5": [
+            {
+              "foodRefId": "P123-201020300-5316",
+              "name": "불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 201.0,
+                "proteinG": 6.5,
+                "fatG": 6.0,
+                "carbG": 30.0,
+                "fiberG": null,
+                "sodiumMg": 465.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020200-0052",
+              "name": "돈불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 153.0,
+                "proteinG": 4.82,
+                "fatG": 3.12,
+                "carbG": 26.35,
+                "fiberG": null,
+                "sodiumMg": 351.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020200-0581",
+              "name": "소불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 142.25,
+                "proteinG": 4.638,
+                "fatG": 2.8,
+                "carbG": 24.593,
+                "fiberG": null,
+                "sodiumMg": 310.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020200-0838",
+              "name": "돼지불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 174.0,
+                "proteinG": 6.04,
+                "fatG": 5.14,
+                "carbG": 25.98,
+                "fiberG": null,
+                "sodiumMg": 468.0
+              }
+            },
+            {
+              "foodRefId": "P111-000030100-0289",
+              "name": "버섯불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 132.0,
+                "proteinG": 6.54,
+                "fatG": 3.57,
+                "carbG": 20.03,
+                "fiberG": null,
+                "sodiumMg": 304.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "불고기 비빔밥",
+          "selected_id": "P123-201020300-5316",
+          "top5": [
+            {
+              "foodRefId": "P123-201020300-5316",
+              "name": "불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 201.0,
+                "proteinG": 6.5,
+                "fatG": 6.0,
+                "carbG": 30.0,
+                "fiberG": null,
+                "sodiumMg": 465.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020200-0052",
+              "name": "돈불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 153.0,
+                "proteinG": 4.82,
+                "fatG": 3.12,
+                "carbG": 26.35,
+                "fiberG": null,
+                "sodiumMg": 351.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020200-0581",
+              "name": "소불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 142.25,
+                "proteinG": 4.638,
+                "fatG": 2.8,
+                "carbG": 24.593,
+                "fiberG": null,
+                "sodiumMg": 310.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020200-0838",
+              "name": "돼지불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 174.0,
+                "proteinG": 6.04,
+                "fatG": 5.14,
+                "carbG": 25.98,
+                "fiberG": null,
+                "sodiumMg": 468.0
+              }
+            },
+            {
+              "foodRefId": "P111-000030100-0289",
+              "name": "버섯불고기비빔밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 132.0,
+                "proteinG": 6.54,
+                "fatG": 3.57,
+                "carbG": 20.03,
+                "fiberG": null,
+                "sodiumMg": 304.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "망고주스",
+          "selected_id": "D220-716000000-0046",
+          "top5": [
+            {
+              "foodRefId": "D220-716000000-0046",
+              "name": "과ㆍ채주스_망고 주스",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 56.0,
+                "proteinG": 0.503,
+                "fatG": 0.35,
+                "carbG": 6.46,
+                "fiberG": null,
+                "sodiumMg": 12.25
+              }
+            },
+            {
+              "foodRefId": "D220-716000000-0091",
+              "name": "과ㆍ채주스_완전망고 주스",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 36.5,
+                "proteinG": 0.3,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 1.0
+              }
+            },
+            {
+              "foodRefId": "D220-716000000-0213",
+              "name": "과ㆍ채주스_망고 주스 (J)",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 22.0,
+                "proteinG": 0.0,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 4.0
+              }
+            },
+            {
+              "foodRefId": "D220-716000000-0145",
+              "name": "과ㆍ채주스_망고 주스 (L)",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 29.0,
+                "proteinG": 0.0,
+                "fatG": null,
+                "carbG": 4.23,
+                "fiberG": null,
+                "sodiumMg": 2.0
+              }
+            },
+            {
+              "foodRefId": "D220-716000000-0148",
+              "name": "과ㆍ채주스_망고 주스 (R)",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 56.0,
+                "proteinG": 0.2,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 0.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "망고 주스",
+          "selected_id": "D220-716000000-0013",
+          "top5": [
+            {
+              "foodRefId": "D220-716000000-0013",
+              "name": "과ㆍ채주스_놀라운망고",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 32.0,
+                "proteinG": 0.03,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 0.0
+              }
+            },
+            {
+              "foodRefId": "D220-716000000-0046",
+              "name": "과ㆍ채주스_망고 주스",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 56.0,
+                "proteinG": 0.503,
+                "fatG": 0.35,
+                "carbG": 6.46,
+                "fiberG": null,
+                "sodiumMg": 12.25
+              }
+            },
+            {
+              "foodRefId": "D220-716000000-0215",
+              "name": "과ㆍ채주스_망고 쥬스",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 50.0,
+                "proteinG": 0.19,
+                "fatG": 0.03,
+                "carbG": 12.58,
+                "fiberG": null,
+                "sodiumMg": 6.0
+              }
+            },
+            {
+              "foodRefId": "D220-716000000-0047",
+              "name": "과ㆍ채주스_망고바나나",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 67.0,
+                "proteinG": 1.06,
+                "fatG": 0.93,
+                "carbG": 13.6,
+                "fiberG": null,
+                "sodiumMg": 10.0
+              }
+            },
+            {
+              "foodRefId": "D220-716000000-0091",
+              "name": "과ㆍ채주스_완전망고 주스",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 36.5,
+                "proteinG": 0.3,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 1.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "양송이스프",
+          "selected_id": "P123-206020300-0092",
+          "top5": [
+            {
+              "foodRefId": "P123-206020300-0092",
+              "name": "양송이스프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 131.895,
+                "proteinG": 3.247,
+                "fatG": 7.055,
+                "carbG": 13.794,
+                "fiberG": 0.0,
+                "sodiumMg": 449.316
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0077",
+              "name": "생양송이스프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 91.0,
+                "proteinG": 2.635,
+                "fatG": 6.645,
+                "carbG": 6.135,
+                "fiberG": null,
+                "sodiumMg": 197.5
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0482",
+              "name": "빕스양송이스프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 153.0,
+                "proteinG": 2.5,
+                "fatG": 12.5,
+                "carbG": 2.5,
+                "fiberG": null,
+                "sodiumMg": 306.0
+              }
+            },
+            {
+              "foodRefId": "P108-009000400-0033",
+              "name": "양송이스프라면",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 438.0,
+                "proteinG": 7.62,
+                "fatG": 13.33,
+                "carbG": 72.38,
+                "fiberG": null,
+                "sodiumMg": 848.0
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0542",
+              "name": "크림양송이스프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 65.0,
+                "proteinG": 1.0,
+                "fatG": 3.2,
+                "carbG": 7.6,
+                "fiberG": null,
+                "sodiumMg": 290.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "양송이수프",
+          "selected_id": "D204-185000000-0002",
+          "top5": [
+            {
+              "foodRefId": "D204-185000000-0002",
+              "name": "스프_양송이 수프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 125.0,
+                "proteinG": 1.5,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 225.0
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0203",
+              "name": "양송이수프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 263.4,
+                "proteinG": 5.006,
+                "fatG": 6.48,
+                "carbG": 46.392,
+                "fiberG": null,
+                "sodiumMg": 1749.4
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0056",
+              "name": "못생긴양송이수프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 400.0,
+                "proteinG": 5.0,
+                "fatG": 8.0,
+                "carbG": 75.0,
+                "fiberG": null,
+                "sodiumMg": 1500.0
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0661",
+              "name": "곰곰 양송이 수프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 97.0,
+                "proteinG": 1.37,
+                "fatG": 6.84,
+                "carbG": 7.37,
+                "fiberG": null,
+                "sodiumMg": 458.0
+              }
+            },
+            {
+              "foodRefId": "P101-405000400-1635",
+              "name": "요리하다양송이수프&빠네",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 185.0,
+                "proteinG": 5.0,
+                "fatG": 7.0,
+                "carbG": 25.5,
+                "fiberG": null,
+                "sodiumMg": 420.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "양송이 수프",
+          "selected_id": "D204-185000000-0002",
+          "top5": [
+            {
+              "foodRefId": "D204-185000000-0002",
+              "name": "스프_양송이 수프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 125.0,
+                "proteinG": 1.5,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 225.0
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0203",
+              "name": "양송이수프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 263.4,
+                "proteinG": 5.006,
+                "fatG": 6.48,
+                "carbG": 46.392,
+                "fiberG": null,
+                "sodiumMg": 1749.4
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0054",
+              "name": "모닝수프양송이",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 380.0,
+                "proteinG": 8.0,
+                "fatG": 5.6,
+                "carbG": 76.0,
+                "fiberG": null,
+                "sodiumMg": 1440.0
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0102",
+              "name": "양송이크림수프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 87.5,
+                "proteinG": 1.75,
+                "fatG": 6.15,
+                "carbG": 6.0,
+                "fiberG": null,
+                "sodiumMg": 255.0
+              }
+            },
+            {
+              "foodRefId": "P123-206020300-0056",
+              "name": "못생긴양송이수프",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 400.0,
+                "proteinG": 5.0,
+                "fatG": 8.0,
+                "carbG": 75.0,
+                "fiberG": null,
+                "sodiumMg": 1500.0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "purpose": "correct generic ingredient can still match wrong dish; not an AI naming error",
+      "queries": [
+        {
+          "query": "버터",
+          "selected_id": "D302-093000000-0001",
+          "top5": [
+            {
+              "foodRefId": "D302-093000000-0001",
+              "name": "버터크림빵",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 383.0,
+                "proteinG": 8.18,
+                "fatG": 18.41,
+                "carbG": 46.23,
+                "fiberG": 2.6,
+                "sodiumMg": 319.0
+              }
+            },
+            {
+              "foodRefId": "D202-092000000-0005",
+              "name": "버터빵_버터롤",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 320.0,
+                "proteinG": 8.0,
+                "fatG": 11.0,
+                "carbG": 48.0,
+                "fiberG": null,
+                "sodiumMg": 410.0
+              }
+            },
+            {
+              "foodRefId": "D202-092000000-0006",
+              "name": "버터빵_소금빵",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 432.0,
+                "proteinG": 15.38,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": null
+              }
+            },
+            {
+              "foodRefId": "D202-094000000-0035",
+              "name": "번_골든버터번",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 314.0,
+                "proteinG": 5.71,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 186.0
+              }
+            },
+            {
+              "foodRefId": "D302-101270000-0001",
+              "name": "앙금빵_앙버터빵",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 372.0,
+                "proteinG": 7.0,
+                "fatG": 19.72,
+                "carbG": 41.64,
+                "fiberG": 4.1,
+                "sodiumMg": 221.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "연두부",
+          "selected_id": "D407-371000000-0001",
+          "top5": [
+            {
+              "foodRefId": "D407-371000000-0001",
+              "name": "연두부찜",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 67.75,
+                "proteinG": 4.975,
+                "fatG": 3.37,
+                "carbG": 4.363,
+                "fiberG": 1.125,
+                "sodiumMg": 191.0
+              }
+            },
+            {
+              "foodRefId": "D406-344000000-0001",
+              "name": "연두부찌개",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 42.0,
+                "proteinG": 4.8,
+                "fatG": 1.48,
+                "carbG": 2.59,
+                "fiberG": 0.8,
+                "sodiumMg": 291.0
+              }
+            },
+            {
+              "foodRefId": "P106-001000100-0131",
+              "name": "연두부",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 49.25,
+                "proteinG": 4.905,
+                "fatG": 2.27,
+                "carbG": 2.315,
+                "fiberG": 0.3,
+                "sodiumMg": 21.25
+              }
+            },
+            {
+              "foodRefId": "P106-005000300-0054",
+              "name": "냉동연두부",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 69.0,
+                "proteinG": 8.0,
+                "fatG": 2.3,
+                "carbG": 4.0,
+                "fiberG": null,
+                "sodiumMg": 3.0
+              }
+            },
+            {
+              "foodRefId": "P106-001000100-0504",
+              "name": "네컵연두부",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 46.0,
+                "proteinG": 3.61,
+                "fatG": 2.5,
+                "carbG": 2.22,
+                "fiberG": null,
+                "sodiumMg": 14.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "양념두부",
+          "selected_id": "D510-524000000-0001",
+          "top5": [
+            {
+              "foodRefId": "D510-524000000-0001",
+              "name": "양념두부",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 68.0,
+                "proteinG": 6.2,
+                "fatG": 3.39,
+                "carbG": 2.99,
+                "fiberG": 2.0,
+                "sodiumMg": 105.0
+              }
+            },
+            {
+              "foodRefId": "P113-206020400-1645",
+              "name": "마파두부양념",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 153.0,
+                "proteinG": 4.67,
+                "fatG": 8.67,
+                "carbG": 14.0,
+                "fiberG": null,
+                "sodiumMg": 1400.0
+              }
+            },
+            {
+              "foodRefId": "P113-206020400-1792",
+              "name": "순두부찌개양념",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 83.5,
+                "proteinG": 4.04,
+                "fatG": 3.96,
+                "carbG": 7.86,
+                "fiberG": null,
+                "sodiumMg": 1877.0
+              }
+            },
+            {
+              "foodRefId": "P123-210020300-0170",
+              "name": "두부 양념 조림",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 143.0,
+                "proteinG": 9.64,
+                "fatG": 9.66,
+                "carbG": 4.4,
+                "fiberG": null,
+                "sodiumMg": 161.0
+              }
+            },
+            {
+              "foodRefId": "P113-206020400-1611",
+              "name": "두부두루치기양념",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 93.0,
+                "proteinG": 2.86,
+                "fatG": 4.29,
+                "carbG": 12.14,
+                "fiberG": null,
+                "sodiumMg": 857.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "공깃밥",
+          "selected_id": "P123-201020300-0002",
+          "top5": [
+            {
+              "foodRefId": "P123-201020300-0002",
+              "name": "0.7공깃밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 150.0,
+                "proteinG": 0.0,
+                "fatG": 0.73,
+                "carbG": 33.33,
+                "fiberG": null,
+                "sodiumMg": 7.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020300-5001",
+              "name": "맛있는 공깃밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 138.0,
+                "proteinG": 2.0,
+                "fatG": 0.5,
+                "carbG": 31.0,
+                "fiberG": null,
+                "sodiumMg": 3.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020300-4819",
+              "name": "크레잇 공깃밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 143.0,
+                "proteinG": 3.0,
+                "fatG": 0.45,
+                "carbG": 31.5,
+                "fiberG": null,
+                "sodiumMg": 0.0
+              }
+            },
+            {
+              "foodRefId": "P118-100010700-0164",
+              "name": "공깃돌쉐키란",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 128.0,
+                "proteinG": 11.0,
+                "fatG": 6.6,
+                "carbG": 4.0,
+                "fiberG": null,
+                "sodiumMg": 420.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "쌀밥",
+          "selected_id": "D301-022000000-0001",
+          "top5": [
+            {
+              "foodRefId": "D301-022000000-0001",
+              "name": "쌀밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 135.333,
+                "proteinG": 2.587,
+                "fatG": 0.333,
+                "carbG": 29.633,
+                "fiberG": 0.433,
+                "sodiumMg": 0.667
+              }
+            },
+            {
+              "foodRefId": "P123-201020200-0748",
+              "name": "쌀밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 152.333,
+                "proteinG": 2.713,
+                "fatG": 0.633,
+                "carbG": 34.013,
+                "fiberG": null,
+                "sodiumMg": 2.333
+              }
+            },
+            {
+              "foodRefId": "P123-201020300-4379",
+              "name": "찹쌀밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 171.0,
+                "proteinG": 2.915,
+                "fatG": 1.2,
+                "carbG": 36.99,
+                "fiberG": null,
+                "sodiumMg": 3.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020300-3572",
+              "name": "햅쌀밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 155.0,
+                "proteinG": 2.86,
+                "fatG": 0.62,
+                "carbG": 34.29,
+                "fiberG": null,
+                "sodiumMg": 3.0
+              }
+            },
+            {
+              "foodRefId": "P123-201020300-6675",
+              "name": "흰쌀밥",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 130.0,
+                "proteinG": 2.4,
+                "fatG": 0.3,
+                "carbG": 28.6,
+                "fiberG": null,
+                "sodiumMg": 0.0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "purpose": "packaged drink coverage diagnosis only; brand retention is NOT current prompt policy",
+      "queries": [
+        {
+          "query": "모구모구 망고",
+          "selected_id": "P109-303030300-0338",
+          "top5": [
+            {
+              "foodRefId": "P109-303030300-0338",
+              "name": "모구모구망고맛",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 52.5,
+                "proteinG": 0.315,
+                "fatG": 0.0,
+                "carbG": 12.655,
+                "fiberG": null,
+                "sodiumMg": 18.0
+              }
+            },
+            {
+              "foodRefId": "P109-303030300-2095",
+              "name": "모구모구 망고맛 망고주스25퍼센트 함유",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 50.0,
+                "proteinG": 0.63,
+                "fatG": 0.0,
+                "carbG": 11.56,
+                "fiberG": null,
+                "sodiumMg": 14.0
+              }
+            },
+            {
+              "foodRefId": "P109-801080100-5656",
+              "name": "모구모구 배맛",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 42.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 10.63,
+                "fiberG": null,
+                "sodiumMg": 27.0
+              }
+            },
+            {
+              "foodRefId": "P109-303030300-0337",
+              "name": "모구모구리치맛",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 53.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 13.44,
+                "fiberG": null,
+                "sodiumMg": 19.0
+              }
+            },
+            {
+              "foodRefId": "P109-303030300-0339",
+              "name": "모구모구사과맛",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 94.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 23.625,
+                "fiberG": null,
+                "sodiumMg": 42.5
+              }
+            }
+          ]
+        },
+        {
+          "query": "모구모구 리치",
+          "selected_id": "P109-303030300-0337",
+          "top5": [
+            {
+              "foodRefId": "P109-303030300-0337",
+              "name": "모구모구리치맛",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 53.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 13.44,
+                "fiberG": null,
+                "sodiumMg": 19.0
+              }
+            },
+            {
+              "foodRefId": "P102-301030000-0090",
+              "name": "모구모구리치아이스",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 109.0,
+                "proteinG": 0.31,
+                "fatG": 1.08,
+                "carbG": 24.62,
+                "fiberG": null,
+                "sodiumMg": 8.0
+              }
+            },
+            {
+              "foodRefId": "P101-205000200-0304",
+              "name": "모구모구 젤리 리치",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 56.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 14.0,
+                "fiberG": null,
+                "sodiumMg": 7.0
+              }
+            },
+            {
+              "foodRefId": "P102-104010400-0505",
+              "name": "모구모구 리치 요거트바",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 181.0,
+                "proteinG": 1.25,
+                "fatG": 4.88,
+                "carbG": 33.75,
+                "fiberG": null,
+                "sodiumMg": 50.0
+              }
+            },
+            {
+              "foodRefId": "P109-303030300-2088",
+              "name": "모구모구 나타데코코 리치맛",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 54.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 13.4,
+                "fiberG": null,
+                "sodiumMg": 18.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "모구모구 복숭아",
+          "selected_id": "P109-801080100-0467",
+          "top5": [
+            {
+              "foodRefId": "P109-801080100-0467",
+              "name": "모구모구복숭아향",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 47.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 11.56,
+                "fiberG": null,
+                "sodiumMg": 22.0
+              }
+            },
+            {
+              "foodRefId": "P109-801080100-5522",
+              "name": "모구모구 복숭아향 드링크",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 47.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 11.56,
+                "fiberG": null,
+                "sodiumMg": 22.0
+              }
+            },
+            {
+              "foodRefId": "P109-801080100-4403",
+              "name": "모구모구 복숭아향 (1000ML)",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 46.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 11.6,
+                "fiberG": null,
+                "sodiumMg": 22.0
+              }
+            },
+            {
+              "foodRefId": "P109-801080100-4394",
+              "name": "모구모구 나타데코코 복숭아향 드링크",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 49.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 12.2,
+                "fiberG": null,
+                "sodiumMg": 26.0
+              }
+            },
+            {
+              "foodRefId": "P109-801080100-5521",
+              "name": "모구모구 복숭아맛 - 복숭아향 0.1% 함유",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 46.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 11.5,
+                "fiberG": null,
+                "sodiumMg": 23.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "망고 과즙음료",
+          "selected_id": "P109-303030300-2012",
+          "top5": [
+            {
+              "foodRefId": "P109-303030300-2012",
+              "name": "더블포멜로즙음료[포멜로과즙2퍼센트 천연향료(포멜로향)0.03퍼센트함유]",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 37.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 9.18,
+                "fiberG": null,
+                "sodiumMg": 12.0
+              }
+            },
+            {
+              "foodRefId": "D220-716000000-0048",
+              "name": "과ㆍ채주스_망고 주스 병음료",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 62.0,
+                "proteinG": 0.53,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 8.0
+              }
+            },
+            {
+              "foodRefId": "D220-718000000-0016",
+              "name": "기타음료_마시는 요거트 망고",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 135.0,
+                "proteinG": 2.47,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 31.0
+              }
+            },
+            {
+              "foodRefId": "D220-718000000-0023",
+              "name": "기타음료_비타2000 저칼로리 망고 블랜딩 제로슈거 (초대용량)",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 4.0,
+                "proteinG": 0.06,
+                "fatG": null,
+                "carbG": null,
+                "fiberG": null,
+                "sodiumMg": 2.0
+              }
+            },
+            {
+              "foodRefId": "P109-303030300-2886",
+              "name": "망고과즙",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 179.0,
+                "proteinG": 0.85,
+                "fatG": 0.4,
+                "carbG": 44.0,
+                "fiberG": null,
+                "sodiumMg": 4.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "리치 과즙음료",
+          "selected_id": "P109-303030300-2012",
+          "top5": [
+            {
+              "foodRefId": "P109-303030300-2012",
+              "name": "더블포멜로즙음료[포멜로과즙2퍼센트 천연향료(포멜로향)0.03퍼센트함유]",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 37.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 9.18,
+                "fiberG": null,
+                "sodiumMg": 12.0
+              }
+            },
+            {
+              "foodRefId": "P109-303030300-2063",
+              "name": "리치음료",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 50.667,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 12.667,
+                "fiberG": null,
+                "sodiumMg": 46.0
+              }
+            },
+            {
+              "foodRefId": "P109-801080100-4377",
+              "name": "리치젤리 음료",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 156.0,
+                "proteinG": 0.1,
+                "fatG": 0.0,
+                "carbG": 39.0,
+                "fiberG": null,
+                "sodiumMg": 87.0
+              }
+            },
+            {
+              "foodRefId": "P109-801080100-5005",
+              "name": "코지 리치음료",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 88.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 26.0,
+                "fiberG": null,
+                "sodiumMg": 0.0
+              }
+            },
+            {
+              "foodRefId": "P109-303030300-2073",
+              "name": "마틸다 리치음료",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 144.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 36.0,
+                "fiberG": null,
+                "sodiumMg": 66.0
+              }
+            }
+          ]
+        },
+        {
+          "query": "복숭아 과즙음료",
+          "selected_id": "D220-718000000-0022",
+          "top5": [
+            {
+              "foodRefId": "D220-718000000-0022",
+              "name": "기타음료_복숭아요거트드링크",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 67.0,
+                "proteinG": 1.64,
+                "fatG": 1.95,
+                "carbG": 10.56,
+                "fiberG": null,
+                "sodiumMg": 30.0
+              }
+            },
+            {
+              "foodRefId": "P109-303030300-0434",
+              "name": "복숭아음료",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 49.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 12.33,
+                "fiberG": null,
+                "sodiumMg": 20.0
+              }
+            },
+            {
+              "foodRefId": "P109-801080100-0576",
+              "name": "복숭아맛젖산음료",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 36.0,
+                "proteinG": 0.21,
+                "fatG": 0.01,
+                "carbG": 8.85,
+                "fiberG": 1.8,
+                "sodiumMg": 39.0
+              }
+            },
+            {
+              "foodRefId": "P109-801080100-6004",
+              "name": "복숭아아이스음료",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 106.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 26.5,
+                "fiberG": null,
+                "sodiumMg": 50.0
+              }
+            },
+            {
+              "foodRefId": "P109-303030300-2581",
+              "name": "왕왕 복숭아음료",
+              "servingSizeG": 100.0,
+              "nutrition": {
+                "kcal": 115.0,
+                "proteinG": 0.0,
+                "fatG": 0.0,
+                "carbG": 28.5,
+                "fiberG": null,
+                "sodiumMg": 180.0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "exact_butter_rows": [
+    {
+      "id": "P102-103010300-1059",
+      "name": "버터",
+      "category": "PROCESSED",
+      "dataset_version": "20260828"
+    }
+  ]
+}

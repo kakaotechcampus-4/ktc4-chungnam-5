@@ -1,0 +1,1014 @@
+{
+  "created_at_utc": "2026-11-08T15:39:56.729311+00:00",
+  "reviewer": "photo_labels_b",
+  "review_status": "independent_provisional_ai_review_for_root_adjudication_not_human_verified",
+  "source_sha256": {
+    "replay.json": "416f22cfde0b48101e12af01a956f8fec5052be0615742a7d9d2b4e4c0d78c6d",
+    "photo_labels.json": "8c0ce8ece2ec417236e963f680f6d4e0a00dfed69da354602bbc099948697e1c"
+  },
+  "method": {
+    "photo_labels_frozen": true,
+    "photo_labels_modified": false,
+    "label_scope": "Strictly assess visible food identity at supported specificity. Unknown subtype is uncertain; known product substitution is approximate. Correct means supported food category, never exact measured nutrition.",
+    "counts_scope": "69 recognized item occurrences, including repeated runs and repeated bowls. Not 69 independent photos.",
+    "do_not_report": "Do not present this provisional count as human-verified overall model accuracy; uncertain and approximate cases remain separate.",
+    "classification_definitions": {
+      "correct": "Selected food identity is supported at the specificity justified by frozen photo labels.",
+      "wrong": "Positive evidence of incompatible food category or preparation.",
+      "approximate": "Broad identity overlaps but known product/recipe specificity differs or is not preserved.",
+      "uncertain": "Photo evidence cannot establish selected subtype or recipe; absence of visible ingredient alone is not evidence of error."
+    }
+  },
+  "summary": {
+    "item_occurrences": 69,
+    "distinct_case_name_selected_groups": 37,
+    "photo_to_db_counts": {
+      "correct": 14,
+      "uncertain": 44,
+      "wrong": 2,
+      "approximate": 9
+    },
+    "input_name_to_db_counts": {
+      "correct": 53,
+      "wrong": 1,
+      "approximate": 15
+    },
+    "photo_counts_by_case": {
+      "piece_of_pizza": {
+        "correct": 3
+      },
+      "whole_cake": {
+        "correct": 3
+      },
+      "food_and_notfood": {
+        "uncertain": 14,
+        "wrong": 1
+      },
+      "manybanchan": {
+        "uncertain": 27,
+        "correct": 8,
+        "wrong": 1
+      },
+      "branded_drinks": {
+        "approximate": 9
+      },
+      "occludedfood": {
+        "uncertain": 3
+      }
+    }
+  },
+  "adjudication_points": [
+    "버터→버터크림빵 is a hard semantic error regardless of uncertainty about whether the spread is actually butter.",
+    "채소샐러드→구운채소샐러드 is proposed wrong because the visible salad is raw shredded cabbage; parent/human should adjudicate this boundary explicitly.",
+    "샐러드→햄샐러드 is uncertain rather than automatically wrong: ham is not shown but its absence cannot be established from this photo.",
+    "Rice is uncertain because bowls are closed, not a proven phantom-food error.",
+    "양념게장 and exact reddish-side-dish identities remain uncertain because blind labels did not establish their identity.",
+    "Many banchan subtypes have faithful name matches but unverified photo recognition; do not blame the matcher for these automatically.",
+    "All 9 branded-drink mappings are approximations and should not inflate an exact-product accuracy metric.",
+    "Occluded image outputs disagree across runs; all 3 exact food judgments remain uncertain despite DB links."
+  ],
+  "groups": [
+    {
+      "case": "piece_of_pizza",
+      "query_id": 1,
+      "input_name": "포테이토피자",
+      "selected_food_ref_id": "D202-120000000-1705",
+      "selected_name": "피자_포테이토 피자",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 1
+        },
+        {
+          "run": 2,
+          "item_index": 1
+        },
+        {
+          "run": 3,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "correct",
+        "reason": "감자 토핑 피자라는 사진의 지지 가능한 음식 정체와 일치한다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "whole_cake",
+      "query_id": 2,
+      "input_name": "치즈케이크",
+      "selected_food_ref_id": "D202-110000000-0340",
+      "selected_name": "케이크_치즈 케이크",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 1
+        },
+        {
+          "run": 2,
+          "item_index": 1
+        },
+        {
+          "run": 3,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "correct",
+        "reason": "사진의 CHEESE CAKE 표기와 치즈케이크 DB 음식 종류가 일치한다. 실제 섭취량은 별개다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 3,
+      "input_name": "부시맨 브레드",
+      "selected_food_ref_id": "P101-405000400-3114",
+      "selected_name": "부시맨브레드",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "갈색 빵은 보이지만 부시맨브레드라는 정확한 종류는 사진 라벨에서 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 4,
+      "input_name": "양송이스프",
+      "selected_food_ref_id": "P123-206020300-0092",
+      "selected_name": "양송이스프",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 2
+        },
+        {
+          "run": 2,
+          "item_index": 2
+        },
+        {
+          "run": 3,
+          "item_index": 2
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "크림 수프는 보이지만 양송이라는 재료는 사진 라벨에서 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 5,
+      "input_name": "버터",
+      "selected_food_ref_id": "D302-093000000-0001",
+      "selected_name": "버터크림빵",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 3
+        }
+      ],
+      "photo_to_db": {
+        "status": "wrong",
+        "reason": "모델이 별도 스프레드에 버터라는 이름을 부여했는데 DB는 버터크림빵이다. 사진의 별도 스프레드와 빵은 음식 종류가 다르다."
+      },
+      "input_name_to_db": {
+        "status": "wrong",
+        "reason": "버터와 버터크림빵은 핵심 음식 종류가 다르다. 문자열 포함은 의미 일치를 보장하지 않는다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 6,
+      "input_name": "초콜릿 시럽",
+      "selected_food_ref_id": "P104-201070000-0134",
+      "selected_name": "초콜릿시럽",
+      "occurrences": 2,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 4
+        },
+        {
+          "run": 2,
+          "item_index": 4
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "짙은 갈색 소스는 보이지만 초콜릿인지 사진만으로 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 7,
+      "input_name": "블루치즈 드레싱",
+      "selected_food_ref_id": "P113-205020400-0358",
+      "selected_name": "월든팜스 블루치즈 드레싱",
+      "occurrences": 2,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 5
+        },
+        {
+          "run": 2,
+          "item_index": 5
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "흰 소스는 보이지만 블루치즈와 월든팜스 제품의 동일성은 확인할 수 없다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "블루치즈 드레싱이라는 종류는 유지하지만 특정 브랜드/레시피를 추가했다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 8,
+      "input_name": "호밀빵",
+      "selected_food_ref_id": "D202-126000000-0002",
+      "selected_name": "호밀빵_행복드림",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 2,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "갈색 빵은 보이지만 호밀 원료와 특정 제품의 동일성은 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "호밀빵 종류는 유지하지만 특정 제품을 추가했다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 9,
+      "input_name": "망고스프레드",
+      "selected_food_ref_id": "P107-305030500-0026",
+      "selected_name": "망고스프레드",
+      "occurrences": 2,
+      "item_coordinates": [
+        {
+          "run": 2,
+          "item_index": 3
+        },
+        {
+          "run": 3,
+          "item_index": 3
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "연한 노란 스프레드는 보이지만 망고 성분인지 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 10,
+      "input_name": "부시맨브레드",
+      "selected_food_ref_id": "P101-405000400-3114",
+      "selected_name": "부시맨브레드",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 3,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "갈색 빵은 보이지만 부시맨브레드라는 정확한 종류는 사진 라벨에서 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 11,
+      "input_name": "블루치즈소스",
+      "selected_food_ref_id": "P113-206020400-4475",
+      "selected_name": "육회바른연어 블루치즈소스",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 3,
+          "item_index": 4
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "흰 소스는 보이지만 블루치즈 및 해당 제품의 동일성은 확인할 수 없다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "블루치즈소스 종류는 유지하지만 특정 제품을 추가했다."
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "query_id": 12,
+      "input_name": "초콜릿소스",
+      "selected_food_ref_id": "P103-101020400-0097",
+      "selected_name": "블랙초콜릿소스",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 3,
+          "item_index": 5
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "짙은 갈색 소스는 보이지만 초콜릿의 정확한 종류는 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "초콜릿소스에 블랙이라는 세부 유형을 추가했다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 13,
+      "input_name": "불고기비빔밥",
+      "selected_food_ref_id": "P123-201020300-5316",
+      "selected_name": "불고기비빔밥",
+      "occurrences": 4,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 1
+        },
+        {
+          "run": 2,
+          "item_index": 1
+        },
+        {
+          "run": 2,
+          "item_index": 2
+        },
+        {
+          "run": 3,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "채소·고기가 든 비빔밥 형태는 보이지만 불고기 조리법·육종은 사진 라벨에서 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 14,
+      "input_name": "쌀밥",
+      "selected_food_ref_id": "D301-022000000-0001",
+      "selected_name": "쌀밥",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 2
+        },
+        {
+          "run": 2,
+          "item_index": 3
+        },
+        {
+          "run": 2,
+          "item_index": 4
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "닫힌 밥그릇의 내용은 보이지 않는다. 쌀밥이라는 주장을 사진만으로 검증할 수 없으며 틀렸다고 단정하지도 않는다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 15,
+      "input_name": "콩나물국",
+      "selected_food_ref_id": "D105-253000000-0001",
+      "selected_name": "콩나물국",
+      "occurrences": 4,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 3
+        },
+        {
+          "run": 2,
+          "item_index": 5
+        },
+        {
+          "run": 2,
+          "item_index": 6
+        },
+        {
+          "run": 3,
+          "item_index": 3
+        }
+      ],
+      "photo_to_db": {
+        "status": "correct",
+        "reason": "콩나물이 보이는 맑은 국이라는 사진 정체와 일치한다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 16,
+      "input_name": "잡채",
+      "selected_food_ref_id": "D110-492000000-0001",
+      "selected_name": "잡채",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 4
+        },
+        {
+          "run": 2,
+          "item_index": 7
+        },
+        {
+          "run": 3,
+          "item_index": 4
+        }
+      ],
+      "photo_to_db": {
+        "status": "correct",
+        "reason": "사진에서 잡채를 식별할 수 있다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 17,
+      "input_name": "브로콜리두부무침",
+      "selected_food_ref_id": "D414-688000000-0001",
+      "selected_name": "브로콜리 두부무침",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 5
+        },
+        {
+          "run": 2,
+          "item_index": 14
+        },
+        {
+          "run": 3,
+          "item_index": 5
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "브로콜리 반찬은 보이지만 흰 부재료가 두부인지 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 18,
+      "input_name": "배추김치",
+      "selected_food_ref_id": "D315-670000000-0001",
+      "selected_name": "배추김치",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 6
+        },
+        {
+          "run": 2,
+          "item_index": 13
+        },
+        {
+          "run": 3,
+          "item_index": 6
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "붉은 반찬은 보이나 독립 사진 라벨에서 정확한 반찬 두 종류를 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 19,
+      "input_name": "양념게장",
+      "selected_food_ref_id": "P114-400020100-0086",
+      "selected_name": "양념게장",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 7
+        },
+        {
+          "run": 2,
+          "item_index": 8
+        },
+        {
+          "run": 3,
+          "item_index": 11
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "붉은 반찬의 정확한 정체를 확정하지 않았다. 게가 명확히 보이지 않는다는 이유만으로 오답으로 단정하지 않는다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 20,
+      "input_name": "연두부",
+      "selected_food_ref_id": "D407-371000000-0001",
+      "selected_name": "연두부찜",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 8
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "양념을 얹은 흰 두부는 보이나 연두부의 종류와 찜 조리법은 사진만으로 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "연두부에 찜이라는 조리법을 추가했다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 21,
+      "input_name": "미역초무침",
+      "selected_food_ref_id": "D114-632000000-0001",
+      "selected_name": "미역초무침",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 9
+        },
+        {
+          "run": 2,
+          "item_index": 11
+        },
+        {
+          "run": 3,
+          "item_index": 8
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "해조류 반찬은 보이나 미역이라는 종과 초무침 조리법을 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 22,
+      "input_name": "채소샐러드",
+      "selected_food_ref_id": "P123-226020200-0112",
+      "selected_name": "구운채소샐러드",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 10
+        }
+      ],
+      "photo_to_db": {
+        "status": "wrong",
+        "reason": "사진의 채썬 생 양배추 샐러드에 구운채소샐러드가 연결됐다. 조리 형태가 시각적 샐러드 정체와 다르다. 최종 인간 검토 권장."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "채소샐러드에 구운 조리법을 추가했다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 23,
+      "input_name": "무피클",
+      "selected_food_ref_id": "P114-202020100-0069",
+      "selected_name": "무피클",
+      "occurrences": 3,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 11
+        },
+        {
+          "run": 2,
+          "item_index": 10
+        },
+        {
+          "run": 3,
+          "item_index": 9
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "분홍색 절임 반찬은 보이나 정확한 원재료가 무인지 사진 라벨에서 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 24,
+      "input_name": "두부부침",
+      "selected_food_ref_id": "D109-419000000-0001",
+      "selected_name": "두부부침",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 2,
+          "item_index": 9
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "두부로 보일 수 있는 반찬은 있으나 해당 항목의 두부부침 조리법을 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 25,
+      "input_name": "샐러드",
+      "selected_food_ref_id": "D414-724000000-0001",
+      "selected_name": "햄샐러드",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 2,
+          "item_index": 12
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "샐러드는 보이나 햄은 확인되지 않는다. 햄이 보이지 않는 것만으로 부재를 단정하지 않고 미지원 세부 재료 추가로 기록한다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "샐러드에 햄이라는 핵심 재료를 추가했다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 26,
+      "input_name": "공깃밥",
+      "selected_food_ref_id": "P123-201020300-0002",
+      "selected_name": "0.7공깃밥",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 3,
+          "item_index": 2
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "닫힌 밥그릇의 내용과 0.7공기 양을 사진만으로 확인할 수 없다. 100g 기준 영양 환산과 별도로 본다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 27,
+      "input_name": "양배추샐러드",
+      "selected_food_ref_id": "D414-701000000-0001",
+      "selected_name": "양배추 샐러드",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 3,
+          "item_index": 7
+        }
+      ],
+      "photo_to_db": {
+        "status": "correct",
+        "reason": "사진의 채썬 양배추 샐러드와 음식 종류가 일치한다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "manybanchan",
+      "query_id": 28,
+      "input_name": "양념두부구이",
+      "selected_food_ref_id": "P123-227020300-0142",
+      "selected_name": "두부구이와 양념장",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 3,
+          "item_index": 10
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "붉은 양념 반찬의 정체와 두부구이 조리법은 독립 사진 라벨에서 확정하지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "branded_drinks",
+      "query_id": 29,
+      "input_name": "망고주스",
+      "selected_food_ref_id": "D220-716000000-0046",
+      "selected_name": "과ㆍ채주스_망고 주스",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "approximate",
+        "reason": "사진은 젤리가 든 망고맛 포장 음료다. 일반 망고 주스는 맛/종류 수준의 대체 매칭일 뿐 정확한 제품·영양 일치는 아니다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "branded_drinks",
+      "query_id": 30,
+      "input_name": "리치주스",
+      "selected_food_ref_id": "P109-302030200-0712",
+      "selected_name": "리치주스",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 2
+        }
+      ],
+      "photo_to_db": {
+        "status": "approximate",
+        "reason": "사진의 리치맛 포장 젤리음료와 일반 리치주스는 넓은 과일 종류는 같지만 제품·성분 동일성은 미확인이다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "branded_drinks",
+      "query_id": 31,
+      "input_name": "복숭아주스",
+      "selected_food_ref_id": "D220-716000000-0236",
+      "selected_name": "과ㆍ채주스_선셋 복숭아 주스 살구복숭아",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 3
+        }
+      ],
+      "photo_to_db": {
+        "status": "approximate",
+        "reason": "복숭아맛 포장 젤리음료에 다른 복숭아 주스 제품이 연결됐다. 살구복숭아 세부 유형도 확인되지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "복숭아 주스에 살구복숭아 및 특정 제품 정보를 추가했다."
+      }
+    },
+    {
+      "case": "branded_drinks",
+      "query_id": 32,
+      "input_name": "망고 주스",
+      "selected_food_ref_id": "D220-716000000-0013",
+      "selected_name": "과ㆍ채주스_놀라운망고",
+      "occurrences": 2,
+      "item_coordinates": [
+        {
+          "run": 2,
+          "item_index": 1
+        },
+        {
+          "run": 3,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "approximate",
+        "reason": "망고맛 포장 젤리음료에 놀라운망고 주스가 연결됐다. 맛 수준은 가깝지만 제품·영양 동일성은 미확인이다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "망고 주스에 특정 제품 정보를 추가했다."
+      }
+    },
+    {
+      "case": "branded_drinks",
+      "query_id": 33,
+      "input_name": "리치 주스",
+      "selected_food_ref_id": "P109-302030200-0712",
+      "selected_name": "리치주스",
+      "occurrences": 2,
+      "item_coordinates": [
+        {
+          "run": 2,
+          "item_index": 2
+        },
+        {
+          "run": 3,
+          "item_index": 2
+        }
+      ],
+      "photo_to_db": {
+        "status": "approximate",
+        "reason": "사진의 리치맛 포장 젤리음료와 일반 리치주스는 넓은 과일 종류는 같지만 제품·성분 동일성은 미확인이다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "branded_drinks",
+      "query_id": 34,
+      "input_name": "복숭아 주스",
+      "selected_food_ref_id": "D220-716000000-0236",
+      "selected_name": "과ㆍ채주스_선셋 복숭아 주스 살구복숭아",
+      "occurrences": 2,
+      "item_coordinates": [
+        {
+          "run": 2,
+          "item_index": 3
+        },
+        {
+          "run": 3,
+          "item_index": 3
+        }
+      ],
+      "photo_to_db": {
+        "status": "approximate",
+        "reason": "복숭아맛 포장 젤리음료에 다른 복숭아 주스 제품이 연결됐다. 살구복숭아 세부 유형도 확인되지 않았다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "복숭아 주스에 살구복숭아 및 특정 제품 정보를 추가했다."
+      }
+    },
+    {
+      "case": "occludedfood",
+      "query_id": 35,
+      "input_name": "대창전골",
+      "selected_food_ref_id": "P117-800060000-1335",
+      "selected_name": "한우대창전골",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 1,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "가려진 냄비 요리의 정확한 재료·요리명을 사진 라벨에서 판정 보류했다. 대창·한우를 확인할 수 없다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "대창전골에 한우라는 세부 원재료/제품을 추가했다."
+      }
+    },
+    {
+      "case": "occludedfood",
+      "query_id": 36,
+      "input_name": "즉석떡볶이",
+      "selected_food_ref_id": "P101-501000500-5042",
+      "selected_name": "즉석떡볶이",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 2,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "가려진 냄비 요리의 정확한 재료·요리명을 판정 보류했다. 떡볶이 정답 여부를 사진만으로 확정할 수 없다."
+      },
+      "input_name_to_db": {
+        "status": "correct",
+        "reason": "음식명에서 표현한 핵심 종류가 유지된다. 이 판정은 사진 인식 또는 영양 동일성을 검증하지 않는다."
+      }
+    },
+    {
+      "case": "occludedfood",
+      "query_id": 37,
+      "input_name": "전골",
+      "selected_food_ref_id": "D406-264000000-0001",
+      "selected_name": "곱창전골",
+      "occurrences": 1,
+      "item_coordinates": [
+        {
+          "run": 3,
+          "item_index": 1
+        }
+      ],
+      "photo_to_db": {
+        "status": "uncertain",
+        "reason": "전골의 정확한 종류를 판정 보류했다. 곱창이라는 세부 재료가 사진에서 확인되지 않는다."
+      },
+      "input_name_to_db": {
+        "status": "approximate",
+        "reason": "전골에 곱창이라는 핵심 재료를 추가했다."
+      }
+    }
+  ]
+}

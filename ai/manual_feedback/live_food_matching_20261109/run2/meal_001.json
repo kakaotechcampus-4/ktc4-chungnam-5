@@ -1,0 +1,356 @@
+{
+  "case_id": "manybanchan",
+  "run": 1,
+  "meal_type": "DINNER",
+  "image_path": "ai/evals/fixtures/analyze_meal/manybanchan.jpg",
+  "image_sha256": "7d8b8e4aabafe983250c45a5f719b350fbacbeb08680b3e93b97b6be4232cd91",
+  "sequence": 1,
+  "observability": {
+    "originalFoodName": "not_exposed_by_public_api",
+    "candidateFoodRefId": "not_exposed_by_public_api",
+    "selectedFoodRefId": "not_exposed_by_public_api",
+    "rawModelResponse": "not_exposed_by_public_api",
+    "modelVersion": "not_exposed_by_public_api",
+    "gatewayAttemptCount": "not_exposed_by_public_api",
+    "queueAttempts": "not_exposed_by_public_api"
+  },
+  "request": {
+    "mealType": "DINNER",
+    "eatenAt": "2026-11-09T02:21:15.595898+09:00",
+    "satietyBeforePct": "50",
+    "image_sha256": "7d8b8e4aabafe983250c45a5f719b350fbacbeb08680b3e93b97b6be4232cd91",
+    "image_bytes": 179476,
+    "content_type": "image/jpeg"
+  },
+  "upload_request_sequence": 6,
+  "meal_id": "4c9819e8-f8fa-444d-a32e-f2cc648d0cdc",
+  "create_response": {
+    "mealId": "4c9819e8-f8fa-444d-a32e-f2cc648d0cdc",
+    "status": "ANALYZING",
+    "steps": [
+      {
+        "key": "FOOD_RECOGNITION",
+        "state": "RUNNING"
+      },
+      {
+        "key": "DB_MATCHING",
+        "state": "PENDING"
+      },
+      {
+        "key": "STAGE_RULE_APPLY",
+        "state": "PENDING"
+      }
+    ],
+    "pollIntervalMs": 1500,
+    "timeoutMs": 30000
+  },
+  "outcome": "REVIEW_REQUIRED",
+  "elapsed_seconds": 16.739,
+  "polls": [
+    {
+      "request_sequence": 7,
+      "elapsed_seconds": 0.007,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 8,
+      "elapsed_seconds": 1.536,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 9,
+      "elapsed_seconds": 3.058,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 10,
+      "elapsed_seconds": 4.581,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 11,
+      "elapsed_seconds": 6.089,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 12,
+      "elapsed_seconds": 7.606,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 13,
+      "elapsed_seconds": 9.125,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 14,
+      "elapsed_seconds": 10.651,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 15,
+      "elapsed_seconds": 12.172,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 16,
+      "elapsed_seconds": 13.698,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 17,
+      "elapsed_seconds": 15.206,
+      "status_code": 200,
+      "status": "ANALYZING"
+    },
+    {
+      "request_sequence": 18,
+      "elapsed_seconds": 16.739,
+      "status_code": 200,
+      "status": "REVIEW_REQUIRED"
+    }
+  ],
+  "final_detail": {
+    "mealId": "4c9819e8-f8fa-444d-a32e-f2cc648d0cdc",
+    "status": "REVIEW_REQUIRED",
+    "isRecalculation": false,
+    "skipped": false,
+    "stage": "MAINTENANCE",
+    "mealType": "DINNER",
+    "eatenAt": "2026-11-09T02:21:15.595898+09:00",
+    "imageUrl": "[REDACTED]",
+    "steps": [
+      {
+        "key": "FOOD_RECOGNITION",
+        "state": "DONE"
+      },
+      {
+        "key": "DB_MATCHING",
+        "state": "RUNNING"
+      },
+      {
+        "key": "STAGE_RULE_APPLY",
+        "state": "PENDING"
+      }
+    ],
+    "clarifyQuestion": null,
+    "items": [
+      {
+        "itemId": "e43f6a2c-c3f7-4056-9d5c-79b7930d4819",
+        "displayName": "불고기비빔밥",
+        "amount": 350.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 703.5,
+          "proteinG": 22.75,
+          "fatG": 21.0,
+          "carbG": 105.0,
+          "fiberG": null,
+          "sodiumMg": 1627.5
+        }
+      },
+      {
+        "itemId": "7f68f72f-40ea-4b9d-b1c4-6b165574cf7d",
+        "displayName": "0.7공깃밥",
+        "amount": 210.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 315.0,
+          "proteinG": 0.0,
+          "fatG": 1.53,
+          "carbG": 69.99,
+          "fiberG": null,
+          "sodiumMg": 14.7
+        }
+      },
+      {
+        "itemId": "a92d37a9-031d-477c-8865-5375f5180482",
+        "displayName": "콩나물국",
+        "amount": 200.0,
+        "unit": "g",
+        "confidence": 0.93,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 12.0,
+          "proteinG": 1.49,
+          "fatG": 0.29,
+          "carbG": 1.37,
+          "fiberG": 0.67,
+          "sodiumMg": 330.0
+        }
+      },
+      {
+        "itemId": "7180d9d9-e64b-407d-a582-85b8383d62e8",
+        "displayName": "잡채",
+        "amount": 80.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 116.8,
+          "proteinG": 3.77,
+          "fatG": 2.64,
+          "carbG": 19.41,
+          "fiberG": 2.96,
+          "sodiumMg": 288.0
+        }
+      },
+      {
+        "itemId": "bad0e5b7-203b-482e-a6be-aac524aa94a0",
+        "displayName": "브로콜리 두부무침",
+        "amount": 60.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 21.0,
+          "proteinG": 1.2,
+          "fatG": 0.43,
+          "carbG": 3.7,
+          "fiberG": 1.02,
+          "sodiumMg": 100.2
+        }
+      },
+      {
+        "itemId": "ba05fd42-f521-41f9-b1c4-5d97bb0a63e5",
+        "displayName": "배추김치",
+        "amount": 40.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 15.2,
+          "proteinG": 0.79,
+          "fatG": 0.17,
+          "carbG": 2.6,
+          "fiberG": 1.0,
+          "sodiumMg": 220.4
+        }
+      },
+      {
+        "itemId": "f26a5b30-fcf1-4b2d-9f17-009c4e100e30",
+        "displayName": "양념두부",
+        "amount": 70.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 47.6,
+          "proteinG": 4.34,
+          "fatG": 2.37,
+          "carbG": 2.09,
+          "fiberG": 1.4,
+          "sodiumMg": 73.5
+        }
+      },
+      {
+        "itemId": "cd9b73b7-d820-4d2e-b231-073254cc5711",
+        "displayName": "더덕무침",
+        "amount": 50.0,
+        "unit": "g",
+        "confidence": 0.75,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 53.88,
+          "proteinG": 1.1,
+          "fatG": 1.0,
+          "carbG": 10.62,
+          "fiberG": 2.78,
+          "sodiumMg": 386.38
+        }
+      },
+      {
+        "itemId": "2c46e105-c048-4bde-97fa-5e133b17bf0d",
+        "displayName": "구운채소샐러드",
+        "amount": 70.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 44.45,
+          "proteinG": 1.21,
+          "fatG": 2.2,
+          "carbG": 4.96,
+          "fiberG": null,
+          "sodiumMg": 80.5
+        }
+      },
+      {
+        "itemId": "7de547a9-a13f-4012-a81b-66a01635029e",
+        "displayName": "미역초무침",
+        "amount": 40.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 17.2,
+          "proteinG": 0.65,
+          "fatG": 0.29,
+          "carbG": 3.29,
+          "fiberG": 1.25,
+          "sodiumMg": 194.0
+        }
+      },
+      {
+        "itemId": "40c44cbb-3254-461c-80af-6690a3954bf7",
+        "displayName": "무피클",
+        "amount": 40.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "matched": true,
+        "nutritionSource": "PUBLIC_DB",
+        "userConfirmed": false,
+        "nutrition": {
+          "kcal": 30.6,
+          "proteinG": 0.47,
+          "fatG": 0.52,
+          "carbG": 6.06,
+          "fiberG": null,
+          "sodiumMg": 114.2
+        }
+      }
+    ],
+    "scores": null,
+    "nutrients": [],
+    "satiety": null,
+    "feedback": null
+  },
+  "api_advertised_timeout_ms": 30000,
+  "ready_within_api_advertised_timeout": true,
+  "pending_work_may_continue": false,
+  "upload_to_observation_seconds": 16.761
+}

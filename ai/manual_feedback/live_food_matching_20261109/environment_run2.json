@@ -1,0 +1,52 @@
+{
+  "frozen_at_utc": "2026-11-08T17:21:12.277091+00:00",
+  "git_head": "bbee3c1996ce86475f8fe28a8574d06b54b0e42c",
+  "branch": "ai/6-feat-food-db-matching",
+  "develop_sha": "89366dfc1c0f071597a7b544888b7e755261476f",
+  "backend_diff_from_latest_develop": "",
+  "working_tree_status": "M ai/README.md\n M ai/app/food_analyzer.py\n M ai/app/main.py\n M ai/evals/README.md\n M ai/evals/food_name_ab.py\n M ai/tests/test_eval_fixture_server.py\n M ai/tests/test_eval_food_name_ab.py\n M ai/tests/test_food_analyzer.py\n?? ai/evals/docker-compose.live.yml\n?? ai/evals/inspect_live_food_db.py\n?? ai/evals/live_db_bootstrap.py\n?? ai/evals/live_db_seed.sh\n?? ai/evals/live_food_matching_eval.py\n?? ai/evals/live_vision_app.py\n?? ai/tests/fixtures/\n?? ai/tests/test_eval_inspect_live_food_db.py\n?? ai/tests/test_eval_live_food_matching.py\n?? ai/tests/test_eval_live_vision_app.py\n?? ai/tests/test_vision_response_recovery.py",
+  "file_sha256": {
+    "ai/app/food_analyzer.py": "1d840519bf3264eceda5d609bbf5be7151b26cc3d007b7208020ca04cadca718",
+    "ai/app/food_names.py": "faf42a0fc35b393640f24ae1f73a231e660c0b0bc37fad004cf8e1fb834af731",
+    "ai/app/main.py": "cd4ee6d3f7e5a79552c853f3139a25eef689a572558de68e97cde15b6bc13958",
+    "ai/app/config.py": "d6684766c8e5b91a1e0ea8b5e95907dddf97d0c2f6c8754dddc2d5aa1e7469ca",
+    "ai/evals/live_vision_app.py": "810928ec48a185fb9f9b62d9a453b292fda51b4339398edf12568f6bf2b7956e",
+    "ai/evals/live_food_matching_eval.py": "28486d28a19009d3ceb1fdf963adad83ffd43092c14907de2b213e17fc5427d7",
+    "ai/evals/docker-compose.live.yml": "8aa29866b50f5f3cd0f070152107e4fb17b91c7fe4dcd0308fd6d06ef913108d",
+    "ai/evals/live_db_bootstrap.py": "eaaf696cf93bd1a1c01849b04947386f6b2b8b37c9897d8859f5c36e5d270887",
+    "ai/evals/live_db_seed.sh": "88371a95ed8f4c6cda533ab20b39fcc82e02244c505c393991df8e048f9c2b89",
+    "backend/app/crud/food.py": "e59addf421cf98b120aa35b500fac2a752a055f4b9a81675cdaf7711c6b80f2b",
+    "backend/app/services/nutrition.py": "3e4e02b83f0b00d65a7ff121fa852985d50110280d43b8f8490180fe9f31c8de",
+    "backend/app/worker/jobs/analyze_meal.py": "bb8426abe07c13f69d791c75e489344b4fd7f1c66189ba33c4fd5f3b88d6438a",
+    "ai/requirements.txt": "81316fa1d5d112bf934276cd4fd28a396d5e4fbdd6ca1fec6c65c7f74b987062",
+    "backend/requirements.txt": "24776853a43facbb0dd002a37e183cfa3510dd30fcd8e51005141760b3ff6436",
+    "infra/seed/food_refs_20260828.dump": "43c0962b7f6da1d098647f618aaabad1aeeeb9f1e7763320a166c9c24abfba9b"
+  },
+  "compose_project": "ktc-food-live-20261109",
+  "services": "[{\"ID\":\"sha256:5f971fafab9da5ec2dfd55821c76c410716d549b8bba803c61e7d0aa84456a94\",\"ContainerName\":\"ktc-food-live-20261109-schema-base-1\",\"Repository\":\"ktc-food-live-20261109-schema-base\",\"Tag\":\"latest\",\"Platform\":\"linux/arm64\",\"Size\":513614886,\"Created\":\"2026-11-08T17:11:45.187262587Z\",\"LastTagTime\":\"2026-11-08T17:11:48.252442547Z\"},{\"ID\":\"sha256:9448593c62cc5867547358a7f9bbe1cd3392739ba355417885a5a8ca3e054d65\",\"ContainerName\":\"ktc-food-live-20261109-ai-1\",\"Repository\":\"ktc-food-live-20261109-ai\",\"Tag\":\"latest\",\"Platform\":\"linux/arm64\",\"Size\":281512688,\"Created\":\"2026-11-08T17:11:29.423601885Z\",\"LastTagTime\":\"2026-11-08T17:11:30.419835428Z\"},{\"ID\":\"sha256:86db278778e87ff918f53f56dc34cefd91a10ee8f5d3fee59c221711f4af7dec\",\"ContainerName\":\"ktc-food-live-20261109-worker-1\",\"Repository\":\"ktc-food-live-20261109-worker\",\"Tag\":\"latest\",\"Platform\":\"linux/arm64\",\"Size\":513614881,\"Created\":\"2026-11-08T17:11:45.187262587Z\",\"LastTagTime\":\"2026-11-08T17:11:48.251103463Z\"},{\"ID\":\"sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac\",\"ContainerName\":\"ktc-food-live-20261109-seed-1\",\"Repository\":\"postgres\",\"Tag\":\"17-alpine\",\"Platform\":\"linux/arm64/v8\",\"Size\":414812043,\"Created\":\"2026-11-05T19:03:57.181599785Z\",\"LastTagTime\":\"2026-11-08T04:12:44.30162913Z\"},{\"ID\":\"sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac\",\"ContainerName\":\"ktc-food-live-20261109-db-1\",\"Repository\":\"postgres\",\"Tag\":\"17-alpine\",\"Platform\":\"linux/arm64/v8\",\"Size\":414812043,\"Created\":\"2026-11-05T19:03:57.181599785Z\",\"LastTagTime\":\"2026-11-08T04:12:44.30162913Z\"},{\"ID\":\"sha256:1dec6a494f35fa92454a4c47e1f6b8340b0fb3b4e8e56f9e8ec6ff74b16527d7\",\"ContainerName\":\"ktc-food-live-20261109-migrate-1\",\"Repository\":\"ktc-food-live-20261109-migrate\",\"Tag\":\"latest\",\"Platform\":\"linux/arm64\",\"Size\":513614882,\"Created\":\"2026-11-08T17:11:45.187262587Z\",\"LastTagTime\":\"2026-11-08T17:11:48.252014838Z\"},{\"ID\":\"sha256:0794b626936f4bc3cac160cd3d746b85fcb85a004784a71fdca5fc18da33861c\",\"ContainerName\":\"ktc-food-live-20261109-api-1\",\"Repository\":\"ktc-food-live-20261109-api\",\"Tag\":\"latest\",\"Platform\":\"linux/arm64\",\"Size\":513614878,\"Created\":\"2026-11-08T17:11:45.187262587Z\",\"LastTagTime\":\"2026-11-08T17:11:48.251522463Z\"}]",
+  "ai_settings": {
+    "timeout_sec": 45,
+    "max_retries": 1,
+    "vision_url_configured": true,
+    "api_key_configured": true
+  },
+  "be_settings": {
+    "ai_timeout_sec": 45,
+    "queue_max_attempts": 3,
+    "queue_backoff_base_sec": 30,
+    "queue_lease_sec": 120,
+    "queue_worker_threads": 4
+  },
+  "planned_uploads": 6,
+  "maximum_gateway_attempts_normal_queue_execution": 36,
+  "confirm_meals": false,
+  "limitations": [
+    "Local media and X-User-Id test seam; no S3, JWT, reverse proxy or Flutter UI",
+    "Existing six photos are smoke evidence, not independent accuracy validation",
+    "No meal confirmation or feedback model requests",
+    "Local observer adds small file I/O overhead"
+  ],
+  "notes": [
+    "Initial run1 stopped at synthetic medication validation before any photo upload or model request; runner now uses backend enum value 위고비."
+  ]
+}

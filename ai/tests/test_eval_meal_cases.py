@@ -454,3 +454,14 @@ def test_presentation_observation_keeps_the_actual_response():
             samples = results[f"{case.id}/{axis.id}"]["samples"]
             assert len(samples) == 1
             assert samples[0]["response"] == response
+
+
+def test_baseline_is_saved_with_the_current_rule_version():
+    """커밋한 baseline 은 지금 판정 규칙 버전으로 잰 것이다 — 케이스나 판정을 바꾸면 버전을 올리고 다시 저장한다."""
+    import json
+    from pathlib import Path
+
+    from evals import meal_feedback_eval
+
+    baseline = Path(meal_feedback_eval.__file__).parent / "baselines" / "meal_feedback_baseline.json"
+    assert json.loads(baseline.read_text(encoding="utf-8"))["rule_version"] == meal_feedback_eval.RULE_VERSION

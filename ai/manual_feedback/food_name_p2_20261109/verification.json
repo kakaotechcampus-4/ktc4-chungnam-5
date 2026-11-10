@@ -1,0 +1,17 @@
+{
+  "verified_at_utc": "2026-11-08T16:42:26.723584+00:00",
+  "known_local_secret_values_absent": true,
+  "analysis_source_hashes_match": true,
+  "code_sha256": {
+    "ai/app/food_analyzer.py": "47f002c0f418b9543a7960593477c93f0110f716ad831847f80e43cfcbd95eae",
+    "ai/tests/test_food_analyzer.py": "a1fcb7c124b7e00e3bbf351be166236c0d1067c485e293ab12c38c348a26e246",
+    "ai/app/food_names.py": "faf42a0fc35b393640f24ae1f73a231e660c0b0bc37fad004cf8e1fb834af731",
+    "ai/evals/food_name_normalization_eval.py": "260b1346ca8bc7d22a61ae9c6da0fff2f9e38bab4b0f7610b431d2f4acf5735b",
+    "ai/tests/test_eval_food_name_normalization.py": "30d60c4e898ee34e41a1447809924ec9ad26b0959b7bbf21015ef9b184cfd3f8",
+    "ai/tests/test_food_names.py": "faf6b7cf30477079786b2d3211e4eb1accc0c9c04edafc6ccb67425421c86b8e"
+  },
+  "focused_tests_passed": 126,
+  "no_new_model_calls": true,
+  "committed": false,
+  "pushed": false
+}

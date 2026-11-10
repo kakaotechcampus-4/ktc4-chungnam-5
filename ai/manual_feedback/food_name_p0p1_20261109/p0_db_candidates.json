@@ -1,0 +1,1890 @@
+{
+  "created_at_utc": "2026-11-08T16:06:02.265791+00:00",
+  "purpose": "P0 candidate label curation before live model responses; not trial results",
+  "seed_sha256": "43c0962b7f6da1d098647f618aaabad1aeeeb9f1e7763320a166c9c24abfba9b",
+  "queries": {
+    "코울슬로": [
+      {
+        "foodRefId": "D214-640000000-0043",
+        "name": "샐러드_코울슬로",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 112.0,
+          "proteinG": 0.9,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 130.0
+        }
+      },
+      {
+        "foodRefId": "D202-091000000-0297",
+        "name": "버거_코울슬로 치킨",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 243.0,
+          "proteinG": 12.39,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 600.0
+        }
+      },
+      {
+        "foodRefId": "D202-091000000-0108",
+        "name": "버거_코울슬로치킨 버거",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 255.0,
+          "proteinG": 11.01,
+          "fatG": 13.76,
+          "carbG": 22.02,
+          "fiberG": null,
+          "sodiumMg": 608.0
+        }
+      },
+      {
+        "foodRefId": "P116-702070100-0576",
+        "name": "코울슬로",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 134.5,
+          "proteinG": 0.775,
+          "fatG": 7.375,
+          "carbG": 15.87,
+          "fiberG": null,
+          "sodiumMg": 293.5
+        }
+      },
+      {
+        "foodRefId": "P114-400020100-0793",
+        "name": "콘코울슬로",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 125.0,
+          "proteinG": 2.0,
+          "fatG": 6.0,
+          "carbG": 16.0,
+          "fiberG": null,
+          "sodiumMg": 340.0
+        }
+      },
+      {
+        "foodRefId": "P113-206020400-3867",
+        "name": "코울슬로소스",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 352.0,
+          "proteinG": 0.7,
+          "fatG": 26.0,
+          "carbG": 28.8,
+          "fiberG": null,
+          "sodiumMg": 405.0
+        }
+      },
+      {
+        "foodRefId": "P114-400020100-0474",
+        "name": "bhc코울슬로",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 89.0,
+          "proteinG": 0.33,
+          "fatG": 5.56,
+          "carbG": 8.89,
+          "fiberG": null,
+          "sodiumMg": 78.0
+        }
+      },
+      {
+        "foodRefId": "P101-101000100-0134",
+        "name": "코울슬로맛팝콘",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 492.0,
+          "proteinG": 8.33,
+          "fatG": 26.67,
+          "carbG": 60.0,
+          "fiberG": null,
+          "sodiumMg": 808.0
+        }
+      }
+    ],
+    "콜슬로": [
+      {
+        "foodRefId": "D214-640000000-0043",
+        "name": "샐러드_코울슬로",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 112.0,
+          "proteinG": 0.9,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 130.0
+        }
+      },
+      {
+        "foodRefId": "D202-091000000-0297",
+        "name": "버거_코울슬로 치킨",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 243.0,
+          "proteinG": 12.39,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 600.0
+        }
+      },
+      {
+        "foodRefId": "D202-100000000-0092",
+        "name": "식빵_슬로우오트식빵",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 281.0,
+          "proteinG": 8.36,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 338.0
+        }
+      },
+      {
+        "foodRefId": "D202-088000000-0022",
+        "name": "모닝빵_슬로우오트모닝롤",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 288.0,
+          "proteinG": 7.35,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 435.0
+        }
+      },
+      {
+        "foodRefId": "D202-091000000-0108",
+        "name": "버거_코울슬로치킨 버거",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 255.0,
+          "proteinG": 11.01,
+          "fatG": 13.76,
+          "carbG": 22.02,
+          "fiberG": null,
+          "sodiumMg": 608.0
+        }
+      },
+      {
+        "foodRefId": "D314-640224600-0001",
+        "name": "샐러드_양배추_코올슬로",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 153.0,
+          "proteinG": 0.95,
+          "fatG": 9.91,
+          "carbG": 14.89,
+          "fiberG": 1.9,
+          "sodiumMg": 203.0
+        }
+      },
+      {
+        "foodRefId": "P116-705070200-1289",
+        "name": "슬로리얼",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 414.0,
+          "proteinG": 11.43,
+          "fatG": 8.86,
+          "carbG": 74.29,
+          "fiberG": null,
+          "sodiumMg": 343.0
+        }
+      },
+      {
+        "foodRefId": "P116-702070100-2044",
+        "name": "슬로베린",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 333.0,
+          "proteinG": 0.0,
+          "fatG": 0.0,
+          "carbG": 83.33,
+          "fiberG": null,
+          "sodiumMg": 0.0
+        }
+      }
+    ],
+    "양배추샐러드": [
+      {
+        "foodRefId": "D414-701000000-0001",
+        "name": "양배추 샐러드",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 99.0,
+          "proteinG": 0.9,
+          "fatG": 8.95,
+          "carbG": 4.32,
+          "fiberG": 1.3,
+          "sodiumMg": 145.0
+        }
+      },
+      {
+        "foodRefId": "P114-400020100-0188",
+        "name": "당근양배추샐러드",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 79.0,
+          "proteinG": 3.31,
+          "fatG": 5.54,
+          "carbG": 3.88,
+          "fiberG": null,
+          "sodiumMg": 559.0
+        }
+      },
+      {
+        "foodRefId": "P123-226020200-0693",
+        "name": "놀라운양배추샐러드",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 35.0,
+          "proteinG": 1.47,
+          "fatG": 0.39,
+          "carbG": 6.37,
+          "fiberG": null,
+          "sodiumMg": 30.0
+        }
+      },
+      {
+        "foodRefId": "D114-640220000-0001",
+        "name": "샐러드_양배추",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 150.0,
+          "proteinG": 2.69,
+          "fatG": 11.71,
+          "carbG": 8.47,
+          "fiberG": 2.6,
+          "sodiumMg": 97.0
+        }
+      },
+      {
+        "foodRefId": "D514-700000000-0001",
+        "name": "양배추 사과 샐러드",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 137.667,
+          "proteinG": 0.9,
+          "fatG": 10.72,
+          "carbG": 10.613,
+          "fiberG": 2.0,
+          "sodiumMg": 73.333
+        }
+      },
+      {
+        "foodRefId": "D514-703000000-0001",
+        "name": "양배추오이  샐러드",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 188.0,
+          "proteinG": 1.8,
+          "fatG": 17.09,
+          "carbG": 8.2,
+          "fiberG": 2.3,
+          "sodiumMg": 120.0
+        }
+      },
+      {
+        "foodRefId": "D314-640224600-0001",
+        "name": "샐러드_양배추_코올슬로",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 153.0,
+          "proteinG": 0.95,
+          "fatG": 9.91,
+          "carbG": 14.89,
+          "fiberG": 1.9,
+          "sodiumMg": 203.0
+        }
+      },
+      {
+        "foodRefId": "P123-226020200-1790",
+        "name": "양배추 케요네즈 샐러드",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 136.0,
+          "proteinG": 1.6,
+          "fatG": 10.6,
+          "carbG": 8.4,
+          "fiberG": null,
+          "sodiumMg": 482.0
+        }
+      }
+    ],
+    "계란프라이": [
+      {
+        "foodRefId": "P123-201020300-0734",
+        "name": "낙지곤약볶음밥&계란프라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 171.0,
+          "proteinG": 5.71,
+          "fatG": 5.24,
+          "carbG": 24.76,
+          "fiberG": null,
+          "sodiumMg": 424.0
+        }
+      },
+      {
+        "foodRefId": "P123-203020200-3530",
+        "name": "진또배기마늘계란프라이짜장밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 158.0,
+          "proteinG": 3.75,
+          "fatG": 5.63,
+          "carbG": 23.13,
+          "fiberG": null,
+          "sodiumMg": 384.0
+        }
+      },
+      {
+        "foodRefId": "P101-205000200-3259",
+        "name": "하리보 계란프라이 모양 젤리",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 369.0,
+          "proteinG": 7.5,
+          "fatG": 0.38,
+          "carbG": 83.75,
+          "fiberG": null,
+          "sodiumMg": 20.0
+        }
+      },
+      {
+        "foodRefId": "P101-205000200-1055",
+        "name": "프라이드계란모양구미",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 336.0,
+          "proteinG": 4.0,
+          "fatG": 0.0,
+          "carbG": 80.0,
+          "fiberG": null,
+          "sodiumMg": 40.0
+        }
+      },
+      {
+        "foodRefId": "P101-106000100-7663",
+        "name": "리얼프라이스 계란과자",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 473.0,
+          "proteinG": 6.0,
+          "fatG": 17.0,
+          "carbG": 74.0,
+          "fiberG": null,
+          "sodiumMg": 186.0
+        }
+      },
+      {
+        "foodRefId": "P101-205000200-0434",
+        "name": "비달프라이드계란모양젤리",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 329.0,
+          "proteinG": 5.5,
+          "fatG": 0.0,
+          "carbG": 77.0,
+          "fiberG": null,
+          "sodiumMg": 100.0
+        }
+      },
+      {
+        "foodRefId": "D212-537000000-0016",
+        "name": "감자튀김_프렌치 프라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 275.0,
+          "proteinG": 3.75,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 278.0
+        }
+      },
+      {
+        "foodRefId": "D212-549000000-0158",
+        "name": "닭튀김_순살치킨 앤 프라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 255.0,
+          "proteinG": 11.54,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 508.0
+        }
+      }
+    ],
+    "달걀프라이": [
+      {
+        "foodRefId": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 181.0,
+          "proteinG": 11.0,
+          "fatG": 13.105,
+          "carbG": 3.06,
+          "fiberG": 0.0,
+          "sodiumMg": 262.0
+        }
+      },
+      {
+        "foodRefId": "D109-417000000-0001",
+        "name": "달걀부침(달걀후라이)",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 181.5,
+          "proteinG": 11.923,
+          "fatG": 12.768,
+          "carbG": 3.508,
+          "fiberG": 2.1,
+          "sodiumMg": 269.75
+        }
+      },
+      {
+        "foodRefId": "D212-537000000-0016",
+        "name": "감자튀김_프렌치 프라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 275.0,
+          "proteinG": 3.75,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 278.0
+        }
+      },
+      {
+        "foodRefId": "D109-417120000-0001",
+        "name": "달걀부침(달걀후라이)_햄",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 277.0,
+          "proteinG": 12.71,
+          "fatG": 21.59,
+          "carbG": 8.06,
+          "fiberG": 1.5,
+          "sodiumMg": 591.0
+        }
+      },
+      {
+        "foodRefId": "D212-549000000-0158",
+        "name": "닭튀김_순살치킨 앤 프라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 255.0,
+          "proteinG": 11.54,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 508.0
+        }
+      },
+      {
+        "foodRefId": "D220-737000000-1239",
+        "name": "스무디_코코넛 서프라이즈 (S)",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 57.0,
+          "proteinG": 1.41,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 18.0
+        }
+      },
+      {
+        "foodRefId": "D202-120000000-1829",
+        "name": "피자_할라피뇨프라이 피자 (L)",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 268.0,
+          "proteinG": 14.0,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 429.0
+        }
+      },
+      {
+        "foodRefId": "D202-110000000-0247",
+        "name": "케이크_스트로베리서프라이즈 케이크",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 275.0,
+          "proteinG": 3.0,
+          "fatG": 19.0,
+          "carbG": 22.0,
+          "fiberG": null,
+          "sodiumMg": 100.0
+        }
+      }
+    ],
+    "계란후라이": [
+      {
+        "foodRefId": "P123-212020300-1938",
+        "name": "햄&계란후라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 125.0,
+          "proteinG": 11.25,
+          "fatG": 4.0,
+          "carbG": 11.25,
+          "fiberG": null,
+          "sodiumMg": 488.0
+        }
+      },
+      {
+        "foodRefId": "P123-213020200-0812",
+        "name": "계란후라이도시락",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 92.0,
+          "proteinG": 8.89,
+          "fatG": 3.33,
+          "carbG": 6.67,
+          "fiberG": null,
+          "sodiumMg": 444.0
+        }
+      },
+      {
+        "foodRefId": "P118-100010700-0447",
+        "name": "수제 계란후라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 182.0,
+          "proteinG": 14.9,
+          "fatG": 11.84,
+          "carbG": 3.73,
+          "fiberG": null,
+          "sodiumMg": 227.0
+        }
+      },
+      {
+        "foodRefId": "P118-100010700-0372",
+        "name": "조인 계란후라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 100.0,
+          "proteinG": 10.0,
+          "fatG": 3.8,
+          "carbG": 6.0,
+          "fiberG": null,
+          "sodiumMg": 410.0
+        }
+      },
+      {
+        "foodRefId": "P101-205000200-0042",
+        "name": "계란후라이모양젤리",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 251.5,
+          "proteinG": 4.1,
+          "fatG": 0.275,
+          "carbG": 58.25,
+          "fiberG": null,
+          "sodiumMg": 35.0
+        }
+      },
+      {
+        "foodRefId": "P118-100010700-0315",
+        "name": "냉동 계란 후라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 97.0,
+          "proteinG": 10.9,
+          "fatG": 2.1,
+          "carbG": 8.7,
+          "fiberG": null,
+          "sodiumMg": 588.0
+        }
+      },
+      {
+        "foodRefId": "P123-203020200-4206",
+        "name": "계란후라이&쏘야볶음",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 168.0,
+          "proteinG": 5.11,
+          "fatG": 4.38,
+          "carbG": 27.01,
+          "fiberG": null,
+          "sodiumMg": 332.0
+        }
+      },
+      {
+        "foodRefId": "P118-100010700-0019",
+        "name": "계란후라이(패티용)",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 100.0,
+          "proteinG": 9.0,
+          "fatG": 3.2,
+          "carbG": 9.0,
+          "fiberG": null,
+          "sodiumMg": 390.0
+        }
+      }
+    ],
+    "달걀 후라이": [
+      {
+        "foodRefId": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 181.0,
+          "proteinG": 11.0,
+          "fatG": 13.105,
+          "carbG": 3.06,
+          "fiberG": 0.0,
+          "sodiumMg": 262.0
+        }
+      },
+      {
+        "foodRefId": "D109-417000000-0001",
+        "name": "달걀부침(달걀후라이)",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 181.5,
+          "proteinG": 11.923,
+          "fatG": 12.768,
+          "carbG": 3.508,
+          "fiberG": 2.1,
+          "sodiumMg": 269.75
+        }
+      },
+      {
+        "foodRefId": "D109-417120000-0001",
+        "name": "달걀부침(달걀후라이)_햄",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 277.0,
+          "proteinG": 12.71,
+          "fatG": 21.59,
+          "carbG": 8.06,
+          "fiberG": 1.5,
+          "sodiumMg": 591.0
+        }
+      },
+      {
+        "foodRefId": "D212-549000000-0143",
+        "name": "닭튀김_후라이드 치킨",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 279.667,
+          "proteinG": 25.533,
+          "fatG": null,
+          "carbG": 7.48,
+          "fiberG": null,
+          "sodiumMg": 271.0
+        }
+      },
+      {
+        "foodRefId": "D212-549000000-0118",
+        "name": "닭튀김_핫후라이드 치킨",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 263.0,
+          "proteinG": 23.0,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 324.0
+        }
+      },
+      {
+        "foodRefId": "D212-549000000-0039",
+        "name": "닭튀김_리얼후라이드 치킨",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 268.0,
+          "proteinG": 22.91,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 399.0
+        }
+      },
+      {
+        "foodRefId": "D212-549000000-0067",
+        "name": "닭튀김_살살후라이드 치킨",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 325.0,
+          "proteinG": 18.88,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 468.0
+        }
+      },
+      {
+        "foodRefId": "D202-120000000-1130",
+        "name": "피자_오지치즈후라이 피자",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 255.0,
+          "proteinG": 13.47,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 435.0
+        }
+      }
+    ],
+    "감자샐러드": [
+      {
+        "foodRefId": "D414-664000000-0001",
+        "name": "감자샐러드",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 162.0,
+          "proteinG": 2.725,
+          "fatG": 10.058,
+          "carbG": 15.605,
+          "fiberG": 2.3,
+          "sodiumMg": 310.0
+        }
+      },
+      {
+        "foodRefId": "D514-664440000-0001",
+        "name": "감자샐러드_당근",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 77.0,
+          "proteinG": 1.2,
+          "fatG": 4.49,
+          "carbG": 8.31,
+          "fiberG": 1.7,
+          "sodiumMg": 33.0
+        }
+      },
+      {
+        "foodRefId": "D714-664260000-0001",
+        "name": "감자샐러드_오이",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 104.0,
+          "proteinG": 1.7,
+          "fatG": 6.05,
+          "carbG": 11.17,
+          "fiberG": 2.1,
+          "sodiumMg": 1010.0
+        }
+      },
+      {
+        "foodRefId": "D402-143000000-0001",
+        "name": "감자샐러드 샌드위치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 108.333,
+          "proteinG": 3.067,
+          "fatG": 4.753,
+          "carbG": 13.457,
+          "fiberG": 1.3,
+          "sodiumMg": 216.667
+        }
+      },
+      {
+        "foodRefId": "D202-098000000-0001",
+        "name": "소세지빵_감자샐러드 소세지빵",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 319.0,
+          "proteinG": 10.37,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 609.0
+        }
+      },
+      {
+        "foodRefId": "D202-112000000-0053",
+        "name": "크로켓(고로케)_야채감자 샐러드고로케",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 308.0,
+          "proteinG": 6.25,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 384.0
+        }
+      },
+      {
+        "foodRefId": "P123-226020200-0060",
+        "name": "감자샐러드",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 149.0,
+          "proteinG": 4.506,
+          "fatG": 8.124,
+          "carbG": 15.509,
+          "fiberG": null,
+          "sodiumMg": 408.0
+        }
+      },
+      {
+        "foodRefId": "P123-226020200-1465",
+        "name": "감자샐러드무스",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 185.0,
+          "proteinG": 2.0,
+          "fatG": 13.0,
+          "carbG": 15.0,
+          "fiberG": null,
+          "sodiumMg": 330.0
+        }
+      }
+    ],
+    "콩나물국": [
+      {
+        "foodRefId": "D105-253000000-0001",
+        "name": "콩나물국",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 6.0,
+          "proteinG": 0.747,
+          "fatG": 0.143,
+          "carbG": 0.683,
+          "fiberG": 0.333,
+          "sodiumMg": 165.0
+        }
+      },
+      {
+        "foodRefId": "D401-046000000-0001",
+        "name": "콩나물국밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 59.667,
+          "proteinG": 2.62,
+          "fatG": 0.767,
+          "carbG": 10.533,
+          "fiberG": 0.767,
+          "sodiumMg": 57.667
+        }
+      },
+      {
+        "foodRefId": "D605-253150000-0001",
+        "name": "콩나물국_무",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 6.0,
+          "proteinG": 0.7,
+          "fatG": 0.2,
+          "carbG": 0.75,
+          "fiberG": 0.3,
+          "sodiumMg": 122.0
+        }
+      },
+      {
+        "foodRefId": "D405-269000000-0001",
+        "name": "김치 콩나물국",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 10.25,
+          "proteinG": 1.075,
+          "fatG": 0.225,
+          "carbG": 1.273,
+          "fiberG": 0.775,
+          "sodiumMg": 210.75
+        }
+      },
+      {
+        "foodRefId": "D705-253450000-0001",
+        "name": "콩나물국_고추",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 9.0,
+          "proteinG": 1.1,
+          "fatG": 0.3,
+          "carbG": 1.12,
+          "fiberG": 0.4,
+          "sodiumMg": 255.0
+        }
+      },
+      {
+        "foodRefId": "D405-253060000-0001",
+        "name": "콩나물국_김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 9.0,
+          "proteinG": 0.9,
+          "fatG": 0.27,
+          "carbG": 1.1,
+          "fiberG": 0.5,
+          "sodiumMg": 164.0
+        }
+      },
+      {
+        "foodRefId": "D505-253170000-0001",
+        "name": "콩나물국_바지락",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 6.0,
+          "proteinG": 0.7,
+          "fatG": 0.19,
+          "carbG": 0.65,
+          "fiberG": 0.3,
+          "sodiumMg": 118.0
+        }
+      },
+      {
+        "foodRefId": "D505-253370000-0001",
+        "name": "콩나물국_콩나물",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 7.0,
+          "proteinG": 0.83,
+          "fatG": 0.2,
+          "carbG": 1.01,
+          "fiberG": 0.4,
+          "sodiumMg": 179.0
+        }
+      }
+    ],
+    "잡채": [
+      {
+        "foodRefId": "D110-492000000-0001",
+        "name": "잡채",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 146.0,
+          "proteinG": 4.71,
+          "fatG": 3.3,
+          "carbG": 24.26,
+          "fiberG": 3.7,
+          "sodiumMg": 360.0
+        }
+      },
+      {
+        "foodRefId": "D101-033000000-0001",
+        "name": "잡채밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 114.8,
+          "proteinG": 3.144,
+          "fatG": 1.884,
+          "carbG": 20.702,
+          "fiberG": 1.16,
+          "sodiumMg": 109.8
+        }
+      },
+      {
+        "foodRefId": "D410-453000000-0001",
+        "name": "고추잡채",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 75.667,
+          "proteinG": 6.023,
+          "fatG": 3.797,
+          "carbG": 4.523,
+          "fiberG": 1.3,
+          "sodiumMg": 195.667
+        }
+      },
+      {
+        "foodRefId": "D510-517000000-0001",
+        "name": "부추잡채",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 86.0,
+          "proteinG": 5.9,
+          "fatG": 5.29,
+          "carbG": 3.487,
+          "fiberG": 1.133,
+          "sodiumMg": 214.667
+        }
+      },
+      {
+        "foodRefId": "D410-527000000-0001",
+        "name": "어묵잡채",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 127.0,
+          "proteinG": 6.6,
+          "fatG": 6.54,
+          "carbG": 10.005,
+          "fiberG": 0.6,
+          "sodiumMg": 426.5
+        }
+      },
+      {
+        "foodRefId": "D410-496000000-0001",
+        "name": "중식잡채",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 83.0,
+          "proteinG": 2.3,
+          "fatG": 2.24,
+          "carbG": 13.58,
+          "fiberG": 1.0,
+          "sodiumMg": 112.0
+        }
+      },
+      {
+        "foodRefId": "D410-515000000-0001",
+        "name": "버섯 잡채",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 149.0,
+          "proteinG": 4.8,
+          "fatG": 12.22,
+          "carbG": 6.28,
+          "fiberG": 2.9,
+          "sodiumMg": 207.0
+        }
+      },
+      {
+        "foodRefId": "D310-492080000-0001",
+        "name": "잡채_고추",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 128.0,
+          "proteinG": 5.5,
+          "fatG": 6.01,
+          "carbG": 13.09,
+          "fiberG": 2.3,
+          "sodiumMg": 414.0
+        }
+      }
+    ],
+    "포테이토피자": [
+      {
+        "foodRefId": "D202-120000000-1705",
+        "name": "피자_포테이토 피자",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 234.444,
+          "proteinG": 11.178,
+          "fatG": 10.997,
+          "carbG": 26.75,
+          "fiberG": 2.7,
+          "sodiumMg": 341.222
+        }
+      },
+      {
+        "foodRefId": "D202-120420000-0003",
+        "name": "피자_골드포테이토피자",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 263.0,
+          "proteinG": 12.8,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 478.0
+        }
+      },
+      {
+        "foodRefId": "D202-120420000-0083",
+        "name": "피자_점보포테이토피자",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 233.0,
+          "proteinG": 11.17,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 254.0
+        }
+      },
+      {
+        "foodRefId": "D202-120000000-0457",
+        "name": "피자_로얄포테이토 피자",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 259.0,
+          "proteinG": 11.77,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 467.0
+        }
+      },
+      {
+        "foodRefId": "D202-120420000-0025",
+        "name": "피자_몬스터포테이토피자",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 243.0,
+          "proteinG": 11.42,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 405.0
+        }
+      },
+      {
+        "foodRefId": "D202-120000000-0890",
+        "name": "피자_순삭포테이토 피자",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 348.0,
+          "proteinG": 10.28,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 351.0
+        }
+      },
+      {
+        "foodRefId": "D202-120000000-1167",
+        "name": "피자_웨지포테이토 피자",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 302.0,
+          "proteinG": 11.96,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 411.0
+        }
+      },
+      {
+        "foodRefId": "D202-120420000-0131",
+        "name": "피자_포테이토피자바이트",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 256.0,
+          "proteinG": 12.0,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 463.0
+        }
+      }
+    ],
+    "치즈케이크": [
+      {
+        "foodRefId": "D202-110000000-0340",
+        "name": "케이크_치즈 케이크",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 388.5,
+          "proteinG": 6.145,
+          "fatG": 21.815,
+          "carbG": 26.82,
+          "fiberG": 1.2,
+          "sodiumMg": 140.0
+        }
+      },
+      {
+        "foodRefId": "D202-110000000-0029",
+        "name": "케이크_뉴욕치즈 케이크",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 326.0,
+          "proteinG": 5.012,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 174.0
+        }
+      },
+      {
+        "foodRefId": "D202-110000000-0047",
+        "name": "케이크_더블치즈 케이크",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 311.0,
+          "proteinG": 7.78,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 270.0
+        }
+      },
+      {
+        "foodRefId": "D202-110000000-0584",
+        "name": "케이크_우유치즈 케이크",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 274.0,
+          "proteinG": 6.32,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 116.0
+        }
+      },
+      {
+        "foodRefId": "D202-086000000-0122",
+        "name": "마카롱_치즈케이크 마카롱",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 450.0,
+          "proteinG": 7.0,
+          "fatG": null,
+          "carbG": 45.0,
+          "fiberG": null,
+          "sodiumMg": 179.0
+        }
+      },
+      {
+        "foodRefId": "D219-711000000-0310",
+        "name": "아이스크림_뉴욕치즈케이크",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 239.0,
+          "proteinG": 3.48,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 91.0
+        }
+      },
+      {
+        "foodRefId": "D202-110000000-0040",
+        "name": "케이크_당근 치즈 케이크",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 344.5,
+          "proteinG": 4.63,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 161.5
+        }
+      },
+      {
+        "foodRefId": "D202-110000000-0057",
+        "name": "케이크_듀얼 치즈 케이크",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 330.0,
+          "proteinG": 7.06,
+          "fatG": null,
+          "carbG": null,
+          "fiberG": null,
+          "sodiumMg": 220.0
+        }
+      }
+    ]
+  },
+  "details": [
+    {
+      "id": "P114-400020100-0474",
+      "name": "bhc코울슬로",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D414-664000000-0001",
+      "name": "감자샐러드",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-226020200-0060",
+      "name": "감자샐러드",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D402-143000000-0001",
+      "name": "감자샐러드 샌드위치",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D514-664440000-0001",
+      "name": "감자샐러드_당근",
+      "category": "GENERAL",
+      "origin_type": "초등학교급식(재료량 기반 산출 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D714-664260000-0001",
+      "name": "감자샐러드_오이",
+      "category": "GENERAL",
+      "origin_type": "산업체급식(재료량 기반 산출 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-226020200-1465",
+      "name": "감자샐러드무스",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D212-537000000-0016",
+      "name": "감자튀김_프렌치 프라이",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-203020200-4206",
+      "name": "계란후라이&쏘야볶음",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P118-100010700-0019",
+      "name": "계란후라이(패티용)",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-213020200-0812",
+      "name": "계란후라이도시락",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P101-205000200-0042",
+      "name": "계란후라이모양젤리",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D410-453000000-0001",
+      "name": "고추잡채",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D405-269000000-0001",
+      "name": "김치 콩나물국",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020300-0734",
+      "name": "낙지곤약볶음밥&계란프라이",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P118-100010700-0315",
+      "name": "냉동 계란 후라이",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-226020200-0693",
+      "name": "놀라운양배추샐러드",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D109-417000000-0001",
+      "name": "달걀부침(달걀후라이)",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D109-417120000-0001",
+      "name": "달걀부침(달걀후라이)_햄",
+      "category": "GENERAL",
+      "origin_type": "가정식(분석 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D609-449000000-0001",
+      "name": "달걀후라이",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D212-549000000-0039",
+      "name": "닭튀김_리얼후라이드 치킨",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D212-549000000-0067",
+      "name": "닭튀김_살살후라이드 치킨",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D212-549000000-0158",
+      "name": "닭튀김_순살치킨 앤 프라이",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D212-549000000-0118",
+      "name": "닭튀김_핫후라이드 치킨",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D212-549000000-0143",
+      "name": "닭튀김_후라이드 치킨",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-400020100-0188",
+      "name": "당근양배추샐러드",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P101-106000100-7663",
+      "name": "리얼프라이스 계란과자",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-086000000-0122",
+      "name": "마카롱_치즈케이크 마카롱",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-088000000-0022",
+      "name": "모닝빵_슬로우오트모닝롤",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-091000000-0297",
+      "name": "버거_코울슬로 치킨",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-091000000-0108",
+      "name": "버거_코울슬로치킨 버거",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D410-515000000-0001",
+      "name": "버섯 잡채",
+      "category": "GENERAL",
+      "origin_type": "외식(재료량 기반 산출함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D510-517000000-0001",
+      "name": "부추잡채",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P101-205000200-0434",
+      "name": "비달프라이드계란모양젤리",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D114-640220000-0001",
+      "name": "샐러드_양배추",
+      "category": "GENERAL",
+      "origin_type": "가정식(분석 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D314-640224600-0001",
+      "name": "샐러드_양배추_코올슬로",
+      "category": "GENERAL",
+      "origin_type": "외식(분석함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D214-640000000-0043",
+      "name": "샐러드_코울슬로",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-098000000-0001",
+      "name": "소세지빵_감자샐러드 소세지빵",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P118-100010700-0447",
+      "name": "수제 계란후라이",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D220-737000000-1239",
+      "name": "스무디_코코넛 서프라이즈 (S)",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P116-705070200-1289",
+      "name": "슬로리얼",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P116-702070100-2044",
+      "name": "슬로베린",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-100000000-0092",
+      "name": "식빵_슬로우오트식빵",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D219-711000000-0310",
+      "name": "아이스크림_뉴욕치즈케이크",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D514-700000000-0001",
+      "name": "양배추 사과 샐러드",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D414-701000000-0001",
+      "name": "양배추 샐러드",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-226020200-1790",
+      "name": "양배추 케요네즈 샐러드",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D514-703000000-0001",
+      "name": "양배추오이  샐러드",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D410-527000000-0001",
+      "name": "어묵잡채",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D110-492000000-0001",
+      "name": "잡채",
+      "category": "GENERAL",
+      "origin_type": "가정식(분석 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D310-492080000-0001",
+      "name": "잡채_고추",
+      "category": "GENERAL",
+      "origin_type": "외식(분석함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D101-033000000-0001",
+      "name": "잡채밥",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P118-100010700-0372",
+      "name": "조인 계란후라이",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D410-496000000-0001",
+      "name": "중식잡채",
+      "category": "GENERAL",
+      "origin_type": "외식(재료량 기반 산출함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-203020200-3530",
+      "name": "진또배기마늘계란프라이짜장밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-110000000-0029",
+      "name": "케이크_뉴욕치즈 케이크",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-110000000-0040",
+      "name": "케이크_당근 치즈 케이크",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-110000000-0047",
+      "name": "케이크_더블치즈 케이크",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-110000000-0057",
+      "name": "케이크_듀얼 치즈 케이크",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-110000000-0247",
+      "name": "케이크_스트로베리서프라이즈 케이크",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-110000000-0584",
+      "name": "케이크_우유치즈 케이크",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-110000000-0340",
+      "name": "케이크_치즈 케이크",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P116-702070100-0576",
+      "name": "코울슬로",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P101-101000100-0134",
+      "name": "코울슬로맛팝콘",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P113-206020400-3867",
+      "name": "코울슬로소스",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-400020100-0793",
+      "name": "콘코울슬로",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D105-253000000-0001",
+      "name": "콩나물국",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D705-253450000-0001",
+      "name": "콩나물국_고추",
+      "category": "GENERAL",
+      "origin_type": "산업체급식(재료량 기반 산출 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D405-253060000-0001",
+      "name": "콩나물국_김치",
+      "category": "GENERAL",
+      "origin_type": "외식(재료량 기반 산출함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D605-253150000-0001",
+      "name": "콩나물국_무",
+      "category": "GENERAL",
+      "origin_type": "중고등학교급식(재료량 기반 산출함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D505-253170000-0001",
+      "name": "콩나물국_바지락",
+      "category": "GENERAL",
+      "origin_type": "초등학교급식(재료량 기반 산출 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D505-253370000-0001",
+      "name": "콩나물국_콩나물",
+      "category": "GENERAL",
+      "origin_type": "초등학교급식(재료량 기반 산출 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D401-046000000-0001",
+      "name": "콩나물국밥",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-112000000-0053",
+      "name": "크로켓(고로케)_야채감자 샐러드고로케",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P101-205000200-1055",
+      "name": "프라이드계란모양구미",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120420000-0003",
+      "name": "피자_골드포테이토피자",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120000000-0457",
+      "name": "피자_로얄포테이토 피자",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120420000-0025",
+      "name": "피자_몬스터포테이토피자",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120000000-0890",
+      "name": "피자_순삭포테이토 피자",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120000000-1130",
+      "name": "피자_오지치즈후라이 피자",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120000000-1167",
+      "name": "피자_웨지포테이토 피자",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120420000-0083",
+      "name": "피자_점보포테이토피자",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120000000-1705",
+      "name": "피자_포테이토 피자",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120420000-0131",
+      "name": "피자_포테이토피자바이트",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D202-120000000-1829",
+      "name": "피자_할라피뇨프라이 피자 (L)",
+      "category": "GENERAL",
+      "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P101-205000200-3259",
+      "name": "하리보 계란프라이 모양 젤리",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-212020300-1938",
+      "name": "햄&계란후라이",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    }
+  ]
+}

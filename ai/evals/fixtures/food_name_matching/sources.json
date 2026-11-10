@@ -1,0 +1,52 @@
+[
+  {
+    "case_id": "coleslaw",
+    "file": "coleslaw.jpg",
+    "title": "Coleslaw (3173259085).jpg",
+    "description_url": "https://commons.wikimedia.org/wiki/File:Coleslaw_(3173259085).jpg",
+    "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/df/Coleslaw_%283173259085%29.jpg/960px-Coleslaw_%283173259085%29.jpg",
+    "original_url": "https://upload.wikimedia.org/wikipedia/commons/d/df/Coleslaw_%283173259085%29.jpg",
+    "author": "David Pursehouse",
+    "license": "CC BY 2.0",
+    "license_url": "https://creativecommons.org/licenses/by/2.0/",
+    "source_description": "Coleslaw",
+    "bytes": 112448,
+    "sha256": "f1b52dc677cf5baab6182f8a4a8b3a63cf8448280dd4b51d4049f5a07410e16f",
+    "changes": "Wikimedia-provided960px thumbnail; Exif metadata removed locally without changing compressed pixel data",
+    "retrieved_date_kst": "2026-11-09",
+    "download_sha256": "b7c936dee473dae9f1c0cb494e4efc49122934a777c9238674a5ca4dd0bf1eaa"
+  },
+  {
+    "case_id": "fried_eggs",
+    "file": "fried_eggs.jpg",
+    "title": "Fried eggs.jpg",
+    "description_url": "https://commons.wikimedia.org/wiki/File:Fried_eggs.jpg",
+    "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Fried_eggs.jpg/960px-Fried_eggs.jpg",
+    "original_url": "https://upload.wikimedia.org/wikipedia/commons/2/23/Fried_eggs.jpg",
+    "author": "Stangoldsmith",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_description": "fried eggs",
+    "bytes": 181804,
+    "sha256": "ca5806156bceb32c557c5b3b424b0db0a2406a8b2cc8bc810232304eb2d0389b",
+    "changes": "Wikimedia-provided960px thumbnail; Exif metadata removed locally without changing compressed pixel data",
+    "retrieved_date_kst": "2026-11-09",
+    "download_sha256": "5955bae3d366346de1a1af467b4752c84f6618306a2b3e55384c8751d470f1bd"
+  },
+  {
+    "case_id": "potato_salad",
+    "file": "potato_salad.jpg",
+    "title": "Potato salad close-up.jpg",
+    "description_url": "https://commons.wikimedia.org/wiki/File:Potato_salad_close-up.jpg",
+    "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Potato_salad_close-up.jpg/960px-Potato_salad_close-up.jpg",
+    "original_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Potato_salad_close-up.jpg",
+    "author": "Steven Depolo",
+    "license": "CC BY 2.0",
+    "license_url": "https://creativecommons.org/licenses/by/2.0/",
+    "source_description": "Potato salad close-up",
+    "bytes": 108531,
+    "sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6",
+    "changes": "Wikimedia-provided 960px thumbnail; no local pixel editing",
+    "retrieved_date_kst": "2026-11-09"
+  }
+]

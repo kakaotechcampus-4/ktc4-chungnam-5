@@ -1,0 +1,5572 @@
+{
+  "metadata": {
+    "started_at_utc": "2026-11-08T16:17:24.809126+00:00",
+    "baseline_file": "baseline_replay.json",
+    "baseline_sha256": "82b58072dbd076339668dfe636cb929ca70d6cffab49490bdf3fb27583ea7880",
+    "baseline_rule_version": "food-name-ab-observations-v1",
+    "baseline_prompt_hash": "b8041e85f198f39cc09fad93f1821fca61b140259136bf193e0d8365c5c9360a",
+    "backend_git_head": "a088974080756b320ee5755fb885a5f332414742",
+    "backend_source_sha256": {
+      "app/crud/food.py": "e59addf421cf98b120aa35b500fac2a752a055f4b9a81675cdaf7711c6b80f2b",
+      "app/services/nutrition.py": "3e4e02b83f0b00d65a7ff121fa852985d50110280d43b8f8490180fe9f31c8de",
+      "app/services/meal.py": "abf194d50f346b7df9477bf359fd1af87417f387cc1d3c2c81a30efbd37013e6",
+      "app/worker/jobs/analyze_meal.py": "bb8426abe07c13f69d791c75e489344b4fd7f1c66189ba33c4fd5f3b88d6438a",
+      "app/models/food.py": "929f0d69cb2d5003d9c8bf2e50de61eb43a0bdeab2a9f269815d7dee80e3d3a3",
+      "app/models/enums.py": "45ae3df590caad42a774a3ab4236a46f9ad6fcf56acca7768b10649688e1cee4",
+      "app/schemas/nutrition.py": "2a157b9c3da389f4c39f68efedde9fdd4c8be56789cd7b3b336a1d20c0dce0e3"
+    },
+    "model_calls": 0,
+    "scope": "Saved amount_accuracy responses; confidence_calibration copies verified",
+    "timing_scope": "Diagnostic local read-only replay; not a production latency benchmark",
+    "before_129_comparison": {
+      "method": "Inferred from prior worker's valid-candidate-ID-only condition",
+      "historical_code_executed": false,
+      "historical_database_available": false,
+      "note": "Candidate existence is checked in this snapshot. This is not an observed historical rate."
+    },
+    "database": {
+      "server_version": "17.11",
+      "transaction_isolation": "repeatable read",
+      "transaction_read_only": "on",
+      "server_encoding": "UTF8",
+      "datcollate": "C",
+      "datctype": "C",
+      "counts_by_category_and_dataset": [
+        {
+          "category": "GENERAL",
+          "dataset_version": "20260828",
+          "count": 14991
+        },
+        {
+          "category": "PROCESSED",
+          "dataset_version": "20260828",
+          "count": 261101
+        }
+      ],
+      "food_refs_rows": 276092,
+      "food_refs_sha256": "f6dd19fbc654d14f5f413357818ec320dee6e8149b59954b43819a90b08ba4b4",
+      "fingerprint_method": "SHA256 of UTF-8 row_to_json(f)::text + LF, all columns, id COLLATE C order"
+    },
+    "finished_at_utc": "2026-11-08T16:17:27.223577+00:00"
+  },
+  "summary": {
+    "saved_responses": 17,
+    "food_items": 39,
+    "unique_name_queries": 20,
+    "name_query_cache_hits": 19,
+    "resolve_by_name_calls": 20,
+    "search_candidates_calls": 20,
+    "sql_statement_counts": {
+      "metadata": 4,
+      "replay": 126
+    },
+    "before_129_linked_inferred": 0,
+    "after_129_linked": 39,
+    "nutrition_conversion_counts": {
+      "amount_not_convertible": 3,
+      "calculated_complete": 26,
+      "calculated_with_missing_nutrients": 10
+    },
+    "semantic_accuracy": "not_judged"
+  },
+  "queries": [
+    {
+      "query_id": 1,
+      "name": "불고기비빔밥",
+      "name_match_food_ref_id": "P123-201020300-5316",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-201020300-5316",
+          "name": "불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 201.0,
+            "proteinG": 6.5,
+            "fatG": 6.0,
+            "carbG": 30.0,
+            "fiberG": null,
+            "sodiumMg": 465.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0052",
+          "name": "돈불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 153.0,
+            "proteinG": 4.82,
+            "fatG": 3.12,
+            "carbG": 26.35,
+            "fiberG": null,
+            "sodiumMg": 351.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0581",
+          "name": "소불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 142.25,
+            "proteinG": 4.638,
+            "fatG": 2.8,
+            "carbG": 24.593,
+            "fiberG": null,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0838",
+          "name": "돼지불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 174.0,
+            "proteinG": 6.04,
+            "fatG": 5.14,
+            "carbG": 25.98,
+            "fiberG": null,
+            "sodiumMg": 468.0
+          }
+        },
+        {
+          "foodRefId": "P111-000030100-0289",
+          "name": "버섯불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 132.0,
+            "proteinG": 6.54,
+            "fatG": 3.57,
+            "carbG": 20.03,
+            "fiberG": null,
+            "sodiumMg": 304.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 26.469,
+      "search_candidates_ms": 16.063
+    },
+    {
+      "query_id": 2,
+      "name": "쌀밥",
+      "name_match_food_ref_id": "D301-022000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D301-022000000-0001",
+          "name": "쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 135.333,
+            "proteinG": 2.587,
+            "fatG": 0.333,
+            "carbG": 29.633,
+            "fiberG": 0.433,
+            "sodiumMg": 0.667
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0748",
+          "name": "쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 152.333,
+            "proteinG": 2.713,
+            "fatG": 0.633,
+            "carbG": 34.013,
+            "fiberG": null,
+            "sodiumMg": 2.333
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-4379",
+          "name": "찹쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 171.0,
+            "proteinG": 2.915,
+            "fatG": 1.2,
+            "carbG": 36.99,
+            "fiberG": null,
+            "sodiumMg": 3.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-3572",
+          "name": "햅쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 155.0,
+            "proteinG": 2.86,
+            "fatG": 0.62,
+            "carbG": 34.29,
+            "fiberG": null,
+            "sodiumMg": 3.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-6675",
+          "name": "흰쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 130.0,
+            "proteinG": 2.4,
+            "fatG": 0.3,
+            "carbG": 28.6,
+            "fiberG": null,
+            "sodiumMg": 0.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 16.347,
+      "search_candidates_ms": 16.098
+    },
+    {
+      "query_id": 3,
+      "name": "콩나물국",
+      "name_match_food_ref_id": "D105-253000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D105-253000000-0001",
+          "name": "콩나물국",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 6.0,
+            "proteinG": 0.747,
+            "fatG": 0.143,
+            "carbG": 0.683,
+            "fiberG": 0.333,
+            "sodiumMg": 165.0
+          }
+        },
+        {
+          "foodRefId": "D401-046000000-0001",
+          "name": "콩나물국밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 59.667,
+            "proteinG": 2.62,
+            "fatG": 0.767,
+            "carbG": 10.533,
+            "fiberG": 0.767,
+            "sodiumMg": 57.667
+          }
+        },
+        {
+          "foodRefId": "D605-253150000-0001",
+          "name": "콩나물국_무",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 6.0,
+            "proteinG": 0.7,
+            "fatG": 0.2,
+            "carbG": 0.75,
+            "fiberG": 0.3,
+            "sodiumMg": 122.0
+          }
+        },
+        {
+          "foodRefId": "D405-269000000-0001",
+          "name": "김치 콩나물국",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 10.25,
+            "proteinG": 1.075,
+            "fatG": 0.225,
+            "carbG": 1.273,
+            "fiberG": 0.775,
+            "sodiumMg": 210.75
+          }
+        },
+        {
+          "foodRefId": "D705-253450000-0001",
+          "name": "콩나물국_고추",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 9.0,
+            "proteinG": 1.1,
+            "fatG": 0.3,
+            "carbG": 1.12,
+            "fiberG": 0.4,
+            "sodiumMg": 255.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 15.962,
+      "search_candidates_ms": 16.643
+    },
+    {
+      "query_id": 4,
+      "name": "잡채",
+      "name_match_food_ref_id": "D110-492000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D110-492000000-0001",
+          "name": "잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 146.0,
+            "proteinG": 4.71,
+            "fatG": 3.3,
+            "carbG": 24.26,
+            "fiberG": 3.7,
+            "sodiumMg": 360.0
+          }
+        },
+        {
+          "foodRefId": "D101-033000000-0001",
+          "name": "잡채밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 114.8,
+            "proteinG": 3.144,
+            "fatG": 1.884,
+            "carbG": 20.702,
+            "fiberG": 1.16,
+            "sodiumMg": 109.8
+          }
+        },
+        {
+          "foodRefId": "D410-453000000-0001",
+          "name": "고추잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 75.667,
+            "proteinG": 6.023,
+            "fatG": 3.797,
+            "carbG": 4.523,
+            "fiberG": 1.3,
+            "sodiumMg": 195.667
+          }
+        },
+        {
+          "foodRefId": "D510-517000000-0001",
+          "name": "부추잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 86.0,
+            "proteinG": 5.9,
+            "fatG": 5.29,
+            "carbG": 3.487,
+            "fiberG": 1.133,
+            "sodiumMg": 214.667
+          }
+        },
+        {
+          "foodRefId": "D410-527000000-0001",
+          "name": "어묵잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 127.0,
+            "proteinG": 6.6,
+            "fatG": 6.54,
+            "carbG": 10.005,
+            "fiberG": 0.6,
+            "sodiumMg": 426.5
+          }
+        }
+      ],
+      "resolve_by_name_ms": 15.913,
+      "search_candidates_ms": 16.22
+    },
+    {
+      "query_id": 5,
+      "name": "양념게장",
+      "name_match_food_ref_id": "P114-400020100-0086",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "P114-400020100-0086",
+          "name": "양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 122.125,
+            "proteinG": 10.829,
+            "fatG": 1.277,
+            "carbG": 16.835,
+            "fiberG": 1.7,
+            "sodiumMg": 810.688
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0838",
+          "name": "꽃게양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 164.0,
+            "proteinG": 8.0,
+            "fatG": 3.2,
+            "carbG": 25.0,
+            "fiberG": null,
+            "sodiumMg": 736.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-2953",
+          "name": "도화양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 157.0,
+            "proteinG": 8.4,
+            "fatG": 2.1,
+            "carbG": 25.9,
+            "fiberG": null,
+            "sodiumMg": 965.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-3158",
+          "name": "려 양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 167.0,
+            "proteinG": 12.22,
+            "fatG": 1.66,
+            "carbG": 25.88,
+            "fiberG": null,
+            "sodiumMg": 1000.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-3397",
+          "name": "수제양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 133.0,
+            "proteinG": 8.1,
+            "fatG": 3.8,
+            "carbG": 16.6,
+            "fiberG": null,
+            "sodiumMg": 837.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 16.601,
+      "search_candidates_ms": 16.634
+    },
+    {
+      "query_id": 6,
+      "name": "양념두부",
+      "name_match_food_ref_id": "D510-524000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D510-524000000-0001",
+          "name": "양념두부",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 68.0,
+            "proteinG": 6.2,
+            "fatG": 3.39,
+            "carbG": 2.99,
+            "fiberG": 2.0,
+            "sodiumMg": 105.0
+          }
+        },
+        {
+          "foodRefId": "P113-206020400-1645",
+          "name": "마파두부양념",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 153.0,
+            "proteinG": 4.67,
+            "fatG": 8.67,
+            "carbG": 14.0,
+            "fiberG": null,
+            "sodiumMg": 1400.0
+          }
+        },
+        {
+          "foodRefId": "P113-206020400-1792",
+          "name": "순두부찌개양념",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 83.5,
+            "proteinG": 4.04,
+            "fatG": 3.96,
+            "carbG": 7.86,
+            "fiberG": null,
+            "sodiumMg": 1877.0
+          }
+        },
+        {
+          "foodRefId": "P123-210020300-0170",
+          "name": "두부 양념 조림",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 143.0,
+            "proteinG": 9.64,
+            "fatG": 9.66,
+            "carbG": 4.4,
+            "fiberG": null,
+            "sodiumMg": 161.0
+          }
+        },
+        {
+          "foodRefId": "P113-206020400-1611",
+          "name": "두부두루치기양념",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 93.0,
+            "proteinG": 2.86,
+            "fatG": 4.29,
+            "carbG": 12.14,
+            "fiberG": null,
+            "sodiumMg": 857.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 16.128,
+      "search_candidates_ms": 58.45
+    },
+    {
+      "query_id": 7,
+      "name": "브로콜리두부무침",
+      "name_match_food_ref_id": "D414-688000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-688000000-0001",
+          "name": "브로콜리 두부무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 35.0,
+            "proteinG": 2.0,
+            "fatG": 0.72,
+            "carbG": 6.17,
+            "fiberG": 1.7,
+            "sodiumMg": 167.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0743",
+          "name": "브로콜리두부무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 77.0,
+            "proteinG": 7.33,
+            "fatG": 4.0,
+            "carbG": 5.33,
+            "fiberG": null,
+            "sodiumMg": 467.0
+          }
+        },
+        {
+          "foodRefId": "P123-212020200-0221",
+          "name": "브로콜리참깨두부무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 407.0,
+            "proteinG": 22.22,
+            "fatG": 20.0,
+            "carbG": 34.81,
+            "fiberG": null,
+            "sodiumMg": 631.0
+          }
+        },
+        {
+          "foodRefId": "P110-400040000-1062",
+          "name": "단호박브로콜리두부죽",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 65.0,
+            "proteinG": 1.86,
+            "fatG": 0.43,
+            "carbG": 13.57,
+            "fiberG": null,
+            "sodiumMg": 2.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-0093",
+          "name": "F58 한우브로콜리두부덮밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 109.0,
+            "proteinG": 3.75,
+            "fatG": 2.0,
+            "carbG": 18.75,
+            "fiberG": null,
+            "sodiumMg": 69.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 15.551,
+      "search_candidates_ms": 93.448
+    },
+    {
+      "query_id": 8,
+      "name": "배추김치",
+      "name_match_food_ref_id": "D315-670000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D315-670000000-0001",
+          "name": "배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 38.0,
+            "proteinG": 1.98,
+            "fatG": 0.43,
+            "carbG": 6.49,
+            "fiberG": 2.5,
+            "sodiumMg": 551.0
+          }
+        },
+        {
+          "foodRefId": "D615-687000000-0001",
+          "name": "양배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 39.0,
+            "proteinG": 2.2,
+            "fatG": 0.39,
+            "carbG": 8.29,
+            "fiberG": 3.4,
+            "sodiumMg": 2099.0
+          }
+        },
+        {
+          "foodRefId": "D115-674000000-0001",
+          "name": "얼갈이배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 46.5,
+            "proteinG": 1.735,
+            "fatG": 1.015,
+            "carbG": 7.655,
+            "fiberG": 2.5,
+            "sodiumMg": 413.5
+          }
+        },
+        {
+          "foodRefId": "D403-164250000-0001",
+          "name": "우동_배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 65.0,
+            "proteinG": 1.85,
+            "fatG": 0.79,
+            "carbG": 12.11,
+            "fiberG": 1.1,
+            "sodiumMg": 250.0
+          }
+        },
+        {
+          "foodRefId": "D315-670030000-0001",
+          "name": "배추김치_봄재배",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 39.0,
+            "proteinG": 2.22,
+            "fatG": 0.67,
+            "carbG": 5.95,
+            "fiberG": 3.6,
+            "sodiumMg": 626.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 16.485,
+      "search_candidates_ms": 16.577
+    },
+    {
+      "query_id": 9,
+      "name": "양배추샐러드",
+      "name_match_food_ref_id": "D414-701000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-701000000-0001",
+          "name": "양배추 샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 99.0,
+            "proteinG": 0.9,
+            "fatG": 8.95,
+            "carbG": 4.32,
+            "fiberG": 1.3,
+            "sodiumMg": 145.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0188",
+          "name": "당근양배추샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 79.0,
+            "proteinG": 3.31,
+            "fatG": 5.54,
+            "carbG": 3.88,
+            "fiberG": null,
+            "sodiumMg": 559.0
+          }
+        },
+        {
+          "foodRefId": "P123-226020200-0693",
+          "name": "놀라운양배추샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 35.0,
+            "proteinG": 1.47,
+            "fatG": 0.39,
+            "carbG": 6.37,
+            "fiberG": null,
+            "sodiumMg": 30.0
+          }
+        },
+        {
+          "foodRefId": "D114-640220000-0001",
+          "name": "샐러드_양배추",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 150.0,
+            "proteinG": 2.69,
+            "fatG": 11.71,
+            "carbG": 8.47,
+            "fiberG": 2.6,
+            "sodiumMg": 97.0
+          }
+        },
+        {
+          "foodRefId": "D514-700000000-0001",
+          "name": "양배추 사과 샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 137.667,
+            "proteinG": 0.9,
+            "fatG": 10.72,
+            "carbG": 10.613,
+            "fiberG": 2.0,
+            "sodiumMg": 73.333
+          }
+        }
+      ],
+      "resolve_by_name_ms": 15.836,
+      "search_candidates_ms": 78.493
+    },
+    {
+      "query_id": 10,
+      "name": "미역초무침",
+      "name_match_food_ref_id": "D114-632000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D114-632000000-0001",
+          "name": "미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 43.0,
+            "proteinG": 1.617,
+            "fatG": 0.737,
+            "carbG": 8.22,
+            "fiberG": 3.133,
+            "sodiumMg": 485.0
+          }
+        },
+        {
+          "foodRefId": "D514-711000000-0001",
+          "name": "오징어미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 87.0,
+            "proteinG": 15.0,
+            "fatG": 1.72,
+            "carbG": 5.24,
+            "fiberG": 3.6,
+            "sodiumMg": 1133.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0211",
+          "name": "미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 35.0,
+            "proteinG": 1.18,
+            "fatG": 1.02,
+            "carbG": 5.24,
+            "fiberG": null,
+            "sodiumMg": 452.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-2404",
+          "name": "황태미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 260.0,
+            "proteinG": 21.0,
+            "fatG": 5.0,
+            "carbG": 33.0,
+            "fiberG": null,
+            "sodiumMg": 1020.0
+          }
+        },
+        {
+          "foodRefId": "D114-660000000-0001",
+          "name": "해초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 39.0,
+            "proteinG": 0.95,
+            "fatG": 0.16,
+            "carbG": 8.52,
+            "fiberG": 4.3,
+            "sodiumMg": 862.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 16.371,
+      "search_candidates_ms": 71.602
+    },
+    {
+      "query_id": 11,
+      "name": "무피클",
+      "name_match_food_ref_id": "P114-202020100-0069",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "P114-202020100-0069",
+          "name": "무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 76.5,
+            "proteinG": 1.165,
+            "fatG": 1.295,
+            "carbG": 15.16,
+            "fiberG": null,
+            "sodiumMg": 285.5
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0063",
+          "name": "갓무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 17.0,
+            "proteinG": 0.52,
+            "fatG": 0.3,
+            "carbG": 3.05,
+            "fiberG": null,
+            "sodiumMg": 189.0
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0233",
+          "name": "오이무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 53.0,
+            "proteinG": 0.0,
+            "fatG": 0.3,
+            "carbG": 12.0,
+            "fiberG": null,
+            "sodiumMg": 19.0
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0076",
+          "name": "조선무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 20.0,
+            "proteinG": 0.48,
+            "fatG": 0.48,
+            "carbG": 3.56,
+            "fiberG": null,
+            "sodiumMg": 352.0
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0155",
+          "name": "무피클동치미",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 14.0,
+            "proteinG": 0.2,
+            "fatG": 0.0,
+            "carbG": 3.2,
+            "fiberG": null,
+            "sodiumMg": 435.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 16.135,
+      "search_candidates_ms": 16.46
+    },
+    {
+      "query_id": 12,
+      "name": "공깃밥",
+      "name_match_food_ref_id": "P123-201020300-0002",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-201020300-0002",
+          "name": "0.7공깃밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 150.0,
+            "proteinG": 0.0,
+            "fatG": 0.73,
+            "carbG": 33.33,
+            "fiberG": null,
+            "sodiumMg": 7.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-5001",
+          "name": "맛있는 공깃밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 138.0,
+            "proteinG": 2.0,
+            "fatG": 0.5,
+            "carbG": 31.0,
+            "fiberG": null,
+            "sodiumMg": 3.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-4819",
+          "name": "크레잇 공깃밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 143.0,
+            "proteinG": 3.0,
+            "fatG": 0.45,
+            "carbG": 31.5,
+            "fiberG": null,
+            "sodiumMg": 0.0
+          }
+        },
+        {
+          "foodRefId": "P118-100010700-0164",
+          "name": "공깃돌쉐키란",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 128.0,
+            "proteinG": 11.0,
+            "fatG": 6.6,
+            "carbG": 4.0,
+            "fiberG": null,
+            "sodiumMg": 420.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 13.674,
+      "search_candidates_ms": 44.341
+    },
+    {
+      "query_id": 13,
+      "name": "샐러드",
+      "name_match_food_ref_id": "D414-724000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-724000000-0001",
+          "name": "햄샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 124.75,
+            "proteinG": 4.025,
+            "fatG": 5.443,
+            "carbG": 15.168,
+            "fiberG": 1.425,
+            "sodiumMg": 199.5
+          }
+        },
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D414-608000000-0001",
+          "name": "과일샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 87.5,
+            "proteinG": 0.578,
+            "fatG": 5.37,
+            "carbG": 10.218,
+            "fiberG": 1.65,
+            "sodiumMg": 37.75
+          }
+        },
+        {
+          "foodRefId": "D301-007270000-0001",
+          "name": "김밥_샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 139.5,
+            "proteinG": 3.625,
+            "fatG": 4.355,
+            "carbG": 21.36,
+            "fiberG": 1.4,
+            "sodiumMg": 261.0
+          }
+        },
+        {
+          "foodRefId": "D414-668000000-0001",
+          "name": "달걀 샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 139.667,
+            "proteinG": 5.633,
+            "fatG": 10.383,
+            "carbG": 5.71,
+            "fiberG": 0.7,
+            "sodiumMg": 189.667
+          }
+        }
+      ],
+      "resolve_by_name_ms": 15.718,
+      "search_candidates_ms": 15.989
+    },
+    {
+      "query_id": 14,
+      "name": "더덕무침",
+      "name_match_food_ref_id": "D314-618000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D314-618000000-0001",
+          "name": "더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 107.75,
+            "proteinG": 2.19,
+            "fatG": 2.01,
+            "carbG": 21.233,
+            "fiberG": 5.55,
+            "sodiumMg": 772.75
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0039",
+          "name": "더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 137.0,
+            "proteinG": 2.585,
+            "fatG": 1.411,
+            "carbG": 28.826,
+            "fiberG": null,
+            "sodiumMg": 778.357
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0750",
+          "name": "생더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 144.667,
+            "proteinG": 3.223,
+            "fatG": 2.16,
+            "carbG": 28.087,
+            "fiberG": null,
+            "sodiumMg": 647.667
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0135",
+          "name": "통더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 185.0,
+            "proteinG": 4.0,
+            "fatG": 2.2,
+            "carbG": 37.0,
+            "fiberG": null,
+            "sodiumMg": 300.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0484",
+          "name": "국산 더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 185.0,
+            "proteinG": 4.0,
+            "fatG": 2.2,
+            "carbG": 37.0,
+            "fiberG": null,
+            "sodiumMg": 300.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 15.737,
+      "search_candidates_ms": 15.779
+    },
+    {
+      "query_id": 15,
+      "name": "연두부",
+      "name_match_food_ref_id": "D407-371000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D407-371000000-0001",
+          "name": "연두부찜",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 67.75,
+            "proteinG": 4.975,
+            "fatG": 3.37,
+            "carbG": 4.363,
+            "fiberG": 1.125,
+            "sodiumMg": 191.0
+          }
+        },
+        {
+          "foodRefId": "D406-344000000-0001",
+          "name": "연두부찌개",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 42.0,
+            "proteinG": 4.8,
+            "fatG": 1.48,
+            "carbG": 2.59,
+            "fiberG": 0.8,
+            "sodiumMg": 291.0
+          }
+        },
+        {
+          "foodRefId": "P106-001000100-0131",
+          "name": "연두부",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 49.25,
+            "proteinG": 4.905,
+            "fatG": 2.27,
+            "carbG": 2.315,
+            "fiberG": 0.3,
+            "sodiumMg": 21.25
+          }
+        },
+        {
+          "foodRefId": "P106-005000300-0054",
+          "name": "냉동연두부",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 69.0,
+            "proteinG": 8.0,
+            "fatG": 2.3,
+            "carbG": 4.0,
+            "fiberG": null,
+            "sodiumMg": 3.0
+          }
+        },
+        {
+          "foodRefId": "P106-001000100-0504",
+          "name": "네컵연두부",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 46.0,
+            "proteinG": 3.61,
+            "fatG": 2.5,
+            "carbG": 2.22,
+            "fiberG": null,
+            "sodiumMg": 14.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 16.318,
+      "search_candidates_ms": 16.878
+    },
+    {
+      "query_id": 16,
+      "name": "포테이토피자",
+      "name_match_food_ref_id": "D202-120000000-1705",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D202-120000000-1705",
+          "name": "피자_포테이토 피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 234.444,
+            "proteinG": 11.178,
+            "fatG": 10.997,
+            "carbG": 26.75,
+            "fiberG": 2.7,
+            "sodiumMg": 341.222
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0003",
+          "name": "피자_골드포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 263.0,
+            "proteinG": 12.8,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 478.0
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0083",
+          "name": "피자_점보포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 233.0,
+            "proteinG": 11.17,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 254.0
+          }
+        },
+        {
+          "foodRefId": "D202-120000000-0457",
+          "name": "피자_로얄포테이토 피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 259.0,
+            "proteinG": 11.77,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 467.0
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0025",
+          "name": "피자_몬스터포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 243.0,
+            "proteinG": 11.42,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 405.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 14.229,
+      "search_candidates_ms": 14.554
+    },
+    {
+      "query_id": 17,
+      "name": "치즈케이크",
+      "name_match_food_ref_id": "D202-110000000-0340",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D202-110000000-0340",
+          "name": "케이크_치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 388.5,
+            "proteinG": 6.145,
+            "fatG": 21.815,
+            "carbG": 26.82,
+            "fiberG": 1.2,
+            "sodiumMg": 140.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0029",
+          "name": "케이크_뉴욕치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 326.0,
+            "proteinG": 5.012,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 174.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0047",
+          "name": "케이크_더블치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 311.0,
+            "proteinG": 7.78,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 270.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0584",
+          "name": "케이크_우유치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 274.0,
+            "proteinG": 6.32,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 116.0
+          }
+        },
+        {
+          "foodRefId": "D202-086000000-0122",
+          "name": "마카롱_치즈케이크 마카롱",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 450.0,
+            "proteinG": 7.0,
+            "fatG": null,
+            "carbG": 45.0,
+            "fiberG": null,
+            "sodiumMg": 179.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 16.314,
+      "search_candidates_ms": 16.327
+    },
+    {
+      "query_id": 18,
+      "name": "무샐러드",
+      "name_match_food_ref_id": "P123-224020200-0732",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-224020200-0732",
+          "name": "비트무샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 93.0,
+            "proteinG": 7.39,
+            "fatG": 3.04,
+            "carbG": 8.7,
+            "fiberG": null,
+            "sodiumMg": 234.0
+          }
+        },
+        {
+          "foodRefId": "P123-226020200-0841",
+          "name": "제철 열무샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 91.0,
+            "proteinG": 6.0,
+            "fatG": 4.8,
+            "carbG": 6.0,
+            "fiberG": null,
+            "sodiumMg": 203.0
+          }
+        },
+        {
+          "foodRefId": "D414-724000000-0001",
+          "name": "햄샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 124.75,
+            "proteinG": 4.025,
+            "fatG": 5.443,
+            "carbG": 15.168,
+            "fiberG": 1.425,
+            "sodiumMg": 199.5
+          }
+        },
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D414-608000000-0001",
+          "name": "과일샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 87.5,
+            "proteinG": 0.578,
+            "fatG": 5.37,
+            "carbG": 10.218,
+            "fiberG": 1.65,
+            "sodiumMg": 37.75
+          }
+        }
+      ],
+      "resolve_by_name_ms": 16.016,
+      "search_candidates_ms": 56.522
+    },
+    {
+      "query_id": 19,
+      "name": "달걀프라이",
+      "name_match_food_ref_id": "D609-449000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D609-449000000-0001",
+          "name": "달걀후라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 181.0,
+            "proteinG": 11.0,
+            "fatG": 13.105,
+            "carbG": 3.06,
+            "fiberG": 0.0,
+            "sodiumMg": 262.0
+          }
+        },
+        {
+          "foodRefId": "D109-417000000-0001",
+          "name": "달걀부침(달걀후라이)",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 181.5,
+            "proteinG": 11.923,
+            "fatG": 12.768,
+            "carbG": 3.508,
+            "fiberG": 2.1,
+            "sodiumMg": 269.75
+          }
+        },
+        {
+          "foodRefId": "D212-537000000-0016",
+          "name": "감자튀김_프렌치 프라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 275.0,
+            "proteinG": 3.75,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 278.0
+          }
+        },
+        {
+          "foodRefId": "D109-417120000-0001",
+          "name": "달걀부침(달걀후라이)_햄",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 277.0,
+            "proteinG": 12.71,
+            "fatG": 21.59,
+            "carbG": 8.06,
+            "fiberG": 1.5,
+            "sodiumMg": 591.0
+          }
+        },
+        {
+          "foodRefId": "D212-549000000-0158",
+          "name": "닭튀김_순살치킨 앤 프라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 255.0,
+            "proteinG": 11.54,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 508.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 62.438,
+      "search_candidates_ms": 61.358
+    },
+    {
+      "query_id": 20,
+      "name": "감자샐러드",
+      "name_match_food_ref_id": "D414-664000000-0001",
+      "candidate_search_status": "ok",
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D514-664440000-0001",
+          "name": "감자샐러드_당근",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 77.0,
+            "proteinG": 1.2,
+            "fatG": 4.49,
+            "carbG": 8.31,
+            "fiberG": 1.7,
+            "sodiumMg": 33.0
+          }
+        },
+        {
+          "foodRefId": "D714-664260000-0001",
+          "name": "감자샐러드_오이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 104.0,
+            "proteinG": 1.7,
+            "fatG": 6.05,
+            "carbG": 11.17,
+            "fiberG": 2.1,
+            "sodiumMg": 1010.0
+          }
+        },
+        {
+          "foodRefId": "D402-143000000-0001",
+          "name": "감자샐러드 샌드위치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 108.333,
+            "proteinG": 3.067,
+            "fatG": 4.753,
+            "carbG": 13.457,
+            "fiberG": 1.3,
+            "sodiumMg": 216.667
+          }
+        },
+        {
+          "foodRefId": "D202-098000000-0001",
+          "name": "소세지빵_감자샐러드 소세지빵",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 319.0,
+            "proteinG": 10.37,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 609.0
+          }
+        }
+      ],
+      "resolve_by_name_ms": 13.901,
+      "search_candidates_ms": 14.297
+    }
+  ],
+  "items": [
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 350.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "불고기비빔밥",
+      "worker_amount": "350.00",
+      "worker_unit": "g",
+      "amount_g": "350.00",
+      "query_id": 1,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-201020300-5316",
+          "name": "불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 201.0,
+            "proteinG": 6.5,
+            "fatG": 6.0,
+            "carbG": 30.0,
+            "fiberG": null,
+            "sodiumMg": 465.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0052",
+          "name": "돈불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 153.0,
+            "proteinG": 4.82,
+            "fatG": 3.12,
+            "carbG": 26.35,
+            "fiberG": null,
+            "sodiumMg": 351.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0581",
+          "name": "소불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 142.25,
+            "proteinG": 4.638,
+            "fatG": 2.8,
+            "carbG": 24.593,
+            "fiberG": null,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0838",
+          "name": "돼지불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 174.0,
+            "proteinG": 6.04,
+            "fatG": 5.14,
+            "carbG": 25.98,
+            "fiberG": null,
+            "sodiumMg": 468.0
+          }
+        },
+        {
+          "foodRefId": "P111-000030100-0289",
+          "name": "버섯불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 132.0,
+            "proteinG": 6.54,
+            "fatG": 3.57,
+            "carbG": 20.03,
+            "fiberG": null,
+            "sodiumMg": 304.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 703.5,
+        "proteinG": 22.75,
+        "fatG": 21.0,
+        "carbG": 105.0,
+        "fiberG": null,
+        "sodiumMg": 1627.5
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 2,
+      "original_item": {
+        "originalFoodName": "쌀밥",
+        "estimatedAmount": 210.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "쌀밥",
+      "worker_amount": "210.00",
+      "worker_unit": "g",
+      "amount_g": "210.00",
+      "query_id": 2,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D301-022000000-0001",
+          "name": "쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 135.333,
+            "proteinG": 2.587,
+            "fatG": 0.333,
+            "carbG": 29.633,
+            "fiberG": 0.433,
+            "sodiumMg": 0.667
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0748",
+          "name": "쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 152.333,
+            "proteinG": 2.713,
+            "fatG": 0.633,
+            "carbG": 34.013,
+            "fiberG": null,
+            "sodiumMg": 2.333
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-4379",
+          "name": "찹쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 171.0,
+            "proteinG": 2.915,
+            "fatG": 1.2,
+            "carbG": 36.99,
+            "fiberG": null,
+            "sodiumMg": 3.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-3572",
+          "name": "햅쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 155.0,
+            "proteinG": 2.86,
+            "fatG": 0.62,
+            "carbG": 34.29,
+            "fiberG": null,
+            "sodiumMg": 3.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-6675",
+          "name": "흰쌀밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 130.0,
+            "proteinG": 2.4,
+            "fatG": 0.3,
+            "carbG": 28.6,
+            "fiberG": null,
+            "sodiumMg": 0.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D301-022000000-0001",
+        "name": "쌀밥",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 284.2,
+        "proteinG": 5.43,
+        "fatG": 0.7,
+        "carbG": 62.23,
+        "fiberG": 0.91,
+        "sodiumMg": 1.4
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 3,
+      "original_item": {
+        "originalFoodName": "콩나물국",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "콩나물국",
+      "worker_amount": "200.00",
+      "worker_unit": "g",
+      "amount_g": "200.00",
+      "query_id": 3,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D105-253000000-0001",
+          "name": "콩나물국",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 6.0,
+            "proteinG": 0.747,
+            "fatG": 0.143,
+            "carbG": 0.683,
+            "fiberG": 0.333,
+            "sodiumMg": 165.0
+          }
+        },
+        {
+          "foodRefId": "D401-046000000-0001",
+          "name": "콩나물국밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 59.667,
+            "proteinG": 2.62,
+            "fatG": 0.767,
+            "carbG": 10.533,
+            "fiberG": 0.767,
+            "sodiumMg": 57.667
+          }
+        },
+        {
+          "foodRefId": "D605-253150000-0001",
+          "name": "콩나물국_무",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 6.0,
+            "proteinG": 0.7,
+            "fatG": 0.2,
+            "carbG": 0.75,
+            "fiberG": 0.3,
+            "sodiumMg": 122.0
+          }
+        },
+        {
+          "foodRefId": "D405-269000000-0001",
+          "name": "김치 콩나물국",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 10.25,
+            "proteinG": 1.075,
+            "fatG": 0.225,
+            "carbG": 1.273,
+            "fiberG": 0.775,
+            "sodiumMg": 210.75
+          }
+        },
+        {
+          "foodRefId": "D705-253450000-0001",
+          "name": "콩나물국_고추",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 9.0,
+            "proteinG": 1.1,
+            "fatG": 0.3,
+            "carbG": 1.12,
+            "fiberG": 0.4,
+            "sodiumMg": 255.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D105-253000000-0001",
+        "name": "콩나물국",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 12.0,
+        "proteinG": 1.49,
+        "fatG": 0.29,
+        "carbG": 1.37,
+        "fiberG": 0.67,
+        "sodiumMg": 330.0
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 4,
+      "original_item": {
+        "originalFoodName": "잡채",
+        "estimatedAmount": 80.0,
+        "unit": "g",
+        "confidence": 0.93,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "잡채",
+      "worker_amount": "80.00",
+      "worker_unit": "g",
+      "amount_g": "80.00",
+      "query_id": 4,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D110-492000000-0001",
+          "name": "잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 146.0,
+            "proteinG": 4.71,
+            "fatG": 3.3,
+            "carbG": 24.26,
+            "fiberG": 3.7,
+            "sodiumMg": 360.0
+          }
+        },
+        {
+          "foodRefId": "D101-033000000-0001",
+          "name": "잡채밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 114.8,
+            "proteinG": 3.144,
+            "fatG": 1.884,
+            "carbG": 20.702,
+            "fiberG": 1.16,
+            "sodiumMg": 109.8
+          }
+        },
+        {
+          "foodRefId": "D410-453000000-0001",
+          "name": "고추잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 75.667,
+            "proteinG": 6.023,
+            "fatG": 3.797,
+            "carbG": 4.523,
+            "fiberG": 1.3,
+            "sodiumMg": 195.667
+          }
+        },
+        {
+          "foodRefId": "D510-517000000-0001",
+          "name": "부추잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 86.0,
+            "proteinG": 5.9,
+            "fatG": 5.29,
+            "carbG": 3.487,
+            "fiberG": 1.133,
+            "sodiumMg": 214.667
+          }
+        },
+        {
+          "foodRefId": "D410-527000000-0001",
+          "name": "어묵잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 127.0,
+            "proteinG": 6.6,
+            "fatG": 6.54,
+            "carbG": 10.005,
+            "fiberG": 0.6,
+            "sodiumMg": 426.5
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D110-492000000-0001",
+        "name": "잡채",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 116.8,
+        "proteinG": 3.77,
+        "fatG": 2.64,
+        "carbG": 19.41,
+        "fiberG": 2.96,
+        "sodiumMg": 288.0
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 5,
+      "original_item": {
+        "originalFoodName": "양념게장",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.8,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "양념게장",
+      "worker_amount": "70.00",
+      "worker_unit": "g",
+      "amount_g": "70.00",
+      "query_id": 5,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "P114-400020100-0086",
+          "name": "양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 122.125,
+            "proteinG": 10.829,
+            "fatG": 1.277,
+            "carbG": 16.835,
+            "fiberG": 1.7,
+            "sodiumMg": 810.688
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0838",
+          "name": "꽃게양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 164.0,
+            "proteinG": 8.0,
+            "fatG": 3.2,
+            "carbG": 25.0,
+            "fiberG": null,
+            "sodiumMg": 736.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-2953",
+          "name": "도화양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 157.0,
+            "proteinG": 8.4,
+            "fatG": 2.1,
+            "carbG": 25.9,
+            "fiberG": null,
+            "sodiumMg": 965.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-3158",
+          "name": "려 양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 167.0,
+            "proteinG": 12.22,
+            "fatG": 1.66,
+            "carbG": 25.88,
+            "fiberG": null,
+            "sodiumMg": 1000.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-3397",
+          "name": "수제양념게장",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 133.0,
+            "proteinG": 8.1,
+            "fatG": 3.8,
+            "carbG": 16.6,
+            "fiberG": null,
+            "sodiumMg": 837.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P114-400020100-0086",
+        "name": "양념게장",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 85.49,
+        "proteinG": 7.58,
+        "fatG": 0.89,
+        "carbG": 11.78,
+        "fiberG": 1.19,
+        "sodiumMg": 567.48
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 6,
+      "original_item": {
+        "originalFoodName": "양념두부",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "양념두부",
+      "worker_amount": "60.00",
+      "worker_unit": "g",
+      "amount_g": "60.00",
+      "query_id": 6,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D510-524000000-0001",
+          "name": "양념두부",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 68.0,
+            "proteinG": 6.2,
+            "fatG": 3.39,
+            "carbG": 2.99,
+            "fiberG": 2.0,
+            "sodiumMg": 105.0
+          }
+        },
+        {
+          "foodRefId": "P113-206020400-1645",
+          "name": "마파두부양념",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 153.0,
+            "proteinG": 4.67,
+            "fatG": 8.67,
+            "carbG": 14.0,
+            "fiberG": null,
+            "sodiumMg": 1400.0
+          }
+        },
+        {
+          "foodRefId": "P113-206020400-1792",
+          "name": "순두부찌개양념",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 83.5,
+            "proteinG": 4.04,
+            "fatG": 3.96,
+            "carbG": 7.86,
+            "fiberG": null,
+            "sodiumMg": 1877.0
+          }
+        },
+        {
+          "foodRefId": "P123-210020300-0170",
+          "name": "두부 양념 조림",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 143.0,
+            "proteinG": 9.64,
+            "fatG": 9.66,
+            "carbG": 4.4,
+            "fiberG": null,
+            "sodiumMg": 161.0
+          }
+        },
+        {
+          "foodRefId": "P113-206020400-1611",
+          "name": "두부두루치기양념",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 93.0,
+            "proteinG": 2.86,
+            "fatG": 4.29,
+            "carbG": 12.14,
+            "fiberG": null,
+            "sodiumMg": 857.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D510-524000000-0001",
+        "name": "양념두부",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 40.8,
+        "proteinG": 3.72,
+        "fatG": 2.03,
+        "carbG": 1.79,
+        "fiberG": 1.2,
+        "sodiumMg": 63.0
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 7,
+      "original_item": {
+        "originalFoodName": "브로콜리두부무침",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "브로콜리두부무침",
+      "worker_amount": "50.00",
+      "worker_unit": "g",
+      "amount_g": "50.00",
+      "query_id": 7,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-688000000-0001",
+          "name": "브로콜리 두부무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 35.0,
+            "proteinG": 2.0,
+            "fatG": 0.72,
+            "carbG": 6.17,
+            "fiberG": 1.7,
+            "sodiumMg": 167.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0743",
+          "name": "브로콜리두부무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 77.0,
+            "proteinG": 7.33,
+            "fatG": 4.0,
+            "carbG": 5.33,
+            "fiberG": null,
+            "sodiumMg": 467.0
+          }
+        },
+        {
+          "foodRefId": "P123-212020200-0221",
+          "name": "브로콜리참깨두부무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 407.0,
+            "proteinG": 22.22,
+            "fatG": 20.0,
+            "carbG": 34.81,
+            "fiberG": null,
+            "sodiumMg": 631.0
+          }
+        },
+        {
+          "foodRefId": "P110-400040000-1062",
+          "name": "단호박브로콜리두부죽",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 65.0,
+            "proteinG": 1.86,
+            "fatG": 0.43,
+            "carbG": 13.57,
+            "fiberG": null,
+            "sodiumMg": 2.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-0093",
+          "name": "F58 한우브로콜리두부덮밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 109.0,
+            "proteinG": 3.75,
+            "fatG": 2.0,
+            "carbG": 18.75,
+            "fiberG": null,
+            "sodiumMg": 69.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D414-688000000-0001",
+        "name": "브로콜리 두부무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 17.5,
+        "proteinG": 1.0,
+        "fatG": 0.36,
+        "carbG": 3.08,
+        "fiberG": 0.85,
+        "sodiumMg": 83.5
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 8,
+      "original_item": {
+        "originalFoodName": "배추김치",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "배추김치",
+      "worker_amount": "40.00",
+      "worker_unit": "g",
+      "amount_g": "40.00",
+      "query_id": 8,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D315-670000000-0001",
+          "name": "배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 38.0,
+            "proteinG": 1.98,
+            "fatG": 0.43,
+            "carbG": 6.49,
+            "fiberG": 2.5,
+            "sodiumMg": 551.0
+          }
+        },
+        {
+          "foodRefId": "D615-687000000-0001",
+          "name": "양배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 39.0,
+            "proteinG": 2.2,
+            "fatG": 0.39,
+            "carbG": 8.29,
+            "fiberG": 3.4,
+            "sodiumMg": 2099.0
+          }
+        },
+        {
+          "foodRefId": "D115-674000000-0001",
+          "name": "얼갈이배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 46.5,
+            "proteinG": 1.735,
+            "fatG": 1.015,
+            "carbG": 7.655,
+            "fiberG": 2.5,
+            "sodiumMg": 413.5
+          }
+        },
+        {
+          "foodRefId": "D403-164250000-0001",
+          "name": "우동_배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 65.0,
+            "proteinG": 1.85,
+            "fatG": 0.79,
+            "carbG": 12.11,
+            "fiberG": 1.1,
+            "sodiumMg": 250.0
+          }
+        },
+        {
+          "foodRefId": "D315-670030000-0001",
+          "name": "배추김치_봄재배",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 39.0,
+            "proteinG": 2.22,
+            "fatG": 0.67,
+            "carbG": 5.95,
+            "fiberG": 3.6,
+            "sodiumMg": 626.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D315-670000000-0001",
+        "name": "배추김치",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 15.2,
+        "proteinG": 0.79,
+        "fatG": 0.17,
+        "carbG": 2.6,
+        "fiberG": 1.0,
+        "sodiumMg": 220.4
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 9,
+      "original_item": {
+        "originalFoodName": "양배추샐러드",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.87,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "양배추샐러드",
+      "worker_amount": "60.00",
+      "worker_unit": "g",
+      "amount_g": "60.00",
+      "query_id": 9,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-701000000-0001",
+          "name": "양배추 샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 99.0,
+            "proteinG": 0.9,
+            "fatG": 8.95,
+            "carbG": 4.32,
+            "fiberG": 1.3,
+            "sodiumMg": 145.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0188",
+          "name": "당근양배추샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 79.0,
+            "proteinG": 3.31,
+            "fatG": 5.54,
+            "carbG": 3.88,
+            "fiberG": null,
+            "sodiumMg": 559.0
+          }
+        },
+        {
+          "foodRefId": "P123-226020200-0693",
+          "name": "놀라운양배추샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 35.0,
+            "proteinG": 1.47,
+            "fatG": 0.39,
+            "carbG": 6.37,
+            "fiberG": null,
+            "sodiumMg": 30.0
+          }
+        },
+        {
+          "foodRefId": "D114-640220000-0001",
+          "name": "샐러드_양배추",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 150.0,
+            "proteinG": 2.69,
+            "fatG": 11.71,
+            "carbG": 8.47,
+            "fiberG": 2.6,
+            "sodiumMg": 97.0
+          }
+        },
+        {
+          "foodRefId": "D514-700000000-0001",
+          "name": "양배추 사과 샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 137.667,
+            "proteinG": 0.9,
+            "fatG": 10.72,
+            "carbG": 10.613,
+            "fiberG": 2.0,
+            "sodiumMg": 73.333
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D414-701000000-0001",
+        "name": "양배추 샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 59.4,
+        "proteinG": 0.54,
+        "fatG": 5.37,
+        "carbG": 2.59,
+        "fiberG": 0.78,
+        "sodiumMg": 87.0
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 10,
+      "original_item": {
+        "originalFoodName": "미역초무침",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.82,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "미역초무침",
+      "worker_amount": "40.00",
+      "worker_unit": "g",
+      "amount_g": "40.00",
+      "query_id": 10,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D114-632000000-0001",
+          "name": "미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 43.0,
+            "proteinG": 1.617,
+            "fatG": 0.737,
+            "carbG": 8.22,
+            "fiberG": 3.133,
+            "sodiumMg": 485.0
+          }
+        },
+        {
+          "foodRefId": "D514-711000000-0001",
+          "name": "오징어미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 87.0,
+            "proteinG": 15.0,
+            "fatG": 1.72,
+            "carbG": 5.24,
+            "fiberG": 3.6,
+            "sodiumMg": 1133.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0211",
+          "name": "미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 35.0,
+            "proteinG": 1.18,
+            "fatG": 1.02,
+            "carbG": 5.24,
+            "fiberG": null,
+            "sodiumMg": 452.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-2404",
+          "name": "황태미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 260.0,
+            "proteinG": 21.0,
+            "fatG": 5.0,
+            "carbG": 33.0,
+            "fiberG": null,
+            "sodiumMg": 1020.0
+          }
+        },
+        {
+          "foodRefId": "D114-660000000-0001",
+          "name": "해초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 39.0,
+            "proteinG": 0.95,
+            "fatG": 0.16,
+            "carbG": 8.52,
+            "fiberG": 4.3,
+            "sodiumMg": 862.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D114-632000000-0001",
+        "name": "미역초무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 17.2,
+        "proteinG": 0.65,
+        "fatG": 0.29,
+        "carbG": 3.29,
+        "fiberG": 1.25,
+        "sodiumMg": 194.0
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 1,
+      "item_index": 11,
+      "original_item": {
+        "originalFoodName": "무피클",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "무피클",
+      "worker_amount": "40.00",
+      "worker_unit": "g",
+      "amount_g": "40.00",
+      "query_id": 11,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "P114-202020100-0069",
+          "name": "무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 76.5,
+            "proteinG": 1.165,
+            "fatG": 1.295,
+            "carbG": 15.16,
+            "fiberG": null,
+            "sodiumMg": 285.5
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0063",
+          "name": "갓무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 17.0,
+            "proteinG": 0.52,
+            "fatG": 0.3,
+            "carbG": 3.05,
+            "fiberG": null,
+            "sodiumMg": 189.0
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0233",
+          "name": "오이무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 53.0,
+            "proteinG": 0.0,
+            "fatG": 0.3,
+            "carbG": 12.0,
+            "fiberG": null,
+            "sodiumMg": 19.0
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0076",
+          "name": "조선무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 20.0,
+            "proteinG": 0.48,
+            "fatG": 0.48,
+            "carbG": 3.56,
+            "fiberG": null,
+            "sodiumMg": 352.0
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0155",
+          "name": "무피클동치미",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 14.0,
+            "proteinG": 0.2,
+            "fatG": 0.0,
+            "carbG": 3.2,
+            "fiberG": null,
+            "sodiumMg": 435.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P114-202020100-0069",
+        "name": "무피클",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 30.6,
+        "proteinG": 0.47,
+        "fatG": 0.52,
+        "carbG": 6.06,
+        "fiberG": null,
+        "sodiumMg": 114.2
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 450.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "불고기비빔밥",
+      "worker_amount": "450.00",
+      "worker_unit": "g",
+      "amount_g": "450.00",
+      "query_id": 1,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-201020300-5316",
+          "name": "불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 201.0,
+            "proteinG": 6.5,
+            "fatG": 6.0,
+            "carbG": 30.0,
+            "fiberG": null,
+            "sodiumMg": 465.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0052",
+          "name": "돈불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 153.0,
+            "proteinG": 4.82,
+            "fatG": 3.12,
+            "carbG": 26.35,
+            "fiberG": null,
+            "sodiumMg": 351.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0581",
+          "name": "소불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 142.25,
+            "proteinG": 4.638,
+            "fatG": 2.8,
+            "carbG": 24.593,
+            "fiberG": null,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0838",
+          "name": "돼지불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 174.0,
+            "proteinG": 6.04,
+            "fatG": 5.14,
+            "carbG": 25.98,
+            "fiberG": null,
+            "sodiumMg": 468.0
+          }
+        },
+        {
+          "foodRefId": "P111-000030100-0289",
+          "name": "버섯불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 132.0,
+            "proteinG": 6.54,
+            "fatG": 3.57,
+            "carbG": 20.03,
+            "fiberG": null,
+            "sodiumMg": 304.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 904.5,
+        "proteinG": 29.25,
+        "fatG": 27.0,
+        "carbG": 135.0,
+        "fiberG": null,
+        "sodiumMg": 2092.5
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 2,
+      "original_item": {
+        "originalFoodName": "불고기비빔밥",
+        "estimatedAmount": 450.0,
+        "unit": "g",
+        "confidence": 0.88,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "불고기비빔밥",
+      "worker_amount": "450.00",
+      "worker_unit": "g",
+      "amount_g": "450.00",
+      "query_id": 1,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-201020300-5316",
+          "name": "불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 201.0,
+            "proteinG": 6.5,
+            "fatG": 6.0,
+            "carbG": 30.0,
+            "fiberG": null,
+            "sodiumMg": 465.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0052",
+          "name": "돈불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 153.0,
+            "proteinG": 4.82,
+            "fatG": 3.12,
+            "carbG": 26.35,
+            "fiberG": null,
+            "sodiumMg": 351.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0581",
+          "name": "소불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 142.25,
+            "proteinG": 4.638,
+            "fatG": 2.8,
+            "carbG": 24.593,
+            "fiberG": null,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020200-0838",
+          "name": "돼지불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 174.0,
+            "proteinG": 6.04,
+            "fatG": 5.14,
+            "carbG": 25.98,
+            "fiberG": null,
+            "sodiumMg": 468.0
+          }
+        },
+        {
+          "foodRefId": "P111-000030100-0289",
+          "name": "버섯불고기비빔밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 132.0,
+            "proteinG": 6.54,
+            "fatG": 3.57,
+            "carbG": 20.03,
+            "fiberG": null,
+            "sodiumMg": 304.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 904.5,
+        "proteinG": 29.25,
+        "fatG": 27.0,
+        "carbG": 135.0,
+        "fiberG": null,
+        "sodiumMg": 2092.5
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 3,
+      "original_item": {
+        "originalFoodName": "공깃밥",
+        "estimatedAmount": 210.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "공깃밥",
+      "worker_amount": "210.00",
+      "worker_unit": "g",
+      "amount_g": "210.00",
+      "query_id": 12,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-201020300-0002",
+          "name": "0.7공깃밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 150.0,
+            "proteinG": 0.0,
+            "fatG": 0.73,
+            "carbG": 33.33,
+            "fiberG": null,
+            "sodiumMg": 7.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-5001",
+          "name": "맛있는 공깃밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 138.0,
+            "proteinG": 2.0,
+            "fatG": 0.5,
+            "carbG": 31.0,
+            "fiberG": null,
+            "sodiumMg": 3.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-4819",
+          "name": "크레잇 공깃밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 143.0,
+            "proteinG": 3.0,
+            "fatG": 0.45,
+            "carbG": 31.5,
+            "fiberG": null,
+            "sodiumMg": 0.0
+          }
+        },
+        {
+          "foodRefId": "P118-100010700-0164",
+          "name": "공깃돌쉐키란",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 128.0,
+            "proteinG": 11.0,
+            "fatG": 6.6,
+            "carbG": 4.0,
+            "fiberG": null,
+            "sodiumMg": 420.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P123-201020300-0002",
+        "name": "0.7공깃밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 315.0,
+        "proteinG": 0.0,
+        "fatG": 1.53,
+        "carbG": 69.99,
+        "fiberG": null,
+        "sodiumMg": 14.7
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 4,
+      "original_item": {
+        "originalFoodName": "공깃밥",
+        "estimatedAmount": 210.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "공깃밥",
+      "worker_amount": "210.00",
+      "worker_unit": "g",
+      "amount_g": "210.00",
+      "query_id": 12,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-201020300-0002",
+          "name": "0.7공깃밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 150.0,
+            "proteinG": 0.0,
+            "fatG": 0.73,
+            "carbG": 33.33,
+            "fiberG": null,
+            "sodiumMg": 7.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-5001",
+          "name": "맛있는 공깃밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 138.0,
+            "proteinG": 2.0,
+            "fatG": 0.5,
+            "carbG": 31.0,
+            "fiberG": null,
+            "sodiumMg": 3.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-4819",
+          "name": "크레잇 공깃밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 143.0,
+            "proteinG": 3.0,
+            "fatG": 0.45,
+            "carbG": 31.5,
+            "fiberG": null,
+            "sodiumMg": 0.0
+          }
+        },
+        {
+          "foodRefId": "P118-100010700-0164",
+          "name": "공깃돌쉐키란",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 128.0,
+            "proteinG": 11.0,
+            "fatG": 6.6,
+            "carbG": 4.0,
+            "fiberG": null,
+            "sodiumMg": 420.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P123-201020300-0002",
+        "name": "0.7공깃밥",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 315.0,
+        "proteinG": 0.0,
+        "fatG": 1.53,
+        "carbG": 69.99,
+        "fiberG": null,
+        "sodiumMg": 14.7
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 5,
+      "original_item": {
+        "originalFoodName": "콩나물국",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "콩나물국",
+      "worker_amount": "200.00",
+      "worker_unit": "g",
+      "amount_g": "200.00",
+      "query_id": 3,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D105-253000000-0001",
+          "name": "콩나물국",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 6.0,
+            "proteinG": 0.747,
+            "fatG": 0.143,
+            "carbG": 0.683,
+            "fiberG": 0.333,
+            "sodiumMg": 165.0
+          }
+        },
+        {
+          "foodRefId": "D401-046000000-0001",
+          "name": "콩나물국밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 59.667,
+            "proteinG": 2.62,
+            "fatG": 0.767,
+            "carbG": 10.533,
+            "fiberG": 0.767,
+            "sodiumMg": 57.667
+          }
+        },
+        {
+          "foodRefId": "D605-253150000-0001",
+          "name": "콩나물국_무",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 6.0,
+            "proteinG": 0.7,
+            "fatG": 0.2,
+            "carbG": 0.75,
+            "fiberG": 0.3,
+            "sodiumMg": 122.0
+          }
+        },
+        {
+          "foodRefId": "D405-269000000-0001",
+          "name": "김치 콩나물국",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 10.25,
+            "proteinG": 1.075,
+            "fatG": 0.225,
+            "carbG": 1.273,
+            "fiberG": 0.775,
+            "sodiumMg": 210.75
+          }
+        },
+        {
+          "foodRefId": "D705-253450000-0001",
+          "name": "콩나물국_고추",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 9.0,
+            "proteinG": 1.1,
+            "fatG": 0.3,
+            "carbG": 1.12,
+            "fiberG": 0.4,
+            "sodiumMg": 255.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D105-253000000-0001",
+        "name": "콩나물국",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 12.0,
+        "proteinG": 1.49,
+        "fatG": 0.29,
+        "carbG": 1.37,
+        "fiberG": 0.67,
+        "sodiumMg": 330.0
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 6,
+      "original_item": {
+        "originalFoodName": "잡채",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "잡채",
+      "worker_amount": "70.00",
+      "worker_unit": "g",
+      "amount_g": "70.00",
+      "query_id": 4,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D110-492000000-0001",
+          "name": "잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 146.0,
+            "proteinG": 4.71,
+            "fatG": 3.3,
+            "carbG": 24.26,
+            "fiberG": 3.7,
+            "sodiumMg": 360.0
+          }
+        },
+        {
+          "foodRefId": "D101-033000000-0001",
+          "name": "잡채밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 114.8,
+            "proteinG": 3.144,
+            "fatG": 1.884,
+            "carbG": 20.702,
+            "fiberG": 1.16,
+            "sodiumMg": 109.8
+          }
+        },
+        {
+          "foodRefId": "D410-453000000-0001",
+          "name": "고추잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 75.667,
+            "proteinG": 6.023,
+            "fatG": 3.797,
+            "carbG": 4.523,
+            "fiberG": 1.3,
+            "sodiumMg": 195.667
+          }
+        },
+        {
+          "foodRefId": "D510-517000000-0001",
+          "name": "부추잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 86.0,
+            "proteinG": 5.9,
+            "fatG": 5.29,
+            "carbG": 3.487,
+            "fiberG": 1.133,
+            "sodiumMg": 214.667
+          }
+        },
+        {
+          "foodRefId": "D410-527000000-0001",
+          "name": "어묵잡채",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 127.0,
+            "proteinG": 6.6,
+            "fatG": 6.54,
+            "carbG": 10.005,
+            "fiberG": 0.6,
+            "sodiumMg": 426.5
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D110-492000000-0001",
+        "name": "잡채",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 102.2,
+        "proteinG": 3.3,
+        "fatG": 2.31,
+        "carbG": 16.98,
+        "fiberG": 2.59,
+        "sodiumMg": 252.0
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 7,
+      "original_item": {
+        "originalFoodName": "브로콜리두부무침",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "브로콜리두부무침",
+      "worker_amount": "50.00",
+      "worker_unit": "g",
+      "amount_g": "50.00",
+      "query_id": 7,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-688000000-0001",
+          "name": "브로콜리 두부무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 35.0,
+            "proteinG": 2.0,
+            "fatG": 0.72,
+            "carbG": 6.17,
+            "fiberG": 1.7,
+            "sodiumMg": 167.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0743",
+          "name": "브로콜리두부무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 77.0,
+            "proteinG": 7.33,
+            "fatG": 4.0,
+            "carbG": 5.33,
+            "fiberG": null,
+            "sodiumMg": 467.0
+          }
+        },
+        {
+          "foodRefId": "P123-212020200-0221",
+          "name": "브로콜리참깨두부무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 407.0,
+            "proteinG": 22.22,
+            "fatG": 20.0,
+            "carbG": 34.81,
+            "fiberG": null,
+            "sodiumMg": 631.0
+          }
+        },
+        {
+          "foodRefId": "P110-400040000-1062",
+          "name": "단호박브로콜리두부죽",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 65.0,
+            "proteinG": 1.86,
+            "fatG": 0.43,
+            "carbG": 13.57,
+            "fiberG": null,
+            "sodiumMg": 2.0
+          }
+        },
+        {
+          "foodRefId": "P123-201020300-0093",
+          "name": "F58 한우브로콜리두부덮밥",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 109.0,
+            "proteinG": 3.75,
+            "fatG": 2.0,
+            "carbG": 18.75,
+            "fiberG": null,
+            "sodiumMg": 69.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D414-688000000-0001",
+        "name": "브로콜리 두부무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 17.5,
+        "proteinG": 1.0,
+        "fatG": 0.36,
+        "carbG": 3.08,
+        "fiberG": 0.85,
+        "sodiumMg": 83.5
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 8,
+      "original_item": {
+        "originalFoodName": "배추김치",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "배추김치",
+      "worker_amount": "40.00",
+      "worker_unit": "g",
+      "amount_g": "40.00",
+      "query_id": 8,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D315-670000000-0001",
+          "name": "배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 38.0,
+            "proteinG": 1.98,
+            "fatG": 0.43,
+            "carbG": 6.49,
+            "fiberG": 2.5,
+            "sodiumMg": 551.0
+          }
+        },
+        {
+          "foodRefId": "D615-687000000-0001",
+          "name": "양배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 39.0,
+            "proteinG": 2.2,
+            "fatG": 0.39,
+            "carbG": 8.29,
+            "fiberG": 3.4,
+            "sodiumMg": 2099.0
+          }
+        },
+        {
+          "foodRefId": "D115-674000000-0001",
+          "name": "얼갈이배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 46.5,
+            "proteinG": 1.735,
+            "fatG": 1.015,
+            "carbG": 7.655,
+            "fiberG": 2.5,
+            "sodiumMg": 413.5
+          }
+        },
+        {
+          "foodRefId": "D403-164250000-0001",
+          "name": "우동_배추김치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 65.0,
+            "proteinG": 1.85,
+            "fatG": 0.79,
+            "carbG": 12.11,
+            "fiberG": 1.1,
+            "sodiumMg": 250.0
+          }
+        },
+        {
+          "foodRefId": "D315-670030000-0001",
+          "name": "배추김치_봄재배",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 39.0,
+            "proteinG": 2.22,
+            "fatG": 0.67,
+            "carbG": 5.95,
+            "fiberG": 3.6,
+            "sodiumMg": 626.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D315-670000000-0001",
+        "name": "배추김치",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 15.2,
+        "proteinG": 0.79,
+        "fatG": 0.17,
+        "carbG": 2.6,
+        "fiberG": 1.0,
+        "sodiumMg": 220.4
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 9,
+      "original_item": {
+        "originalFoodName": "샐러드",
+        "estimatedAmount": 60.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "샐러드",
+      "worker_amount": "60.00",
+      "worker_unit": "g",
+      "amount_g": "60.00",
+      "query_id": 13,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-724000000-0001",
+          "name": "햄샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 124.75,
+            "proteinG": 4.025,
+            "fatG": 5.443,
+            "carbG": 15.168,
+            "fiberG": 1.425,
+            "sodiumMg": 199.5
+          }
+        },
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D414-608000000-0001",
+          "name": "과일샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 87.5,
+            "proteinG": 0.578,
+            "fatG": 5.37,
+            "carbG": 10.218,
+            "fiberG": 1.65,
+            "sodiumMg": 37.75
+          }
+        },
+        {
+          "foodRefId": "D301-007270000-0001",
+          "name": "김밥_샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 139.5,
+            "proteinG": 3.625,
+            "fatG": 4.355,
+            "carbG": 21.36,
+            "fiberG": 1.4,
+            "sodiumMg": 261.0
+          }
+        },
+        {
+          "foodRefId": "D414-668000000-0001",
+          "name": "달걀 샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 139.667,
+            "proteinG": 5.633,
+            "fatG": 10.383,
+            "carbG": 5.71,
+            "fiberG": 0.7,
+            "sodiumMg": 189.667
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D414-724000000-0001",
+        "name": "햄샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 74.85,
+        "proteinG": 2.42,
+        "fatG": 3.27,
+        "carbG": 9.1,
+        "fiberG": 0.86,
+        "sodiumMg": 119.7
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 10,
+      "original_item": {
+        "originalFoodName": "더덕무침",
+        "estimatedAmount": 50.0,
+        "unit": "g",
+        "confidence": 0.75,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "더덕무침",
+      "worker_amount": "50.00",
+      "worker_unit": "g",
+      "amount_g": "50.00",
+      "query_id": 14,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D314-618000000-0001",
+          "name": "더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 107.75,
+            "proteinG": 2.19,
+            "fatG": 2.01,
+            "carbG": 21.233,
+            "fiberG": 5.55,
+            "sodiumMg": 772.75
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0039",
+          "name": "더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 137.0,
+            "proteinG": 2.585,
+            "fatG": 1.411,
+            "carbG": 28.826,
+            "fiberG": null,
+            "sodiumMg": 778.357
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0750",
+          "name": "생더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 144.667,
+            "proteinG": 3.223,
+            "fatG": 2.16,
+            "carbG": 28.087,
+            "fiberG": null,
+            "sodiumMg": 647.667
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0135",
+          "name": "통더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 185.0,
+            "proteinG": 4.0,
+            "fatG": 2.2,
+            "carbG": 37.0,
+            "fiberG": null,
+            "sodiumMg": 300.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0484",
+          "name": "국산 더덕무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 185.0,
+            "proteinG": 4.0,
+            "fatG": 2.2,
+            "carbG": 37.0,
+            "fiberG": null,
+            "sodiumMg": 300.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D314-618000000-0001",
+        "name": "더덕무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 53.88,
+        "proteinG": 1.1,
+        "fatG": 1.0,
+        "carbG": 10.62,
+        "fiberG": 2.78,
+        "sodiumMg": 386.38
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 11,
+      "original_item": {
+        "originalFoodName": "연두부",
+        "estimatedAmount": 70.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "연두부",
+      "worker_amount": "70.00",
+      "worker_unit": "g",
+      "amount_g": "70.00",
+      "query_id": 15,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D407-371000000-0001",
+          "name": "연두부찜",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 67.75,
+            "proteinG": 4.975,
+            "fatG": 3.37,
+            "carbG": 4.363,
+            "fiberG": 1.125,
+            "sodiumMg": 191.0
+          }
+        },
+        {
+          "foodRefId": "D406-344000000-0001",
+          "name": "연두부찌개",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 42.0,
+            "proteinG": 4.8,
+            "fatG": 1.48,
+            "carbG": 2.59,
+            "fiberG": 0.8,
+            "sodiumMg": 291.0
+          }
+        },
+        {
+          "foodRefId": "P106-001000100-0131",
+          "name": "연두부",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 49.25,
+            "proteinG": 4.905,
+            "fatG": 2.27,
+            "carbG": 2.315,
+            "fiberG": 0.3,
+            "sodiumMg": 21.25
+          }
+        },
+        {
+          "foodRefId": "P106-005000300-0054",
+          "name": "냉동연두부",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 69.0,
+            "proteinG": 8.0,
+            "fatG": 2.3,
+            "carbG": 4.0,
+            "fiberG": null,
+            "sodiumMg": 3.0
+          }
+        },
+        {
+          "foodRefId": "P106-001000100-0504",
+          "name": "네컵연두부",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 46.0,
+            "proteinG": 3.61,
+            "fatG": 2.5,
+            "carbG": 2.22,
+            "fiberG": null,
+            "sodiumMg": 14.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D407-371000000-0001",
+        "name": "연두부찜",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 47.42,
+        "proteinG": 3.48,
+        "fatG": 2.36,
+        "carbG": 3.05,
+        "fiberG": 0.79,
+        "sodiumMg": 133.7
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 12,
+      "original_item": {
+        "originalFoodName": "미역초무침",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "미역초무침",
+      "worker_amount": "40.00",
+      "worker_unit": "g",
+      "amount_g": "40.00",
+      "query_id": 10,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D114-632000000-0001",
+          "name": "미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 43.0,
+            "proteinG": 1.617,
+            "fatG": 0.737,
+            "carbG": 8.22,
+            "fiberG": 3.133,
+            "sodiumMg": 485.0
+          }
+        },
+        {
+          "foodRefId": "D514-711000000-0001",
+          "name": "오징어미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 87.0,
+            "proteinG": 15.0,
+            "fatG": 1.72,
+            "carbG": 5.24,
+            "fiberG": 3.6,
+            "sodiumMg": 1133.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-0211",
+          "name": "미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 35.0,
+            "proteinG": 1.18,
+            "fatG": 1.02,
+            "carbG": 5.24,
+            "fiberG": null,
+            "sodiumMg": 452.0
+          }
+        },
+        {
+          "foodRefId": "P114-400020100-2404",
+          "name": "황태미역초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 260.0,
+            "proteinG": 21.0,
+            "fatG": 5.0,
+            "carbG": 33.0,
+            "fiberG": null,
+            "sodiumMg": 1020.0
+          }
+        },
+        {
+          "foodRefId": "D114-660000000-0001",
+          "name": "해초무침",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 39.0,
+            "proteinG": 0.95,
+            "fatG": 0.16,
+            "carbG": 8.52,
+            "fiberG": 4.3,
+            "sodiumMg": 862.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D114-632000000-0001",
+        "name": "미역초무침",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 17.2,
+        "proteinG": 0.65,
+        "fatG": 0.29,
+        "carbG": 3.29,
+        "fiberG": 1.25,
+        "sodiumMg": 194.0
+      }
+    },
+    {
+      "case": "manybanchan",
+      "run": 2,
+      "item_index": 13,
+      "original_item": {
+        "originalFoodName": "무피클",
+        "estimatedAmount": 40.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "무피클",
+      "worker_amount": "40.00",
+      "worker_unit": "g",
+      "amount_g": "40.00",
+      "query_id": 11,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "P114-202020100-0069",
+          "name": "무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 76.5,
+            "proteinG": 1.165,
+            "fatG": 1.295,
+            "carbG": 15.16,
+            "fiberG": null,
+            "sodiumMg": 285.5
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0063",
+          "name": "갓무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 17.0,
+            "proteinG": 0.52,
+            "fatG": 0.3,
+            "carbG": 3.05,
+            "fiberG": null,
+            "sodiumMg": 189.0
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0233",
+          "name": "오이무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 53.0,
+            "proteinG": 0.0,
+            "fatG": 0.3,
+            "carbG": 12.0,
+            "fiberG": null,
+            "sodiumMg": 19.0
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0076",
+          "name": "조선무피클",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 20.0,
+            "proteinG": 0.48,
+            "fatG": 0.48,
+            "carbG": 3.56,
+            "fiberG": null,
+            "sodiumMg": 352.0
+          }
+        },
+        {
+          "foodRefId": "P114-202020100-0155",
+          "name": "무피클동치미",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 14.0,
+            "proteinG": 0.2,
+            "fatG": 0.0,
+            "carbG": 3.2,
+            "fiberG": null,
+            "sodiumMg": 435.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P114-202020100-0069",
+        "name": "무피클",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 30.6,
+        "proteinG": 0.47,
+        "fatG": 0.52,
+        "carbG": 6.06,
+        "fiberG": null,
+        "sodiumMg": 114.2
+      }
+    },
+    {
+      "case": "piece_of_pizza",
+      "run": 1,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "포테이토피자",
+        "estimatedAmount": 100.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "포테이토피자",
+      "worker_amount": "100.00",
+      "worker_unit": "g",
+      "amount_g": "100.00",
+      "query_id": 16,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D202-120000000-1705",
+          "name": "피자_포테이토 피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 234.444,
+            "proteinG": 11.178,
+            "fatG": 10.997,
+            "carbG": 26.75,
+            "fiberG": 2.7,
+            "sodiumMg": 341.222
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0003",
+          "name": "피자_골드포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 263.0,
+            "proteinG": 12.8,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 478.0
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0083",
+          "name": "피자_점보포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 233.0,
+            "proteinG": 11.17,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 254.0
+          }
+        },
+        {
+          "foodRefId": "D202-120000000-0457",
+          "name": "피자_로얄포테이토 피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 259.0,
+            "proteinG": 11.77,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 467.0
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0025",
+          "name": "피자_몬스터포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 243.0,
+            "proteinG": 11.42,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 405.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D202-120000000-1705",
+        "name": "피자_포테이토 피자",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 234.44,
+        "proteinG": 11.18,
+        "fatG": 11.0,
+        "carbG": 26.75,
+        "fiberG": 2.7,
+        "sodiumMg": 341.22
+      }
+    },
+    {
+      "case": "piece_of_pizza",
+      "run": 2,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "포테이토피자",
+        "estimatedAmount": 100.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "포테이토피자",
+      "worker_amount": "100.00",
+      "worker_unit": "g",
+      "amount_g": "100.00",
+      "query_id": 16,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D202-120000000-1705",
+          "name": "피자_포테이토 피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 234.444,
+            "proteinG": 11.178,
+            "fatG": 10.997,
+            "carbG": 26.75,
+            "fiberG": 2.7,
+            "sodiumMg": 341.222
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0003",
+          "name": "피자_골드포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 263.0,
+            "proteinG": 12.8,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 478.0
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0083",
+          "name": "피자_점보포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 233.0,
+            "proteinG": 11.17,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 254.0
+          }
+        },
+        {
+          "foodRefId": "D202-120000000-0457",
+          "name": "피자_로얄포테이토 피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 259.0,
+            "proteinG": 11.77,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 467.0
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0025",
+          "name": "피자_몬스터포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 243.0,
+            "proteinG": 11.42,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 405.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D202-120000000-1705",
+        "name": "피자_포테이토 피자",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 234.44,
+        "proteinG": 11.18,
+        "fatG": 11.0,
+        "carbG": 26.75,
+        "fiberG": 2.7,
+        "sodiumMg": 341.22
+      }
+    },
+    {
+      "case": "piece_of_pizza",
+      "run": 3,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "포테이토피자",
+        "estimatedAmount": 105.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "포테이토피자",
+      "worker_amount": "105.00",
+      "worker_unit": "g",
+      "amount_g": "105.00",
+      "query_id": 16,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D202-120000000-1705",
+          "name": "피자_포테이토 피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 234.444,
+            "proteinG": 11.178,
+            "fatG": 10.997,
+            "carbG": 26.75,
+            "fiberG": 2.7,
+            "sodiumMg": 341.222
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0003",
+          "name": "피자_골드포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 263.0,
+            "proteinG": 12.8,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 478.0
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0083",
+          "name": "피자_점보포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 233.0,
+            "proteinG": 11.17,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 254.0
+          }
+        },
+        {
+          "foodRefId": "D202-120000000-0457",
+          "name": "피자_로얄포테이토 피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 259.0,
+            "proteinG": 11.77,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 467.0
+          }
+        },
+        {
+          "foodRefId": "D202-120420000-0025",
+          "name": "피자_몬스터포테이토피자",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 243.0,
+            "proteinG": 11.42,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 405.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D202-120000000-1705",
+        "name": "피자_포테이토 피자",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 246.17,
+        "proteinG": 11.74,
+        "fatG": 11.55,
+        "carbG": 28.09,
+        "fiberG": 2.84,
+        "sodiumMg": 358.28
+      }
+    },
+    {
+      "case": "whole_cake",
+      "run": 1,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "치즈케이크",
+        "estimatedAmount": 1.0,
+        "unit": "개",
+        "confidence": 0.98,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "치즈케이크",
+      "worker_amount": "1.00",
+      "worker_unit": "개",
+      "amount_g": null,
+      "query_id": 17,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D202-110000000-0340",
+          "name": "케이크_치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 388.5,
+            "proteinG": 6.145,
+            "fatG": 21.815,
+            "carbG": 26.82,
+            "fiberG": 1.2,
+            "sodiumMg": 140.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0029",
+          "name": "케이크_뉴욕치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 326.0,
+            "proteinG": 5.012,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 174.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0047",
+          "name": "케이크_더블치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 311.0,
+            "proteinG": 7.78,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 270.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0584",
+          "name": "케이크_우유치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 274.0,
+            "proteinG": 6.32,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 116.0
+          }
+        },
+        {
+          "foodRefId": "D202-086000000-0122",
+          "name": "마카롱_치즈케이크 마카롱",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 450.0,
+            "proteinG": 7.0,
+            "fatG": null,
+            "carbG": 45.0,
+            "fiberG": null,
+            "sodiumMg": 179.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D202-110000000-0340",
+        "name": "케이크_치즈 케이크",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "amount_not_convertible",
+      "nutrition": null
+    },
+    {
+      "case": "whole_cake",
+      "run": 2,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "치즈케이크",
+        "estimatedAmount": 1.0,
+        "unit": "개",
+        "confidence": 0.98,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "치즈케이크",
+      "worker_amount": "1.00",
+      "worker_unit": "개",
+      "amount_g": null,
+      "query_id": 17,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D202-110000000-0340",
+          "name": "케이크_치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 388.5,
+            "proteinG": 6.145,
+            "fatG": 21.815,
+            "carbG": 26.82,
+            "fiberG": 1.2,
+            "sodiumMg": 140.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0029",
+          "name": "케이크_뉴욕치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 326.0,
+            "proteinG": 5.012,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 174.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0047",
+          "name": "케이크_더블치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 311.0,
+            "proteinG": 7.78,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 270.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0584",
+          "name": "케이크_우유치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 274.0,
+            "proteinG": 6.32,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 116.0
+          }
+        },
+        {
+          "foodRefId": "D202-086000000-0122",
+          "name": "마카롱_치즈케이크 마카롱",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 450.0,
+            "proteinG": 7.0,
+            "fatG": null,
+            "carbG": 45.0,
+            "fiberG": null,
+            "sodiumMg": 179.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D202-110000000-0340",
+        "name": "케이크_치즈 케이크",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "amount_not_convertible",
+      "nutrition": null
+    },
+    {
+      "case": "whole_cake",
+      "run": 3,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "치즈케이크",
+        "estimatedAmount": 1.0,
+        "unit": "개",
+        "confidence": 0.98,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "치즈케이크",
+      "worker_amount": "1.00",
+      "worker_unit": "개",
+      "amount_g": null,
+      "query_id": 17,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D202-110000000-0340",
+          "name": "케이크_치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 388.5,
+            "proteinG": 6.145,
+            "fatG": 21.815,
+            "carbG": 26.82,
+            "fiberG": 1.2,
+            "sodiumMg": 140.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0029",
+          "name": "케이크_뉴욕치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 326.0,
+            "proteinG": 5.012,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 174.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0047",
+          "name": "케이크_더블치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 311.0,
+            "proteinG": 7.78,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 270.0
+          }
+        },
+        {
+          "foodRefId": "D202-110000000-0584",
+          "name": "케이크_우유치즈 케이크",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 274.0,
+            "proteinG": 6.32,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 116.0
+          }
+        },
+        {
+          "foodRefId": "D202-086000000-0122",
+          "name": "마카롱_치즈케이크 마카롱",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 450.0,
+            "proteinG": 7.0,
+            "fatG": null,
+            "carbG": 45.0,
+            "fiberG": null,
+            "sodiumMg": 179.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D202-110000000-0340",
+        "name": "케이크_치즈 케이크",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "amount_not_convertible",
+      "nutrition": null
+    },
+    {
+      "case": "coleslaw",
+      "run": 1,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "무샐러드",
+        "estimatedAmount": 90.0,
+        "unit": "g",
+        "confidence": 0.85,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "무샐러드",
+      "worker_amount": "90.00",
+      "worker_unit": "g",
+      "amount_g": "90.00",
+      "query_id": 18,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-224020200-0732",
+          "name": "비트무샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 93.0,
+            "proteinG": 7.39,
+            "fatG": 3.04,
+            "carbG": 8.7,
+            "fiberG": null,
+            "sodiumMg": 234.0
+          }
+        },
+        {
+          "foodRefId": "P123-226020200-0841",
+          "name": "제철 열무샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 91.0,
+            "proteinG": 6.0,
+            "fatG": 4.8,
+            "carbG": 6.0,
+            "fiberG": null,
+            "sodiumMg": 203.0
+          }
+        },
+        {
+          "foodRefId": "D414-724000000-0001",
+          "name": "햄샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 124.75,
+            "proteinG": 4.025,
+            "fatG": 5.443,
+            "carbG": 15.168,
+            "fiberG": 1.425,
+            "sodiumMg": 199.5
+          }
+        },
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D414-608000000-0001",
+          "name": "과일샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 87.5,
+            "proteinG": 0.578,
+            "fatG": 5.37,
+            "carbG": 10.218,
+            "fiberG": 1.65,
+            "sodiumMg": 37.75
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P123-224020200-0732",
+        "name": "비트무샐러드",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 83.7,
+        "proteinG": 6.65,
+        "fatG": 2.74,
+        "carbG": 7.83,
+        "fiberG": null,
+        "sodiumMg": 210.6
+      }
+    },
+    {
+      "case": "coleslaw",
+      "run": 2,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "무샐러드",
+        "estimatedAmount": 80.0,
+        "unit": "g",
+        "confidence": 0.8,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "무샐러드",
+      "worker_amount": "80.00",
+      "worker_unit": "g",
+      "amount_g": "80.00",
+      "query_id": 18,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-224020200-0732",
+          "name": "비트무샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 93.0,
+            "proteinG": 7.39,
+            "fatG": 3.04,
+            "carbG": 8.7,
+            "fiberG": null,
+            "sodiumMg": 234.0
+          }
+        },
+        {
+          "foodRefId": "P123-226020200-0841",
+          "name": "제철 열무샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 91.0,
+            "proteinG": 6.0,
+            "fatG": 4.8,
+            "carbG": 6.0,
+            "fiberG": null,
+            "sodiumMg": 203.0
+          }
+        },
+        {
+          "foodRefId": "D414-724000000-0001",
+          "name": "햄샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 124.75,
+            "proteinG": 4.025,
+            "fatG": 5.443,
+            "carbG": 15.168,
+            "fiberG": 1.425,
+            "sodiumMg": 199.5
+          }
+        },
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D414-608000000-0001",
+          "name": "과일샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 87.5,
+            "proteinG": 0.578,
+            "fatG": 5.37,
+            "carbG": 10.218,
+            "fiberG": 1.65,
+            "sodiumMg": 37.75
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P123-224020200-0732",
+        "name": "비트무샐러드",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 74.4,
+        "proteinG": 5.91,
+        "fatG": 2.43,
+        "carbG": 6.96,
+        "fiberG": null,
+        "sodiumMg": 187.2
+      }
+    },
+    {
+      "case": "coleslaw",
+      "run": 3,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "무샐러드",
+        "estimatedAmount": 80.0,
+        "unit": "g",
+        "confidence": 0.8,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "무샐러드",
+      "worker_amount": "80.00",
+      "worker_unit": "g",
+      "amount_g": "80.00",
+      "query_id": 18,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "P123-224020200-0732",
+          "name": "비트무샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 93.0,
+            "proteinG": 7.39,
+            "fatG": 3.04,
+            "carbG": 8.7,
+            "fiberG": null,
+            "sodiumMg": 234.0
+          }
+        },
+        {
+          "foodRefId": "P123-226020200-0841",
+          "name": "제철 열무샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 91.0,
+            "proteinG": 6.0,
+            "fatG": 4.8,
+            "carbG": 6.0,
+            "fiberG": null,
+            "sodiumMg": 203.0
+          }
+        },
+        {
+          "foodRefId": "D414-724000000-0001",
+          "name": "햄샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 124.75,
+            "proteinG": 4.025,
+            "fatG": 5.443,
+            "carbG": 15.168,
+            "fiberG": 1.425,
+            "sodiumMg": 199.5
+          }
+        },
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D414-608000000-0001",
+          "name": "과일샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 87.5,
+            "proteinG": 0.578,
+            "fatG": 5.37,
+            "carbG": 10.218,
+            "fiberG": 1.65,
+            "sodiumMg": 37.75
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "P123-224020200-0732",
+        "name": "비트무샐러드",
+        "category": "PROCESSED",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_with_missing_nutrients",
+      "nutrition": {
+        "kcal": 74.4,
+        "proteinG": 5.91,
+        "fatG": 2.43,
+        "carbG": 6.96,
+        "fiberG": null,
+        "sodiumMg": 187.2
+      }
+    },
+    {
+      "case": "fried_eggs",
+      "run": 1,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "달걀프라이",
+        "estimatedAmount": 100.0,
+        "unit": "g",
+        "confidence": 0.98,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "달걀프라이",
+      "worker_amount": "100.00",
+      "worker_unit": "g",
+      "amount_g": "100.00",
+      "query_id": 19,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D609-449000000-0001",
+          "name": "달걀후라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 181.0,
+            "proteinG": 11.0,
+            "fatG": 13.105,
+            "carbG": 3.06,
+            "fiberG": 0.0,
+            "sodiumMg": 262.0
+          }
+        },
+        {
+          "foodRefId": "D109-417000000-0001",
+          "name": "달걀부침(달걀후라이)",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 181.5,
+            "proteinG": 11.923,
+            "fatG": 12.768,
+            "carbG": 3.508,
+            "fiberG": 2.1,
+            "sodiumMg": 269.75
+          }
+        },
+        {
+          "foodRefId": "D212-537000000-0016",
+          "name": "감자튀김_프렌치 프라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 275.0,
+            "proteinG": 3.75,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 278.0
+          }
+        },
+        {
+          "foodRefId": "D109-417120000-0001",
+          "name": "달걀부침(달걀후라이)_햄",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 277.0,
+            "proteinG": 12.71,
+            "fatG": 21.59,
+            "carbG": 8.06,
+            "fiberG": 1.5,
+            "sodiumMg": 591.0
+          }
+        },
+        {
+          "foodRefId": "D212-549000000-0158",
+          "name": "닭튀김_순살치킨 앤 프라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 255.0,
+            "proteinG": 11.54,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 508.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      }
+    },
+    {
+      "case": "fried_eggs",
+      "run": 2,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "달걀프라이",
+        "estimatedAmount": 100.0,
+        "unit": "g",
+        "confidence": 0.96,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "달걀프라이",
+      "worker_amount": "100.00",
+      "worker_unit": "g",
+      "amount_g": "100.00",
+      "query_id": 19,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D609-449000000-0001",
+          "name": "달걀후라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 181.0,
+            "proteinG": 11.0,
+            "fatG": 13.105,
+            "carbG": 3.06,
+            "fiberG": 0.0,
+            "sodiumMg": 262.0
+          }
+        },
+        {
+          "foodRefId": "D109-417000000-0001",
+          "name": "달걀부침(달걀후라이)",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 181.5,
+            "proteinG": 11.923,
+            "fatG": 12.768,
+            "carbG": 3.508,
+            "fiberG": 2.1,
+            "sodiumMg": 269.75
+          }
+        },
+        {
+          "foodRefId": "D212-537000000-0016",
+          "name": "감자튀김_프렌치 프라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 275.0,
+            "proteinG": 3.75,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 278.0
+          }
+        },
+        {
+          "foodRefId": "D109-417120000-0001",
+          "name": "달걀부침(달걀후라이)_햄",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 277.0,
+            "proteinG": 12.71,
+            "fatG": 21.59,
+            "carbG": 8.06,
+            "fiberG": 1.5,
+            "sodiumMg": 591.0
+          }
+        },
+        {
+          "foodRefId": "D212-549000000-0158",
+          "name": "닭튀김_순살치킨 앤 프라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 255.0,
+            "proteinG": 11.54,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 508.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      }
+    },
+    {
+      "case": "fried_eggs",
+      "run": 3,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "달걀프라이",
+        "estimatedAmount": 100.0,
+        "unit": "g",
+        "confidence": 0.95,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "달걀프라이",
+      "worker_amount": "100.00",
+      "worker_unit": "g",
+      "amount_g": "100.00",
+      "query_id": 19,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D609-449000000-0001",
+          "name": "달걀후라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 181.0,
+            "proteinG": 11.0,
+            "fatG": 13.105,
+            "carbG": 3.06,
+            "fiberG": 0.0,
+            "sodiumMg": 262.0
+          }
+        },
+        {
+          "foodRefId": "D109-417000000-0001",
+          "name": "달걀부침(달걀후라이)",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 181.5,
+            "proteinG": 11.923,
+            "fatG": 12.768,
+            "carbG": 3.508,
+            "fiberG": 2.1,
+            "sodiumMg": 269.75
+          }
+        },
+        {
+          "foodRefId": "D212-537000000-0016",
+          "name": "감자튀김_프렌치 프라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 275.0,
+            "proteinG": 3.75,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 278.0
+          }
+        },
+        {
+          "foodRefId": "D109-417120000-0001",
+          "name": "달걀부침(달걀후라이)_햄",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 277.0,
+            "proteinG": 12.71,
+            "fatG": 21.59,
+            "carbG": 8.06,
+            "fiberG": 1.5,
+            "sodiumMg": 591.0
+          }
+        },
+        {
+          "foodRefId": "D212-549000000-0158",
+          "name": "닭튀김_순살치킨 앤 프라이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 255.0,
+            "proteinG": 11.54,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 508.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D609-449000000-0001",
+        "name": "달걀후라이",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 181.0,
+        "proteinG": 11.0,
+        "fatG": 13.1,
+        "carbG": 3.06,
+        "fiberG": 0.0,
+        "sodiumMg": 262.0
+      }
+    },
+    {
+      "case": "potato_salad",
+      "run": 1,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "감자샐러드",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "감자샐러드",
+      "worker_amount": "200.00",
+      "worker_unit": "g",
+      "amount_g": "200.00",
+      "query_id": 20,
+      "query_cache_hit": false,
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D514-664440000-0001",
+          "name": "감자샐러드_당근",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 77.0,
+            "proteinG": 1.2,
+            "fatG": 4.49,
+            "carbG": 8.31,
+            "fiberG": 1.7,
+            "sodiumMg": 33.0
+          }
+        },
+        {
+          "foodRefId": "D714-664260000-0001",
+          "name": "감자샐러드_오이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 104.0,
+            "proteinG": 1.7,
+            "fatG": 6.05,
+            "carbG": 11.17,
+            "fiberG": 2.1,
+            "sodiumMg": 1010.0
+          }
+        },
+        {
+          "foodRefId": "D402-143000000-0001",
+          "name": "감자샐러드 샌드위치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 108.333,
+            "proteinG": 3.067,
+            "fatG": 4.753,
+            "carbG": 13.457,
+            "fiberG": 1.3,
+            "sodiumMg": 216.667
+          }
+        },
+        {
+          "foodRefId": "D202-098000000-0001",
+          "name": "소세지빵_감자샐러드 소세지빵",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 319.0,
+            "proteinG": 10.37,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 609.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D414-664000000-0001",
+        "name": "감자샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 324.0,
+        "proteinG": 5.45,
+        "fatG": 20.12,
+        "carbG": 31.21,
+        "fiberG": 4.6,
+        "sodiumMg": 620.0
+      }
+    },
+    {
+      "case": "potato_salad",
+      "run": 2,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "감자샐러드",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.9,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "감자샐러드",
+      "worker_amount": "200.00",
+      "worker_unit": "g",
+      "amount_g": "200.00",
+      "query_id": 20,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D514-664440000-0001",
+          "name": "감자샐러드_당근",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 77.0,
+            "proteinG": 1.2,
+            "fatG": 4.49,
+            "carbG": 8.31,
+            "fiberG": 1.7,
+            "sodiumMg": 33.0
+          }
+        },
+        {
+          "foodRefId": "D714-664260000-0001",
+          "name": "감자샐러드_오이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 104.0,
+            "proteinG": 1.7,
+            "fatG": 6.05,
+            "carbG": 11.17,
+            "fiberG": 2.1,
+            "sodiumMg": 1010.0
+          }
+        },
+        {
+          "foodRefId": "D402-143000000-0001",
+          "name": "감자샐러드 샌드위치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 108.333,
+            "proteinG": 3.067,
+            "fatG": 4.753,
+            "carbG": 13.457,
+            "fiberG": 1.3,
+            "sodiumMg": 216.667
+          }
+        },
+        {
+          "foodRefId": "D202-098000000-0001",
+          "name": "소세지빵_감자샐러드 소세지빵",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 319.0,
+            "proteinG": 10.37,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 609.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D414-664000000-0001",
+        "name": "감자샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 324.0,
+        "proteinG": 5.45,
+        "fatG": 20.12,
+        "carbG": 31.21,
+        "fiberG": 4.6,
+        "sodiumMg": 620.0
+      }
+    },
+    {
+      "case": "potato_salad",
+      "run": 3,
+      "item_index": 1,
+      "original_item": {
+        "originalFoodName": "감자샐러드",
+        "estimatedAmount": 200.0,
+        "unit": "g",
+        "confidence": 0.92,
+        "candidateFoodRefId": null,
+        "clarifyQuestion": null
+      },
+      "worker_food_name": "감자샐러드",
+      "worker_amount": "200.00",
+      "worker_unit": "g",
+      "amount_g": "200.00",
+      "query_id": 20,
+      "query_cache_hit": true,
+      "top5_candidates": [
+        {
+          "foodRefId": "D414-664000000-0001",
+          "name": "감자샐러드",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 162.0,
+            "proteinG": 2.725,
+            "fatG": 10.058,
+            "carbG": 15.605,
+            "fiberG": 2.3,
+            "sodiumMg": 310.0
+          }
+        },
+        {
+          "foodRefId": "D514-664440000-0001",
+          "name": "감자샐러드_당근",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 77.0,
+            "proteinG": 1.2,
+            "fatG": 4.49,
+            "carbG": 8.31,
+            "fiberG": 1.7,
+            "sodiumMg": 33.0
+          }
+        },
+        {
+          "foodRefId": "D714-664260000-0001",
+          "name": "감자샐러드_오이",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 104.0,
+            "proteinG": 1.7,
+            "fatG": 6.05,
+            "carbG": 11.17,
+            "fiberG": 2.1,
+            "sodiumMg": 1010.0
+          }
+        },
+        {
+          "foodRefId": "D402-143000000-0001",
+          "name": "감자샐러드 샌드위치",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 108.333,
+            "proteinG": 3.067,
+            "fatG": 4.753,
+            "carbG": 13.457,
+            "fiberG": 1.3,
+            "sodiumMg": 216.667
+          }
+        },
+        {
+          "foodRefId": "D202-098000000-0001",
+          "name": "소세지빵_감자샐러드 소세지빵",
+          "servingSizeG": 100.0,
+          "nutrition": {
+            "kcal": 319.0,
+            "proteinG": 10.37,
+            "fatG": null,
+            "carbG": null,
+            "fiberG": null,
+            "sodiumMg": 609.0
+          }
+        }
+      ],
+      "selected": {
+        "food_ref_id": "D414-664000000-0001",
+        "name": "감자샐러드",
+        "category": "GENERAL",
+        "dataset_version": "20260828"
+      },
+      "selection_source": "name_search",
+      "before_129_linked_inferred": false,
+      "after_129_linked": true,
+      "nutrition_conversion_status": "calculated_complete",
+      "nutrition": {
+        "kcal": 324.0,
+        "proteinG": 5.45,
+        "fatG": 20.12,
+        "carbG": 31.21,
+        "fiberG": 4.6,
+        "sodiumMg": 620.0
+      }
+    }
+  ]
+}

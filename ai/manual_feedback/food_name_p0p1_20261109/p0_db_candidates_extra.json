@@ -1,0 +1,1748 @@
+{
+  "created_at_utc": "2026-11-08T16:08:41.243967+00:00",
+  "purpose": "P0 candidate label curation before live model responses; not trial results",
+  "seed_sha256": "43c0962b7f6da1d098647f618aaabad1aeeeb9f1e7763320a166c9c24abfba9b",
+  "queries": {
+    "김치": [
+      {
+        "foodRefId": "D315-663000000-0001",
+        "name": "갓김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 37.0,
+          "proteinG": 3.26,
+          "fatG": 0.4,
+          "carbG": 7.07,
+          "fiberG": 3.0,
+          "sodiumMg": 720.0
+        }
+      },
+      {
+        "foodRefId": "D105-205000000-0001",
+        "name": "김치국",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 17.75,
+          "proteinG": 1.085,
+          "fatG": 0.55,
+          "carbG": 2.105,
+          "fiberG": 0.925,
+          "sodiumMg": 281.75
+        }
+      },
+      {
+        "foodRefId": "D109-412000000-0001",
+        "name": "김치전",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 136.5,
+          "proteinG": 4.195,
+          "fatG": 4.933,
+          "carbG": 18.003,
+          "fiberG": 2.025,
+          "sodiumMg": 307.0
+        }
+      },
+      {
+        "foodRefId": "D315-671000000-0001",
+        "name": "백김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 16.0,
+          "proteinG": 0.95,
+          "fatG": 0.07,
+          "carbG": 3.0,
+          "fiberG": 1.9,
+          "sodiumMg": 395.0
+        }
+      },
+      {
+        "foodRefId": "D315-683000000-0001",
+        "name": "파김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 49.0,
+          "proteinG": 2.5,
+          "fatG": 0.58,
+          "carbG": 8.51,
+          "fiberG": 4.6,
+          "sodiumMg": 655.0
+        }
+      },
+      {
+        "foodRefId": "D415-684000000-0001",
+        "name": "가지김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 36.0,
+          "proteinG": 2.1,
+          "fatG": 0.77,
+          "carbG": 6.22,
+          "fiberG": 3.5,
+          "sodiumMg": 1592.0
+        }
+      },
+      {
+        "foodRefId": "D403-182000000-0001",
+        "name": "김치만두",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 73.75,
+          "proteinG": 5.125,
+          "fatG": 1.9,
+          "carbG": 8.375,
+          "fiberG": 1.325,
+          "sodiumMg": 278.0
+        }
+      },
+      {
+        "foodRefId": "D110-456000000-0001",
+        "name": "김치볶음",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 56.0,
+          "proteinG": 1.316,
+          "fatG": 3.264,
+          "carbG": 5.314,
+          "fiberG": 2.76,
+          "sodiumMg": 394.6
+        }
+      }
+    ],
+    "배추김치": [
+      {
+        "foodRefId": "D315-670000000-0001",
+        "name": "배추김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 38.0,
+          "proteinG": 1.98,
+          "fatG": 0.43,
+          "carbG": 6.49,
+          "fiberG": 2.5,
+          "sodiumMg": 551.0
+        }
+      },
+      {
+        "foodRefId": "D615-687000000-0001",
+        "name": "양배추김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 39.0,
+          "proteinG": 2.2,
+          "fatG": 0.39,
+          "carbG": 8.29,
+          "fiberG": 3.4,
+          "sodiumMg": 2099.0
+        }
+      },
+      {
+        "foodRefId": "D115-674000000-0001",
+        "name": "얼갈이배추김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 46.5,
+          "proteinG": 1.735,
+          "fatG": 1.015,
+          "carbG": 7.655,
+          "fiberG": 2.5,
+          "sodiumMg": 413.5
+        }
+      },
+      {
+        "foodRefId": "D403-164250000-0001",
+        "name": "우동_배추김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 65.0,
+          "proteinG": 1.85,
+          "fatG": 0.79,
+          "carbG": 12.11,
+          "fiberG": 1.1,
+          "sodiumMg": 250.0
+        }
+      },
+      {
+        "foodRefId": "D315-670030000-0001",
+        "name": "배추김치_봄재배",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 39.0,
+          "proteinG": 2.22,
+          "fatG": 0.67,
+          "carbG": 5.95,
+          "fiberG": 3.6,
+          "sodiumMg": 626.0
+        }
+      },
+      {
+        "foodRefId": "D401-035230000-0001",
+        "name": "주먹밥_배추김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 106.0,
+          "proteinG": 2.39,
+          "fatG": 1.3,
+          "carbG": 20.81,
+          "fiberG": 1.2,
+          "sodiumMg": 144.0
+        }
+      },
+      {
+        "foodRefId": "D611-511070000-0001",
+        "name": "꽁치조림_배추김치",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 84.5,
+          "proteinG": 8.77,
+          "fatG": 2.885,
+          "carbG": 5.655,
+          "fiberG": 1.95,
+          "sodiumMg": 413.0
+        }
+      },
+      {
+        "foodRefId": "D315-670010000-0001",
+        "name": "배추김치_가을재배",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 37.0,
+          "proteinG": 1.85,
+          "fatG": 0.54,
+          "carbG": 6.1,
+          "fiberG": 4.6,
+          "sodiumMg": 548.0
+        }
+      }
+    ],
+    "소고기비빔밥": [
+      {
+        "foodRefId": "P123-201020200-1027",
+        "name": "소고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 148.0,
+          "proteinG": 4.738,
+          "fatG": 4.01,
+          "carbG": 23.203,
+          "fiberG": null,
+          "sodiumMg": 340.0
+        }
+      },
+      {
+        "foodRefId": "P114-300030000-0656",
+        "name": "소고기비빔밥세트",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 110.0,
+          "proteinG": 6.67,
+          "fatG": 4.67,
+          "carbG": 14.0,
+          "fiberG": null,
+          "sodiumMg": 727.0
+        }
+      },
+      {
+        "foodRefId": "P111-000030100-0115",
+        "name": "당플랜 소고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 133.5,
+          "proteinG": 5.58,
+          "fatG": 3.89,
+          "carbG": 21.45,
+          "fiberG": null,
+          "sodiumMg": 274.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-3733",
+        "name": "수제 소고기 비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 155.0,
+          "proteinG": 3.67,
+          "fatG": 3.67,
+          "carbG": 26.67,
+          "fiberG": null,
+          "sodiumMg": 323.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-1320",
+        "name": "리스컵스 소고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 173.0,
+          "proteinG": 5.47,
+          "fatG": 4.58,
+          "carbG": 27.58,
+          "fiberG": null,
+          "sodiumMg": 513.0
+        }
+      },
+      {
+        "foodRefId": "P111-000030100-0203",
+        "name": "당뇨케어 삼색소고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 187.0,
+          "proteinG": 8.42,
+          "fatG": 7.0,
+          "carbG": 22.55,
+          "fiberG": null,
+          "sodiumMg": 184.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-2342",
+        "name": "일빵빵소고기비빔밥고추장형",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 345.0,
+          "proteinG": 12.31,
+          "fatG": 3.08,
+          "carbG": 66.92,
+          "fiberG": null,
+          "sodiumMg": 584.0
+        }
+      },
+      {
+        "foodRefId": "P111-000030100-0011",
+        "name": "닥터키친 나물가득 소고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 149.0,
+          "proteinG": 6.09,
+          "fatG": 5.22,
+          "carbG": 23.48,
+          "fiberG": 7.8,
+          "sodiumMg": 217.0
+        }
+      }
+    ],
+    "소고기 비빔밥": [
+      {
+        "foodRefId": "D501-018283500-0001",
+        "name": "비빔밥_소고기_양념장",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 83.0,
+          "proteinG": 2.63,
+          "fatG": 1.28,
+          "carbG": 15.06,
+          "fiberG": 0.85,
+          "sodiumMg": 107.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020200-1027",
+        "name": "소고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 148.0,
+          "proteinG": 4.738,
+          "fatG": 4.01,
+          "carbG": 23.203,
+          "fiberG": null,
+          "sodiumMg": 340.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-3353",
+        "name": "소고기버섯비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 180.0,
+          "proteinG": 3.94,
+          "fatG": 7.39,
+          "carbG": 25.12,
+          "fiberG": 1.0,
+          "sodiumMg": 163.0
+        }
+      },
+      {
+        "foodRefId": "P114-300030000-2262",
+        "name": "소고기볶음비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 131.0,
+          "proteinG": 6.0,
+          "fatG": 7.0,
+          "carbG": 11.0,
+          "fiberG": null,
+          "sodiumMg": 690.0
+        }
+      },
+      {
+        "foodRefId": "P114-300030000-0656",
+        "name": "소고기비빔밥세트",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 110.0,
+          "proteinG": 6.67,
+          "fatG": 4.67,
+          "carbG": 14.0,
+          "fiberG": null,
+          "sodiumMg": 727.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-5818",
+        "name": "소고기오색비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 156.0,
+          "proteinG": 6.6,
+          "fatG": 5.6,
+          "carbG": 19.6,
+          "fiberG": null,
+          "sodiumMg": 242.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-1808",
+        "name": "소고기&오색비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 163.0,
+          "proteinG": 4.19,
+          "fatG": 4.84,
+          "carbG": 25.81,
+          "fiberG": null,
+          "sodiumMg": 371.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020200-1188",
+        "name": "소고기전주식비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 160.0,
+          "proteinG": 3.25,
+          "fatG": 4.75,
+          "carbG": 26.0,
+          "fiberG": null,
+          "sodiumMg": 350.0
+        }
+      }
+    ],
+    "비빔밥 소고기": [
+      {
+        "foodRefId": "D501-018283500-0001",
+        "name": "비빔밥_소고기_양념장",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 83.0,
+          "proteinG": 2.63,
+          "fatG": 1.28,
+          "carbG": 15.06,
+          "fiberG": 0.85,
+          "sodiumMg": 107.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020200-1027",
+        "name": "소고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 148.0,
+          "proteinG": 4.738,
+          "fatG": 4.01,
+          "carbG": 23.203,
+          "fiberG": null,
+          "sodiumMg": 340.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-3353",
+        "name": "소고기버섯비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 180.0,
+          "proteinG": 3.94,
+          "fatG": 7.39,
+          "carbG": 25.12,
+          "fiberG": 1.0,
+          "sodiumMg": 163.0
+        }
+      },
+      {
+        "foodRefId": "P114-300030000-2262",
+        "name": "소고기볶음비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 131.0,
+          "proteinG": 6.0,
+          "fatG": 7.0,
+          "carbG": 11.0,
+          "fiberG": null,
+          "sodiumMg": 690.0
+        }
+      },
+      {
+        "foodRefId": "P114-300030000-0656",
+        "name": "소고기비빔밥세트",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 110.0,
+          "proteinG": 6.67,
+          "fatG": 4.67,
+          "carbG": 14.0,
+          "fiberG": null,
+          "sodiumMg": 727.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-5818",
+        "name": "소고기오색비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 156.0,
+          "proteinG": 6.6,
+          "fatG": 5.6,
+          "carbG": 19.6,
+          "fiberG": null,
+          "sodiumMg": 242.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-1808",
+        "name": "소고기&오색비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 163.0,
+          "proteinG": 4.19,
+          "fatG": 4.84,
+          "carbG": 25.81,
+          "fiberG": null,
+          "sodiumMg": 371.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020200-1188",
+        "name": "소고기전주식비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 160.0,
+          "proteinG": 3.25,
+          "fatG": 4.75,
+          "carbG": 26.0,
+          "fiberG": null,
+          "sodiumMg": 350.0
+        }
+      }
+    ],
+    "불고기비빔밥": [
+      {
+        "foodRefId": "P123-201020300-5316",
+        "name": "불고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 201.0,
+          "proteinG": 6.5,
+          "fatG": 6.0,
+          "carbG": 30.0,
+          "fiberG": null,
+          "sodiumMg": 465.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020200-0052",
+        "name": "돈불고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 153.0,
+          "proteinG": 4.82,
+          "fatG": 3.12,
+          "carbG": 26.35,
+          "fiberG": null,
+          "sodiumMg": 351.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020200-0581",
+        "name": "소불고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 142.25,
+          "proteinG": 4.638,
+          "fatG": 2.8,
+          "carbG": 24.593,
+          "fiberG": null,
+          "sodiumMg": 310.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020200-0838",
+        "name": "돼지불고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 174.0,
+          "proteinG": 6.04,
+          "fatG": 5.14,
+          "carbG": 25.98,
+          "fiberG": null,
+          "sodiumMg": 468.0
+        }
+      },
+      {
+        "foodRefId": "P111-000030100-0289",
+        "name": "버섯불고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 132.0,
+          "proteinG": 6.54,
+          "fatG": 3.57,
+          "carbG": 20.03,
+          "fiberG": null,
+          "sodiumMg": 304.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020200-1185",
+        "name": "산채불고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 127.75,
+          "proteinG": 3.923,
+          "fatG": 3.458,
+          "carbG": 20.3,
+          "fiberG": null,
+          "sodiumMg": 332.75
+        }
+      },
+      {
+        "foodRefId": "P123-201020200-0510",
+        "name": "한돈불고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 143.0,
+          "proteinG": 4.32,
+          "fatG": 4.32,
+          "carbG": 21.765,
+          "fiberG": null,
+          "sodiumMg": 256.5
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-2851",
+        "name": "한우불고기비빔밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 139.0,
+          "proteinG": 4.44,
+          "fatG": 3.33,
+          "carbG": 22.78,
+          "fiberG": null,
+          "sodiumMg": 25.0
+        }
+      }
+    ],
+    "미역나물": [
+      {
+        "foodRefId": "P114-300030000-2253",
+        "name": "미역줄기나물",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 70.0,
+          "proteinG": 0.7,
+          "fatG": 6.0,
+          "carbG": 4.0,
+          "fiberG": null,
+          "sodiumMg": 1090.0
+        }
+      },
+      {
+        "foodRefId": "P110-400040000-1948",
+        "name": "대구콩나물미역죽",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 61.0,
+          "proteinG": 2.22,
+          "fatG": 0.0,
+          "carbG": 13.33,
+          "fiberG": null,
+          "sodiumMg": 14.0
+        }
+      },
+      {
+        "foodRefId": "P114-300030000-1111",
+        "name": "바로팜 미역줄기나물",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 0.0,
+          "proteinG": 0.0,
+          "fatG": 0.0,
+          "carbG": 0.0,
+          "fiberG": null,
+          "sodiumMg": 0.0
+        }
+      }
+    ],
+    "미역무침": [
+      {
+        "foodRefId": "P114-300030000-1546",
+        "name": "물미역무침 순봉이네",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 65.0,
+          "proteinG": 2.0,
+          "fatG": 1.4,
+          "carbG": 11.0,
+          "fiberG": null,
+          "sodiumMg": 390.0
+        }
+      },
+      {
+        "foodRefId": "D114-632000000-0001",
+        "name": "미역초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 43.0,
+          "proteinG": 1.617,
+          "fatG": 0.737,
+          "carbG": 8.22,
+          "fiberG": 3.133,
+          "sodiumMg": 485.0
+        }
+      },
+      {
+        "foodRefId": "D414-682000000-0001",
+        "name": "미역 오이무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 59.667,
+          "proteinG": 1.833,
+          "fatG": 1.287,
+          "carbG": 13.137,
+          "fiberG": 2.833,
+          "sodiumMg": 843.333
+        }
+      },
+      {
+        "foodRefId": "D514-711000000-0001",
+        "name": "오징어미역초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 87.0,
+          "proteinG": 15.0,
+          "fatG": 1.72,
+          "carbG": 5.24,
+          "fiberG": 3.6,
+          "sodiumMg": 1133.0
+        }
+      },
+      {
+        "foodRefId": "P114-400020100-0211",
+        "name": "미역초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 35.0,
+          "proteinG": 1.18,
+          "fatG": 1.02,
+          "carbG": 5.24,
+          "fiberG": null,
+          "sodiumMg": 452.0
+        }
+      },
+      {
+        "foodRefId": "P114-300030000-0272",
+        "name": "미역줄기무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 75.667,
+          "proteinG": 1.693,
+          "fatG": 1.713,
+          "carbG": 12.813,
+          "fiberG": null,
+          "sodiumMg": 646.667
+        }
+      },
+      {
+        "foodRefId": "P110-400040000-3134",
+        "name": "새우미역무른밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 73.0,
+          "proteinG": 2.08,
+          "fatG": 0.29,
+          "carbG": 15.42,
+          "fiberG": null,
+          "sodiumMg": 10.0
+        }
+      },
+      {
+        "foodRefId": "P114-400020100-2404",
+        "name": "황태미역초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 260.0,
+          "proteinG": 21.0,
+          "fatG": 5.0,
+          "carbG": 33.0,
+          "fiberG": null,
+          "sodiumMg": 1020.0
+        }
+      }
+    ],
+    "미역초무침": [
+      {
+        "foodRefId": "D114-632000000-0001",
+        "name": "미역초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 43.0,
+          "proteinG": 1.617,
+          "fatG": 0.737,
+          "carbG": 8.22,
+          "fiberG": 3.133,
+          "sodiumMg": 485.0
+        }
+      },
+      {
+        "foodRefId": "D514-711000000-0001",
+        "name": "오징어미역초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 87.0,
+          "proteinG": 15.0,
+          "fatG": 1.72,
+          "carbG": 5.24,
+          "fiberG": 3.6,
+          "sodiumMg": 1133.0
+        }
+      },
+      {
+        "foodRefId": "P114-400020100-0211",
+        "name": "미역초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 35.0,
+          "proteinG": 1.18,
+          "fatG": 1.02,
+          "carbG": 5.24,
+          "fiberG": null,
+          "sodiumMg": 452.0
+        }
+      },
+      {
+        "foodRefId": "P114-400020100-2404",
+        "name": "황태미역초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 260.0,
+          "proteinG": 21.0,
+          "fatG": 5.0,
+          "carbG": 33.0,
+          "fiberG": null,
+          "sodiumMg": 1020.0
+        }
+      },
+      {
+        "foodRefId": "D114-660000000-0001",
+        "name": "해초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 39.0,
+          "proteinG": 0.95,
+          "fatG": 0.16,
+          "carbG": 8.52,
+          "fiberG": 4.3,
+          "sodiumMg": 862.0
+        }
+      },
+      {
+        "foodRefId": "D414-686000000-0001",
+        "name": "부추 초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 23.0,
+          "proteinG": 1.1,
+          "fatG": 0.78,
+          "carbG": 3.66,
+          "fiberG": 1.9,
+          "sodiumMg": 187.0
+        }
+      },
+      {
+        "foodRefId": "D514-681000000-0001",
+        "name": "미나리 초무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 46.333,
+          "proteinG": 1.967,
+          "fatG": 1.333,
+          "carbG": 8.217,
+          "fiberG": 3.2,
+          "sodiumMg": 541.667
+        }
+      },
+      {
+        "foodRefId": "D414-682000000-0001",
+        "name": "미역 오이무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 59.667,
+          "proteinG": 1.833,
+          "fatG": 1.287,
+          "carbG": 13.137,
+          "fiberG": 2.833,
+          "sodiumMg": 843.333
+        }
+      }
+    ],
+    "두부부침": [
+      {
+        "foodRefId": "D109-419000000-0001",
+        "name": "두부부침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 158.333,
+          "proteinG": 12.042,
+          "fatG": 10.235,
+          "carbG": 4.01,
+          "fiberG": 2.717,
+          "sodiumMg": 272.5
+        }
+      },
+      {
+        "foodRefId": "P123-212020300-0684",
+        "name": "들기름두부부침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 85.0,
+          "proteinG": 6.73,
+          "fatG": 4.87,
+          "carbG": 3.47,
+          "fiberG": null,
+          "sodiumMg": 566.0
+        }
+      },
+      {
+        "foodRefId": "P106-001000100-0509",
+        "name": "촌두부 부침용",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 80.0,
+          "proteinG": 6.16,
+          "fatG": 4.0,
+          "carbG": 5.0,
+          "fiberG": null,
+          "sodiumMg": 5.0
+        }
+      },
+      {
+        "foodRefId": "P106-001000100-0173",
+        "name": "한끼두부 부침용",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 82.0,
+          "proteinG": 7.27,
+          "fatG": 5.45,
+          "carbG": 1.82,
+          "fiberG": 0.5,
+          "sodiumMg": 9.0
+        }
+      },
+      {
+        "foodRefId": "P106-001000100-0037",
+        "name": "국산콩두부 부침용",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 87.5,
+          "proteinG": 7.0,
+          "fatG": 6.0,
+          "carbG": 2.0,
+          "fiberG": 0.8,
+          "sodiumMg": 7.5
+        }
+      },
+      {
+        "foodRefId": "P106-001000100-0287",
+        "name": "한둘 두부 부침용",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 90.0,
+          "proteinG": 8.0,
+          "fatG": 5.0,
+          "carbG": 3.0,
+          "fiberG": null,
+          "sodiumMg": 0.0
+        }
+      },
+      {
+        "foodRefId": "P106-001000100-0265",
+        "name": "즐거운요리두부 부침용",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 110.0,
+          "proteinG": 8.0,
+          "fatG": 7.0,
+          "carbG": 3.0,
+          "fiberG": null,
+          "sodiumMg": 30.0
+        }
+      },
+      {
+        "foodRefId": "P106-001000100-0396",
+        "name": "하루두부 부침&찌개용",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 90.0,
+          "proteinG": 8.0,
+          "fatG": 4.8,
+          "carbG": 4.0,
+          "fiberG": null,
+          "sodiumMg": 5.0
+        }
+      }
+    ],
+    "두부나물무침": [
+      {
+        "foodRefId": "D114-673000000-0001",
+        "name": "돌나물무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 44.5,
+          "proteinG": 1.215,
+          "fatG": 1.283,
+          "carbG": 7.758,
+          "fiberG": 1.3,
+          "sodiumMg": 216.0
+        }
+      },
+      {
+        "foodRefId": "D113-578000000-0001",
+        "name": "무나물무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 21.0,
+          "proteinG": 0.62,
+          "fatG": 0.46,
+          "carbG": 3.64,
+          "fiberG": 1.6,
+          "sodiumMg": 352.0
+        }
+      },
+      {
+        "foodRefId": "D313-596000000-0001",
+        "name": "취나물무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 73.667,
+          "proteinG": 2.05,
+          "fatG": 4.913,
+          "carbG": 6.013,
+          "fiberG": 3.7,
+          "sodiumMg": 360.333
+        }
+      },
+      {
+        "foodRefId": "D113-597000000-0001",
+        "name": "콩나물무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 44.0,
+          "proteinG": 2.73,
+          "fatG": 2.845,
+          "carbG": 2.325,
+          "fiberG": 1.15,
+          "sodiumMg": 262.5
+        }
+      },
+      {
+        "foodRefId": "D114-653000000-0001",
+        "name": "톳나물무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 75.0,
+          "proteinG": 1.87,
+          "fatG": 2.09,
+          "carbG": 12.28,
+          "fiberG": 6.4,
+          "sodiumMg": 600.0
+        }
+      },
+      {
+        "foodRefId": "D114-601000000-0001",
+        "name": "가죽나물무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 76.0,
+          "proteinG": 5.83,
+          "fatG": 1.35,
+          "carbG": 10.05,
+          "fiberG": 6.2,
+          "sodiumMg": 276.0
+        }
+      },
+      {
+        "foodRefId": "D313-576000000-0001",
+        "name": "머위나물무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 85.0,
+          "proteinG": 1.62,
+          "fatG": 7.66,
+          "carbG": 2.49,
+          "fiberG": 2.0,
+          "sodiumMg": 452.0
+        }
+      },
+      {
+        "foodRefId": "D113-580000000-0001",
+        "name": "방풍나물무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 76.0,
+          "proteinG": 4.39,
+          "fatG": 1.73,
+          "carbG": 10.74,
+          "fiberG": 6.7,
+          "sodiumMg": 267.0
+        }
+      }
+    ],
+    "브로콜리두부무침": [
+      {
+        "foodRefId": "D414-688000000-0001",
+        "name": "브로콜리 두부무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 35.0,
+          "proteinG": 2.0,
+          "fatG": 0.72,
+          "carbG": 6.17,
+          "fiberG": 1.7,
+          "sodiumMg": 167.0
+        }
+      },
+      {
+        "foodRefId": "P114-400020100-0743",
+        "name": "브로콜리두부무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 77.0,
+          "proteinG": 7.33,
+          "fatG": 4.0,
+          "carbG": 5.33,
+          "fiberG": null,
+          "sodiumMg": 467.0
+        }
+      },
+      {
+        "foodRefId": "P123-212020200-0221",
+        "name": "브로콜리참깨두부무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 407.0,
+          "proteinG": 22.22,
+          "fatG": 20.0,
+          "carbG": 34.81,
+          "fiberG": null,
+          "sodiumMg": 631.0
+        }
+      },
+      {
+        "foodRefId": "P110-400040000-1062",
+        "name": "단호박브로콜리두부죽",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 65.0,
+          "proteinG": 1.86,
+          "fatG": 0.43,
+          "carbG": 13.57,
+          "fiberG": null,
+          "sodiumMg": 2.0
+        }
+      },
+      {
+        "foodRefId": "P123-201020300-0093",
+        "name": "F58 한우브로콜리두부덮밥",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 109.0,
+          "proteinG": 3.75,
+          "fatG": 2.0,
+          "carbG": 18.75,
+          "fiberG": null,
+          "sodiumMg": 69.0
+        }
+      },
+      {
+        "foodRefId": "D414-690000000-0001",
+        "name": "브로콜리무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 32.0,
+          "proteinG": 1.6,
+          "fatG": 0.25,
+          "carbG": 7.01,
+          "fiberG": 1.5,
+          "sodiumMg": 175.0
+        }
+      },
+      {
+        "foodRefId": "D514-689000000-0001",
+        "name": "브로콜리 채소무침",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 34.0,
+          "proteinG": 1.7,
+          "fatG": 0.35,
+          "carbG": 7.21,
+          "fiberG": 1.5,
+          "sodiumMg": 182.0
+        }
+      },
+      {
+        "foodRefId": "P110-400040000-3092",
+        "name": "두부브로콜리죽",
+        "servingSizeG": 100.0,
+        "nutrition": {
+          "kcal": 65.0,
+          "proteinG": 1.5,
+          "fatG": 0.25,
+          "carbG": 14.0,
+          "fiberG": null,
+          "sodiumMg": 5.0
+        }
+      }
+    ]
+  },
+  "details": [
+    {
+      "id": "P123-201020300-0093",
+      "name": "F58 한우브로콜리두부덮밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D114-601000000-0001",
+      "name": "가죽나물무침",
+      "category": "GENERAL",
+      "origin_type": "가정식(분석 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D415-684000000-0001",
+      "name": "가지김치",
+      "category": "GENERAL",
+      "origin_type": "외식(재료량 기반 산출함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D315-663000000-0001",
+      "name": "갓김치",
+      "category": "GENERAL",
+      "origin_type": "외식(분석함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P106-001000100-0037",
+      "name": "국산콩두부 부침용",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D105-205000000-0001",
+      "name": "김치국",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D403-182000000-0001",
+      "name": "김치만두",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D110-456000000-0001",
+      "name": "김치볶음",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D109-412000000-0001",
+      "name": "김치전",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D611-511070000-0001",
+      "name": "꽁치조림_배추김치",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P111-000030100-0011",
+      "name": "닥터키친 나물가득 소고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P110-400040000-1062",
+      "name": "단호박브로콜리두부죽",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P111-000030100-0203",
+      "name": "당뇨케어 삼색소고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P111-000030100-0115",
+      "name": "당플랜 소고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P110-400040000-1948",
+      "name": "대구콩나물미역죽",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020200-0052",
+      "name": "돈불고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D114-673000000-0001",
+      "name": "돌나물무침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020200-0838",
+      "name": "돼지불고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D109-419000000-0001",
+      "name": "두부부침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P110-400040000-3092",
+      "name": "두부브로콜리죽",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-212020300-0684",
+      "name": "들기름두부부침",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020300-1320",
+      "name": "리스컵스 소고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D313-576000000-0001",
+      "name": "머위나물무침",
+      "category": "GENERAL",
+      "origin_type": "외식(분석함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D113-578000000-0001",
+      "name": "무나물무침",
+      "category": "GENERAL",
+      "origin_type": "가정식(분석 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-300030000-1546",
+      "name": "물미역무침 순봉이네",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D514-681000000-0001",
+      "name": "미나리 초무침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D414-682000000-0001",
+      "name": "미역 오이무침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-300030000-2253",
+      "name": "미역줄기나물",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-300030000-0272",
+      "name": "미역줄기무침",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D114-632000000-0001",
+      "name": "미역초무침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-400020100-0211",
+      "name": "미역초무침",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-300030000-1111",
+      "name": "바로팜 미역줄기나물",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D113-580000000-0001",
+      "name": "방풍나물무침",
+      "category": "GENERAL",
+      "origin_type": "가정식(분석 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D315-670000000-0001",
+      "name": "배추김치",
+      "category": "GENERAL",
+      "origin_type": "외식(분석함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D315-670010000-0001",
+      "name": "배추김치_가을재배",
+      "category": "GENERAL",
+      "origin_type": "외식(분석함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D315-670030000-0001",
+      "name": "배추김치_봄재배",
+      "category": "GENERAL",
+      "origin_type": "외식(분석함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D315-671000000-0001",
+      "name": "백김치",
+      "category": "GENERAL",
+      "origin_type": "외식(분석함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P111-000030100-0289",
+      "name": "버섯불고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D414-686000000-0001",
+      "name": "부추 초무침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020300-5316",
+      "name": "불고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D414-688000000-0001",
+      "name": "브로콜리 두부무침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D514-689000000-0001",
+      "name": "브로콜리 채소무침",
+      "category": "GENERAL",
+      "origin_type": "초등학교급식(재료량 기반 산출 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-400020100-0743",
+      "name": "브로콜리두부무침",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D414-690000000-0001",
+      "name": "브로콜리무침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-212020200-0221",
+      "name": "브로콜리참깨두부무침",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D501-018283500-0001",
+      "name": "비빔밥_소고기_양념장",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020200-1185",
+      "name": "산채불고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P110-400040000-3134",
+      "name": "새우미역무른밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020300-1808",
+      "name": "소고기&오색비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020300-3353",
+      "name": "소고기버섯비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-300030000-2262",
+      "name": "소고기볶음비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020200-1027",
+      "name": "소고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-300030000-0656",
+      "name": "소고기비빔밥세트",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020300-5818",
+      "name": "소고기오색비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020200-1188",
+      "name": "소고기전주식비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020200-0581",
+      "name": "소불고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020300-3733",
+      "name": "수제 소고기 비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D615-687000000-0001",
+      "name": "양배추김치",
+      "category": "GENERAL",
+      "origin_type": "중고등학교급식(재료량 기반 산출함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D115-674000000-0001",
+      "name": "얼갈이배추김치",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D514-711000000-0001",
+      "name": "오징어미역초무침",
+      "category": "GENERAL",
+      "origin_type": "초등학교급식(재료량 기반 산출 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D403-164250000-0001",
+      "name": "우동_배추김치",
+      "category": "GENERAL",
+      "origin_type": "외식(재료량 기반 산출함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020300-2342",
+      "name": "일빵빵소고기비빔밥고추장형",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D401-035230000-0001",
+      "name": "주먹밥_배추김치",
+      "category": "GENERAL",
+      "origin_type": "외식(재료량 기반 산출함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P106-001000100-0265",
+      "name": "즐거운요리두부 부침용",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P106-001000100-0509",
+      "name": "촌두부 부침용",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D313-596000000-0001",
+      "name": "취나물무침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D113-597000000-0001",
+      "name": "콩나물무침",
+      "category": "GENERAL",
+      "origin_type": null,
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D114-653000000-0001",
+      "name": "톳나물무침",
+      "category": "GENERAL",
+      "origin_type": "가정식(분석 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D315-683000000-0001",
+      "name": "파김치",
+      "category": "GENERAL",
+      "origin_type": "외식(분석함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P106-001000100-0396",
+      "name": "하루두부 부침&찌개용",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P106-001000100-0173",
+      "name": "한끼두부 부침용",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020200-0510",
+      "name": "한돈불고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P106-001000100-0287",
+      "name": "한둘 두부 부침용",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P123-201020300-2851",
+      "name": "한우불고기비빔밥",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "D114-660000000-0001",
+      "name": "해초무침",
+      "category": "GENERAL",
+      "origin_type": "가정식(분석 함량)",
+      "dataset_version": "20260828"
+    },
+    {
+      "id": "P114-400020100-2404",
+      "name": "황태미역초무침",
+      "category": "PROCESSED",
+      "origin_type": "가공식품",
+      "dataset_version": "20260828"
+    }
+  ]
+}

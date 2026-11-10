@@ -71,6 +71,20 @@ ai/
 - LLM SDK 없이 `httpx`로 직접 POST 한다 — SDK는 base URL 뒤에 경로를 붙여 이 엔드포인트와 맞지 않는다
 - 타임아웃·재시도 횟수를 설정값으로 노출 (재시도는 비용 × 지연의 곱셈이다)
 
+사진 분석은 이미지 다운로드와 모든 모델 시도를 합쳐 `LLM_TIMEOUT_SEC` 안에 끝낸다.
+모델 POST는 `LLM_MAX_RETRIES + 1`회까지이며(기본 2회), 전송 오류·408/429·일시적
+5xx와 잘린 JSON·스키마 오류가 이 횟수를 공유한다. 400/401/403 등 요청 오류,
+501, 모델의 명시적 거부는 추가 모델 재시도를 하지 않는다. BE 큐의 작업 재시도는
+기존 별도 정책을 따른다. 재시도해도 프롬프트·사진은 동일하며 부분 JSON을 복구해
+불완전한 음식 목록이나 빈 성공 응답으로 반환하지 않는다.
+
+`/analyze-meal`은 모델 응답/통신 오류를 502, 시간 초과를 504, 비전 URL 미설정을
+503으로 반환한다. 정상적인 `items: []`는 기존대로 허용한다. 운영 로그에는 시도 번호,
+결과 분류, HTTP 상태, 허용된 종료 사유, 원문 길이만 남기고 음식명·응답 원문·URL·키는
+추가하지 않는다. `invalid_json`과 `invalid_schema`를 구분하며, 종료 사유가 없다는
+이유만으로 토큰 제한을 추측하지 않는다. 실제 잘린 응답의 회귀 검증은
+`tests/test_vision_response_recovery.py`에서 모델 전송을 모킹해 수행한다.
+
 ## 환경변수
 
 `.env.example` 참고.
@@ -98,6 +112,16 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 pytest
 ```
+
+### 자동 회귀 테스트 (CI)
+
+[`AI tests`](../.github/workflows/ai-tests.yml)는 `ai/**` 또는 워크플로 파일이 바뀐
+`develop`·`main` 대상 PR과 두 브랜치의 push에서 실행됩니다. PR에서는 대상 브랜치와
+합친 코드를 운영 Docker와 같은 Python 3.12로 검사합니다.
+
+- `requirements.txt` 설치 후 `python -m pytest -q --tb=short`로 전체 테스트를 실행합니다.
+- 모델 호출은 모킹하므로 API 키나 운영 DB가 필요 없습니다. 실제 모델 평가와는 별도입니다.
+- 결과는 PR Checks에 표시되며, JUnit 결과는 `ai-test-results` 아티팩트로 7일간 보관합니다.
 
 ---
 

@@ -1,0 +1,48 @@
+{
+  "verified_at_utc": "2026-11-08T17:02:24.259568+00:00",
+  "base_commit": "bbee3c1996ce86475f8fe28a8574d06b54b0e42c",
+  "branch": "ai/6-feat-food-db-matching",
+  "pytest": {
+    "command": "python -m pytest tests -q",
+    "cwd": "ai",
+    "tests": 1488,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 1,
+    "warning": "Existing Starlette TestClient httpx deprecation"
+  },
+  "new_response_recovery_tests": 45,
+  "injected_before_after_scenarios_passed": 7,
+  "normal_api_cases_passed": 114,
+  "normal_food_items_verified": 220,
+  "normal_api_cases_first_attempt_success": 114,
+  "new_model_calls": 0,
+  "prompt_and_p2_parser_unchanged": true,
+  "backend_schema_normalizer_settings_unchanged": true,
+  "known_local_secret_scan_passed": true,
+  "git_diff_check_passed": true,
+  "limitations": [
+    "Injected recovery is not a measured live model recovery rate.",
+    "Original failure lacks finish_reason, so cause is not established.",
+    "AI total45s and BE read45s share the same default duration; client504 delivery before BE timeout is not guaranteed.",
+    "Existing BE queue retries remain separate from per-request gateway attempt cap."
+  ],
+  "source_sha256": {
+    "ai/README.md": "a67f11034d0a10bb08d50d7b50721251bc48e0454e1891df2c27e29e75a5d43a",
+    "ai/app/food_analyzer.py": "1d840519bf3264eceda5d609bbf5be7151b26cc3d007b7208020ca04cadca718",
+    "ai/app/main.py": "cd4ee6d3f7e5a79552c853f3139a25eef689a572558de68e97cde15b6bc13958",
+    "ai/evals/README.md": "76576a5fc79691d635555c384e73a5814b3ce35533d25f1cf310d977585b34d6",
+    "ai/evals/food_name_ab.py": "53330c30369eee31f18d211850da7f6cf226d3f3244a4095e6b0a587a6b23389",
+    "ai/tests/test_eval_fixture_server.py": "d00b499d9494000ae79c914a37b7effd907e0dfc99e5c01982d6f4bf5ae6931a",
+    "ai/tests/test_eval_food_name_ab.py": "37437f43ca6b794c9ac4586c518593d769958c7fc1d48b8ad2ec2a994effa8d0",
+    "ai/tests/test_food_analyzer.py": "e3601e1a573ec7f42b27f61da9c2f94e5eb25c96d8527d76082d582b92dd1e7a",
+    "ai/tests/fixtures/vision_truncated_manybanchan.json": "134a9ceeb27eb64c1e6d6a7e8e62c05183cda08f07d7a5f452ee1a5f37d2c313",
+    "ai/tests/test_vision_response_recovery.py": "5008995da1c468363285db4421bad8e4f5a945c183a760bbe693d5a80a739486",
+    "ai/manual_feedback/vision_response_recovery_20261109/normal_response_regression.json": "6b75f3d36f8340e347bf6e3d1b084f092dd98e543b3271af6fc19a5a62fbe453",
+    "ai/manual_feedback/vision_response_recovery_20261109/analysis.json": "acdb17b33a64ffadb00fe9439eec4b4da95db566333f4b9d99c8104bc7ccd8d7",
+    "ai/manual_feedback/vision_response_recovery_20261109/scenarios.json": "88140bd2146c64a66589c08ea371126b8adb4232a68a497b726cd9424f0294f9"
+  },
+  "committed": false,
+  "pushed": false
+}

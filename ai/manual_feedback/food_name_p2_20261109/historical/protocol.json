@@ -1,0 +1,68 @@
+{
+  "version": "food-name-normalization-v1",
+  "created_at_utc": "2026-11-08T16:38:34.894745+00:00",
+  "source_file": "analyze_meal_baseline.json",
+  "source_sha256": "db14548e249b5b9e3c571460b4816b0acc3654a226dee54b073f1a207068749b",
+  "candidate_sha256": "df8d623e95fe9eb5fe6f141ea3ba6523ba208353147335f69b9b9d2e82124b97",
+  "normalizer_source_file": "food_names.py",
+  "normalizer_source_sha256": "faf42a0fc35b393640f24ae1f73a231e660c0b0bc37fad004cf8e1fb834af731",
+  "source_rule_version": "analyze-meal-labels-v1",
+  "source_prompt_hash": "5817d1d66a34f686f9feb25cbdcded64332a5f851a8a618df9057ada31db4402",
+  "model_calls": 0,
+  "saved_responses": 18,
+  "item_occurrences": 69,
+  "changed_item_occurrences": 7,
+  "transformations": [
+    {
+      "case": "food_and_notfood",
+      "run": 1,
+      "item_index": 2,
+      "before_name": "양송이스프",
+      "after_name": "양송이 스프"
+    },
+    {
+      "case": "food_and_notfood",
+      "run": 2,
+      "item_index": 2,
+      "before_name": "양송이스프",
+      "after_name": "양송이 스프"
+    },
+    {
+      "case": "food_and_notfood",
+      "run": 3,
+      "item_index": 2,
+      "before_name": "양송이스프",
+      "after_name": "양송이 스프"
+    },
+    {
+      "case": "branded_drinks",
+      "run": 2,
+      "item_index": 1,
+      "before_name": "망고 주스",
+      "after_name": "망고주스"
+    },
+    {
+      "case": "branded_drinks",
+      "run": 2,
+      "item_index": 2,
+      "before_name": "리치 주스",
+      "after_name": "리치주스"
+    },
+    {
+      "case": "branded_drinks",
+      "run": 3,
+      "item_index": 1,
+      "before_name": "망고 주스",
+      "after_name": "망고주스"
+    },
+    {
+      "case": "branded_drinks",
+      "run": 3,
+      "item_index": 2,
+      "before_name": "리치 주스",
+      "after_name": "리치주스"
+    }
+  ],
+  "scope": "Only originalFoodName in amount_accuracy and confidence_calibration observations is changed. Other fields and historical evaluation results are preserved, not re-evaluated.",
+  "limitation": "Input is previously parsed saved responses. No omitted food, parser failure, photo identity, or model improvement is measured."
+}

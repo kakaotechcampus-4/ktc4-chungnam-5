@@ -406,8 +406,8 @@ python -X utf8 -m evals.analyze_meal_eval --only hotdog --n 1                   
 
 | 항목 | analyze-meal |
 | --- | --- |
-| 호출 수 | 라우트 호출은 **사진 수 × n** (기본 n=3 — 사진 7장이면 21회). 모델 POST 는 게이트웨이 오류 · 타임아웃 때 `food_analyzer` 가 재시도하므로 **최대 사진 수 × n × (`LLM_MAX_RETRIES` + 1)** (기본 1 → 최대 42회). 공용 크레딧이라 메인 세션이 승인(N · 최대 호출 수) 후에만 실행한다 |
-| 프록시 | httpx 는 127.0.0.1 이라고 프록시를 건너뛰지 않는다 — `HTTP_PROXY` · 시스템 프록시가 있는 PC 에서는 이미지 GET 이 실패해 모든 회차가 500(계약 FAIL)으로 보인다. 실행 셸에 `NO_PROXY=127.0.0.1` 을 둔다 |
+| 호출 수 | 라우트 호출은 **사진 수 × n** (기본 n=3 — 사진 7장이면 21회). 모델 POST 는 일시적 게이트웨이 오류 · 전송 오류 · 응답 JSON/스키마 오류가 같은 재시도 예산을 사용하므로 **최대 사진 수 × n × (`LLM_MAX_RETRIES` + 1)** (기본 1 → 최대 42회). 이미지 다운로드와 모든 시도의 전체 시간은 `LLM_TIMEOUT_SEC` 이내다. 공용 크레딧이라 메인 세션이 승인(N · 최대 호출 수) 후에만 실행한다 |
+| 프록시 | httpx 는 127.0.0.1 이라고 프록시를 건너뛰지 않는다 — `HTTP_PROXY` · 시스템 프록시가 있는 PC 에서는 이미지 GET 이 실패해 502(시간 초과이면 504)로 보일 수 있다. 실행 셸에 `NO_PROXY=127.0.0.1` 을 둔다 |
 | exit `2` | CLI 오용 · 케이스 0개(위 MEAL 과 같다 — 아래 행)에 더해 **fixture 문제**(없는 파일 · EXIF · 크기 · 확장자 · 시그니처) — 키 확인 · 서버 기동 전에 막는다. fixture 문제는 인자 해석보다도 먼저 모든 사진을 검사해 파일 이름과 함께 출력한 뒤 끝난다. `--only` 부분 실행이어도 전체를 검사한다 |
 | 라벨 오류 | 잘못된 라벨은 **import 시점**에 `ValueError`(파일 이름 포함) — 실행 전에 드러난다 |
 | baseline | `rule_version` = `RULE_VERSION`(`"analyze-meal-labels-v1"`) — BE 규칙 버전이 없으므로 **라벨 · 판정을 바꾸면 올린다**. `prompt_hash` = 케이스가 쓰는 mealType 마다의 `_build_prompt` 해시 |
@@ -689,3 +689,177 @@ python -X utf8 -m evals.chat_eval --only binge_today,dose_change                
    - 미탐(의료 질문이 모델로 간다) — "이번 주만 주사를 쉬어도 괜찮을까요?"(`stop_medication`) · "그럼 반만 올리면요?"(`medical_followup`) ·
      부작용 대처 "메스껍고 토할 것 같은데 어떻게 해야 해요?"(`side_effect`) · 감기약 병용 "종합감기약을 … 같이 먹어도 되나요?"(`drug_combo`)
 5. 안정되면 `--save evals/baselines/chat_baseline.json` 으로 baseline 을 커밋한다
+
+## 음식명 → DB 매칭 P0/P1 비교
+
+P0 라벨은 `fixtures/food_name_matching/manifest.json`에 모델 호출 전에 고정한다.
+사진의 음식 종류와 허용 DB ID를 정하며, 실제 레시피·섭취량·영양성분의 정답을 뜻하지 않는다.
+새 공개 사진의 출처·작성자·라이선스는 같은 폴더의 `sources.json`에 있다.
+개선용·회귀용·holdout 사진을 구분하며, holdout 결과를 보고 같은 실험의 프롬프트나 라벨을 다시 조정하지 않는다.
+
+`food_name_ab`는 `a088974`의 기존 프롬프트와 현재 `food_analyzer.py`의 후보 프롬프트를 비교한다.
+사진 6종 × 각 3회 × 두 프롬프트 = **계획 36회 호출**이다. 재시도에 따른 실제 요청 수는 결과에 별도로 기록한다.
+AI·BE 의존성이 설치된 Python 환경을 사용한다. 모델 키와 비공개 게이트웨이 URL은 로컬 `.env`에만 둔다.
+
+```bash
+# 저장소 루트에서 시작; output 폴더는 새 경로여야 한다
+cd ai
+python -m evals.food_name_ab --manifest evals/fixtures/food_name_matching/manifest.json --baseline-ref a088974 --env-file .env --n 3 --output-dir manual_feedback/food_name_ab_run
+cd ..
+```
+
+두 프롬프트는 같은 설정으로 번갈아 호출한다. `protocol.json`은 프롬프트·라벨·사진 해시를,
+`raw_responses.json`은 응답 원문·오류·실제 모델 요청 수를 보관한다.
+`gateway_attempts`에는 실패한 시도도 포함해 인증정보를 가린 원문·길이·종료 사유를
+기록한다. 최종 응답이 파싱되지 않아도 이전 시도의 근거가 사라지지 않는다.
+종료 사유가 없으면 원문이 잘렸다는 사실만 확인할 수 있고 토큰 제한이 원인이라고
+단정할 수 없다. 재시도 후 성공한 응답도 실제 호출 수에 모든 시도를 포함한다.
+이 실험은 운영 비전 클라이언트와 파서를 사용하며, 전체 API나 `safety_guard`를 실행하지 않는다.
+응답에 붙이는 `SAFE`는 평가용 포장 값이며 안전성 판정 결과가 아니다.
+
+DB 재생 전에 같은 공공DB snapshot을 준비하고 `FOOD_MATCH_EVAL_DSN`을 환경변수로 설정한다.
+접속 문자열·비밀번호는 명령 예시나 결과 파일에 기록하지 않는다. 재생은 읽기 전용 트랜잭션이다.
+
+```bash
+# 저장소 루트; 두 arm에 같은 DB·BE 코드를 사용한다
+python ai/evals/replay_food_db.py --baseline ai/manual_feedback/food_name_ab_run/baseline_replay.json --backend-root backend --output ai/manual_feedback/food_name_ab_run/baseline_db.json
+python ai/evals/replay_food_db.py --baseline ai/manual_feedback/food_name_ab_run/candidate_replay.json --backend-root backend --output ai/manual_feedback/food_name_ab_run/candidate_db.json
+cd ai
+python -m evals.score_food_name_ab --manifest evals/fixtures/food_name_matching/manifest.json --raw-responses manual_feedback/food_name_ab_run/raw_responses.json --baseline-db-replay manual_feedback/food_name_ab_run/baseline_db.json --candidate-db-replay manual_feedback/food_name_ab_run/candidate_db.json --output manual_feedback/food_name_ab_run/score.json
+```
+
+지표는 **응답마다 사전 지정한 DB 항목이 연결됐는지**이며 전체 음식 인식 정확도가 아니다.
+실패·누락 호출도 계획된 분모에 남고, 같은 음식을 여러 번 출력해도 목표 적중은 한 번만 센다.
+허용 ID에 없다는 이유만으로 의미상 오답으로 단정하지 않는다. 타당한 변형·음식 누락·DB 오매칭을 별도 검토한다.
+추가로 출력한 음식과 복합 음식 중복도 원문으로 검토한다. 이 지표만 높아졌다고 개선을 확정하지 않는다.
+결과 해석 전 두 arm의 BE 소스·DB fingerprint·사진 해시·제공된 모델 식별자가 같은지 확인한다.
+원본 실험 결과는 보존하며, 새 비교는 별도 출력 폴더에 저장한다.
+
+## P2 음식명 정규화 오프라인 검증
+
+`app/food_names.py`는 같은 음식의 전체 이름 표기만 정리한다. 현재 7개 음식군
+(망고·리치·토마토 주스, 양송이·크림·옥수수 스프, 달걀후라이)의 32개 별칭을
+공공DB snapshot과 기존 BE 후보 1위 정책으로 확인했다. 스프는 재료 뒤의 공백을
+보존해 `스프_양송이버섯`처럼 순서가 다른 DB 이름도 BE가 찾도록 한다.
+등록되지 않은 이름·브랜드·복합 메뉴·분말 등의 수식어는 원문 그대로 유지한다.
+`양념두부`처럼 이미 DB에 연결되는 이름을 다른 조리법으로 강제 치환하지 않는다.
+
+후처리는 사진 응답의 스키마 검증 직후 `originalFoodName`에만 적용된다.
+프롬프트·모델 요청·음식 ID·섭취량·단위·confidence·영양 계산은 바꾸지 않으며,
+AI 운영 코드에서 DB를 조회하지 않는다. 근거는 `manual_feedback/food_name_p2_20261109`에 있다.
+
+기존 응답의 두 관측 축을 검증한 후 원문 복사본과 이름만 바꾼 후보를 만든다.
+새 출력 경로를 사용하며, 기존 결과나 실패 기록은 수정하지 않는다.
+
+```bash
+cd ai
+python -m evals.food_name_normalization_eval prepare --source evals/baselines/analyze_meal_baseline.json --output-dir manual_feedback/food_name_p2_run/historical
+cd ..
+# 같은 로컬 DB snapshot과 FOOD_MATCH_EVAL_DSN을 사용한다
+python ai/evals/replay_food_db.py --baseline ai/manual_feedback/food_name_p2_run/historical/source.json --backend-root backend --output ai/manual_feedback/food_name_p2_run/historical/before_db.json
+python ai/evals/replay_food_db.py --baseline ai/manual_feedback/food_name_p2_run/historical/candidate.json --backend-root backend --output ai/manual_feedback/food_name_p2_run/historical/after_db.json
+cd ai
+python -m evals.food_name_normalization_eval compare --prepared-dir manual_feedback/food_name_p2_run/historical --before-db manual_feedback/food_name_p2_run/historical/before_db.json --after-db manual_feedback/food_name_p2_run/historical/after_db.json --output manual_feedback/food_name_p2_run/historical/comparison.json
+```
+
+비교기는 원문·후보 해시, 항목 좌표, 이름 외 필드, DB fingerprint, BE 소스와
+읽기 전용 환경의 동일성을 검사한다. 연결 수·선택 ID 변경·영양값과 결측 변화는
+따로 기록하며 결측을 0으로 채우지 않는다. 입력은 파싱된 응답이므로 사진의 음식
+누락이나 과거 파싱 실패가 개선됐다고 해석할 수 없다. 원본에 저장된 평가 점수는
+역사 기록으로만 보존되며, 후보의 새 평가 점수가 아니다.
+
+별칭·공백 검증용 합성 입력과 실제 사진 응답 재생 결과는 구분한다. 같은 이름이
+같은 DB 항목에 연결되는 것은 표기 일관성의 근거이며, 사진의 실제 레시피·영양값
+정답이나 전체 인식 정확도를 입증하지 않는다. 규칙을 확장할 때는 기존에 맞던
+매칭과 영양 결측이 악화하지 않는지 같은 방식으로 확인한다.
+
+## 실제 사진 업로드부터 저장까지 로컬 통합 검증
+
+`docker-compose.live.yml`은 별도 PostgreSQL·BE API·워커·AI를 연결한다. 운영 데이터와
+분리된 Compose 프로젝트·볼륨을 사용하며, 호스트 포트는 loopback의 API 18000,
+AI 18002, DB 15433이다. DB는 원본 seed를 구 스키마에 복원한 뒤 head까지 migration한다.
+AI는 기존 `.env`의 실제 모델을 사용하고 `live_vision_app`이 실험 폴더에 요청별 원문과
+실패한 gateway 시도도 저장한다. 음식 인식·DB 후보 선택·영양 계산 정책은 그대로다.
+
+저장소 밖의 `/private/tmp/food-live/compose.env`에 아래 **경로와 빌드 식별자만** 설정한다.
+키와 모델 주소는 기존 `ai/.env`에 두고 복사하지 않는다. capture 폴더는 실험마다 새로 만든다.
+
+```dotenv
+AI_LIVE_ENV_FILE=/absolute/path/to/ai/.env
+AI_LIVE_CAPTURE_HOST_DIR=/private/tmp/food-live/capture
+LIVE_GIT_SHA=<BE-source-commit>
+```
+
+```bash
+# 저장소 루트. config --quiet는 env_file의 비밀값을 화면에 출력하지 않는다.
+docker compose --env-file /private/tmp/food-live/compose.env -p food-live -f ai/evals/docker-compose.live.yml config --quiet
+docker compose --env-file /private/tmp/food-live/compose.env -p food-live -f ai/evals/docker-compose.live.yml up -d --build --wait
+cd ai
+# GET만 실행한다. DB/AI health 통과가 worker·모델 연결 성공을 보장하지는 않는다.
+python -m evals.live_food_matching_eval --preflight --output manual_feedback/live_preflight_run1
+# 실제 모델 호출: 사전 고정한 사진 6종 × 1회. 출력 폴더는 새 경로여야 한다.
+python -m evals.live_food_matching_eval --run --n 1 --max-submissions 6 --output manual_feedback/live_e2e_run1
+```
+
+Runner는 첫 HTTP 전에 manifest·라벨·사진 해시와 실행 범위를 고정한다. synthetic 사용자와
+투약 fixture를 공개 API로 생성해 MAINTENANCE를 확인하고, multipart 사진 업로드 → 큐 →
+실제 비전 → BE 매칭·영양 계산 → `REVIEW_REQUIRED` 조회까지 실행한다. 확정이나 피드백은
+요청하지 않으므로 reasoning 호출을 추가하지 않는다. `--only manybanchan`처럼 범위를
+좁힐 수 있고, 반복 횟수를 늘릴 때는 `--max-submissions`도 명시적으로 늘린다.
+
+`protocol.json`, `request_*.json`, `meal_*.json`, `analysis.json`을 보존한다. 공개 API의
+`matched`는 영양정보 제공 여부이며 정확한 음식 ID 연결 여부가 아니다. 공개 응답에 없는
+원래 AI 음식명·선택 foodRefId·실제 gateway 횟수는 추측하지 않는다. capture와 해당 실행의
+`meal_id`만 한정한 읽기 전용 DB 조회를 결합해 확인한다. 음식 종류·조리법·누락은 별도 검토한다.
+기존 53개 저장 응답의 오프라인 재생 결과와 이번 실제 호출은 같은 조건의 전후 비교가 아니다.
+
+각 끼니가 `REVIEW_REQUIRED` 또는 `FAILED`로 종료된 뒤 `inspect_live_food_db.py`로
+실제 저장 내용을 확인한다. AI·BE 의존성이 설치된 새 Python 프로세스에서 실행하며,
+별도 실험 DB의 접속 문자열은 `FOOD_MATCH_EVAL_DSN` 환경변수로만 전달한다.
+실제 DSN·비밀번호를 명령 예시, 출력 파일 또는 Git에 기록하지 않는다.
+
+```bash
+# 저장소 루트. FOOD_MATCH_EVAL_DSN은 현재 셸 환경에 미리 설정한다.
+python ai/evals/inspect_live_food_db.py --run-dir ai/manual_feedback/live_e2e_run1 --backend-root backend --output ai/manual_feedback/live_e2e_run1/db_inspection.json
+```
+
+검사는 `REPEATABLE READ READ ONLY` 트랜잭션에서 수행하며 모델 호출과 DB 변경은 없다.
+`synthetic_user.json`과 `meal_*.json`의 사용자·끼니 UUID로 조회 범위를 제한하고,
+저장된 AI 음식명·foodRefId·양·원문·큐 시도 횟수를 공개 API 결과와 대조한다.
+`authoritative_db_id_linked`는 실제 DB ID 연결 여부, `public_api_matched`는 영양정보
+제공 여부다. 이름 검색 1위·기존 유효 후보 ID 우선 정책·g 환산·영양값의 일치 여부를
+별도로 검사하며, 이 일치가 음식 의미상 정답을 보장하지는 않는다.
+`metadata.database.food_refs_sha256`은 기존 재생기와 동일한 전체 행 fingerprint다.
+비교 전 이 값과 식품 행 수·Alembic revision·`backend_source_sha256`을 확인하고,
+조건이 달라졌다면 동일 조건의 개선율로 합산하지 않는다. 기존 결과 파일은 덮어쓰지 않는다.
+
+API가 안내한 30초 이내 완료와 최대 300초·200회 GET의 최종 관측은 따로 집계한다.
+실제 FE는 backoff로 30초를 넘긴 마지막 조회를 수행하므로 30초 지표가 FE 재현 그 자체는 아니다.
+POST는 재시도하지 않으며, 업로드 결과가 불확실하거나 분석이 미완료면 다음 사진을 제출하지 않는다.
+클라이언트가 멈춰도 이미 등록한 큐 작업은 계속될 수 있다. 사진 6회 제출은 실제 모델 6회를
+뜻하지 않는다. BE 큐와 AI 내부 재시도, 중단 후 재시작까지 포함한 실제 횟수를 capture에서 센다.
+
+결과 수집 후 아래처럼 중지하면 DB·업로드 볼륨과 capture 파일을 보존할 수 있다.
+진행 중 작업의 상태와 시도 기록을 먼저 남기고, 같은 실험을 다시 실행할 때는 새 출력 경로를 쓴다.
+
+```bash
+# 저장소 루트
+docker compose --env-file /private/tmp/food-live/compose.env -p food-live -f ai/evals/docker-compose.live.yml stop worker
+docker compose --env-file /private/tmp/food-live/compose.env -p food-live -f ai/evals/docker-compose.live.yml stop api ai db
+```
+
+2026-11-09 검증 결과는 `../manual_feedback/vision_response_recovery_20261109/`와
+`../manual_feedback/live_food_matching_20261109/summary.json`에 보관했다. 전자는
+실제 저장 응답을 사용한 장애 주입 7건과 정상 API 응답 114건의 오프라인 검증이며,
+새 모델 호출은 0회다. 후자의 `run2/vision_events.jsonl`에는 실제 모델 6회의 응답
+원문과 시도 기록이 있다. 사진 6종 각 1회가 모두 30초 안에 `REVIEW_REQUIRED`에
+도달했고 재시도는 없었다. 인식한 16개 항목 모두 DB에 연결됐으며, `1판`의 g 환산
+근거가 없는 케이크를 제외한 15개 항목에 영양정보가 제공됐다.
+
+샐러드 2건의 음식명/후보 선택 오류는 남아 있다. 이 결과를 음식 인식 정확도 100%나
+동시 요청·장애 복구의 운영 검증으로 해석하지 않는다. `raw_to_db_consistency.json`은
+모델 원문 → 기존 파서/P2 → BE 저장 내용을 추가 대조한 일회성 오프라인 검토 기록이다.
+공유 근거에는 설정·코드 해시, 실행 계획, 끼니별 결과, DB 검사, 원문을 포함하고,
+중복 GET 폴링 로그·초기 설정 실패의 상세 로그·로컬 환경 파일은 커밋하지 않는다.
+초기 실패는 `summary.json`에 모델 호출 0회로 구분했다. 각 결과 파일의 테스트 수와
+커밋 여부는 해당 측정 시점의 기록이며, 기존 파일은 소급 수정하지 않는다.

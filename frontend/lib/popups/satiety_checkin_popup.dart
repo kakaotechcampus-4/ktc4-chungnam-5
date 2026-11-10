@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../api/meal_api.dart';
 import '../common/api_format.dart';
+import '../common/api_image.dart';
 import '../screens/shared_meal_widgets.dart' show SkeletonBox;
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -43,10 +44,14 @@ class CheckinMeal {
     required this.mealType,
     required this.eatenAt,
     required this.displayName,
+    this.imageUrl,
   });
 
   final String mealId;
   final String mealType;
+
+  /// 끼니 사진(없으면 null). 서버가 주는 상대 경로를 [ApiImage] 가 그린다.
+  final String? imageUrl;
 
   /// 먹은 시각(절대 시각). 경과 시간 계산에 쓴다. 화면에 시각을 적을 때는
   /// [eatenAtKst] 를 쓴다.
@@ -63,6 +68,7 @@ class CheckinMeal {
     mealType: meal.mealType,
     eatenAt: meal.eatenAtInstant,
     displayName: meal.displayName,
+    imageUrl: meal.imageUrl,
   );
 }
 
@@ -294,13 +300,17 @@ class _SatietyCheckinPopupState extends State<SatietyCheckinPopup> {
       ),
       child: Row(
         children: [
-          // 끼니 썸네일 자리. 사진 URL 이 생기면 이미지로 바꾼다.
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
+          // 끼니 썸네일. 사진이 없거나 아직 불러오는 중이면 빈 자리만 둔다.
+          ClipRRect(
+            borderRadius: AppRadius.mdRadius,
+            child: Container(
+              width: 40,
+              height: 40,
               color: AppColors.surfaceSage,
-              borderRadius: AppRadius.mdRadius,
+              child: switch (meal?.imageUrl) {
+                final url? => ApiImage(url),
+                null => null,
+              },
             ),
           ),
           const SizedBox(width: AppSpacing.md),

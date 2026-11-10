@@ -1,0 +1,1010 @@
+[
+  {
+    "scenario": "saved_truncation_then_saved_valid",
+    "arms": {
+      "before": {
+        "http_status": 500,
+        "image_gets": 1,
+        "model_posts_mocked": 1,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"연두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"무초절임\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"오징어초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      ",
+            "response_chars": 1685,
+            "finish_reason": null
+          }
+        ],
+        "safe_runtime_events": [],
+        "api_response": {
+          "error": "unhandled_server_error"
+        }
+      },
+      "after": {
+        "http_status": 200,
+        "image_gets": 1,
+        "model_posts_mocked": 2,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"연두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"무초절임\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"오징어초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      ",
+            "response_chars": 1685,
+            "finish_reason": null
+          },
+          {
+            "index": 2,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.93\n    },\n    {\n      \"originalFoodName\": \"양념게장\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.8\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.87\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.82\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    }\n  ]\n}\n```",
+            "response_chars": 1356,
+            "finish_reason": "stop"
+          }
+        ],
+        "safe_runtime_events": [
+          {
+            "attempt": 1,
+            "max_attempts": 2,
+            "outcome": "invalid_json",
+            "status_code": 200,
+            "finish_reason": "unknown",
+            "response_chars": 1685
+          },
+          {
+            "attempt": 2,
+            "max_attempts": 2,
+            "outcome": "success",
+            "status_code": 200,
+            "finish_reason": "stop",
+            "response_chars": 1356
+          }
+        ],
+        "api_response": {
+          "mealId": "recovery-verification",
+          "modelVersion": "gemini-flash-gateway",
+          "safetyStatus": "SAFE",
+          "items": [
+            {
+              "originalFoodName": "불고기비빔밥",
+              "estimatedAmount": 350.0,
+              "unit": "g",
+              "confidence": 0.9,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "쌀밥",
+              "estimatedAmount": 210.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "콩나물국",
+              "estimatedAmount": 200.0,
+              "unit": "g",
+              "confidence": 0.92,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "잡채",
+              "estimatedAmount": 80.0,
+              "unit": "g",
+              "confidence": 0.93,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념게장",
+              "estimatedAmount": 70.0,
+              "unit": "g",
+              "confidence": 0.8,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념두부",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.88,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "브로콜리두부무침",
+              "estimatedAmount": 50.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "배추김치",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양배추샐러드",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.87,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "미역초무침",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.82,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "무피클",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            }
+          ]
+        }
+      }
+    },
+    "expectations_passed": true
+  },
+  {
+    "scenario": "saved_truncation_twice",
+    "arms": {
+      "before": {
+        "http_status": 500,
+        "image_gets": 1,
+        "model_posts_mocked": 1,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"연두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"무초절임\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"오징어초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      ",
+            "response_chars": 1685,
+            "finish_reason": null
+          }
+        ],
+        "safe_runtime_events": [],
+        "api_response": {
+          "error": "unhandled_server_error"
+        }
+      },
+      "after": {
+        "http_status": 502,
+        "image_gets": 1,
+        "model_posts_mocked": 2,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"연두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"무초절임\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"오징어초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      ",
+            "response_chars": 1685,
+            "finish_reason": null
+          },
+          {
+            "index": 2,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"연두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"무초절임\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"오징어초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      ",
+            "response_chars": 1685,
+            "finish_reason": null
+          }
+        ],
+        "safe_runtime_events": [
+          {
+            "attempt": 1,
+            "max_attempts": 2,
+            "outcome": "invalid_json",
+            "status_code": 200,
+            "finish_reason": "unknown",
+            "response_chars": 1685
+          },
+          {
+            "attempt": 2,
+            "max_attempts": 2,
+            "outcome": "invalid_json",
+            "status_code": 200,
+            "finish_reason": "unknown",
+            "response_chars": 1685
+          }
+        ],
+        "api_response": {
+          "detail": "음식 분석 모델 응답을 처리하지 못했습니다"
+        }
+      }
+    },
+    "expectations_passed": true
+  },
+  {
+    "scenario": "http503_then_truncated_shared_budget",
+    "arms": {
+      "before": {
+        "http_status": 500,
+        "image_gets": 1,
+        "model_posts_mocked": 2,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 503,
+            "raw_text": null,
+            "response_chars": null,
+            "finish_reason": null
+          },
+          {
+            "index": 2,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"연두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"무초절임\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"오징어초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      ",
+            "response_chars": 1685,
+            "finish_reason": null
+          }
+        ],
+        "safe_runtime_events": [],
+        "api_response": {
+          "error": "unhandled_server_error"
+        }
+      },
+      "after": {
+        "http_status": 502,
+        "image_gets": 1,
+        "model_posts_mocked": 2,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 503,
+            "raw_text": null,
+            "response_chars": null,
+            "finish_reason": null
+          },
+          {
+            "index": 2,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"연두부\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"무초절임\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"오징어초무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      ",
+            "response_chars": 1685,
+            "finish_reason": null
+          }
+        ],
+        "safe_runtime_events": [
+          {
+            "attempt": 1,
+            "max_attempts": 2,
+            "outcome": "http_error",
+            "status_code": 503,
+            "finish_reason": "unknown",
+            "response_chars": 0
+          },
+          {
+            "attempt": 2,
+            "max_attempts": 2,
+            "outcome": "invalid_json",
+            "status_code": 200,
+            "finish_reason": "unknown",
+            "response_chars": 1685
+          }
+        ],
+        "api_response": {
+          "detail": "음식 분석 모델 응답을 처리하지 못했습니다"
+        }
+      }
+    },
+    "expectations_passed": true
+  },
+  {
+    "scenario": "length_flag_with_empty_json_then_valid",
+    "arms": {
+      "before": {
+        "http_status": 200,
+        "image_gets": 1,
+        "model_posts_mocked": 1,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 200,
+            "raw_text": "{\"items\": []}",
+            "response_chars": 13,
+            "finish_reason": "length"
+          }
+        ],
+        "safe_runtime_events": [],
+        "api_response": {
+          "mealId": "recovery-verification",
+          "modelVersion": "gemini-flash-gateway",
+          "safetyStatus": "SAFE",
+          "items": []
+        }
+      },
+      "after": {
+        "http_status": 200,
+        "image_gets": 1,
+        "model_posts_mocked": 2,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 200,
+            "raw_text": "{\"items\": []}",
+            "response_chars": 13,
+            "finish_reason": "length"
+          },
+          {
+            "index": 2,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.93\n    },\n    {\n      \"originalFoodName\": \"양념게장\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.8\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.87\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.82\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    }\n  ]\n}\n```",
+            "response_chars": 1356,
+            "finish_reason": "stop"
+          }
+        ],
+        "safe_runtime_events": [
+          {
+            "attempt": 1,
+            "max_attempts": 2,
+            "outcome": "truncated",
+            "status_code": 200,
+            "finish_reason": "length",
+            "response_chars": 13
+          },
+          {
+            "attempt": 2,
+            "max_attempts": 2,
+            "outcome": "success",
+            "status_code": 200,
+            "finish_reason": "stop",
+            "response_chars": 1356
+          }
+        ],
+        "api_response": {
+          "mealId": "recovery-verification",
+          "modelVersion": "gemini-flash-gateway",
+          "safetyStatus": "SAFE",
+          "items": [
+            {
+              "originalFoodName": "불고기비빔밥",
+              "estimatedAmount": 350.0,
+              "unit": "g",
+              "confidence": 0.9,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "쌀밥",
+              "estimatedAmount": 210.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "콩나물국",
+              "estimatedAmount": 200.0,
+              "unit": "g",
+              "confidence": 0.92,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "잡채",
+              "estimatedAmount": 80.0,
+              "unit": "g",
+              "confidence": 0.93,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념게장",
+              "estimatedAmount": 70.0,
+              "unit": "g",
+              "confidence": 0.8,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념두부",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.88,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "브로콜리두부무침",
+              "estimatedAmount": 50.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "배추김치",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양배추샐러드",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.87,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "미역초무침",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.82,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "무피클",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            }
+          ]
+        }
+      }
+    },
+    "expectations_passed": true
+  },
+  {
+    "scenario": "unauthorized_not_retried",
+    "arms": {
+      "before": {
+        "http_status": 500,
+        "image_gets": 1,
+        "model_posts_mocked": 2,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 401,
+            "raw_text": null,
+            "response_chars": null,
+            "finish_reason": null
+          },
+          {
+            "index": 2,
+            "status_code": 401,
+            "raw_text": null,
+            "response_chars": null,
+            "finish_reason": null
+          }
+        ],
+        "safe_runtime_events": [],
+        "api_response": {
+          "error": "unhandled_server_error"
+        }
+      },
+      "after": {
+        "http_status": 502,
+        "image_gets": 1,
+        "model_posts_mocked": 1,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 401,
+            "raw_text": null,
+            "response_chars": null,
+            "finish_reason": null
+          }
+        ],
+        "safe_runtime_events": [
+          {
+            "attempt": 1,
+            "max_attempts": 2,
+            "outcome": "http_error",
+            "status_code": 401,
+            "finish_reason": "unknown",
+            "response_chars": 0
+          }
+        ],
+        "api_response": {
+          "detail": "음식 분석 모델 응답을 처리하지 못했습니다"
+        }
+      }
+    },
+    "expectations_passed": true
+  },
+  {
+    "scenario": "http429_then_valid_regression",
+    "arms": {
+      "before": {
+        "http_status": 200,
+        "image_gets": 1,
+        "model_posts_mocked": 2,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 429,
+            "raw_text": null,
+            "response_chars": null,
+            "finish_reason": null
+          },
+          {
+            "index": 2,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.93\n    },\n    {\n      \"originalFoodName\": \"양념게장\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.8\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.87\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.82\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    }\n  ]\n}\n```",
+            "response_chars": 1356,
+            "finish_reason": "stop"
+          }
+        ],
+        "safe_runtime_events": [],
+        "api_response": {
+          "mealId": "recovery-verification",
+          "modelVersion": "gemini-flash-gateway",
+          "safetyStatus": "SAFE",
+          "items": [
+            {
+              "originalFoodName": "불고기비빔밥",
+              "estimatedAmount": 350.0,
+              "unit": "g",
+              "confidence": 0.9,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "쌀밥",
+              "estimatedAmount": 210.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "콩나물국",
+              "estimatedAmount": 200.0,
+              "unit": "g",
+              "confidence": 0.92,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "잡채",
+              "estimatedAmount": 80.0,
+              "unit": "g",
+              "confidence": 0.93,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념게장",
+              "estimatedAmount": 70.0,
+              "unit": "g",
+              "confidence": 0.8,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념두부",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.88,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "브로콜리두부무침",
+              "estimatedAmount": 50.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "배추김치",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양배추샐러드",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.87,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "미역초무침",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.82,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "무피클",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            }
+          ]
+        }
+      },
+      "after": {
+        "http_status": 200,
+        "image_gets": 1,
+        "model_posts_mocked": 2,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 429,
+            "raw_text": null,
+            "response_chars": null,
+            "finish_reason": null
+          },
+          {
+            "index": 2,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.93\n    },\n    {\n      \"originalFoodName\": \"양념게장\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.8\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.87\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.82\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    }\n  ]\n}\n```",
+            "response_chars": 1356,
+            "finish_reason": "stop"
+          }
+        ],
+        "safe_runtime_events": [
+          {
+            "attempt": 1,
+            "max_attempts": 2,
+            "outcome": "http_error",
+            "status_code": 429,
+            "finish_reason": "unknown",
+            "response_chars": 0
+          },
+          {
+            "attempt": 2,
+            "max_attempts": 2,
+            "outcome": "success",
+            "status_code": 200,
+            "finish_reason": "stop",
+            "response_chars": 1356
+          }
+        ],
+        "api_response": {
+          "mealId": "recovery-verification",
+          "modelVersion": "gemini-flash-gateway",
+          "safetyStatus": "SAFE",
+          "items": [
+            {
+              "originalFoodName": "불고기비빔밥",
+              "estimatedAmount": 350.0,
+              "unit": "g",
+              "confidence": 0.9,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "쌀밥",
+              "estimatedAmount": 210.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "콩나물국",
+              "estimatedAmount": 200.0,
+              "unit": "g",
+              "confidence": 0.92,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "잡채",
+              "estimatedAmount": 80.0,
+              "unit": "g",
+              "confidence": 0.93,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념게장",
+              "estimatedAmount": 70.0,
+              "unit": "g",
+              "confidence": 0.8,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념두부",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.88,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "브로콜리두부무침",
+              "estimatedAmount": 50.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "배추김치",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양배추샐러드",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.87,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "미역초무침",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.82,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "무피클",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            }
+          ]
+        }
+      }
+    },
+    "expectations_passed": true
+  },
+  {
+    "scenario": "valid_first_attempt_regression",
+    "arms": {
+      "before": {
+        "http_status": 200,
+        "image_gets": 1,
+        "model_posts_mocked": 1,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.93\n    },\n    {\n      \"originalFoodName\": \"양념게장\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.8\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.87\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.82\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    }\n  ]\n}\n```",
+            "response_chars": 1356,
+            "finish_reason": "stop"
+          }
+        ],
+        "safe_runtime_events": [],
+        "api_response": {
+          "mealId": "recovery-verification",
+          "modelVersion": "gemini-flash-gateway",
+          "safetyStatus": "SAFE",
+          "items": [
+            {
+              "originalFoodName": "불고기비빔밥",
+              "estimatedAmount": 350.0,
+              "unit": "g",
+              "confidence": 0.9,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "쌀밥",
+              "estimatedAmount": 210.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "콩나물국",
+              "estimatedAmount": 200.0,
+              "unit": "g",
+              "confidence": 0.92,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "잡채",
+              "estimatedAmount": 80.0,
+              "unit": "g",
+              "confidence": 0.93,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념게장",
+              "estimatedAmount": 70.0,
+              "unit": "g",
+              "confidence": 0.8,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념두부",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.88,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "브로콜리두부무침",
+              "estimatedAmount": 50.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "배추김치",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양배추샐러드",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.87,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "미역초무침",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.82,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "무피클",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            }
+          ]
+        }
+      },
+      "after": {
+        "http_status": 200,
+        "image_gets": 1,
+        "model_posts_mocked": 1,
+        "gateway_attempts": [
+          {
+            "index": 1,
+            "status_code": 200,
+            "raw_text": "```json\n{\n  \"items\": [\n    {\n      \"originalFoodName\": \"불고기비빔밥\",\n      \"estimatedAmount\": 350,\n      \"unit\": \"g\",\n      \"confidence\": 0.9\n    },\n    {\n      \"originalFoodName\": \"쌀밥\",\n      \"estimatedAmount\": 210,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"콩나물국\",\n      \"estimatedAmount\": 200,\n      \"unit\": \"g\",\n      \"confidence\": 0.92\n    },\n    {\n      \"originalFoodName\": \"잡채\",\n      \"estimatedAmount\": 80,\n      \"unit\": \"g\",\n      \"confidence\": 0.93\n    },\n    {\n      \"originalFoodName\": \"양념게장\",\n      \"estimatedAmount\": 70,\n      \"unit\": \"g\",\n      \"confidence\": 0.8\n    },\n    {\n      \"originalFoodName\": \"양념두부\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.88\n    },\n    {\n      \"originalFoodName\": \"브로콜리두부무침\",\n      \"estimatedAmount\": 50,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    },\n    {\n      \"originalFoodName\": \"배추김치\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.95\n    },\n    {\n      \"originalFoodName\": \"양배추샐러드\",\n      \"estimatedAmount\": 60,\n      \"unit\": \"g\",\n      \"confidence\": 0.87\n    },\n    {\n      \"originalFoodName\": \"미역초무침\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.82\n    },\n    {\n      \"originalFoodName\": \"무피클\",\n      \"estimatedAmount\": 40,\n      \"unit\": \"g\",\n      \"confidence\": 0.85\n    }\n  ]\n}\n```",
+            "response_chars": 1356,
+            "finish_reason": "stop"
+          }
+        ],
+        "safe_runtime_events": [
+          {
+            "attempt": 1,
+            "max_attempts": 2,
+            "outcome": "success",
+            "status_code": 200,
+            "finish_reason": "stop",
+            "response_chars": 1356
+          }
+        ],
+        "api_response": {
+          "mealId": "recovery-verification",
+          "modelVersion": "gemini-flash-gateway",
+          "safetyStatus": "SAFE",
+          "items": [
+            {
+              "originalFoodName": "불고기비빔밥",
+              "estimatedAmount": 350.0,
+              "unit": "g",
+              "confidence": 0.9,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "쌀밥",
+              "estimatedAmount": 210.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "콩나물국",
+              "estimatedAmount": 200.0,
+              "unit": "g",
+              "confidence": 0.92,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "잡채",
+              "estimatedAmount": 80.0,
+              "unit": "g",
+              "confidence": 0.93,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념게장",
+              "estimatedAmount": 70.0,
+              "unit": "g",
+              "confidence": 0.8,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양념두부",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.88,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "브로콜리두부무침",
+              "estimatedAmount": 50.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "배추김치",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.95,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "양배추샐러드",
+              "estimatedAmount": 60.0,
+              "unit": "g",
+              "confidence": 0.87,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "미역초무침",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.82,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            },
+            {
+              "originalFoodName": "무피클",
+              "estimatedAmount": 40.0,
+              "unit": "g",
+              "confidence": 0.85,
+              "candidateFoodRefId": null,
+              "clarifyQuestion": null
+            }
+          ]
+        }
+      }
+    },
+    "expectations_passed": true
+  }
+]

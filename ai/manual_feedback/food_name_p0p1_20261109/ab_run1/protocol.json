@@ -1,0 +1,523 @@
+{
+  "created_at_utc": "2026-11-08T16:12:23.715637+00:00",
+  "manifest_sha256": "24a5a0ef4db335bd3bae8a855686a5956c82e841b18780c0e417b9faf5ed7dda",
+  "manifest": {
+    "version": "food-name-p0p1-v1",
+    "created_at_utc": "2026-11-08T16:10:15.480986+00:00",
+    "status": "labels frozen before live model calls",
+    "baseline_ref": "a088974",
+    "repetitions": 3,
+    "primary_metric": "Per target, per response: at least one selected BE food_ref_id belongs to the predeclared acceptable set. Denominator includes failed or missing planned calls.",
+    "not_overall_accuracy": "Allowlist non-hit can be an omission, DB mismatch, or an unlisted legitimate variant. Review separately; do not claim all non-hits are semantic errors.",
+    "recognition_metric_note": "recognized_names only supports a whitespace-normalized name observation; unfamiliar names require review and are not proven omissions.",
+    "db_dataset": "20260828; shipped seed and existing migrations; BE matching policy unchanged",
+    "human_confirmation": {
+      "first_reply": "양배추샐러드, 콩나물국, 두부나물무침(보통 쑥갓두부무침, 시금치두부무침 이렇게 나물의 주재료에 따라 달라)",
+      "additional_reply": "잡채, 김치, 소고기비빔밥, 미역나물, 두부부침",
+      "scope": "User identified foods by looking at photo; not an ingredient-weighed meal record."
+    },
+    "heldout_scope": "New photographs not used to draft the4-line P1 change; not claimed absent from foundation-model training. Do not tune again on holdout results.",
+    "candidate_scope": "Only4 generic food-name instructions; no synonyms mapping, candidate ID override, model change, or BE change.",
+    "acceptance_plan": [
+      "Complete paired collection with same gateway/settings and n=3 per image per arm; report every failure and retry.",
+      "Look for increased development target hits with no per-target decrease on heldout photos.",
+      "Check unchanged existing regression axes; inspect new unsupported ingredients, omitted targets, and composite-dish double counting.",
+      "Do not claim improvement if comparison is incomplete, holdout regresses, or unresolved semantic errors explain a metric gain.",
+      "Do not modify labels or loosen thresholds after outputs. Any label revision requires a new version and separate evaluation."
+    ],
+    "cases": [
+      {
+        "case_id": "manybanchan",
+        "split": "development",
+        "meal_type": "DINNER",
+        "image_path": "ai/evals/fixtures/analyze_meal/manybanchan.jpg",
+        "baseline_case": "manybanchan",
+        "targets": [
+          {
+            "target_id": "cabbage_salad",
+            "label": "양배추샐러드",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "D414-701000000-0001",
+              "D114-640220000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D414-701000000-0001",
+                "name": "양배추 샐러드",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D114-640220000-0001",
+                "name": "샐러드_양배추",
+                "category": "GENERAL",
+                "origin_type": "가정식(분석 함량)",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "양배추샐러드",
+              "양배추 샐러드"
+            ]
+          },
+          {
+            "target_id": "bean_sprout_soup",
+            "label": "콩나물국",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "D105-253000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D105-253000000-0001",
+                "name": "콩나물국",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "콩나물국",
+              "콩나물 국"
+            ]
+          },
+          {
+            "target_id": "japchae",
+            "label": "잡채",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "D110-492000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D110-492000000-0001",
+                "name": "잡채",
+                "category": "GENERAL",
+                "origin_type": "가정식(분석 함량)",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "잡채"
+            ]
+          },
+          {
+            "target_id": "kimchi",
+            "label": "배추김치",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls; cabbage subtype supported by visible leaf-shaped kimchi",
+            "acceptable_food_ref_ids": [
+              "D315-670000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D315-670000000-0001",
+                "name": "배추김치",
+                "category": "GENERAL",
+                "origin_type": "외식(분석함량)",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "배추김치",
+              "김치"
+            ]
+          },
+          {
+            "target_id": "beef_bibimbap",
+            "label": "소고기비빔밥",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "P123-201020200-1027",
+              "D501-018283500-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "P123-201020200-1027",
+                "name": "소고기비빔밥",
+                "category": "PROCESSED",
+                "origin_type": "가공식품",
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D501-018283500-0001",
+                "name": "비빔밥_소고기_양념장",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "소고기비빔밥",
+              "쇠고기비빔밥",
+              "소고기 비빔밥",
+              "소불고기비빔밥",
+              "불고기비빔밥"
+            ]
+          },
+          {
+            "target_id": "pan_fried_tofu",
+            "label": "두부부침",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "acceptable_food_ref_ids": [
+              "D109-419000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D109-419000000-0001",
+                "name": "두부부침",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "두부부침",
+              "부침두부",
+              "두부구이",
+              "양념두부구이"
+            ]
+          }
+        ],
+        "unscored_observations": [
+          {
+            "food": "미역나물",
+            "source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "reason": "Seaweed identity confirmed; vinegar/preparation not confirmed. Search outputs 미역줄기나물 and 미역초무침 are not automatically equivalent."
+          },
+          {
+            "food": "두부나물무침",
+            "source": "User visual confirmation in conversation on2026-11-09; DB mapping curated before new model calls",
+            "reason": "Tofu-greens side confirmed; exact vegetable not confirmed. Do not relabel as spinach/crown-daisy to fit DB."
+          },
+          {
+            "food": "쌀밥/공깃밥",
+            "reason": "Covered bowls do not establish contents."
+          },
+          {
+            "food": "기타 반찬",
+            "reason": "All model items are searched and retained; unlabelled foods require review rather than automatic false-positive counting."
+          }
+        ],
+        "image_sha256": "7d8b8e4aabafe983250c45a5f719b350fbacbeb08680b3e93b97b6be4232cd91"
+      },
+      {
+        "case_id": "piece_of_pizza",
+        "split": "regression",
+        "meal_type": "DINNER",
+        "image_path": "ai/evals/fixtures/analyze_meal/piece_of_pizza.jpg",
+        "baseline_case": "piece_of_pizza",
+        "targets": [
+          {
+            "target_id": "potato_pizza",
+            "label": "포테이토피자",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "Existing photo visual review: potato topping on pizza; prior baseline known, not held out",
+            "acceptable_food_ref_ids": [
+              "D202-120000000-1705"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D202-120000000-1705",
+                "name": "피자_포테이토 피자",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "포테이토피자",
+              "감자피자",
+              "피자"
+            ]
+          }
+        ],
+        "image_sha256": "fbad785aa626d6d2ec286fe1cc424a8e855f276a40ec462ef4d2e99f258f5215"
+      },
+      {
+        "case_id": "whole_cake",
+        "split": "regression",
+        "meal_type": "SNACK",
+        "image_path": "ai/evals/fixtures/analyze_meal/whole_cake.jpg",
+        "baseline_case": "whole_cake",
+        "targets": [
+          {
+            "target_id": "cheesecake",
+            "label": "치즈케이크",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "Visible CHEESE CAKE label; prior baseline known, not held out",
+            "acceptable_food_ref_ids": [
+              "D202-110000000-0340"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D202-110000000-0340",
+                "name": "케이크_치즈 케이크",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "치즈케이크",
+              "치즈 케이크"
+            ]
+          }
+        ],
+        "image_sha256": "c641306d92f828e2d42ddc3e699ac0c680ce898bf2ce64610bcbc13aad8479c4"
+      },
+      {
+        "case_id": "coleslaw",
+        "split": "holdout",
+        "meal_type": "LUNCH",
+        "image_path": "ai/evals/fixtures/food_name_matching/coleslaw.jpg",
+        "source": {
+          "case_id": "coleslaw",
+          "file": "coleslaw.jpg",
+          "title": "Coleslaw (3173259085).jpg",
+          "description_url": "https://commons.wikimedia.org/wiki/File:Coleslaw_(3173259085).jpg",
+          "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/df/Coleslaw_%283173259085%29.jpg/960px-Coleslaw_%283173259085%29.jpg",
+          "original_url": "https://upload.wikimedia.org/wikipedia/commons/d/df/Coleslaw_%283173259085%29.jpg",
+          "author": "David Pursehouse",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_description": "Coleslaw",
+          "bytes": 112448,
+          "sha256": "f1b52dc677cf5baab6182f8a4a8b3a63cf8448280dd4b51d4049f5a07410e16f",
+          "changes": "Wikimedia-provided960px thumbnail; Exif metadata removed locally without changing compressed pixel data",
+          "retrieved_date_kst": "2026-11-09",
+          "download_sha256": "b7c936dee473dae9f1c0cb494e4efc49122934a777c9238674a5ca4dd0bf1eaa"
+        },
+        "targets": [
+          {
+            "target_id": "coleslaw",
+            "label": "코울슬로/양배추샐러드",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "https://commons.wikimedia.org/wiki/File:Coleslaw_(3173259085).jpg",
+            "acceptable_food_ref_ids": [
+              "D214-640000000-0043",
+              "D314-640224600-0001",
+              "P116-702070100-0576",
+              "D414-701000000-0001",
+              "D114-640220000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D214-640000000-0043",
+                "name": "샐러드_코울슬로",
+                "category": "GENERAL",
+                "origin_type": "외식(프랜차이즈 등 업체 제공 영양정보)",
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D314-640224600-0001",
+                "name": "샐러드_양배추_코올슬로",
+                "category": "GENERAL",
+                "origin_type": "외식(분석함량)",
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "P116-702070100-0576",
+                "name": "코울슬로",
+                "category": "PROCESSED",
+                "origin_type": "가공식품",
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D414-701000000-0001",
+                "name": "양배추 샐러드",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D114-640220000-0001",
+                "name": "샐러드_양배추",
+                "category": "GENERAL",
+                "origin_type": "가정식(분석 함량)",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "코울슬로",
+              "콜슬로",
+              "코올슬로",
+              "양배추샐러드"
+            ]
+          }
+        ],
+        "image_sha256": "f1b52dc677cf5baab6182f8a4a8b3a63cf8448280dd4b51d4049f5a07410e16f"
+      },
+      {
+        "case_id": "fried_eggs",
+        "split": "holdout",
+        "meal_type": "BREAKFAST",
+        "image_path": "ai/evals/fixtures/food_name_matching/fried_eggs.jpg",
+        "source": {
+          "case_id": "fried_eggs",
+          "file": "fried_eggs.jpg",
+          "title": "Fried eggs.jpg",
+          "description_url": "https://commons.wikimedia.org/wiki/File:Fried_eggs.jpg",
+          "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Fried_eggs.jpg/960px-Fried_eggs.jpg",
+          "original_url": "https://upload.wikimedia.org/wikipedia/commons/2/23/Fried_eggs.jpg",
+          "author": "Stangoldsmith",
+          "license": "CC BY 3.0",
+          "license_url": "https://creativecommons.org/licenses/by/3.0/",
+          "source_description": "fried eggs",
+          "bytes": 181804,
+          "sha256": "ca5806156bceb32c557c5b3b424b0db0a2406a8b2cc8bc810232304eb2d0389b",
+          "changes": "Wikimedia-provided960px thumbnail; Exif metadata removed locally without changing compressed pixel data",
+          "retrieved_date_kst": "2026-11-09",
+          "download_sha256": "5955bae3d366346de1a1af467b4752c84f6618306a2b3e55384c8751d470f1bd"
+        },
+        "targets": [
+          {
+            "target_id": "fried_eggs",
+            "label": "달걀 프라이",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "https://commons.wikimedia.org/wiki/File:Fried_eggs.jpg",
+            "acceptable_food_ref_ids": [
+              "D609-449000000-0001",
+              "D109-417000000-0001"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D609-449000000-0001",
+                "name": "달걀후라이",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "D109-417000000-0001",
+                "name": "달걀부침(달걀후라이)",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "달걀프라이",
+              "달걀후라이",
+              "계란프라이",
+              "계란후라이",
+              "달걀부침"
+            ]
+          }
+        ],
+        "image_sha256": "ca5806156bceb32c557c5b3b424b0db0a2406a8b2cc8bc810232304eb2d0389b"
+      },
+      {
+        "case_id": "potato_salad",
+        "split": "holdout",
+        "meal_type": "LUNCH",
+        "image_path": "ai/evals/fixtures/food_name_matching/potato_salad.jpg",
+        "source": {
+          "case_id": "potato_salad",
+          "file": "potato_salad.jpg",
+          "title": "Potato salad close-up.jpg",
+          "description_url": "https://commons.wikimedia.org/wiki/File:Potato_salad_close-up.jpg",
+          "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Potato_salad_close-up.jpg/960px-Potato_salad_close-up.jpg",
+          "original_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Potato_salad_close-up.jpg",
+          "author": "Steven Depolo",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_description": "Potato salad close-up",
+          "bytes": 108531,
+          "sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6",
+          "changes": "Wikimedia-provided 960px thumbnail; no local pixel editing",
+          "retrieved_date_kst": "2026-11-09"
+        },
+        "targets": [
+          {
+            "target_id": "potato_salad",
+            "label": "감자샐러드",
+            "label_status": "confirmed",
+            "confirmation_scope": "food category identity; exact recipe and nutrient quantities are not ground truth",
+            "label_source": "https://commons.wikimedia.org/wiki/File:Potato_salad_close-up.jpg",
+            "acceptable_food_ref_ids": [
+              "D414-664000000-0001",
+              "P123-226020200-0060"
+            ],
+            "acceptable_db_entries": [
+              {
+                "id": "D414-664000000-0001",
+                "name": "감자샐러드",
+                "category": "GENERAL",
+                "origin_type": null,
+                "dataset_version": "20260828"
+              },
+              {
+                "id": "P123-226020200-0060",
+                "name": "감자샐러드",
+                "category": "PROCESSED",
+                "origin_type": "가공식품",
+                "dataset_version": "20260828"
+              }
+            ],
+            "recognized_names": [
+              "감자샐러드",
+              "감자 샐러드"
+            ]
+          }
+        ],
+        "image_sha256": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6"
+      }
+    ]
+  },
+  "image_sha256": {
+    "manybanchan": "7d8b8e4aabafe983250c45a5f719b350fbacbeb08680b3e93b97b6be4232cd91",
+    "piece_of_pizza": "fbad785aa626d6d2ec286fe1cc424a8e855f276a40ec462ef4d2e99f258f5215",
+    "whole_cake": "c641306d92f828e2d42ddc3e699ac0c680ce898bf2ce64610bcbc13aad8479c4",
+    "coleslaw": "f1b52dc677cf5baab6182f8a4a8b3a63cf8448280dd4b51d4049f5a07410e16f",
+    "fried_eggs": "ca5806156bceb32c557c5b3b424b0db0a2406a8b2cc8bc810232304eb2d0389b",
+    "potato_salad": "a4c005198a676acfe3f35e5864137e1fd4fa2a8aed2ac2d1bc76b24826f5dad6"
+  },
+  "baseline_ref": "a088974",
+  "baseline_source_sha256": "d92b9eb8003272134157578d2024258d81c8deea709a80f466e932366850f3ce",
+  "candidate_source_sha256": "f2c3508098058db1af223f43fad91cf0ddcab5b5c057c7527d8a2e8b0c18f853",
+  "prompt_hashes": {
+    "baseline": "b8041e85f198f39cc09fad93f1821fca61b140259136bf193e0d8365c5c9360a",
+    "candidate": "b1c4177c6efd92fb613eeb5193c0981f59e8df2a1b2795bdccee6624aba9e92c"
+  },
+  "prompts": {
+    "baseline": {
+      "BREAKFAST": "입력된 음식 사진을 분석하세요.\n\nmealType: BREAKFAST\n\n각 음식에 대해 다음 정보를 반환하세요.\n\n- originalFoodName: 표준 음식명 (브랜드명·불필요한 수식어는 제거)\n- estimatedAmount: 추정 섭취량\n- unit: 섭취량 단위\n  - **기본은 그램(g)입니다.** 밥·국·면류는 물론, 빵 조각·고기 한 점·만두 한 개처럼\n    낱개/조각으로 보이는 음식도 1개의 크기를 가늠해서 그램으로 추정하세요.\n  - 음식 전체가 하나의 덩어리라서 크기가 표준화돼 있지 않아 사진만으로 무게를\n    가늠할 근거가 없는 경우(예: 피자 한 판 전체, 수박 한 통)에만 \"판\"/\"개\" 같은\n    자연스러운 단위를 쓰세요. 이때도 그램을 억지로 지어내지 마세요.\n  - 그램을 가늠할 때는 아래를 참고용 기준치로 삼되, 사진에서 명백히 다르면\n    기준치를 따르지 말고 실제로 보이는 양을 우선하세요.\n    - 밥 1공기: 약 210g (180~240g)\n    - 국/찌개/탕 1그릇: 250~400g\n    - 라면 등 면 요리 1그릇(국물 포함): 400~550g\n    - 반찬 1접시(작은 그릇): 50~150g\n    - 빵 1조각/만두 1개/고기 한 점: 30~80g\n- confidence: 이 인식에 대한 확신도 (0~1). \"이 음식명과 양 추정이 맞을 확률\"을\n  뜻하며, 매번 비슷한 값을 내지 말고 실제 불확실성에 따라 구분하세요.\n  - 음식이 가려지거나 일부만 보여서 추측에 가까우면 0.3~0.6을 쓰세요.\n  - 비슷한 음식과 헷갈릴 수 있으면(예: 비슷한 색의 국·찌개) 0.6~0.8을 쓰세요.\n  - 음식이 선명하게 보이고 흔히 아는 메뉴라서 확신이 높으면 0.85 이상을 쓰세요.\n\n결과는 다른 설명 없이 아래 형태의 JSON만 반환하세요.\n\n{\"items\": [{\"originalFoodName\": \"...\", \"estimatedAmount\": 0, \"unit\": \"...\", \"confidence\": 0}]}",
+      "DINNER": "입력된 음식 사진을 분석하세요.\n\nmealType: DINNER\n\n각 음식에 대해 다음 정보를 반환하세요.\n\n- originalFoodName: 표준 음식명 (브랜드명·불필요한 수식어는 제거)\n- estimatedAmount: 추정 섭취량\n- unit: 섭취량 단위\n  - **기본은 그램(g)입니다.** 밥·국·면류는 물론, 빵 조각·고기 한 점·만두 한 개처럼\n    낱개/조각으로 보이는 음식도 1개의 크기를 가늠해서 그램으로 추정하세요.\n  - 음식 전체가 하나의 덩어리라서 크기가 표준화돼 있지 않아 사진만으로 무게를\n    가늠할 근거가 없는 경우(예: 피자 한 판 전체, 수박 한 통)에만 \"판\"/\"개\" 같은\n    자연스러운 단위를 쓰세요. 이때도 그램을 억지로 지어내지 마세요.\n  - 그램을 가늠할 때는 아래를 참고용 기준치로 삼되, 사진에서 명백히 다르면\n    기준치를 따르지 말고 실제로 보이는 양을 우선하세요.\n    - 밥 1공기: 약 210g (180~240g)\n    - 국/찌개/탕 1그릇: 250~400g\n    - 라면 등 면 요리 1그릇(국물 포함): 400~550g\n    - 반찬 1접시(작은 그릇): 50~150g\n    - 빵 1조각/만두 1개/고기 한 점: 30~80g\n- confidence: 이 인식에 대한 확신도 (0~1). \"이 음식명과 양 추정이 맞을 확률\"을\n  뜻하며, 매번 비슷한 값을 내지 말고 실제 불확실성에 따라 구분하세요.\n  - 음식이 가려지거나 일부만 보여서 추측에 가까우면 0.3~0.6을 쓰세요.\n  - 비슷한 음식과 헷갈릴 수 있으면(예: 비슷한 색의 국·찌개) 0.6~0.8을 쓰세요.\n  - 음식이 선명하게 보이고 흔히 아는 메뉴라서 확신이 높으면 0.85 이상을 쓰세요.\n\n결과는 다른 설명 없이 아래 형태의 JSON만 반환하세요.\n\n{\"items\": [{\"originalFoodName\": \"...\", \"estimatedAmount\": 0, \"unit\": \"...\", \"confidence\": 0}]}",
+      "LUNCH": "입력된 음식 사진을 분석하세요.\n\nmealType: LUNCH\n\n각 음식에 대해 다음 정보를 반환하세요.\n\n- originalFoodName: 표준 음식명 (브랜드명·불필요한 수식어는 제거)\n- estimatedAmount: 추정 섭취량\n- unit: 섭취량 단위\n  - **기본은 그램(g)입니다.** 밥·국·면류는 물론, 빵 조각·고기 한 점·만두 한 개처럼\n    낱개/조각으로 보이는 음식도 1개의 크기를 가늠해서 그램으로 추정하세요.\n  - 음식 전체가 하나의 덩어리라서 크기가 표준화돼 있지 않아 사진만으로 무게를\n    가늠할 근거가 없는 경우(예: 피자 한 판 전체, 수박 한 통)에만 \"판\"/\"개\" 같은\n    자연스러운 단위를 쓰세요. 이때도 그램을 억지로 지어내지 마세요.\n  - 그램을 가늠할 때는 아래를 참고용 기준치로 삼되, 사진에서 명백히 다르면\n    기준치를 따르지 말고 실제로 보이는 양을 우선하세요.\n    - 밥 1공기: 약 210g (180~240g)\n    - 국/찌개/탕 1그릇: 250~400g\n    - 라면 등 면 요리 1그릇(국물 포함): 400~550g\n    - 반찬 1접시(작은 그릇): 50~150g\n    - 빵 1조각/만두 1개/고기 한 점: 30~80g\n- confidence: 이 인식에 대한 확신도 (0~1). \"이 음식명과 양 추정이 맞을 확률\"을\n  뜻하며, 매번 비슷한 값을 내지 말고 실제 불확실성에 따라 구분하세요.\n  - 음식이 가려지거나 일부만 보여서 추측에 가까우면 0.3~0.6을 쓰세요.\n  - 비슷한 음식과 헷갈릴 수 있으면(예: 비슷한 색의 국·찌개) 0.6~0.8을 쓰세요.\n  - 음식이 선명하게 보이고 흔히 아는 메뉴라서 확신이 높으면 0.85 이상을 쓰세요.\n\n결과는 다른 설명 없이 아래 형태의 JSON만 반환하세요.\n\n{\"items\": [{\"originalFoodName\": \"...\", \"estimatedAmount\": 0, \"unit\": \"...\", \"confidence\": 0}]}",
+      "SNACK": "입력된 음식 사진을 분석하세요.\n\nmealType: SNACK\n\n각 음식에 대해 다음 정보를 반환하세요.\n\n- originalFoodName: 표준 음식명 (브랜드명·불필요한 수식어는 제거)\n- estimatedAmount: 추정 섭취량\n- unit: 섭취량 단위\n  - **기본은 그램(g)입니다.** 밥·국·면류는 물론, 빵 조각·고기 한 점·만두 한 개처럼\n    낱개/조각으로 보이는 음식도 1개의 크기를 가늠해서 그램으로 추정하세요.\n  - 음식 전체가 하나의 덩어리라서 크기가 표준화돼 있지 않아 사진만으로 무게를\n    가늠할 근거가 없는 경우(예: 피자 한 판 전체, 수박 한 통)에만 \"판\"/\"개\" 같은\n    자연스러운 단위를 쓰세요. 이때도 그램을 억지로 지어내지 마세요.\n  - 그램을 가늠할 때는 아래를 참고용 기준치로 삼되, 사진에서 명백히 다르면\n    기준치를 따르지 말고 실제로 보이는 양을 우선하세요.\n    - 밥 1공기: 약 210g (180~240g)\n    - 국/찌개/탕 1그릇: 250~400g\n    - 라면 등 면 요리 1그릇(국물 포함): 400~550g\n    - 반찬 1접시(작은 그릇): 50~150g\n    - 빵 1조각/만두 1개/고기 한 점: 30~80g\n- confidence: 이 인식에 대한 확신도 (0~1). \"이 음식명과 양 추정이 맞을 확률\"을\n  뜻하며, 매번 비슷한 값을 내지 말고 실제 불확실성에 따라 구분하세요.\n  - 음식이 가려지거나 일부만 보여서 추측에 가까우면 0.3~0.6을 쓰세요.\n  - 비슷한 음식과 헷갈릴 수 있으면(예: 비슷한 색의 국·찌개) 0.6~0.8을 쓰세요.\n  - 음식이 선명하게 보이고 흔히 아는 메뉴라서 확신이 높으면 0.85 이상을 쓰세요.\n\n결과는 다른 설명 없이 아래 형태의 JSON만 반환하세요.\n\n{\"items\": [{\"originalFoodName\": \"...\", \"estimatedAmount\": 0, \"unit\": \"...\", \"confidence\": 0}]}"
+    },
+    "candidate": {
+      "BREAKFAST": "입력된 음식 사진을 분석하세요.\n\nmealType: BREAKFAST\n\n각 음식에 대해 다음 정보를 반환하세요.\n\n- originalFoodName: 표준 음식명 (브랜드명·불필요한 수식어는 제거)\n  - 사진에서 확인되는 주재료와 조리법 중 음식을 구분하는 핵심 정보는 이름에 남기세요.\n  - 브랜드명·홍보 표현·감상이나 분량 설명은 빼되, 음식 종류를 구분하는 재료·조리법까지 생략하지 마세요.\n  - 사진에서 확인할 수 없는 재료·고기 종류·조리법을 추측해 추가하지 마세요.\n  - 여러 후보를 나열하거나 설명문을 쓰지 말고, 확인 가능한 범위의 간결한 음식명 하나로 쓰세요.\n- estimatedAmount: 추정 섭취량\n- unit: 섭취량 단위\n  - **기본은 그램(g)입니다.** 밥·국·면류는 물론, 빵 조각·고기 한 점·만두 한 개처럼\n    낱개/조각으로 보이는 음식도 1개의 크기를 가늠해서 그램으로 추정하세요.\n  - 음식 전체가 하나의 덩어리라서 크기가 표준화돼 있지 않아 사진만으로 무게를\n    가늠할 근거가 없는 경우(예: 피자 한 판 전체, 수박 한 통)에만 \"판\"/\"개\" 같은\n    자연스러운 단위를 쓰세요. 이때도 그램을 억지로 지어내지 마세요.\n  - 그램을 가늠할 때는 아래를 참고용 기준치로 삼되, 사진에서 명백히 다르면\n    기준치를 따르지 말고 실제로 보이는 양을 우선하세요.\n    - 밥 1공기: 약 210g (180~240g)\n    - 국/찌개/탕 1그릇: 250~400g\n    - 라면 등 면 요리 1그릇(국물 포함): 400~550g\n    - 반찬 1접시(작은 그릇): 50~150g\n    - 빵 1조각/만두 1개/고기 한 점: 30~80g\n- confidence: 이 인식에 대한 확신도 (0~1). \"이 음식명과 양 추정이 맞을 확률\"을\n  뜻하며, 매번 비슷한 값을 내지 말고 실제 불확실성에 따라 구분하세요.\n  - 음식이 가려지거나 일부만 보여서 추측에 가까우면 0.3~0.6을 쓰세요.\n  - 비슷한 음식과 헷갈릴 수 있으면(예: 비슷한 색의 국·찌개) 0.6~0.8을 쓰세요.\n  - 음식이 선명하게 보이고 흔히 아는 메뉴라서 확신이 높으면 0.85 이상을 쓰세요.\n\n결과는 다른 설명 없이 아래 형태의 JSON만 반환하세요.\n\n{\"items\": [{\"originalFoodName\": \"...\", \"estimatedAmount\": 0, \"unit\": \"...\", \"confidence\": 0}]}",
+      "DINNER": "입력된 음식 사진을 분석하세요.\n\nmealType: DINNER\n\n각 음식에 대해 다음 정보를 반환하세요.\n\n- originalFoodName: 표준 음식명 (브랜드명·불필요한 수식어는 제거)\n  - 사진에서 확인되는 주재료와 조리법 중 음식을 구분하는 핵심 정보는 이름에 남기세요.\n  - 브랜드명·홍보 표현·감상이나 분량 설명은 빼되, 음식 종류를 구분하는 재료·조리법까지 생략하지 마세요.\n  - 사진에서 확인할 수 없는 재료·고기 종류·조리법을 추측해 추가하지 마세요.\n  - 여러 후보를 나열하거나 설명문을 쓰지 말고, 확인 가능한 범위의 간결한 음식명 하나로 쓰세요.\n- estimatedAmount: 추정 섭취량\n- unit: 섭취량 단위\n  - **기본은 그램(g)입니다.** 밥·국·면류는 물론, 빵 조각·고기 한 점·만두 한 개처럼\n    낱개/조각으로 보이는 음식도 1개의 크기를 가늠해서 그램으로 추정하세요.\n  - 음식 전체가 하나의 덩어리라서 크기가 표준화돼 있지 않아 사진만으로 무게를\n    가늠할 근거가 없는 경우(예: 피자 한 판 전체, 수박 한 통)에만 \"판\"/\"개\" 같은\n    자연스러운 단위를 쓰세요. 이때도 그램을 억지로 지어내지 마세요.\n  - 그램을 가늠할 때는 아래를 참고용 기준치로 삼되, 사진에서 명백히 다르면\n    기준치를 따르지 말고 실제로 보이는 양을 우선하세요.\n    - 밥 1공기: 약 210g (180~240g)\n    - 국/찌개/탕 1그릇: 250~400g\n    - 라면 등 면 요리 1그릇(국물 포함): 400~550g\n    - 반찬 1접시(작은 그릇): 50~150g\n    - 빵 1조각/만두 1개/고기 한 점: 30~80g\n- confidence: 이 인식에 대한 확신도 (0~1). \"이 음식명과 양 추정이 맞을 확률\"을\n  뜻하며, 매번 비슷한 값을 내지 말고 실제 불확실성에 따라 구분하세요.\n  - 음식이 가려지거나 일부만 보여서 추측에 가까우면 0.3~0.6을 쓰세요.\n  - 비슷한 음식과 헷갈릴 수 있으면(예: 비슷한 색의 국·찌개) 0.6~0.8을 쓰세요.\n  - 음식이 선명하게 보이고 흔히 아는 메뉴라서 확신이 높으면 0.85 이상을 쓰세요.\n\n결과는 다른 설명 없이 아래 형태의 JSON만 반환하세요.\n\n{\"items\": [{\"originalFoodName\": \"...\", \"estimatedAmount\": 0, \"unit\": \"...\", \"confidence\": 0}]}",
+      "LUNCH": "입력된 음식 사진을 분석하세요.\n\nmealType: LUNCH\n\n각 음식에 대해 다음 정보를 반환하세요.\n\n- originalFoodName: 표준 음식명 (브랜드명·불필요한 수식어는 제거)\n  - 사진에서 확인되는 주재료와 조리법 중 음식을 구분하는 핵심 정보는 이름에 남기세요.\n  - 브랜드명·홍보 표현·감상이나 분량 설명은 빼되, 음식 종류를 구분하는 재료·조리법까지 생략하지 마세요.\n  - 사진에서 확인할 수 없는 재료·고기 종류·조리법을 추측해 추가하지 마세요.\n  - 여러 후보를 나열하거나 설명문을 쓰지 말고, 확인 가능한 범위의 간결한 음식명 하나로 쓰세요.\n- estimatedAmount: 추정 섭취량\n- unit: 섭취량 단위\n  - **기본은 그램(g)입니다.** 밥·국·면류는 물론, 빵 조각·고기 한 점·만두 한 개처럼\n    낱개/조각으로 보이는 음식도 1개의 크기를 가늠해서 그램으로 추정하세요.\n  - 음식 전체가 하나의 덩어리라서 크기가 표준화돼 있지 않아 사진만으로 무게를\n    가늠할 근거가 없는 경우(예: 피자 한 판 전체, 수박 한 통)에만 \"판\"/\"개\" 같은\n    자연스러운 단위를 쓰세요. 이때도 그램을 억지로 지어내지 마세요.\n  - 그램을 가늠할 때는 아래를 참고용 기준치로 삼되, 사진에서 명백히 다르면\n    기준치를 따르지 말고 실제로 보이는 양을 우선하세요.\n    - 밥 1공기: 약 210g (180~240g)\n    - 국/찌개/탕 1그릇: 250~400g\n    - 라면 등 면 요리 1그릇(국물 포함): 400~550g\n    - 반찬 1접시(작은 그릇): 50~150g\n    - 빵 1조각/만두 1개/고기 한 점: 30~80g\n- confidence: 이 인식에 대한 확신도 (0~1). \"이 음식명과 양 추정이 맞을 확률\"을\n  뜻하며, 매번 비슷한 값을 내지 말고 실제 불확실성에 따라 구분하세요.\n  - 음식이 가려지거나 일부만 보여서 추측에 가까우면 0.3~0.6을 쓰세요.\n  - 비슷한 음식과 헷갈릴 수 있으면(예: 비슷한 색의 국·찌개) 0.6~0.8을 쓰세요.\n  - 음식이 선명하게 보이고 흔히 아는 메뉴라서 확신이 높으면 0.85 이상을 쓰세요.\n\n결과는 다른 설명 없이 아래 형태의 JSON만 반환하세요.\n\n{\"items\": [{\"originalFoodName\": \"...\", \"estimatedAmount\": 0, \"unit\": \"...\", \"confidence\": 0}]}",
+      "SNACK": "입력된 음식 사진을 분석하세요.\n\nmealType: SNACK\n\n각 음식에 대해 다음 정보를 반환하세요.\n\n- originalFoodName: 표준 음식명 (브랜드명·불필요한 수식어는 제거)\n  - 사진에서 확인되는 주재료와 조리법 중 음식을 구분하는 핵심 정보는 이름에 남기세요.\n  - 브랜드명·홍보 표현·감상이나 분량 설명은 빼되, 음식 종류를 구분하는 재료·조리법까지 생략하지 마세요.\n  - 사진에서 확인할 수 없는 재료·고기 종류·조리법을 추측해 추가하지 마세요.\n  - 여러 후보를 나열하거나 설명문을 쓰지 말고, 확인 가능한 범위의 간결한 음식명 하나로 쓰세요.\n- estimatedAmount: 추정 섭취량\n- unit: 섭취량 단위\n  - **기본은 그램(g)입니다.** 밥·국·면류는 물론, 빵 조각·고기 한 점·만두 한 개처럼\n    낱개/조각으로 보이는 음식도 1개의 크기를 가늠해서 그램으로 추정하세요.\n  - 음식 전체가 하나의 덩어리라서 크기가 표준화돼 있지 않아 사진만으로 무게를\n    가늠할 근거가 없는 경우(예: 피자 한 판 전체, 수박 한 통)에만 \"판\"/\"개\" 같은\n    자연스러운 단위를 쓰세요. 이때도 그램을 억지로 지어내지 마세요.\n  - 그램을 가늠할 때는 아래를 참고용 기준치로 삼되, 사진에서 명백히 다르면\n    기준치를 따르지 말고 실제로 보이는 양을 우선하세요.\n    - 밥 1공기: 약 210g (180~240g)\n    - 국/찌개/탕 1그릇: 250~400g\n    - 라면 등 면 요리 1그릇(국물 포함): 400~550g\n    - 반찬 1접시(작은 그릇): 50~150g\n    - 빵 1조각/만두 1개/고기 한 점: 30~80g\n- confidence: 이 인식에 대한 확신도 (0~1). \"이 음식명과 양 추정이 맞을 확률\"을\n  뜻하며, 매번 비슷한 값을 내지 말고 실제 불확실성에 따라 구분하세요.\n  - 음식이 가려지거나 일부만 보여서 추측에 가까우면 0.3~0.6을 쓰세요.\n  - 비슷한 음식과 헷갈릴 수 있으면(예: 비슷한 색의 국·찌개) 0.6~0.8을 쓰세요.\n  - 음식이 선명하게 보이고 흔히 아는 메뉴라서 확신이 높으면 0.85 이상을 쓰세요.\n\n결과는 다른 설명 없이 아래 형태의 JSON만 반환하세요.\n\n{\"items\": [{\"originalFoodName\": \"...\", \"estimatedAmount\": 0, \"unit\": \"...\", \"confidence\": 0}]}"
+    }
+  },
+  "n": 3,
+  "planned_calls": 36,
+  "order": "case order, repetition, alternating baseline/candidate first by case+run parity",
+  "settings": {
+    "timeout_seconds": 45.0,
+    "max_retries": 1
+  },
+  "model_identity_note": "Same configured gateway for both arms; provider metadata recorded when available.",
+  "execution_scope": "Calls production food_analyzer vision client and parser only, not the full API or safety_guard. mealId, modelVersion and safetyStatus are evaluation scaffolding; SAFE is not a safety classifier result. Actual provider model metadata is recorded in gateway_attempts when supplied."
+}

@@ -1,0 +1,163 @@
+{
+  "measured_date_kst": "2026-11-09",
+  "created_at_utc": "2026-11-08T15:41:33.791618+00:00",
+  "branch": "ai/6-feat-food-db-matching",
+  "backend_commit": "f409ff991fddf7bfc8f4f37c989a5f604d81fef7",
+  "source_baseline_commit": "198815d",
+  "source_baseline_commit_date_kst": "2026-11-04T15:02:34+09:00",
+  "scope": "Offline replay of saved photo responses against shipped public DB seed and unchanged BE policy; provisional AI semantic review",
+  "new_project_model_calls": 0,
+  "saved_responses": 18,
+  "photos": 6,
+  "item_occurrences": 69,
+  "unique_query_strings": 37,
+  "db_link_rate": {
+    "linked": 69,
+    "total": 69,
+    "percent": 100.0
+  },
+  "before_129_counterfactual": {
+    "linked": 0,
+    "total": 69,
+    "status": "Inferred from old worker and all-null supplied IDs; not historical operational measurement"
+  },
+  "name_to_db_review": {
+    "correct": 53,
+    "wrong": 1,
+    "approximate": 15
+  },
+  "photo_to_db_review": {
+    "correct": 14,
+    "uncertain": 44,
+    "wrong": 2,
+    "approximate": 9
+  },
+  "photo_review_status": "Provisional AI visual review, not human-verified ground truth or overall accuracy",
+  "photo_review_adjudication": {
+    "reviewed_by": "root assistant after independent blind image labels and candidate review",
+    "accepted_counts_unchanged": true,
+    "butter": "Separate pale spread becomes buttercream bread: incompatible dish category, even though spread ingredients are uncertain.",
+    "roasted_salad": "Visible thin raw cabbage salad is inconsistent with selected roasted vegetable salad; retain wrong as provisional photo finding.",
+    "ham_salad": "Keep uncertain: ham is unsupported, but the picture cannot prove every ingredient absent."
+  },
+  "by_case": [
+    {
+      "case": "piece_of_pizza",
+      "items": 3,
+      "linked": 3,
+      "photo_review": {
+        "correct": 3
+      }
+    },
+    {
+      "case": "whole_cake",
+      "items": 3,
+      "linked": 3,
+      "photo_review": {
+        "correct": 3
+      }
+    },
+    {
+      "case": "food_and_notfood",
+      "items": 15,
+      "linked": 15,
+      "photo_review": {
+        "uncertain": 14,
+        "wrong": 1
+      }
+    },
+    {
+      "case": "manybanchan",
+      "items": 36,
+      "linked": 36,
+      "photo_review": {
+        "uncertain": 27,
+        "correct": 8,
+        "wrong": 1
+      }
+    },
+    {
+      "case": "branded_drinks",
+      "items": 9,
+      "linked": 9,
+      "photo_review": {
+        "approximate": 9
+      }
+    },
+    {
+      "case": "occludedfood",
+      "items": 3,
+      "linked": 3,
+      "photo_review": {
+        "uncertain": 3
+      }
+    }
+  ],
+  "nutrition_conversion": {
+    "amount_not_convertible": 3,
+    "calculated_complete": 36,
+    "calculated_with_missing_nutrients": 30
+  },
+  "nutrition_note": "Whole-cake natural units intentionally remain unconverted. Missing DB nutrients are not an AI matching failure and were not imputed.",
+  "findings": [
+    {
+      "priority": 1,
+      "area": "Visible food identity specificity",
+      "evidence": "Same salad photo: 샐러드→햄샐러드; 채소샐러드→구운채소샐러드; 양배추샐러드→양배추 샐러드.",
+      "ai_action_candidate": "Retain visually supported main ingredient and preparation, while avoiding unsupported specificity.",
+      "improvement_proven": false
+    },
+    {
+      "priority": 2,
+      "area": "Spelling and tokenization",
+      "evidence": "양송이스프→PROCESSED 양송이스프; 양송이수프→GENERAL 스프_양송이 수프. 망고주스 and 망고 주스 choose different IDs.",
+      "ai_action_candidate": "Evaluate narrowly scoped meaning-preserving normalization against held-out photos. Do not globally remove spaces or assume exact nutrient equivalence.",
+      "improvement_proven": false
+    },
+    {
+      "priority": 3,
+      "area": "Uncertain recognition",
+      "evidence": "Occluded photo outputs 대창전골 / 즉석떡볶이 / 전골 in three runs; each obtains an ID despite identity uncertainty.",
+      "ai_action_candidate": "Avoid inventing unseen ingredients; prioritize a verified menu/photo set. Lower confidence alone does not stop current BE matching.",
+      "improvement_proven": false
+    },
+    {
+      "priority": 4,
+      "area": "Packaged drinks and current brand-removal prompt",
+      "evidence": "All9 fruit-drink mappings are generic approximations; diagnostic product queries find 모구모구 variants.",
+      "ai_action_candidate": "Discuss the current AI brand-removal requirement before attempting exact packaged-product matching; current experiment does not change that requirement.",
+      "improvement_proven": false
+    },
+    {
+      "priority": null,
+      "area": "BE policy limitation",
+      "evidence": "Exact PROCESSED 버터 exists, yet unchanged GENERAL-first selection yields 버터크림빵.",
+      "ai_action_candidate": "Record unresolved case; do not invent qualifiers or override BE choice to force a match.",
+      "improvement_proven": false
+    }
+  ],
+  "limitations": [
+    "6 photos with3 repetitions;69 item occurrences are not69 independent samples.",
+    "44 photo judgments are uncertain and9 are approximate; do not treat them as automatic failures or report14/69 as overall accuracy.",
+    "Image review is by AI assistants, not verified by photographer/menu owner.",
+    "Nonfood/blurry cases have no saved response originals in this baseline and are excluded.",
+    "Shipped20260828 public DB snapshot, not a production DB copy; absolute production behavior may differ.",
+    "No fresh vision calls, prompt changes, model-quality improvement estimate, or full application E2E test.",
+    "No reliable omission/duplicate rate: shared dishes and covered bowls prevent independent item ground truth.",
+    "Diagnostic alternative names are hypotheses, not modified production inputs or measured AI gains."
+  ],
+  "validation": {
+    "focused_tests": "9 passed",
+    "baseline_unchanged": true,
+    "backend_sources_unchanged": true,
+    "semantic_rows_accounted_for": 69,
+    "database_transaction": "repeatable read / read only",
+    "per_serving_nutrient_arithmetic_fields_independently_verified": 354
+  },
+  "source_sha256": {
+    "replay.json": "416f22cfde0b48101e12af01a956f8fec5052be0615742a7d9d2b4e4c0d78c6d",
+    "photo_labels.json": "8c0ce8ece2ec417236e963f680f6d4e0a00dfed69da354602bbc099948697e1c",
+    "independent_review.json": "6bfad816aa6175c8544d3e2424edc0bd7e3344c0c5b3330079187a0615a6b22f",
+    "diagnostics.json": "2e9fa8c3756909f4b23816abbf4296e3da6119bd117e29d3af3bfa60f2f14028"
+  }
+}

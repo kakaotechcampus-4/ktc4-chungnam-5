@@ -1,0 +1,432 @@
+{
+  "scope": "Expected DB equivalence, not photo accuracy; chosen during rule development.",
+  "labels": [
+    {
+      "case": "family_1_1",
+      "group": "alias_family",
+      "source_name": "망고주스",
+      "expected_name": "망고주스",
+      "expected_id": "D220-716000000-0046"
+    },
+    {
+      "case": "family_1_2",
+      "group": "alias_family",
+      "source_name": "망고쥬스",
+      "expected_name": "망고주스",
+      "expected_id": "D220-716000000-0046"
+    },
+    {
+      "case": "family_1_3",
+      "group": "alias_family",
+      "source_name": "망고 주스",
+      "expected_name": "망고주스",
+      "expected_id": "D220-716000000-0046"
+    },
+    {
+      "case": "family_1_4",
+      "group": "alias_family",
+      "source_name": "망고 쥬스",
+      "expected_name": "망고주스",
+      "expected_id": "D220-716000000-0046"
+    },
+    {
+      "case": "family_2_1",
+      "group": "alias_family",
+      "source_name": "리치주스",
+      "expected_name": "리치주스",
+      "expected_id": "P109-302030200-0712"
+    },
+    {
+      "case": "family_2_2",
+      "group": "alias_family",
+      "source_name": "리치쥬스",
+      "expected_name": "리치주스",
+      "expected_id": "P109-302030200-0712"
+    },
+    {
+      "case": "family_2_3",
+      "group": "alias_family",
+      "source_name": "리치 주스",
+      "expected_name": "리치주스",
+      "expected_id": "P109-302030200-0712"
+    },
+    {
+      "case": "family_2_4",
+      "group": "alias_family",
+      "source_name": "리치 쥬스",
+      "expected_name": "리치주스",
+      "expected_id": "P109-302030200-0712"
+    },
+    {
+      "case": "family_3_1",
+      "group": "alias_family",
+      "source_name": "토마토주스",
+      "expected_name": "토마토주스",
+      "expected_id": "D220-716000000-0179"
+    },
+    {
+      "case": "family_3_2",
+      "group": "alias_family",
+      "source_name": "토마토쥬스",
+      "expected_name": "토마토주스",
+      "expected_id": "D220-716000000-0179"
+    },
+    {
+      "case": "family_3_3",
+      "group": "alias_family",
+      "source_name": "토마토 주스",
+      "expected_name": "토마토주스",
+      "expected_id": "D220-716000000-0179"
+    },
+    {
+      "case": "family_3_4",
+      "group": "alias_family",
+      "source_name": "토마토 쥬스",
+      "expected_name": "토마토주스",
+      "expected_id": "D220-716000000-0179"
+    },
+    {
+      "case": "family_4_1",
+      "group": "alias_family",
+      "source_name": "양송이스프",
+      "expected_name": "양송이 스프",
+      "expected_id": "D104-185060000-0001"
+    },
+    {
+      "case": "family_4_2",
+      "group": "alias_family",
+      "source_name": "양송이수프",
+      "expected_name": "양송이 스프",
+      "expected_id": "D104-185060000-0001"
+    },
+    {
+      "case": "family_4_3",
+      "group": "alias_family",
+      "source_name": "양송이 스프",
+      "expected_name": "양송이 스프",
+      "expected_id": "D104-185060000-0001"
+    },
+    {
+      "case": "family_4_4",
+      "group": "alias_family",
+      "source_name": "양송이 수프",
+      "expected_name": "양송이 스프",
+      "expected_id": "D104-185060000-0001"
+    },
+    {
+      "case": "family_5_1",
+      "group": "alias_family",
+      "source_name": "크림스프",
+      "expected_name": "크림 스프",
+      "expected_id": "D304-185120000-0001"
+    },
+    {
+      "case": "family_5_2",
+      "group": "alias_family",
+      "source_name": "크림수프",
+      "expected_name": "크림 스프",
+      "expected_id": "D304-185120000-0001"
+    },
+    {
+      "case": "family_5_3",
+      "group": "alias_family",
+      "source_name": "크림 스프",
+      "expected_name": "크림 스프",
+      "expected_id": "D304-185120000-0001"
+    },
+    {
+      "case": "family_5_4",
+      "group": "alias_family",
+      "source_name": "크림 수프",
+      "expected_name": "크림 스프",
+      "expected_id": "D304-185120000-0001"
+    },
+    {
+      "case": "family_6_1",
+      "group": "alias_family",
+      "source_name": "옥수수스프",
+      "expected_name": "옥수수 스프",
+      "expected_id": "D304-185140000-0001"
+    },
+    {
+      "case": "family_6_2",
+      "group": "alias_family",
+      "source_name": "옥수수수프",
+      "expected_name": "옥수수 스프",
+      "expected_id": "D304-185140000-0001"
+    },
+    {
+      "case": "family_6_3",
+      "group": "alias_family",
+      "source_name": "옥수수 스프",
+      "expected_name": "옥수수 스프",
+      "expected_id": "D304-185140000-0001"
+    },
+    {
+      "case": "family_6_4",
+      "group": "alias_family",
+      "source_name": "옥수수 수프",
+      "expected_name": "옥수수 스프",
+      "expected_id": "D304-185140000-0001"
+    },
+    {
+      "case": "family_7_1",
+      "group": "alias_family",
+      "source_name": "달걀프라이",
+      "expected_name": "달걀후라이",
+      "expected_id": "D609-449000000-0001"
+    },
+    {
+      "case": "family_7_2",
+      "group": "alias_family",
+      "source_name": "달걀후라이",
+      "expected_name": "달걀후라이",
+      "expected_id": "D609-449000000-0001"
+    },
+    {
+      "case": "family_7_3",
+      "group": "alias_family",
+      "source_name": "달걀 프라이",
+      "expected_name": "달걀후라이",
+      "expected_id": "D609-449000000-0001"
+    },
+    {
+      "case": "family_7_4",
+      "group": "alias_family",
+      "source_name": "달걀 후라이",
+      "expected_name": "달걀후라이",
+      "expected_id": "D609-449000000-0001"
+    },
+    {
+      "case": "family_7_5",
+      "group": "alias_family",
+      "source_name": "계란프라이",
+      "expected_name": "달걀후라이",
+      "expected_id": "D609-449000000-0001"
+    },
+    {
+      "case": "family_7_6",
+      "group": "alias_family",
+      "source_name": "계란후라이",
+      "expected_name": "달걀후라이",
+      "expected_id": "D609-449000000-0001"
+    },
+    {
+      "case": "family_7_7",
+      "group": "alias_family",
+      "source_name": "계란 프라이",
+      "expected_name": "달걀후라이",
+      "expected_id": "D609-449000000-0001"
+    },
+    {
+      "case": "family_7_8",
+      "group": "alias_family",
+      "source_name": "계란 후라이",
+      "expected_name": "달걀후라이",
+      "expected_id": "D609-449000000-0001"
+    },
+    {
+      "case": "control_1",
+      "group": "preservation_control",
+      "source_name": "양송이스프분말",
+      "expected_name": "양송이스프분말",
+      "expected_id": null
+    },
+    {
+      "case": "control_2",
+      "group": "preservation_control",
+      "source_name": "양송이스프라면",
+      "expected_name": "양송이스프라면",
+      "expected_id": null
+    },
+    {
+      "case": "control_3",
+      "group": "preservation_control",
+      "source_name": "옥수수스프가루",
+      "expected_name": "옥수수스프가루",
+      "expected_id": null
+    },
+    {
+      "case": "control_4",
+      "group": "preservation_control",
+      "source_name": "모구모구 망고 주스",
+      "expected_name": "모구모구 망고 주스",
+      "expected_id": null
+    },
+    {
+      "case": "control_5",
+      "group": "preservation_control",
+      "source_name": "망고 주스 젤리",
+      "expected_name": "망고 주스 젤리",
+      "expected_id": null
+    },
+    {
+      "case": "control_6",
+      "group": "preservation_control",
+      "source_name": "에스프레소",
+      "expected_name": "에스프레소",
+      "expected_id": null
+    },
+    {
+      "case": "control_7",
+      "group": "preservation_control",
+      "source_name": "망고스프레드",
+      "expected_name": "망고스프레드",
+      "expected_id": null
+    },
+    {
+      "case": "control_8",
+      "group": "preservation_control",
+      "source_name": "양념두부",
+      "expected_name": "양념두부",
+      "expected_id": null
+    },
+    {
+      "case": "control_9",
+      "group": "preservation_control",
+      "source_name": "두부부침",
+      "expected_name": "두부부침",
+      "expected_id": null
+    },
+    {
+      "case": "control_10",
+      "group": "preservation_control",
+      "source_name": "두부무침",
+      "expected_name": "두부무침",
+      "expected_id": null
+    },
+    {
+      "case": "control_11",
+      "group": "preservation_control",
+      "source_name": "복숭아주스",
+      "expected_name": "복숭아주스",
+      "expected_id": null
+    },
+    {
+      "case": "control_12",
+      "group": "preservation_control",
+      "source_name": "복숭아 주스",
+      "expected_name": "복숭아 주스",
+      "expected_id": null
+    },
+    {
+      "case": "control_13",
+      "group": "preservation_control",
+      "source_name": "복숭아쥬스",
+      "expected_name": "복숭아쥬스",
+      "expected_id": null
+    },
+    {
+      "case": "control_14",
+      "group": "preservation_control",
+      "source_name": "오렌지주스",
+      "expected_name": "오렌지주스",
+      "expected_id": null
+    },
+    {
+      "case": "control_15",
+      "group": "preservation_control",
+      "source_name": "오렌지 주스",
+      "expected_name": "오렌지 주스",
+      "expected_id": null
+    },
+    {
+      "case": "control_16",
+      "group": "preservation_control",
+      "source_name": "오렌지쥬스",
+      "expected_name": "오렌지쥬스",
+      "expected_id": null
+    },
+    {
+      "case": "control_17",
+      "group": "preservation_control",
+      "source_name": "포도주스",
+      "expected_name": "포도주스",
+      "expected_id": null
+    },
+    {
+      "case": "control_18",
+      "group": "preservation_control",
+      "source_name": "포도 주스",
+      "expected_name": "포도 주스",
+      "expected_id": null
+    },
+    {
+      "case": "control_19",
+      "group": "preservation_control",
+      "source_name": "포도쥬스",
+      "expected_name": "포도쥬스",
+      "expected_id": null
+    },
+    {
+      "case": "control_20",
+      "group": "preservation_control",
+      "source_name": "사과주스",
+      "expected_name": "사과주스",
+      "expected_id": null
+    },
+    {
+      "case": "control_21",
+      "group": "preservation_control",
+      "source_name": "사과 주스",
+      "expected_name": "사과 주스",
+      "expected_id": null
+    },
+    {
+      "case": "control_22",
+      "group": "preservation_control",
+      "source_name": "사과쥬스",
+      "expected_name": "사과쥬스",
+      "expected_id": null
+    },
+    {
+      "case": "format_1",
+      "group": "synthetic_format_validation",
+      "source_name": "망고  쥬스",
+      "expected_name": "망고주스",
+      "expected_id": "D220-716000000-0046"
+    },
+    {
+      "case": "format_2",
+      "group": "synthetic_format_validation",
+      "source_name": "리치\t쥬스",
+      "expected_name": "리치주스",
+      "expected_id": "P109-302030200-0712"
+    },
+    {
+      "case": "format_3",
+      "group": "synthetic_format_validation",
+      "source_name": "토마토\n주스",
+      "expected_name": "토마토주스",
+      "expected_id": "D220-716000000-0179"
+    },
+    {
+      "case": "format_4",
+      "group": "synthetic_format_validation",
+      "source_name": "양송이  수프",
+      "expected_name": "양송이 스프",
+      "expected_id": "D104-185060000-0001"
+    },
+    {
+      "case": "format_5",
+      "group": "synthetic_format_validation",
+      "source_name": "크림\t스프",
+      "expected_name": "크림 스프",
+      "expected_id": "D304-185120000-0001"
+    },
+    {
+      "case": "format_6",
+      "group": "synthetic_format_validation",
+      "source_name": "옥수수  수프",
+      "expected_name": "옥수수 스프",
+      "expected_id": "D304-185140000-0001"
+    },
+    {
+      "case": "format_7",
+      "group": "synthetic_format_validation",
+      "source_name": "계란 프라이",
+      "expected_name": "달걀후라이",
+      "expected_id": "D609-449000000-0001"
+    }
+  ]
+}
