@@ -335,18 +335,21 @@ _DIRECTION_ACT = (
 _DIRECTION_ACT_RE = re.compile(_DIRECTION_ACT)
 # 양 상태 서술 — "양이 많은 편이에요", "양이 적었어요". 끼니의 양이 주어라 시제와 관계없이 방향이다.
 # 서술 어휘는 하나를 두 축이 나눠 쓴다. 조사는 다르다 — `unscored_axis_silent` 는 "양도" 를 보지 않는다
-_AMOUNT_WORDS = r"(?:많|적(?!당|절)|넘치|모자|과하|넉넉)"
-_AMOUNT_STATE_CORE = r"(?<![가-힣])양(?:이|은)\s*" + _AMOUNT_WORDS
-_AMOUNT_STATE = re.compile(r"(?<![가-힣])양(?:이|은|도)\s*" + _AMOUNT_WORDS + r"[가-힣]*")
+_AMOUNT_WORDS = r"(?:많|적(?!당|절|정)|넘치|넘(?=었|어|는|은)|모자|과하|넉넉)"
+# 주어와 서술 사이의 비교 — "양이 평소 한 끼보다 많았고", "양이 적정량보다 많았어요", "양이 적정 범위를 넘었어요"
+_COMPARE = r"(?:(?:평소(?:\s*한\s*끼)?|(?:적정|권장)\s*(?:량|범위|구간)?)(?:보다|을|를)\s*)?"
+_AMOUNT_STATE_CORE = r"(?<![가-힣])양(?:이|은)\s*" + _COMPARE + _AMOUNT_WORDS
+_AMOUNT_STATE = re.compile(r"(?<![가-힣])양(?:이|은|도)\s*" + _COMPARE + _AMOUNT_WORDS + r"[가-힣]*")
 # 양 상태 서술 중 일반 진술 — 조건 · 양보 · 변화 경향("양이 적으면", "양이 적어도", "양이 적어지는 때",
 # "양이 적기 쉬운"). 단계 맥락(STAGE_RISK) 문장이 이 모양이다
-_GENERAL_END = re.compile(r"(?:면|어도|아도|더라도|수록|어지는|아지는)$")
+# 과거형 양보("양이 많지 않았어도 · 적었어도")는 이번 끼니 서술이라 뺀다
+_GENERAL_END = re.compile(r"(?:면|(?<![었았])어도|(?<![었았])아도|더라도|수록|어지는|아지는)$")
 _GENERAL_TAIL = re.compile(r"\s*(?:쉬|쉽)")
 
 # 양 축 평가 — 방향 + "양이 적당했어요" 같은 평가 + 양 축 이름
 _QUANTITY_STATE = re.compile(
     _AMOUNT_STATE_CORE
-    + r"|(?<![가-힣])양(?:이|은|도)\s*(?:적당|괜찮|알맞|충분|적절|딱|권장|부족)"
+    + r"|(?<![가-힣])양(?:이|은|도)\s*(?:적당|적정|괜찮|알맞|충분|적절|딱|권장|부족)"
 )
 _QUANTITY_EVAL = re.compile(
     _DIRECTION_ACT + "|" + _QUANTITY_STATE.pattern
@@ -423,7 +426,7 @@ def unscored_axis_silent(resp: dict, model: ShortFeedbackRequest) -> Verdict:
 def _amount_states(clause: str) -> Iterator[str]:
     """절 안의 양 상태 서술 — 조건 · 양보 · 변화 경향 같은 일반 진술은 뺀다."""
     for m in _AMOUNT_STATE.finditer(clause):
-        if _GENERAL_END.search(m.group(0)) or _GENERAL_TAIL.match(clause, m.end()):
+        if _general(clause, m):
             continue
         yield m.group(0)
 
@@ -466,8 +469,6 @@ def quantity_no_direction(resp: dict, model: ShortFeedbackRequest) -> Verdict:
 # ("평소보다 많았어요")와 "식사량 · 섭취량" 주어, "양을 줄이 · 늘리"(반대 방향을 함의)도 함께 본다.
 # "양이 조금 적었어요" 처럼 정도 부사가 끼어도 같은 방향이다
 _DEGREE = r"(?:(?:조금|좀|약간|다소|살짝|꽤|많이)\s*)?"
-# 주어와 서술 사이의 비교 — "양이 평소 한 끼보다 많았고"
-_COMPARE = r"(?:평소(?:\s*한\s*끼)?보다\s*)?"
 _MORE = re.compile(
     r"(?:많이|배불리|과하게|넉넉히|평소보다\s*더)\s*(?:드셨|드신|먹었|먹은|드셔서|잡수)"
     r"|(?<![가-힣])더\s*(?:드셨|먹었)"
@@ -475,7 +476,7 @@ _MORE = re.compile(
     r"|많은\s*양|(?<![가-힣])양을\s*(?:줄이|줄여)"
     r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _COMPARE + _DEGREE
     # "양이 많이 적었어요" 의 "많이" 는 정도 부사다 — 뒤에 적은 쪽 서술이 오면 많은 쪽이 아니다
-    + r"(?:많(?!이\s*(?:적(?!당|절)|모자|부족))|넘치|과하|넉넉)"
+    + r"(?:많(?!이\s*(?:적(?!당|절|정)|모자|부족))|넘치|넘(?=었|어|는|은)|과하|넉넉)"
     r"|평소보다\s*" + _DEGREE + r"(?:많|넉넉|과하)"
 )
 _LESS = re.compile(
@@ -483,19 +484,44 @@ _LESS = re.compile(
     r"|(?<![가-힣])덜\s*(?:드셨|먹었)"
     r"|소식(?:을\s*)?(?:하셨|했|하신|한\s|이었|이에|이네|이라|인\s)"
     r"|적은\s*양|(?<![가-힣])양을\s*(?:늘리|늘려)"
-    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _COMPARE + _DEGREE + r"(?:적(?!당|절)|모자|부족)"
-    r"|평소보다\s*" + _DEGREE + r"(?:적(?!당|절)|모자)"
+    r"|(?<![가-힣])(?:양|식사량|섭취량)(?:이|은|도)\s*" + _COMPARE + _DEGREE + r"(?:적(?!당|절|정)|모자|부족)"
+    r"|평소보다\s*" + _DEGREE + r"(?:적(?!당|절|정)|모자)"
 )
 
 
 # 부정된 양보 — "양이 많지 않아도"(제안 음식 설명). 끝이 양보형이면 `_GENERAL_END` 가 일반 진술로 본다
 _NEGATED_TAIL = re.compile(r"[가-힣]*(?:\s+(?:않|안)[가-힣]*)?")
+# 가정한 때를 꾸미는 관형형 — "양이 적은 날에도", "양이 많은 때라면". "양이 적은 날이었어요" 는 이번 끼니 서술이다
+# 가정이 아니라 이번 끼니를 가리키는 표지 — "이번 점심처럼", "오늘처럼", "지금처럼"
+_ACTUAL_DAY = re.compile(r"이번|오늘|지금|현재|처럼|같이|같은|정도로")
+_GENERAL_NOUN = re.compile(r"\s*(?:날|때|경우)\s*(?:에도|에는|엔|이라도|라도|라면|이면)")
+# 그 방향을 택하지 않는다는 말 — "양을 늘리기보다", "양을 줄이는 대신"(`_REDIRECT` 와 같은 꼴),
+# "양을 늘리지 않고"(부정), "많은 양을 (채우도록) 권하지 않는다"(거절한 제안)
+_REDIRECT_AFTER = re.compile(
+    r"[가-힣]*?기\s*(?:보다|대신)|는\s*(?:것보다|대신)"
+    # "늘리지 않으면" 은 조건이라 그 방향을 권하는 말이다
+    r"|[가-힣]*?지\s*(?:는\s*)?(?:않(?!으면|는다면)|말|마)"
+)
+# "많은 · 적은 양" 을 목적어로 거절한 제안 — 사이 낱말에 연결 어미("-으니 · -고")가 끼면 다른 절이다
+_REFUSED_AMOUNT = re.compile(
+    # 사이 낱말에 다른 목적어 · 주제("야식은")나 연결 어미("-기에 · -는데")가 끼면 다른 절이다
+    r"[을를]\s*(?:[가-힣]+(?<![니고서면에데은는을를])\s+){0,2}?(?:권하|추천하|제안하)지\s*(?:는\s*)?않"
+)
 
 
 def _general(clause: str, match: re.Match[str]) -> bool:
-    """조건 · 양보 · 경향의 일반 진술인가 — "양이 적으면", "양이 적어도", "양이 많지 않아도", "적게 먹기 쉬운 때"."""
+    """조건 · 양보 · 경향의 일반 진술인가 — "양이 적으면", "양이 적어도", "양이 많지 않아도", "적게 먹기 쉬운 때",
+    "양이 적은 날에도"."""
     end = match.end() + len(_NEGATED_TAIL.match(clause, match.end()).group(0))
-    return bool(_GENERAL_END.search(clause[match.start():end]) or _GENERAL_TAIL.match(clause, end))
+    span = clause[match.start():end]
+    return bool(
+        _GENERAL_END.search(span)
+        or _GENERAL_TAIL.match(clause, end)
+        or (
+            span.endswith(("은", "는")) and _GENERAL_NOUN.match(clause, end)
+            and not _ACTUAL_DAY.search(clause) and not _is_past(clause)
+        )
+    )
 
 
 def _hits(resp: dict, pattern: re.Pattern[str]) -> list[str]:
@@ -506,6 +532,8 @@ def _hits(resp: dict, pattern: re.Pattern[str]) -> list[str]:
         if not _UNCERTAIN.search(clause)
         for m in pattern.finditer(clause)
         if not _general(clause, m)
+        and not _REDIRECT_AFTER.match(clause, m.end())
+        and not (m.group(0).endswith("양") and _REFUSED_AMOUNT.match(clause, m.end()))
     ]
 
 
@@ -632,6 +660,9 @@ _FOOD_MODIFIER = re.compile(r"(?:짠|높은|많은|과한|부족한|적은|낮�
 _REJECTED_OBJECT = re.compile(
     r"\s+(?:[가-힣]+(?:의|한)\s+){0,2}[가-힣]+(?:을|를)\s+"
     r"(?:(?:더|굳이|추가로)\s+)?(?:권하|추천하|제안하)지\s*(?:는\s*)?않"
+    # 피할 음식 — "짠 국물과 양념 센 반찬은 피하는", "짠 소스 없이"
+    r"|\s+(?:[가-힣]+\s+){0,3}?[가-힣]+(?:을|를|은|는)\s+(?:피하|피해|빼|뺀)"
+    r"|\s+[가-힣]+\s+없이"
 )
 
 
