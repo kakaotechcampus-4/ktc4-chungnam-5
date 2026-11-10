@@ -1418,7 +1418,7 @@ void main() {
     // 저녁은 다음 끼니 제안과 챗봇 버튼이 없다(BE 가 제안을 줘도 그리지 않는다).
     expect(find.text('이런 음식은 어때요?'), findsNothing);
     expect(find.text('두부 반 모'), findsNothing);
-    expect(find.text('챗봇으로 다른 음식 추천받기'), findsNothing);
+    expect(find.text('AI 코치에게 다른 음식 추천받기'), findsNothing);
     // 하루 피드백은 부르지 않는다.
     expect(
       api.requests.where((r) => r.path.startsWith('/insights/daily')),
@@ -2066,7 +2066,7 @@ void main() {
     );
     // 저녁이라 제안·챗봇 버튼이 없다.
     expect(find.text('이런 음식은 어때요?'), findsNothing);
-    expect(find.text('챗봇으로 다른 음식 추천받기'), findsNothing);
+    expect(find.text('AI 코치에게 다른 음식 추천받기'), findsNothing);
   });
 
   /// 끼니 피드백 화면(7번)을 다른 화면 위에 띄운다 — 삭제 뒤 돌아갈 곳이 있어야 닫힘을 볼 수 있다.
@@ -2352,8 +2352,8 @@ void main() {
     expect(find.text('이번 끼니는 거르셨어요'), findsOneWidget);
     expect(api.requests.where((r) => r.path.endsWith('/evaluation')), isEmpty);
     // 점심이라 제안과 챗봇 버튼은 보인다(제안이 비어 있어도 버튼은 있다).
-    await tester.scrollUntilVisible(find.text('챗봇으로 다른 음식 추천받기'), 200);
-    expect(find.text('챗봇으로 다른 음식 추천받기'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('AI 코치에게 다른 음식 추천받기'), 200);
+    expect(find.text('AI 코치에게 다른 음식 추천받기'), findsOneWidget);
   });
 
   testWidgets('a skipped meal in the history list opens its feedback', (
