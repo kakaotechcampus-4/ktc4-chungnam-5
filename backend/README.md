@@ -22,16 +22,17 @@ GLP-1 포즈 단계별 식사 코치의 **백엔드**. 공개 API·내부 API·�
    (예: `services/user.py`의 `create_profile`이 "유저 생성 + 첫 체중 기록"을 한 트랜잭션으로 묶으려고
    `db.commit()`을 부른다).
 6. **포즈 정보는 민감 건강정보.** 로그에 약제·용량·이미지 키를 남기지 않는다.
-   모든 공개 API는 JWT + 본인 데이터만 조회.
+   모든 공개 API는 본인 데이터만 조회.
 
-> 🚨 **현재 `/users/*` 는 규칙 6을 지키지 않는다.** `GET`/`PATCH /users/me` 는
-> `X-User-Id` 헤더에 담긴 UUID 를 그대로 사용자 식별자로 신뢰한다 — **이건 인증이
-> 아니라 인증 이음새(seam)다.** 헤더에 아무 UUID나 넣으면 그 사용자의 키·체중(민감
-> 건강정보)을 읽고 쓸 수 있다. JWT 가 `app/core/deps.py` 에 병합되기 전까지
-> **`/users/*` 를 어떤 공개 환경에도 배포하지 않는다.** (`APP_ENV=production` 이면
-> `get_current_user_id` 가 기동 자체를 막는다 — `app/core/config.py` ·
-> `app/core/deps.py` 참고.) FE 는 그동안 `GET`/`PATCH /users/me` 호출마다 이
-> `X-User-Id` 헤더를 붙여야 한다.
+> 🚨 **현재 공개 API 는 규칙 6을 지키지 않는다.** `POST /users/profile` 을 뺀 모든
+> 공개 엔드포인트(`users` · `meals` · `meal_items` · `medications` · `user_states` ·
+> `evaluations` · `feedbacks` · `home` · `dashboard` · `insights` · `nutrition` · `chat`)가
+> `get_current_user_id` 로 `X-User-Id` 헤더의 UUID 를 그대로 사용자 식별자로 신뢰한다 —
+> **이건 인증이 아니라 인증 이음새(seam)다.** 헤더에 아무 UUID나 넣으면 그 사용자의
+> 식사·체중·투약 기록(민감 건강정보)을 읽고 쓸 수 있다. 실제 인증이 붙기 전까지
+> **공개 API 를 어떤 공개 환경에도 배포하지 않는다.**
+> (`APP_ENV=production` 이면 `get_current_user_id` 가 요청을 막는다 — `app/core/config.py` ·
+> `app/core/deps.py` 참고.) FE 는 그동안 모든 호출에 이 `X-User-Id` 헤더를 붙여야 한다.
 
 ---
 
@@ -41,14 +42,14 @@ GLP-1 포즈 단계별 식사 코치의 **백엔드**. 공개 API·내부 API·�
 backend/app/
 ├── main.py                엔트리포인트
 ├── worker_main.py         Worker 엔트리포인트
-├── core/                  설정 · JWT · 응답 래퍼 · 에러 코드
+├── core/                  설정 · 사용자 식별 · 응답 래퍼 · 에러 코드
 ├── db/                    base · session
 ├── models/                SQLAlchemy 모델
 ├── schemas/               Pydantic 스키마
 ├── crud/                  DB 접근만
 ├── services/          ★  비즈니스 로직 (단계 판정 · 상태 머신 · 평가 · 가드레일)
-├── api/v1/endpoints/      공개 REST — JWT
-├── internal/v1/       ★  AI Service 전용 REST — 서비스 토큰
+├── api/v1/endpoints/      공개 REST
+├── internal/v1/       ★  AI Service 전용 REST — 서비스 토큰 (아직 엔드포인트 없음)
 ├── worker/            ★  큐 소비 + 스케줄 배치
 ├── infra/             ★  S3 · 큐 · FCM · AI HTTP
 └── tests/
@@ -115,7 +116,7 @@ pytest
 위 절차가 제대로 끝났는지 확인한다. 셋 다 기대값과 같아야 한다.
 
 ```bash
-# 1. 테이블 수 — 19 가 나와야 한다
+# 1. 테이블 수 — 23 이 나와야 한다
 docker exec glp1-db psql -U glp1 -d glp1_dev -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';"
 
 # 2. 시드 건수 — GENERAL 14991 / PROCESSED 261101
@@ -127,7 +128,7 @@ alembic check
 
 | 확인 | 기대값 |
 | --- | --- |
-| 테이블 수 | **19** — 도메인 테이블 17개 + 작업 큐 `task_queue` 1개 + Alembic 이 쓰는 `alembic_version` 1개 |
+| 테이블 수 | **23** — 도메인 테이블 21개 + 작업 큐 `task_queue` 1개 + Alembic 이 쓰는 `alembic_version` 1개 |
 | `food_refs` | GENERAL 14,991 · PROCESSED 261,101 (합 276,092) |
 | `alembic check` | `No new upgrade operations detected.` |
 
@@ -306,23 +307,26 @@ lease 가 지난 것도 따로 센다.
 | 키                                        | 설명                                                                   |
 | ----------------------------------------- | ---------------------------------------------------------------------- |
 | `DB_URL` · `DB_USER` · `DB_PASSWORD`      | PostgreSQL 접속. `DB_URL` 은 자격증명을 뺀 `host:port/dbname` 형태     |
-| `JWT_SECRET`                              | 액세스 토큰 서명 키                                                    |
-| `KAKAO_CLIENT_ID` · `KAKAO_CLIENT_SECRET` | 카카오 OAuth (D3)                                                      |
-| `INTERNAL_SERVICE_TOKEN`                  | `/internal/v1` 호출용. AI Service와 공유                               |
+| `DB_ECHO`                                 | SQL 로그 출력. 로컬 디버깅할 때만 `true`. 기본 false                   |
+| `DB_POOL_SIZE` · `DB_MAX_OVERFLOW`        | 커넥션 풀. 기본 5 · 10. 합이 `QUEUE_WORKER_THREADS` 이상이어야 한다    |
+| `APP_ENV`                                 | `local` \| `production`. production 이면 `X-User-Id` 이음새가 막힌다   |
 | `AI_SERVICE_BASE_URL`                     | AI 컨테이너 주소. 로컬은 `http://localhost:8001`                       |
 | `AI_TIMEOUT_SEC`                          | 기본 45. 분석이 10~30초 걸린다                                         |
 | `AI_STUB_SCENARIO`                        | ai-stub 의 실패 경로를 부르는 손잡이. **로컬 전용, 평소엔 비움**       |
-| `STORAGE_TYPE`                            | `s3` \| `local`                                                        |
-| `S3_BUCKET`                               | **`glp1-team-*` 패턴이어야 함.** 인스턴스 역할 권한이 이 패턴으로 한정 |
+| `STORAGE_TYPE`                            | `s3` \| `local`. 기본 `local`                                          |
+| `LOCAL_STORAGE_DIR`                       | `local` 일 때 사진 저장 경로. 기본 `var/media`                         |
+| `LOCAL_STORAGE_BASE_URL`                  | 워커가 AI 에 넘기는 `imageUrl` 의 앞부분. **AI 가 접근할 수 있는 주소** |
+| `S3_BUCKET`                               | `s3` 일 때 필수. **`glp1-team-*` 패턴이어야 함.** 인스턴스 역할 권한이 이 패턴으로 한정 |
 | `QUEUE_POLL_INTERVAL_SEC`                 | 빈 큐일 때 쉬는 시간. 기본 1.0                                         |
 | `QUEUE_MAX_ATTEMPTS`                      | 이 횟수만큼 실패하면 FAILED 로 격리. 기본 3                            |
 | `QUEUE_BACKOFF_BASE_SEC`                  | 재시도 지연 기준. 기본 30 (30s → 60s)                                  |
-| `FCM_*`                                   | 푸시 발송                                                              |
+| `QUEUE_LEASE_SEC`                         | 집은 작업의 lease 길이. 기본 120                                       |
+| `QUEUE_WORKER_THREADS`                    | 워커 프로세스 하나의 폴링 스레드 수. 기본 4                            |
+
+아직 Settings 에 없는 키 — 담당 티켓에서 추가한다: `KAKAO_CLIENT_ID` ·
+`KAKAO_CLIENT_SECRET`(D3) · `INTERNAL_SERVICE_TOKEN`(`/internal/v1` 호출용, AI Service 와 공유) · `FCM_*`(푸시 발송).
 
 > 🚨 AWS 액세스 키는 두지 않는다. 서버는 **인스턴스 역할**로 S3 에 접근한다.
-
----
-
 
 ---
 
@@ -331,412 +335,8 @@ lease 가 지난 것도 따로 센다.
 | 대상         | 방식                                                                                                                            |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | Rule Engine  | **순수 함수 단위 테스트.** 입력→기대 점수 표로 고정(`pytest.mark.parametrize`). 단계를 바꾸면 점수가 실제로 달라지는지 검증(R1) |
-| 레이어 경계  | import-linter — `services/*` 상호 참조 금지 · `services` → `crud` 단방향을 CI에서 강제                                          |
+| 레이어 경계  | `services/*` 상호 참조 금지 · `services` → `crud` 단방향. **아직 도구로 강제하지 않는다**(import-linter 미도입) — 리뷰에서 지킨다 |
 | API          | `httpx.ASGITransport` + Testcontainers(Postgres)                                                                                |
 | Worker 루프  | 가짜 큐·가짜 AI 로 **커밋 시점**만 검증 — 실패한 작업을 DONE 으로 커밋하지 않는지(`test_worker_loop.py`). 외부 의존 0 |
 | 작업 큐      | 실제 Postgres 로 lease·SKIP LOCKED·재시도·격리·회수 검증(`test_task_queue.py`). AI 호출 중 커넥션 0 을 `test_worker_loop.py` 가 확인한다 |
 | infra 추상화 | 로컬 구현으로 테스트, 외부 의존 0                                                                                               |
-
----
-
-## 테이블 명세
-
-> 아래는 읽기용 요약이다. **실제 정의는 `app/models/` 가 진실의 출처**이고, 스키마는
-> `alembic/versions/` 의 마이그레이션으로만 바뀐다. 모든 `TIMESTAMP` 는 `TIMESTAMPTZ` 다.
-
-## `users`
-
-로그인한 사용자를 식별하고 닉네임 등 기본 정보를 제공한다. 다른 대부분의 데이터가 `user_id`를 통해 이 사용자와 연결된다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 사용자 ID |
-| auth_provider | VARCHAR | 로그인 방식 |
-| provider_user_id | VARCHAR | 공급자쪽 사용자 식별자. 카카오는 이메일이 선택 동의라 이 값으로 계정을 찾는다 |
-| email | VARCHAR, NULL | 로그인 계정. 동의하지 않으면 없다 |
-| nickname | VARCHAR | 표시 이름 |
-| restrictions | JSONB, DEFAULT `[]` | 알레르기·못 먹는 음식 |
-| created_at | TIMESTAMP | 가입일 |
-| updated_at | TIMESTAMP | 수정일 |
-| fcm_token | VARCHAR, NULL | FCM 푸시 토큰. 미등록·만료 시 NULL |
-| **fcm_token_updated_at** | TIMESTAMP, NULL | 토큰 갱신 시각 |
-| notification_enabled | BOOLEAN, DEFAULT true | 알림 수신 동의 (기기가 아닌 사용자 설정) |
-| baseline_meal_kcal | DECIMAL, NOT NULL | **평소 한 끼 열량 (kcal).** Quantity 감소폭의 분모 |
-
-### 제약·인덱스
-
-| 대상 | 종류 | 내용 | 이유 |
-| --- | --- | --- | --- |
-| fcm_token | **부분 UNIQUE** | `UNIQUE (fcm_token) WHERE fcm_token IS NOT NULL` | 같은 기기에 두 계정이 붙으면 **남의 식사 알림이 뜬다.** |
-| auth_provider + provider_user_id | UNIQUE | `UNIQUE (auth_provider, provider_user_id)` | 같은 소셜 계정으로 두 번 가입되는 걸 막는다 |
-
----
-
-## `user_goals`
-
-목표 체중을 표시하고 현재 체중과 비교해 목표 진행 상황을 보여주는 데 사용한다.(추후 사용될 수 있는 테이블)
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 목표 ID |
-| user_id | UUID FK | 사용자 ID |
-| target_weight_kg | DECIMAL | 목표 체중 |
-| status | ENUM, DEFAULT ACTIVE | ACTIVE / COMPLETED / CANCELLED |
-| created_at | TIMESTAMP | 생성 시각 |
-| updated_at | TIMESTAMP | 수정 시각 |
-
-> 진행 중인 목표는 사용자당 하나다 — `UNIQUE (user_id) WHERE status = 'ACTIVE'`.
-
-## `user_states`
-
-사용자가 입력한 현재 체중, 식욕, GI 증상을 저장한다. 최신 상태 표시 및 기간별 체중·식욕 변화 분석에 활용한다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 상태 기록 ID |
-| user_id | UUID FK | 사용자 ID |
-| appetite_level | INT | 현재 식욕 정도 |
-| weight_kg | DECIMAL | 입력 시점 체중 |
-| gi_symptoms | JSONB, DEFAULT `[]` | 위장관 증상 목록 및 정도 |
-| note | TEXT | 사용자 GI 증상 추가 설명 |
-| recorded_at | TIMESTAMP | 상태 기록 시각 |
-| created_at | TIMESTAMP | 생성 시각 |
-
-> 조회 인덱스: `(user_id, recorded_at DESC)` — "최신 상태"와 기간 조회가 같은 인덱스를 탄다.
-
-## `medical_handoff_logs`
-
-GI 증상이나 피드백 생성 과정에서 의료 판단이 필요한 상황이 감지되면 기록한다.(추후 사용될 수 있는 테이블)
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 핸드오프 ID |
-| user_id | UUID FK | 사용자 ID |
-| meal_id | UUID FK, NULL | 특정 식사와 관련된 경우 |
-| user_state_id | UUID FK, NULL | 증상 기록에서 발생한 경우 |
-| trigger_type | ENUM | DOSAGE_QUESTION / DISCONTINUATION_QUESTION / PRESCRIPTION_QUESTION / SEVERE_GI_SYMPTOM / OTHER |
-| trigger_reason | TEXT | 감지된 이유 |
-| original_input | TEXT | 사용자의 원본 질문/입력 |
-| status | ENUM, DEFAULT PENDING | PENDING / REVIEWED / RESOLVED |
-| reviewer_note | TEXT | 검수 결과 |
-| detected_at | TIMESTAMP | 감지 시각 |
-| reviewed_at | TIMESTAMP, NULL | 검수 시각 |
-
-## `medication_records`
-
-약물명, 용량, 투약 회차, 현재 단계를 저장한다. 식사 평가 시 "현재 사용자가 어느 투약 단계인가"를 결정하는 핵심 Context로 사용한다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 투약 기록 ID |
-| user_id | UUID FK | 사용자 ID |
-| drug_name | VARCHAR | 약물명 |
-| dose_mg | DECIMAL | 해당 시점 투약 용량 |
-| injection_count | INT | 투약 회차 |
-| stage | ENUM | INITIAL / TITRATION / MAINTENANCE/PRE_DOSE |
-| effective_from | DATE | 해당 투약 상태 적용 시작일 |
-| effective_to | DATE, NULL | 종료일, 현재 상태면 NULL |
-| created_at | TIMESTAMP | 기록 생성 시각 |
-| updated_at | TIMESTAMP | 수정 시각 |
-
-> `UNIQUE (user_id) WHERE effective_to IS NULL` — "현재 단계"인 행이 둘이면 단계 판정이 모호해진다.
-
----
-
----
-
-## `medication_snapshots`
-
-한 끼 식사에 매칭될 투약정보 스냅샷. **생성 후 변경하지 않는다** — 그래서 `updated_at` 이 없다.
-사용자가 나중에 과거 투약 기록을 고쳐도 이미 평가된 식사의 단계 맥락은 변하지 않는다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 스냅샷 ID |
-| user_id | UUID FK | 사용자 ID |
-| source_record_id | UUID FK, NULL | 어느 `medication_records` 에서 떠왔는지. 원본이 지워져도 스냅샷은 남는다 |
-| drug_name | VARCHAR, NULL | 약물명. **PRE_DOSE 는 투약 기록이 없어 NULL** |
-| dose_mg | DECIMAL, NULL | 해당 시점 투약 용량 |
-| injection_count | INT, NULL | 투약 회차 |
-| stage | ENUM | PRE_DOSE / INITIAL / TITRATION / MAINTENANCE |
-| created_at | TIMESTAMP | 기록 생성 시각 |
-
----
-
-## `meals`
-
-한 끼 자체를 나타내는 중심 테이블이다. 사진/텍스트 입력, 식사 시간, 식사 종류, 분석 진행 상태 등을 저장한다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 식사 ID |
-| user_id | UUID FK | 사용자 ID |
-| medication_snapshot_id | UUID FK | 식사 당시 투약 단계. PRE_DOSE 사용자도 빈 스냅샷이 하나 붙는다 |
-| meal_type | ENUM | BREAKFAST / LUNCH / DINNER / SNACK |
-| image_key | TEXT, NULL | S3 오브젝트 **키**. presigned URL 은 런타임에 만든다|
-| raw_text | TEXT, NULL | 사용자 입력 원문 |
-| eaten_at | TIMESTAMP | 실제 식사 시각 |
-| status | ENUM, DEFAULT ANALYZING | 식사 처리 상태 |
-| is_recalculation | BOOLEAN, NOT NULL, DEFAULT false | 사용자가 음식을 고쳐 다시 분석 중인지 |
-| created_at | TIMESTAMP | 등록 시각 |
-
-### Status
-
-```
-ANALYZING
-REVIEW_REQUIRED
-EVALUATED
-FAILED
-```
-
-> `CHECK (image_key IS NOT NULL OR raw_text IS NOT NULL)` — 사진도 텍스트도 없는 식사는 분석할 게 없다.
-> 조회 인덱스: `(user_id, eaten_at DESC)`.
-
----
-
-## `meal_items`
-
-사진에서 인식된 각각의 음식과 양을 저장한다. 예를 들어 한 끼 사진에서 밥, 고기, 계란이 인식되면 3개의 `meal_item`이 생성된다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 음식 ID |
-| meal_id | UUID FK | 식사 ID |
-| food_ref_id | VARCHAR FK, NULL | 공공 DB 음식 ID. AI 가 매칭하지 못하면 NULL |
-| original_food_name | VARCHAR | 최초 AI 추정 음식명 |
-| display_name | VARCHAR | 최종 확정 음식명 |
-| estimated_amount | DECIMAL, NULL | AI 가 추정한 양의 숫자 |
-| estimated_unit | VARCHAR(32), NULL | 그 숫자의 단위(`g` · `개` · `ml`) |
-| estimated_amount_g | DECIMAL, NULL | 위 둘의 **g 환산값만**. 환산 불가면 NULL |
-| confirmed_amount | DECIMAL, NULL | 사용자가 입력한 양의 숫자. **확인 여부의 센티넬** |
-| confirmed_unit | VARCHAR(32), NULL | 그 숫자의 단위 |
-| confirmed_amount_g | DECIMAL, NULL | 위 둘의 **g 환산값만**. 환산 불가면 확인 후에도 NULL |
-| confidence | DECIMAL, NULL | AI 분석 신뢰도. `CHECK (0 ~ 1)`. 이름을 바꾸면 지운다 |
-| source | ENUM, DEFAULT MODEL | MODEL / USER |
-| raw_ai_result | JSONB, NULL | AI 응답 원본 보관 전용. `source=USER` 는 인식된 적이 없으므로 NULL |
-
-양이 **쌍 두 개 + 환산값 두 개**로 나뉜다. 각 쌍은 말한 그대로(숫자 + 단위)를 담고,
-`*_amount_g` 는 그걸 g 으로 환산한 결과다. "2개" 처럼 환산 근거가 없으면 `*_amount_g`
-만 NULL 이 되고 숫자·단위는 남는다.
-
-| 상황 | estimated_amount / _unit | estimated_amount_g | confirmed_amount / _unit | confirmed_amount_g |
-| --- | --- | --- | --- | --- |
-| AI 가 "250g" 인식, 확인 전 | `250` / `g` | `250.00` | NULL / NULL | NULL |
-| AI 가 "2개" 인식, 확인 전 | `2` / `개` | NULL | NULL / NULL | NULL |
-| 사용자가 "220g" 으로 확인 | (그대로) | (그대로) | `220` / `g` | `220.00` |
-| 사용자가 "3개" 로 확인 | (그대로) | (그대로) | `3` / `개` | NULL |
-| 사용자가 직접 추가한 음식 | NULL / NULL | NULL | `200` / `g` | `200.00` |
-
-**읽는 규칙은 한 줄이다:**
-
-```
-확인됐으면(confirmed_amount IS NOT NULL) confirmed_*, 아니면 estimated_*
-```
-
-`GET /meals/{mealId}` 의 `amount` · `unit` 이 여기서 나온다 — 출처(MODEL/USER)도
-수정 이력도 볼 필요가 없다. g 이 필요한 쪽(Q/Q/S 채점)만 `*_amount_g` 를 본다.
-
-**"확인했는가" 를 `confirmed_amount_g IS NULL` 로 판정하면 안 된다** — 확인 전과
-"확인했지만 환산 불가"가 구분되지 않는다. 센티넬은 `confirmed_amount` 다. 이걸 틀리면
-"2개" 로 확인한 항목의 직전 값이 AI 추정값으로 되돌아가, 같은 값을 다시 보내도
-'고쳤다' 로 보인다.
-
-`estimated_*` 는 **어떤 수정에도 덮이지 않는다** — AI 인식 성능 평가의 기준이다.
-다만 덮이지 않을 뿐 **행째 사라질 수는 있다**: `DELETE /meals/{mealId}/items/{itemId}` 가
-hard delete 다(아래 `user_corrections` 절 참고).
-`raw_ai_result` 에서는 양을 읽지 않는다. AI 응답 원본을 되짚기 위한 보관 자리이고,
-키 모양이 AI 응답 스키마를 따라 바뀔 수 있다.
-
----
-
-## `user_corrections`
-
-AI가 인식한 음식명이나 양을 사용자가 수정했을 때 변경 전/후 값을 기록한다. 이후 AI 분석 성능 평가에 활용될 수 있다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 수정 ID |
-| meal_item_id | UUID FK | 대상 음식 |
-| original_value | JSONB | 고치기 직전의 값 |
-| corrected_value | JSONB | 사용자 수정값 |
-| corrected_at | TIMESTAMP | 수정 시각 |
-
-`PATCH /meals/{mealId}/items` 가 유일한 기록 지점이고, **`source = MODEL` 항목만** 남긴다 —
-사용자가 직접 넣은 음식(`POST /meals/{mealId}/items`)에는 고칠 AI 인식값이 없다.
-
-⚠️ **이 이력은 대상 음식이 지워지면 함께 사라진다.** `DELETE /meals/{mealId}/items/{itemId}`
-는 hard delete 라(`meal_items` 에 `deleted_at` 이 없다) 그 항목의 `user_corrections` 행과
-바로 위 `meal_items` 절의 `estimated_*` 기준값이 전부 없어진다. 즉 인식 성능을 집계할 때
-**"AI 가 없는 음식을 인식했다" 는 가장 뚜렷한 오인식 신호가 표본에서 빠진다** — 사용자가
-이름·양을 고친 경우는 남는데 통째로 지운 경우만 남지 않는다. 집계 결과를 "AI 가 이만큼
-맞혔다" 로 읽으면 실제보다 후한 수치가 된다.
-
-```json
-// original_value — 고치기 직전의 값. 확인됐으면 confirmed_*, 아니면 estimated_*
-{ "displayName": "김밥", "amountG": "250.00", "confidence": "0.620",
-  "amount": "250.00", "unit": "g" }
-// corrected_value — amount·unit 은 사용자가 입력한 원본 그대로
-{ "displayName": "참치김밥", "amountG": "220.00", "amount": "220", "unit": "g" }
-```
-
-`amount` · `unit` 은 `meal_items` 의 **읽기 규칙 한 줄**로 고른다 — 확인된 항목이면
-`confirmed_*`, 아니면 `estimated_*`. `amountG` 는 그 g 환산값이고 환산이 안 되는
-단위("2개")면 `null` 이지만, **그때도 양이 사라지지는 않는다** — `amount` · `unit` 에
-"2" · "개" 가 그대로 남는다. 숫자를 문자열로 담는 건 자릿수(`250.00`)를 잃지 않기
-위해서다.
-
-`confidence` 는 `original_value` 에만 있다(기록되는 모든 행에 들어가며, 이름을 바꿨는지와
-무관하다). `corrected_value` 에 없는 건 **이름을 바꾸면 그 신뢰도를 항목에서 지우기**
-때문이다 — 사용자가 직접 써 넣은 이름을 FE 가 "AI 가 자신 없어함"(`< 0.8`)으로 강조하면
-거짓말이다. 지운 값이 필요한 곳은 인식 성능 평가뿐이라 여기에만 남긴다.
-
-"고쳤다" 의 판정은 이름과 양이다. 이름은 공백을 무시하고 비교하며(FE 가 화면의 값을 그대로
-돌려보내는 경우), 양은 g 환산값이 있으면 그것으로, 없으면 숫자·단위 쌍으로 비교한다 —
-둘을 섞으면 "2개 → 3개" 가 양쪽 다 `amountG: null` 이라 '안 고쳤다' 가 된다.
-숫자는 **자릿수를 지우고** 비교한다: 저장된 값은 `Numeric(8, 2)` 를 거쳐 `2.00` 이지만
-요청의 `2` 는 `2` 라, 날것으로 비교하면 같은 "2개" 가 매번 '고쳤다' 로 잡힌다.
-
-같은 항목을 두 번 고치면 두 행이 쌓이고, 두 번째 행의 `original_value` 는 AI 인식값이 아니라
-첫 수정의 결과다. **AI 최초 추정값이 기준일 때는 `meal_items.original_food_name` ·
-`estimated_amount` · `estimated_unit` 을 본다** — 그쪽은 어떤 수정에도 덮이지 않는다.
-`estimated_amount_g` 는 환산 불가한 추정("2개")에서 NULL 이라 기준으로 쓸 수 없다.
-
----
-
-## `food_refs`
-
-공공 영양 DB 복제본. 같은 `(category, 정규화한 이름)` 은 한 행이고 성분은 100g 당 평균이다
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | VARCHAR PK | 공공 DB 음식 ID (동명 그룹에서 가장 작은 ID) |
-| name | VARCHAR | 표준 음식명 |
-| category | ENUM, NULL | PROCESSED(가공식품) / GENERAL(일반음식). 공공 DB 적재 시 미분류면 NULL |
-| origin_type | VARCHAR | 식품기원명. 동명 그룹 안에서 값이 갈리면 NULL |
-| serving_size | DECIMAL | 영양성분함량기준량 (병합 후 100) |
-| calories | DECIMAL | 열량 |
-| carbohydrate_g | DECIMAL | 탄수화물 |
-| protein_g | DECIMAL | 단백질 |
-| fat_g | DECIMAL | 지방 |
-| fiber_g | DECIMAL | 식이섬유 |
-| cholesterol_mg | DECIMAL | 콜레스테롤 (mg — `sodium_mg` 와 단위를 맞췄다) |
-| saturated_fat_g | DECIMAL | 포화지방산 |
-| trans_fat_g | DECIMAL | 트랜스지방산 |
-| sodium_mg | DECIMAL | 나트륨 |
-| dataset_version | VARCHAR | 데이터 버전 |
-
----
-
-## `satiety_logs`
-
-사용자가 입력한 식전·식후 포만감 및 다시 허기를 느낀 시간을 저장한다. 이후 Satiety 평가와 개인별 포만감 변화 분석에 활용한다
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 포만감 기록 ID |
-| meal_id | UUID FK | 식사 ID |
-| satiety_before | INT | 식사 전 포만감(%). `CHECK (0 ~ 100)` |
-| satiety_after | INT | 식사 후 포만감(%). `CHECK (0 ~ 100)` |
-| hunger_return_minutes | INT | 다시 허기를 느끼기까지 시간 |
-| user_comment | TEXT | 사용자 추가 의견 |
-| logged_at | TIMESTAMP | 입력 시각 |
-
-> `meal_id` 는 UNIQUE — 식사당 포만감 기록 하나.
-
----
-
-## `qqs_evaluations`
-
-식사별 Quantity·Quality·Satiety 점수를 저장한다. 화면의 Q/Q/S 그래프 및 기간별 점수 추이의 원본 데이터가 된다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 평가 ID |
-| meal_id | UUID FK, UNIQUE | 식사 ID |
-| stage_at_evaluation | ENUM | 평가 당시 투약 단계 |
-| quantity_score | DECIMAL, NULL | Quantity 점수 |
-| quality_score | DECIMAL, NULL | Quality 점수 |
-| satiety_score | DECIMAL, NULL | Satiety 점수|
-| computed_at | TIMESTAMP | 평가 시각 |
-
-> **재평가하면 덮어쓴다** (식사당 1행). `meal_feedbacks` 도 같다.
-> `total_score` 도 `*_weight` 도 없다 — 단계별 차이는 기준선의 엄격함으로 구현한다 (D9).
-
----
-
-### `meal_feedbacks`
-
-해당 한 끼의 QQS 결과를 바탕으로 식사 평가 설명과 "다음 끼니에는 무엇을 해볼지"를 저장하고 보여준다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 끼니 피드백 ID |
-| user_id | UUID FK | 사용자 ID |
-| meal_id | UUID FK, UNIQUE | 대상 식사 ID |
-| body | TEXT | 식사 평가 요약 |
-| suggestions | TEXT | 다음 끼니 행동 제안 |
-| reasoning | TEXT | 피드백 생성 근거 |
-| model_version | VARCHAR | 사용한 AI 모델 |
-| safety_status | ENUM, DEFAULT REVIEW_REQUIRED | SAFE / BLOCKED / REVIEW_REQUIRED — 의료 피드백이 섞이지 않아 그대로 노출해도 되는지 |
-| created_at | TIMESTAMP | 생성 시각 |
-
-> 기본값이 `REVIEW_REQUIRED` 인 건 의도된 것이다. 가드레일을 통과해야만 `SAFE` 가 된다 (규칙 1).
-
-### `daily_feedbacks`
-
-하루 동안 먹은 여러 끼니를 종합하여 "오늘 식사는 전체적으로 어땠는지"를 저장한다. 홈의 오늘 요약이나 일별 기록에 활용할 수 있다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 일일 피드백 ID |
-| user_id | UUID FK | 사용자 ID |
-| feedback_date | DATE | 피드백 대상 날짜 |
-| summary | TEXT | 하루 식사 종합 평가 |
-| quantity_score | DECIMAL | 하루 Quantity 점수 |
-| quality_score | DECIMAL | 하루 Quality 점수 |
-| satiety_score | DECIMAL | 하루 Satiety 점수 |
-| model_version | VARCHAR | 사용한 AI 모델 |
-| created_at | TIMESTAMP | 생성 시각 |
-| safety_status | ENUM, DEFAULT REVIEW_REQUIRED | SAFE / BLOCKED / REVIEW_REQUIRED |
-
-> `UNIQUE (user_id, feedback_date)` — 하루에 하나.
-
-### `long_term_feedbacks`
-
-여러 날의 데이터를 분석하여 주간·월간 Q/Q/S 추이와 장기적인 행동 제안을 저장한다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID PK | 장기 피드백 ID |
-| user_id | UUID FK | 사용자 ID |
-| period_type | ENUM | WEEKLY / MONTHLY |
-| period_start | DATE | 분석 시작일 |
-| period_end | DATE | 분석 종료일 |
-| trend_summary | TEXT | 기간 동안의 변화 추이 |
-| recommendation | TEXT | 장기적인 행동 제안 |
-| chart_data | JSONB | 대시보드용 집계 데이터 |
-| model_version | VARCHAR | 사용한 AI 모델 |
-| created_at | TIMESTAMP | 생성 시각 |
-| safety_status | ENUM, DEFAULT REVIEW_REQUIRED | SAFE / BLOCKED / REVIEW_REQUIRED |
-
-> `UNIQUE (user_id, period_type, period_start)`.
-
-#### `daily_feedback_sources`
-
-하나의 `daily_feedback`이 어떤 `meal_feedback`들을 기반으로 생성됐는지 연결한다. 피드백 생성 근거 추적용이다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| daily_feedback_id | UUID FK, PK | 일일 피드백 |
-| meal_feedback_id | UUID FK, PK | 사용된 끼니 피드백 |
-
-#### `long_term_feedback_sources`
-
-하나의 장기 피드백이 어떤 일일 피드백들을 기반으로 만들어졌는지 기록한다.
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| long_term_feedback_id | UUID FK, PK | 장기 피드백 |
-| daily_feedback_id | UUID FK, PK | 사용된 일일 피드백 |
-
----
