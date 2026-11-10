@@ -2,7 +2,7 @@
 
 사용자가 매 끼니 식사를 기록하고 Q/Q/S 점수·피드백을 확인하는 **네이티브 앱**.
 
-- 스택: **Flutter / Android 우선** (D1, APK 직배포 — 스토어 심사 불필요)
+- 스택: **Flutter / Android 우선** (APK 직배포 — 스토어 심사 불필요) · 상태관리 Provider · HTTP dio
 
 ---
 
@@ -15,64 +15,79 @@
 
 ## 이 파트가 지켜야 하는 절대 규칙
 
-1. **총점·가중치 숫자를 화면에 노출하지 않는다.** 표시되는 건 Q/Q/S 각 1~5점과
-   `stageEmphasis`(이번 단계에서 가장 엄격한 축 이름)뿐이다 (D9).
+1. **총점·가중치를 화면에 노출하지 않는다.** 보여 주는 건 양·질·포만도 각각(0~100 정수)과
+   라벨(`부족` · `적정` · `과다` 등)뿐이다. 평가 전이거나 영양정보가 없으면 값이 `null` 이다 —
+   0 으로 바꿔 그리지 않고 "정보 없음"으로 보여 준다.
 2. **처방 톤 금지.** "이만큼 드세요"가 아니라 "평소 대비 이만큼" 같은 서술형으로만 표현한다.
-   서버가 `safetyStatus=BLOCKED`를 내리면 피드백 대신 **상담 안내 화면**을 띄운다.
-3. **점수는 즉시, 피드백은 늦게.** 확정 버튼을 누르면 Q/Q/S는 동기 응답으로 바로 뜬다.
-   피드백 문장만 나중에 채워진다. 피드백이 실패해도 점수 화면은 정상이다.
-4. **이미지는 서버를 경유하지 않는다.** BE에서 presigned URL을 받아 **S3로 직접 업로드**한다.
-5. **민감정보를 로컬에 남기지 않는다.** 약제명·용량을 캐시·로그에 쓰지 않는다.
-   토큰은 secure storage에만 저장한다.
+   서버가 `safetyStatus=BLOCKED`(의료 질문 감지)를 내리면 피드백 대신 상담 안내를 보여 준다.
+3. **점수는 즉시, 피드백은 늦게.** 확정(`POST /meals/{id}/confirm`)하면 Q/Q/S 는 응답으로 바로 뜬다.
+   피드백 문장만 나중에 채워진다(폴링). 피드백이 실패해도 점수 화면은 정상이고, 다시 시도할 수 있다.
+4. **사진은 서버를 거쳐 올린다.** 앱이 BE 로 `multipart` 업로드한다(`POST /meals`). 서버가 준 사진은
+   `Image.network` 가 아니라 `ApiImage` 로 그린다 — 사진 요청에도 `X-Demo-Key` 가 붙어야 해서다.
+5. **민감정보를 로컬·로그에 남기지 않는다.** 약제명·용량을 캐시·로그에 쓰지 않는다. 기기에 저장하는 건
+   `userId` 뿐이다(`shared_preferences`).
+6. **키를 소스에 넣지 않는다.** `DEMO_KEY` 는 빌드 때 `--dart-define` 으로만 넣는다(아래 "환경변수").
 
 ---
 
 ## 핵심 화면 흐름 — 한 끼 기록
 
 ```
- ① 사진 촬영      → presigned URL 요청 → S3 직접 업로드
- ② 분석 요청      → 202 응답 + mealId   (0.1초)
- ③ 진행 확인      → 1.5초 폴링          (인식 10~30초)
- ④ 결과 확인·수정 → 음식 항목 교정 + 식전/식후 포만감 입력
- ⑤ 확정          → Q/Q/S 즉시 표시     (동기)
- ⑥ 피드백 도착   → 폴링, 45초 초과 시 푸시로 전환
+ ① 식사 입력   사진 촬영·선택 / 음식 검색으로 직접 고르기 / "이번 끼니 안 먹었어요"
+ ② 분석       (사진일 때) 202 + mealId → 폴링   (직접 고른 음식·식사 안 함은 분석 없이 다음으로)
+ ③ 음식 확인   인식된 음식 교정 · 양 수정(−/＋ 또는 숫자 직접 입력) · 음식 추가·삭제 · 영양정보 보완
+ ④ 식사 평가   식후 포만감 입력 → 확정 → 양·질·포만도 점수
+ ⑤ 끼니 피드백 점수 + 영양소 상태 + AI 피드백 문장 + 다음 음식 제안 / "AI 코치에게 다른 음식 추천받기"
+ ⑥ 사후 체크인 식사 후 일정 시간이 지나면 포만감 체크인 팝업
 ```
 
-**폴링 규칙:** 1.5초 간격 · 45초 초과 시 폴링을 끊고 FCM 푸시로 인계한다.
-앱이 백그라운드로 가도 결과를 놓치지 않게 하기 위함이다.
+**폴링 규칙:** 1.5초에서 시작해 점점 늘려 최대 8초 간격, 총 60초까지 기다린다(`lib/common/polling.dart`).
+그 안에 안 끝나면 "아직 만드는 중" 상태로 두고 다시 시도할 수 있게 한다. 푸시 알림은 아직 없다.
 
-**포만감은 사용자가 직접 입력한다** (AI가 추정하지 않는다).
-식전 %와 식후 %를 받아 그 델타로 점수를 낸다 (D5 결정 문서 §5).
+**포만감은 사용자가 직접 입력한다** (AI 가 추정하지 않는다). 식전 %는 입력 때, 식후 %는 평가 화면에서 받고,
+식후 일정 시간 뒤 체크인 팝업에서 한 번 더 기록한다.
 
 ---
 
-## 화면 목록 (MVP)
+## 화면 목록
 
-| 화면 | 내용 |
-|---|---|
-| 온보딩 · 로그인 | 카카오 OAuth (D3) |
-| 포즈 정보 입력 | 단계 분류에 필요한 최소 정보 + **포즈 전 평소 식사 사진** (개인 baseline 산출용, D8) |
-| 홈 | 오늘의 끼니 · 단계 표시 · 다음 식사 알림 |
-| 식사 기록 | 위 ①~⑥ 흐름 |
-| 결과 상세 | Q/Q/S 3축 + 피드백 문장 |
-| 주간 추이 | 포즈 전 대비 변화 (before/after 비교) |
-| 설정 | 알림 시간 · 알레르기/못 먹는 음식 |
+앱을 처음 열면 `userId` 가 없는 사용자는 **프로필 입력 → 투약 정보 입력** 온보딩을 거친다.
+이후 하단 탭 4개(홈 · 피드백 · AI · 마이)가 루트다(`lib/navigation/root_shell.dart`).
 
-> MVP 제외: 목표 체중, 알람 늘리기, 부작용·스트레스 입력, 포만감 단독 기록, 증상 트래킹.
-> 지금 스코프 밖이며, 편해 보여도 되돌리지 않는다.
+| 화면 | 파일 | 내용 |
+|---|---|---|
+| 프로필 입력 | `profile_input_screen.dart` | 온보딩 1/2. 닉네임·키·체중·평소 한 끼 열량(한국인 평균 안내 포함). 마이 탭에서는 수정 모드 |
+| 투약 정보 입력 | `medication_info_screen.dart` | 온보딩 2/2. 투약 단계·시작일. 등록 후에는 잠긴다 |
+| 홈 | `home_screen.dart` | 오늘의 끼니 · 양·질·포만도 · 식사 입력 진입 |
+| 식사 입력 | `meal_input_screen.dart`, `food_search_screen.dart`, `meal_add_sheet.dart` | 끼니·시각·사진·음식 검색 |
+| 분석 | `meal_analysis_screen.dart` | 사진 분석 진행 3단계 |
+| 음식 확인 | `meal_review_screen.dart`, `meal_item_edit_sheet.dart` | 인식 결과 교정 |
+| 식사 평가 | `meal_evaluation_screen.dart` | 식후 포만감 → Q/Q/S |
+| 끼니 피드백 | `next_meal_suggestion_screen.dart` | 점수 · 영양소 · AI 피드백 · 다음 음식 제안 |
+| 피드백 탭 | `feedback_branch_popup.dart` → `meal_history_screen.dart` / `long_term_feedback_screen.dart` | 분기 팝업에서 단기(기록 달력)·장기 피드백 선택 |
+| AI | `chatbot_screen.dart` | AI 코치(챗봇) |
+| 마이 | `my_screen.dart` | 프로필 조회·수정 |
+
+**팝업**은 전부 `PopupGate`(`lib/popups/popup_gate.dart`) 한 곳으로 띄운다 — 우선순위로 한 번에 하나만 뜬다.
+(하루 한 번 컨디션 기록 · 포만감 체크인 · 삭제/식사 안 함/나가기 확인 · 영양정보 안내 · 제안 교체 확인)
+
+> 아직 없는 것: 카카오 로그인, FCM 푸시, secure storage 토큰. 사용자 식별은 `X-User-Id` 헤더이고,
+> 접근 제한은 `X-Demo-Key` 다(JWT 도입 전 임시 장치).
 
 ---
 
 ## 상태 처리
 
-앱은 서버의 `meals.status` 4개를 그대로 따른다.
+앱은 서버의 `meals.status` 를 그대로 따른다.
 
 | status | 앱 동작 |
 |---|---|
-| `ANALYZING` | 진행 인디케이터 + 폴링 |
-| `REVIEW_REQUIRED` | 인식 결과 교정 화면 (`clarifyQuestion`이 있으면 함께 표시) |
-| `EVALUATED` | Q/Q/S 표시. `feedbackStatus`는 별도로 폴링 |
+| `ANALYZING` | 진행 화면 + 폴링 |
+| `REVIEW_REQUIRED` | 음식 확인 화면 (`clarifyQuestion` 이 있으면 함께 표시) |
+| `EVALUATED` | Q/Q/S 표시. `feedbackStatus` 는 별도로 폴링 |
 | `FAILED` | 재시도 안내 |
+
+로딩·빈 상태·오류 표현은 [`docs/design-system.md`](docs/design-system.md) 의 상태 규칙을 따른다.
 
 ---
 
@@ -80,9 +95,11 @@
 
 ```bash
 flutter pub get
-flutter run                       # 디버그
-flutter build apk --release       # 배포용 APK
+flutter run                       # APP_PHASE=local — mock 서버(frontend/mock)에 붙는다
+flutter build apk --release       # 배포용은 아래 "환경변수" 의 phase · 키를 함께 준다
 ```
+
+개발 환경 세팅 · 실기기 테스트 · 테스트 방법은 [`README_FLUTTER.md`](README_FLUTTER.md) 를 본다.
 
 ## 웹 (평가용 창구)
 
@@ -110,15 +127,17 @@ flutter build web --release --base-href /web/
 
 ## 환경변수
 
-`--dart-define` 또는 `.env`(gitignore됨)로 주입한다. **키를 소스에 하드코딩하지 않는다.**
+`--dart-define` 으로 주입한다. 키를 모아 두는 `.env`(gitignore됨, 예시는 `.env.example`)는 앱이 읽지 않는 로컬 메모다.
+**키를 소스에 하드코딩하지 않는다.**
 
 | 키 | 설명 |
 |---|---|
 | `APP_PHASE` | 붙을 환경: `local`(기본) · `dev` · `staging` · `prod`. 아래 표 참고. 잘못 적으면 앱 시작 때 바로 터진다 |
 | `API_BASE_URL` | BE 공개 API 주소 (`/api/v1` 포함). 주면 phase 주소 대신 쓴다. **`local` · `dev` 에서만** 쓸 수 있다(에뮬레이터 `10.0.2.2`·`adb reverse` 용). `staging` · `prod` 에서 주면 시작 때 터진다 |
 | `DEMO_KEY` | 데모 서버 접근 키(`X-Demo-Key`). `staging` · `prod` **앱** 빌드에만 넣고, 그 서버의 키를 넣는다. **웹 빌드에는 넣지 않는다**(위 "웹" 참고) |
-| `KAKAO_NATIVE_APP_KEY` | 카카오 로그인 |
-| `FCM_SENDER_ID` | 푸시 |
+
+> `.env` 는 앱이 읽지 않는다. 빌드할 때 `--dart-define` 으로 **직접 넘긴 값만** 앱에 들어간다 —
+> `DEMO_KEY` 를 빼먹으면 서버가 403 을 준다. 카카오 로그인 · FCM 은 아직 쓰지 않는다.
 
 ### phase — 서버 주소가 자동으로 정해진다
 
