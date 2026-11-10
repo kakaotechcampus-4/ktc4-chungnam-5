@@ -151,8 +151,14 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     final item = _items.firstWhere((i) => i.itemId == itemId);
     final amount = item.amount;
     if (amount == null) return;
-    final next = amount + delta;
+    _setAmount(itemId, amount + delta);
+  }
+
+  /// 숫자 칸에 직접 친 값을 양으로 바꾼다. 0 이하면 무시한다.
+  void _setAmount(String itemId, double next) {
     if (next <= 0) return;
+    final item = _items.firstWhere((i) => i.itemId == itemId);
+    if (item.amount == next) return;
     _replace(item.copyWith(amount: next));
     _pendingAmounts.add(itemId);
     _patchTimer?.cancel();
@@ -669,9 +675,6 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
     if (n.fiberG != null) '식이섬유 ${n.fiberG!.round()}g',
   ].join(' · ');
 
-  static String _formatAmount(double v) =>
-      v == v.roundToDouble() ? '${v.toInt()}' : v.toStringAsFixed(1);
-
   Widget _buildStepper(MealItem item) {
     final amount = item.amount;
     if (amount == null) {
@@ -682,10 +685,18 @@ class _MealReviewScreenState extends State<MealReviewScreen> {
       children: [
         _stepButton(Icons.remove, () => _changeAmount(item.itemId, -step)),
         const SizedBox(width: AppSpacing.sm),
-        Text(
-          '${_formatAmount(amount)}${item.unit ?? ''}',
+        // 숫자는 직접 고칠 수도 있다. 단위는 뒤에 따로 붙인다.
+        MealAmountField(
+          key: ValueKey('amount-${item.itemId}'),
+          width: 48,
+          value: amount,
+          onChanged: (v) {
+            if (v != null) _setAmount(item.itemId, v);
+          },
           style: AppTypography.cardTitle,
         ),
+        if ((item.unit ?? '').isNotEmpty)
+          Text(item.unit!, style: AppTypography.cardTitle),
         const SizedBox(width: AppSpacing.sm),
         _stepButton(Icons.add, () => _changeAmount(item.itemId, step)),
       ],

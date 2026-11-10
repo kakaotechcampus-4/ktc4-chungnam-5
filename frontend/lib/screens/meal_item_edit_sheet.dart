@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api/meal_api.dart';
 import '../theme/app_colors.dart';
@@ -12,6 +13,97 @@ double mealAmountStep(String? unit) => switch (unit) {
   'g' || 'ml' => 10,
   _ => 0.5,
 };
+
+/// 양 숫자 칸 — `−` · `＋` 사이에 두고 숫자를 직접 고칠 수도 있다.
+///
+/// [value] 가 바깥에서(`−` · `＋` 등) 바뀌면 칸도 따라 바뀐다. 직접 치는 중에는 [onChanged]
+/// 로 지금 값을 알리고, 비었거나 0 이면 `null` 을 준다. 포커스를 잃었는데 값이 올바르지
+/// 않으면 마지막 올바른 [value] 로 되돌린다.
+class MealAmountField extends StatefulWidget {
+  const MealAmountField({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    required this.style,
+    this.width = 64,
+  });
+
+  final double value;
+
+  /// 직접 친 값. 비었거나 0 이하면 `null`.
+  final ValueChanged<double?> onChanged;
+  final TextStyle style;
+  final double width;
+
+  @override
+  State<MealAmountField> createState() => _MealAmountFieldState();
+}
+
+class _MealAmountFieldState extends State<MealAmountField> {
+  late final TextEditingController _controller = TextEditingController(
+    text: _format(widget.value),
+  );
+  late final FocusNode _focus = FocusNode()..addListener(_onFocusChanged);
+
+  static String _format(double v) =>
+      v == v.roundToDouble() ? '${v.toInt()}' : v.toStringAsFixed(1);
+
+  double? get _typed {
+    final v = double.tryParse(_controller.text);
+    return v == null || v <= 0 ? null : v;
+  }
+
+  @override
+  void didUpdateWidget(MealAmountField old) {
+    super.didUpdateWidget(old);
+    // 바깥 값이 바뀌었고 칸의 숫자와 다르면 맞춘다. 직접 치는 중이면 이미 같다.
+    if (widget.value > 0 && widget.value != _typed) {
+      _controller.text = _format(widget.value);
+    }
+  }
+
+  void _onFocusChanged() {
+    if (_focus.hasFocus) return;
+    // 비었거나 0 으로 두고 나가면 마지막 올바른 값으로 돌린다.
+    if (_typed == null && widget.value > 0) {
+      _controller.text = _format(widget.value);
+    }
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.width,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focus,
+        onChanged: (_) => widget.onChanged(_typed),
+        textAlign: TextAlign.center,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          LengthLimitingTextInputFormatter(7),
+        ],
+        style: widget.style,
+        decoration: const InputDecoration(
+          filled: false,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+}
 
 /// "음식 수정" 시트에서 사용자가 고른 값.
 ///
@@ -390,13 +482,12 @@ class _MealItemEditSheetState extends State<_MealItemEditSheet> {
                     Icons.remove,
                     () => _step(-mealAmountStep(_unit)),
                   ),
-                  SizedBox(
+                  // 숫자는 직접 고칠 수도 있다. 비우면 0 이라 저장이 막힌다.
+                  MealAmountField(
                     width: 76,
-                    child: Text(
-                      _formatNumber(_amount),
-                      textAlign: TextAlign.center,
-                      style: AppTypography.sectionHead.copyWith(fontSize: 18),
-                    ),
+                    value: _amount,
+                    onChanged: (v) => setState(() => _amount = v ?? 0),
+                    style: AppTypography.sectionHead.copyWith(fontSize: 18),
                   ),
                   _roundButton(Icons.add, () => _step(mealAmountStep(_unit))),
                 ],

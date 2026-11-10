@@ -36,6 +36,15 @@ Map<String, dynamic> _mockBody(String route) {
   return byStatus.values.first as Map<String, dynamic>;
 }
 
+/// 양 숫자 칸(`−` · `＋` 사이의 입력칸) 중 지금 [amount] 가 적힌 것.
+Finder _amountField(String amount) => find.widgetWithText(TextField, amount);
+
+/// 음식 수정 시트 안의 입력칸들(뒤 화면의 양 칸은 뺀다). 순서: 이름 · 수량 · …
+Finder _sheetFields() => find.descendant(
+  of: find.byType(BottomSheet),
+  matching: find.byType(TextField),
+);
+
 /// 기본 테스트 화면(800×600)은 팝업 아래쪽 버튼이 잘려 세로를 늘린다.
 /// 폭은 줄이지 않는다 — 테스트 글꼴(Ahem)은 실제 글꼴보다 넓어서 375 폭에서는
 /// 기존 화면의 Row 가 넘친다.
@@ -936,6 +945,71 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('review amount can be typed directly', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+    );
+    await closeNutritionNotice(tester);
+
+    await tester.enterText(_amountField('250'), '333');
+    await tester.pump();
+    // − · ＋ 는 직접 친 값에서 이어서 센다.
+    await tester.tap(find.byIcon(Icons.add).first);
+    await tester.pump();
+    expect(_amountField('343'), findsOneWidget);
+
+    // 비우거나 0 으로 두고 나가면 마지막 값으로 돌아온다. 서버에도 가지 않는다.
+    await tester.enterText(_amountField('343'), '0');
+    await tester.pump();
+    expect(api.requests.where((r) => r.method == 'PATCH'), isEmpty);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    expect(_amountField('343'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    final items =
+        (api.requests.singleWhere((r) => r.method == 'PATCH').data
+                as Map)['items']
+            as List;
+    expect(items.single['amount'], 343.0);
+  });
+
+  testWidgets('edit sheet amount can be typed and an empty amount blocks saving', (
+    WidgetTester tester,
+  ) async {
+    final api = await pumpMealScreen(
+      tester,
+      const MealReviewScreen(mealId: 'm1'),
+    );
+    await closeNutritionNotice(tester);
+    await tester.tap(find.text('수정').first);
+    await tester.pumpAndSettle();
+
+    final amount = _sheetFields().at(1);
+    await tester.enterText(amount, '');
+    await tester.pump();
+    // 양이 비면 저장이 막힌다 — 눌러도 시트가 닫히지 않고 서버로도 가지 않는다.
+    await tester.tap(find.text('저장'));
+    await tester.pumpAndSettle();
+    expect(find.text('음식 수정'), findsOneWidget);
+    expect(api.requests.where((r) => r.method == 'PATCH'), isEmpty);
+
+    await tester.enterText(amount, '180');
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.add).last);
+    await tester.pump();
+    expect(_amountField('190'), findsOneWidget);
+
+    await tester.tap(find.text('저장'));
+    await _settle(tester);
+    final patch = api.requests.singleWhere((r) => r.method == 'PATCH');
+    expect(((patch.data as Map)['items'] as List).single['amount'], 190.0);
+  });
+
   testWidgets('review sends amount edits together after a pause', (
     WidgetTester tester,
   ) async {
@@ -944,14 +1018,14 @@ void main() {
       const MealReviewScreen(mealId: 'm1'),
     );
     await closeNutritionNotice(tester);
-    expect(find.text('250g'), findsOneWidget);
+    expect(_amountField('250'), findsOneWidget);
     // 매칭 안 된 음식은 영양정보 없음으로 표시한다.
     expect(find.text('영양정보 없음'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.add).first);
     await tester.tap(find.byIcon(Icons.add).first);
     await tester.pump();
-    expect(find.text('270g'), findsOneWidget);
+    expect(_amountField('270'), findsOneWidget);
     expect(api.requests.where((r) => r.method == 'PATCH'), isEmpty);
 
     await tester.pump(const Duration(seconds: 1));
@@ -975,9 +1049,9 @@ void main() {
     await tester.tap(find.text('직접 입력하기'));
     await tester.pumpAndSettle();
     // 칼로리 칸(첫 숫자 칸)에 값을 적고 이름도 바꾼다.
-    final fields = find.byType(TextField);
+    final fields = _sheetFields();
     await tester.enterText(fields.first, '새 이름');
-    await tester.enterText(fields.at(1), '123');
+    await tester.enterText(fields.at(2), '123');
     await tester.pump();
 
     await tester.tap(find.text('저장'));
@@ -1081,7 +1155,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.add).first);
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
-    expect(find.text('250g'), findsOneWidget);
+    expect(_amountField('250'), findsOneWidget);
     expect(find.textContaining('되돌렸어요'), findsOneWidget);
   });
 
@@ -1110,7 +1184,12 @@ void main() {
       ),
     );
     expect(find.text('식사 후 포만감'), findsNothing);
-    await tester.scrollUntilVisible(find.text('확인하고 평가받기'), 100);
+    // 양 칸마다 안쪽 스크롤이 있어서, 화면 전체 스크롤(가장 바깥)을 지정한다.
+    await tester.scrollUntilVisible(
+      find.text('확인하고 평가받기'),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('확인하고 평가받기'));
     await _settle(tester);
 
@@ -1213,7 +1292,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('직접 입력하기'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(1), '123');
+    await tester.enterText(_sheetFields().at(2), '123');
     await tester.pump();
     await tester.tap(find.text('저장'));
     await _settle(tester);
@@ -1775,7 +1854,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
     expect(find.textContaining('800kcal'), findsOneWidget);
-    expect(find.text('260g'), findsOneWidget);
+    expect(_amountField('260'), findsOneWidget);
   });
 
   testWidgets('a failed analysis offers recording again', (
