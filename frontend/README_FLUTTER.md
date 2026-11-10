@@ -51,7 +51,7 @@ flutter pub get
 
 ## 실행
 
-### 환경(phase) — local / dev / prod
+### 환경(phase) — local / dev / staging / prod
 
 앱은 같은 phase 의 서버하고만 통신한다. 빌드할 때 `--dart-define=APP_PHASE` 로 고르고,
 바뀌는 건 **서버 주소뿐**이다(`lib/api/api_client.dart` 의 `ApiConfig`). 화면 코드에 더미 분기를 두지 않는다.
@@ -60,7 +60,8 @@ flutter pub get
 |---|---|---|---|
 | **local**(기본) | 없음 | `http://localhost:4010` — [mock 서버](#mock-서버-local) | BE 없이 화면만 볼 때. **정해진 응답만** 온다(저장해도 다음 조회 값이 그대로) |
 | **dev** | `--dart-define=APP_PHASE=dev` | `http://127.0.0.1:8000` — Docker 로 띄운 실제 BE | 회원가입 → 투약 → 식사처럼 흐름을 이어서 볼 때. 웹은 [웹 → B](#b-실제-be-로-확인하기-dev--docker-be), 폰은 [실기기 테스트](#실기기-테스트-실서버) |
-| **prod** | `--dart-define=APP_PHASE=prod --dart-define=DEMO_KEY=<키>` | `https://glp1-demo.duckdns.org` — 데모 서버(팀 EC2) | 시연용 APK. 키는 팀 비밀 채널에서 받는다. 키가 없거나 틀리면 "서버 접속 키가 맞지 않아요"(403) |
+| **staging** | `--dart-define=APP_PHASE=staging --dart-define=DEMO_KEY=<스테이징 키>` | `https://glp1-staging.duckdns.org` — develop 코드, 운영과 DB·사진 분리 | 머지된 변경 확인·시험 데이터. 키는 `frontend/.env` 의 `STAGING_DEMO_KEY` |
+| **prod** | `--dart-define=APP_PHASE=prod --dart-define=DEMO_KEY=<운영 키>` | `https://glp1-demo.duckdns.org` — 운영(데모) 서버(main 코드) | 시연용 APK. 키는 팀 비밀 채널에서 받는다. 키가 없거나 틀리면 "서버 접속 키가 맞지 않아요"(403) |
 
 `API_BASE_URL` 을 주면 phase 주소 대신 쓴다(에뮬레이터는 `http://10.0.2.2:<포트>/api/v1`).
 
@@ -305,6 +306,8 @@ flutter test                 # 전부. 서버는 필요 없다
 - 테스트는 서버 대신 `test/support/fake_api.dart` 의 가짜 응답을 받는다. 기본은 mock 서버와 같은
   `mock/examples.json` 이고, 흐름이 필요한 테스트(회원가입 → 투약 등)만 그 안에서 응답을 바꾼다.
 - `test/api_services_test.dart` 는 각 화면 API 서비스가 보내는 요청(경로·메서드·body)과 응답 해석을 본다.
+- `test/widget_test.dart` 가 화면 흐름 대부분을 덮는다. 그 밖에 `api_client_test` · `polling_test` ·
+  `popup_gate_test` · `meal_add_sheet_test` · `meal_defaults_test` · `stomach_gauge_test` 가 있다.
 
 > ⚠️ **경로에 한글이 있으면 `flutter analyze`가 죽는다.**
 > (`바탕 화면`, `카카오테크캠퍼스` 같은 상위 폴더명 때문에 analysis server가
@@ -319,10 +322,13 @@ flutter test                 # 전부. 서버는 필요 없다
 ```
 frontend/lib/
 ├─ main.dart              앱 진입점 · MaterialApp 설정 · MultiProvider 등록 · 첫 화면 선택
-├─ api/                   ApiClient(dio · 응답 래퍼 · X-User-Id) · ApiConfig(phase) · ApiException · 회원·투약 API
+├─ api/                   ApiClient(dio · 응답 래퍼 · X-User-Id · X-Demo-Key) · ApiConfig(phase) · ApiException
+│                         · meal_api · chat_api · medication_api · user_api · web_demo_key*(웹 평가용 키)
 ├─ common/
-│  └─ api_format.dart     API 값 ↔ 화면 표시 변환(단계·끼니 라벨, 날짜 파싱·포맷)
-├─ popups/                하루 한 번 팝업(컨디션 기록) · 포만감 체크인 · PopupGate
+│  ├─ api_format.dart     API 값 ↔ 화면 표시 변환(단계·끼니 라벨, 날짜 파싱·포맷)
+│  ├─ api_image.dart      서버 사진을 그리는 위젯(사진 요청에도 X-Demo-Key 를 붙인다)
+│  └─ polling.dart        202 → 완료까지 다시 묻는 폴링(1.5초 시작 · 최대 8초 · 60초)
+├─ popups/                PopupGate(팝업 유일한 통로) · 컨디션 기록 · 포만감 체크인 · 분기/확인 팝업들
 ├─ theme/
 │  ├─ app_colors.dart     색상 상수
 │  ├─ app_spacing.dart    여백 스케일 (xs~xxl) · AppLayout
@@ -333,11 +339,11 @@ frontend/lib/
 │  ├─ app_state.dart      화면 2개 이상이 공유하는 상태 (ChangeNotifier) 예시
 │  ├─ medication_state.dart 현재 투약 — 홈·컨디션 팝업·투약 화면이 같이 본다
 │  ├─ profile_state.dart  내 프로필 — 마이 탭·컨디션 팝업·온보딩 확인이 같이 본다
-│  ├─ tab_state.dart      현재 탭
+│  ├─ tab_state.dart      현재 탭 · 끼니 피드백에서 온 AI 코치 요청
 │  └─ user_session.dart   현재 사용자(userId) — 기기에 저장
 ├─ navigation/
-│  └─ root_shell.dart     하단 탭 4개(홈·피드백·기록·마이) 셸
-└─ screens/               탭별 화면
+│  └─ root_shell.dart     하단 탭 4개(홈·피드백·AI·마이) 셸
+└─ screens/               화면. 목록은 README.md 의 "화면 목록"
 ```
 
 색상·여백·모서리·타이포그래피 값은 **하드코딩하지 말고** `theme/`의 상수를 쓴다.
@@ -352,19 +358,20 @@ frontend/lib/
 - **화면 하나에서만 쓰는 상태**는 그 화면의 `StatefulWidget`/`setState`로 충분하다. 전역으로 올리지 않는다.
 - **화면 2개 이상이 같이 봐야 하는 상태**만 `ChangeNotifier`로 만들어 `lib/state/`에 두고
   `main.dart`의 `MultiProvider`에 등록한다.
-- 기능별로 별도 `ChangeNotifier` 클래스를 만든다 (예: `MealState`, `AuthState`).
+- 기능별로 별도 `ChangeNotifier` 클래스를 만든다 (예: `MedicationState`, `ProfileState`, `TabState`).
   하나의 거대한 상태 클래스로 합치지 않는다.
 - 화면에서는 `context.watch<T>()`(빌드 시 구독) / `context.read<T>()`(콜백 안에서 1회 접근)로 꺼내 쓴다.
 
-`lib/state/app_state.dart`가 패턴을 보여주는 예시다. 실제 기능(로그인, 오늘의 식사 등)을 추가할 때
-이 파일을 참고해 새 클래스를 만들고, 예시 코드는 지워도 된다.
+`lib/state/app_state.dart`가 패턴을 보여주는 예시다. 실제 전역 상태는 `medication_state.dart` ·
+`profile_state.dart` · `tab_state.dart` · `user_session.dart` 를 본다.
 
 ---
 
 ## 화면 간 이동 — Navigator.push
 
 라우팅 라이브러리(`go_router` 등)는 쓰지 않는다. 딥링크·웹 URL 동기화가 필요한 제품이 아니고,
-기본 `Navigator`만으로 README의 화면 흐름(①촬영→②분석→③폴링→④확인→⑤확정→⑥피드백)을 다 표현할 수 있다.
+기본 `Navigator`만으로 README의 화면 흐름(입력→분석→음식 확인→평가→끼니 피드백)을 다 표현할 수 있다.
+식사 흐름은 `pushReplacement` 로 이어 가고, 끝낼 때 `popUntil(isFirst)` 로 루트 탭으로 돌아온다.
 
 ```dart
 Navigator.push(
@@ -387,13 +394,14 @@ Navigator.push(
 
 | 키 | 기본값 | 설명 |
 |---|---|---|
-| `APP_PHASE` | `local` | `local`(mock 서버) · `dev`(Docker BE) · `prod`. [환경(phase)](#환경phase--local--dev--prod) 참고 |
+| `APP_PHASE` | `local` | `local`(mock 서버) · `dev`(Docker BE) · `staging`(스테이징) · `prod`(운영). [환경(phase)](#환경phase--local--dev--staging--prod) 참고 |
 | `API_BASE_URL` | phase 주소 | 주면 phase 주소 대신 쓴다. **`/api/v1` 까지 적는다.** 에뮬레이터는 `http://10.0.2.2:<포트>/api/v1` |
-| `DEMO_KEY` | 없음 | 데모 서버 접근 키. 있으면 모든 요청과 사진에 `X-Demo-Key` 로 붙는다. local · dev 는 필요 없다 |
+| `DEMO_KEY` | 없음 | 데모 서버 접근 키. 있으면 모든 요청과 사진에 `X-Demo-Key` 로 붙는다. local · dev 는 필요 없다. **`.env` 에 적어 두기만 해서는 앱에 안 들어간다** — 빌드 명령에 `--dart-define=DEMO_KEY=...` 로 직접 넘긴다(빼먹으면 403) |
 
 ```bash
 # 시연용 APK (release 빌드)
-flutter build apk --dart-define=APP_PHASE=prod --dart-define=DEMO_KEY=<키>
+flutter build apk --release --dart-define=APP_PHASE=staging --dart-define=DEMO_KEY=<스테이징 키>
+flutter build apk --release --dart-define=APP_PHASE=prod    --dart-define=DEMO_KEY=<운영 키>
 ```
 
 > 키가 들어간 APK 는 공개 채널에 올리지 않는다(APK 를 풀면 키가 보인다).
