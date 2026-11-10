@@ -28,7 +28,7 @@ import 'shared_meal_widgets.dart';
 /// 하루 피드백은 따로 보여 주지 않는다. 그날 마지막 끼니의 피드백이 곧 하루 피드백이고,
 /// BE 가 끼니 피드백을 받을 때 같이 갱신한다. 그래서 저녁도 아침·점심과 같은 화면이다.
 /// 끼니 종류에 따라 다른 것은 아래뿐이다.
-/// - 아침·점심: 피드백 문장 + `이런 음식은 어때요?` 제안 + `챗봇으로 다른 음식 추천받기`.
+/// - 아침·점심: 피드백 문장 + `이런 음식은 어때요?` 제안 + `AI 코치에게 다른 음식 추천받기`.
 /// - 저녁: 피드백 문장만. 다음 끼니 제안과 챗봇 버튼이 없다.
 ///
 /// 제안을 저장하거나 다시 받는 API 는 아직 없어 그 버튼은 두지 않는다.
@@ -210,7 +210,7 @@ class _NextMealSuggestionScreenState extends State<NextMealSuggestionScreen> {
   /// 기록 탭에서 시작했어도 홈으로 간다.
   void _goHome() => _closeFlowAndGoTo(TabState.home);
 
-  /// "챗봇으로 다른 음식 추천받기" — 식사 기록 흐름을 닫고 AI 탭으로 간다.
+  /// "AI 코치에게 다른 음식 추천받기" — 식사 기록 흐름을 닫고 AI 탭으로 간다.
   ///
   /// 평소 뒤로 가기는 화면이 오른쪽으로 밀려 나가는데, 앞으로 나아가는 느낌을 주려고
   /// 이 화면을 그림으로 찍어 **왼쪽으로** 밀어 내보낸다. 그 사이 화면은 바로 닫고 AI 탭을
@@ -933,7 +933,7 @@ class _SuggestionCard extends StatelessWidget {
   }
 }
 
-/// "챗봇으로 다른 음식 추천받기" — 점선 테두리 버튼.
+/// "AI 코치에게 다른 음식 추천받기" — 점선 테두리 버튼.
 class _ChatbotButton extends StatelessWidget {
   const _ChatbotButton({required this.onTap});
 
@@ -960,7 +960,7 @@ class _ChatbotButton extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                '챗봇으로 다른 음식 추천받기',
+                'AI 코치에게 다른 음식 추천받기',
                 style: AppTypography.cardTitle.copyWith(
                   fontSize: 12,
                   color: AppColors.textSecondary,
