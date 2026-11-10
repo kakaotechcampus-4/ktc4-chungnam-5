@@ -263,15 +263,30 @@ def test_evaluation_view_equals_confirm_with_targets(client: TestClient, db: Ses
     assert {k: v for k, v in confirmed.items() if k != "feedbackStatus"} == fetched
 
 
-def test_missing_fiber_counts_as_zero(client: TestClient, db: Session) -> None:
-    """공공 DB 에 식이섬유가 비어 있으면 0g 으로 본다 — 0.5×0.5 + 0.2×0 + 0.3×1 = 55 (Review Focus 3)."""
+def test_fiber_missing_in_every_food_is_unknown_not_zero(
+    client: TestClient, db: Session
+) -> None:
+    """모든 음식에 식이섬유가 없으면 정보 없음이다 — 빼고 매긴다: (0.5×0.5 + 0.3×1) / 0.8 = 69 (Review Focus 3)."""
     user, meal = _meal_with(db, **{**_BALANCED, "fiber_g": None})
 
     data = _confirm(client, user, meal)
 
-    assert data["scores"]["quality"] == 55
+    assert data["scores"]["quality"] == 69
     fiber = next(r for r in data["nutrients"] if r["code"] == "FIBER")
-    assert fiber["current"] == 0.0 and fiber["state"] == "SHORT"
+    assert fiber["current"] is None and fiber["state"] is None
+
+
+def test_protein_missing_in_every_food_leaves_quality_null(
+    client: TestClient, db: Session
+) -> None:
+    """단백질은 필수라, 모든 음식에 값이 없으면 0g 으로 치지 않고 Quality 를 null 로 둔다."""
+    user, meal = _meal_with(db, **{**_BALANCED, "protein_g": None})
+
+    data = _confirm(client, user, meal)
+
+    assert data["scores"]["quality"] is None
+    protein = next(r for r in data["nutrients"] if r["code"] == "PROTEIN")
+    assert protein["current"] is None and protein["state"] is None
 
 
 def test_sodium_missing_in_every_food_is_unknown_not_zero(

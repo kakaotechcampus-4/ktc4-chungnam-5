@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
+from types import MappingProxyType
 from typing import Final, NamedTuple
 
 from sqlalchemy import Numeric, and_, case, cast, delete, func, select
@@ -95,7 +97,8 @@ class NutrientTotals(NamedTuple):
     있었다"(`unmatched` · `no_amount`) 를 알 길이 없어 경고를 붙이지 못한다.
 
     매칭도 됐고 양도 아는 음식의 **영양소 컬럼만** 빈 경우는 다르다 — 그 성분은 0 으로
-    더한다(`_scaled`). 예외는 열량(`kcal_missing`)과 나트륨(`sodium_known`)이다.
+    더한다(`_scaled`). 값이 있는 음식이 하나도 없으면 정보 없음이다(`known`). 열량은
+    0 으로 더하지 않는다(`kcal_missing`).
     """
 
     kcal: Decimal | None = None
@@ -119,12 +122,12 @@ class NutrientTotals(NamedTuple):
     그러지 않는다 — 0kcal 로 치면 Quantity 가 "거의 안 먹음" 으로 매겨진다. 부족 쪽을
     엄격하게 보는 단계(시작기 · 조정기)에서 틀린 경고가 나간다.
     """
-    sodium_known: int = 0
-    """합산 대상 중 **나트륨 값이 있는** 항목 수. 0 이면 나트륨 합계를 쓰지 않는다.
+    known: Mapping[str, int] = MappingProxyType({})
+    """영양소별로 합산 대상 중 **값이 있는** 항목 수. 키는 `_ZERO_WHEN_EMPTY` 의 필드 이름이다.
 
-    나트륨은 한도 성분이라 0 으로 치면 점수가 오르는 쪽으로 틀린다 — 값이 하나도 없는
-    끼니를 "0mg · 적정" 으로 보여주고 Quality 의 나트륨 몫을 만점으로 준다. 그래서
-    일부 음식만 비면 0 으로 더하고, 전부 비면 정보 없음으로 둔다.
+    0 이면 그 영양소 합계를 쓰지 않는다(정보 없음). 값이 하나도 없는데 0 으로 치면
+    없는 정보를 "0g 먹음" 으로 단정하게 된다 — 나트륨은 한도 이하라 만점을 받고,
+    단백질 · 식이섬유는 부족으로 깎인다. 일부 음식만 비었을 때만 0 으로 더한다.
     """
 
     @property
@@ -166,7 +169,7 @@ def _eaten_amount_g():
 
 _ZERO_WHEN_EMPTY: Final = frozenset({"protein_g", "fiber_g", "sodium_mg"})
 """컬럼이 비어 있으면 0 으로 더하는 성분. 열량은 빠진다(`NutrientTotals.kcal_missing`).
-나트륨은 값이 있는 음식이 하나라도 있을 때만 쓴다(`NutrientTotals.sodium_known`)."""
+값이 있는 음식이 하나도 없으면 합계를 쓰지 않는다(`NutrientTotals.known`)."""
 
 
 def _scaled(column, amount, usable, *, zero_when_empty: bool):
@@ -180,8 +183,9 @@ def _scaled(column, amount, usable, *, zero_when_empty: bool):
     숨기면 대부분의 끼니가 "정보 없음" 이 되어, 끼니 합계(`services/meal.py::meal_nutrition`)
     와 같은 규칙으로 0 으로 친다. 대가로 합계가 실제보다 작을 수 있다.
 
-    합산 대상(`usable`)이 하나도 없으면 `SUM` 이 NULL 이라 None 이 그대로 나간다 —
-    "0g 먹음" 과 "계산할 음식이 없음" 은 구분된다.
+    합산 대상(`usable`)이 하나도 없으면 `SUM` 이 NULL 이라 None 이 그대로 나간다.
+    합산 대상은 있는데 그 영양소 값이 전부 비어 있으면 SUM 은 0 이지만, 호출부가
+    `NutrientTotals.known` 으로 정보 없음으로 바꾼다.
 
     `amount` 를 인자로 받는 건 **호출부와 같은 식을 쓰기 위해서다.** 여기서 따로
     만들면 합계와 카운터가 서로 다른 양을 보게 되고, 한쪽만 고치는 실수가 난다.
@@ -231,7 +235,11 @@ def sum_nutrients(db: Session, meal_id: uuid.UUID) -> NutrientTotals:
                 for key, column in _NUTRIENT_COLUMNS.items()
             ),
             func.count().filter(and_(usable, FoodRef.calories.is_(None))).label("kcal_missing"),
-            func.count().filter(and_(usable, FoodRef.sodium_mg.isnot(None))).label("sodium_known"),
+            *(
+                func.count().filter(and_(usable, column.isnot(None))).label(f"{key}_known")
+                for key, column in _NUTRIENT_COLUMNS.items()
+                if key in _ZERO_WHEN_EMPTY
+            ),
             func.count().filter(usable).label("counted"),
             # 제외 사유를 나눠 센다. 사용자에게 줄 안내가 다르다.
             func.count().filter(~has_nutrition).label("unmatched"),
@@ -251,5 +259,7 @@ def sum_nutrients(db: Session, meal_id: uuid.UUID) -> NutrientTotals:
         unmatched=row.unmatched,
         no_amount=row.no_amount,
         kcal_missing=row.kcal_missing,
-        sodium_known=row.sodium_known,
+        known=MappingProxyType(
+            {key: getattr(row, f"{key}_known") for key in _ZERO_WHEN_EMPTY}
+        ),
     )

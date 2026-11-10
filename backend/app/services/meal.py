@@ -699,7 +699,7 @@ def _build_nutrients(totals: NutrientTotals) -> list[NutrientStatus]:
     """평가 도메인의 성분 합계(`evaluation_crud.sum_nutrients`)를 이 응답 모양으로 옮긴다.
 
     성분 컬럼만 비어 있던 음식은 0 으로 더해져 있다(`crud/evaluation.py::_scaled`).
-    합산된 음식이 없으면 None 이다.
+    그 성분 값이 있는 음식이 하나도 없거나 합산된 음식이 없으면 None 이다.
 
     `target`·`state`는 단계별 목표치가 아직 팀 미확정이라 항상 None —
     `services/evaluation/stage_profile.py` 와 같은 이유다.
@@ -708,7 +708,7 @@ def _build_nutrients(totals: NutrientTotals) -> list[NutrientStatus]:
         NutrientStatus(
             code=code.value,
             label=label,
-            current=_as_float(getattr(totals, key)),
+            current=None if totals.known.get(key) == 0 else _as_float(getattr(totals, key)),
             target=None,
             unit=unit,
             state=None,

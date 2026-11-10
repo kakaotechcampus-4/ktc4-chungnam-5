@@ -347,3 +347,18 @@ def test_build_nutrients_reports_none_when_nothing_was_summed():
     nutrients = _build_nutrients(totals)
 
     assert [n.current for n in nutrients] == [None, None, None]
+
+
+def test_build_nutrients_reports_none_when_no_food_has_the_value():
+    """합산된 음식은 있는데 그 성분 값이 전부 비어 있으면(known 0) 0 이 아니라 None 이다."""
+    totals = NutrientTotals(
+        protein_g=Decimal("20.5"),
+        fiber_g=Decimal("0"),
+        sodium_mg=Decimal("450"),
+        counted=2,
+        known={"protein_g": 2, "fiber_g": 0, "sodium_mg": 1},
+    )
+
+    nutrients = _build_nutrients(totals)
+
+    assert [n.current for n in nutrients] == [20.5, None, 450.0]
