@@ -94,9 +94,11 @@ class NutrientTotals(NamedTuple):
     """한 끼 성분 합계 + **무엇이 합산에 들어갔는지**.
 
     개수를 같이 주는 게 핵심이다. 합계만 주면 호출부가 "성분을 못 구한 음식이
-    있었다" 를 알 길이 없어, 일부만 더한 값을 완전한 값처럼 내보내게 된다
-   . 건강 코칭 앱에서 단백질이 조용히 적게 나오면 사용자는
-    그 숫자를 믿고 다음 끼니를 조절한다.
+    있었다"(`unmatched` · `no_amount`) 를 알 길이 없어 경고를 붙이지 못한다.
+
+    매칭도 됐고 양도 아는 음식의 **영양소 컬럼만** 빈 경우는 다르다 — 그 성분은 0 으로
+    더한다(`_scaled`). 값이 있는 음식이 하나도 없으면 정보 없음이다(`known`). 열량은
+    0 으로 더하지 않는다(`kcal_missing`).
     """
 
     kcal: Decimal | None = None
@@ -113,16 +115,19 @@ class NutrientTotals(NamedTuple):
     """성분은 구했는데 **먹은 양을 모르는** 항목 수. "2개" 처럼 g 환산이 안 된 단위다.
     영양정보를 넣어도 안 풀린다 — 양을 g 으로 고쳐야 한다. `unmatched` 와 섞으면
     사용자를 못 고치는 화면으로 보내게 된다."""
-    missing: Mapping[str, int] = MappingProxyType({})
-    """**성분별로** 값이 비어 있던 항목 수. 키는 위 합계 필드 이름이다.
+    kcal_missing: int = 0
+    """합산 대상인데 **열량 컬럼만** 비어 있던 항목 수. 0 이 아니면 열량 합계를 쓰지 않는다.
 
-    항목 단위 제외(`unmatched` · `no_amount`)와 다른 축이다. 매칭도 됐고 양도 아는
-    항목인데 `food_refs` 의 그 **컬럼만** NULL 인 경우가 있다 — 공공 DB 에 식이섬유나
-    나트륨이 비어 있는 행이 흔하고, 시드 로더가 파싱 실패를 NULL 로 넣는다.
+    영양소(단백질 · 식이섬유 · 나트륨)는 비어 있으면 0 으로 더하지만(`_scaled`) 열량은
+    그러지 않는다 — 0kcal 로 치면 Quantity 가 "거의 안 먹음" 으로 매겨진다. 부족 쪽을
+    엄격하게 보는 단계(시작기 · 조정기)에서 틀린 경고가 나간다.
+    """
+    known: Mapping[str, int] = MappingProxyType({})
+    """영양소별로 합산 대상 중 **값이 있는** 항목 수. 키는 `_ZERO_WHEN_EMPTY` 의 필드 이름이다.
 
-    SQL 의 `SUM` 은 NULL 입력 행을 조용히 건너뛴다. 그래서 이걸 안 세면 **같은 응답
-    안에서 단백질만 부분합이고 식이섬유는 완전한** 상태가 되는데, 겉으로는 구분이
-    안 된다. 0 이 아닌 성분은 합계를 내보내지 않는다 (`services/evaluation`).
+    0 이면 그 영양소 합계를 쓰지 않는다(정보 없음). 값이 하나도 없는데 0 으로 치면
+    없는 정보를 "0g 먹음" 으로 단정하게 된다 — 나트륨은 한도 이하라 만점을 받고,
+    단백질 · 식이섬유는 부족으로 깎인다. 일부 음식만 비었을 때만 0 으로 더한다.
     """
 
     @property
@@ -137,11 +142,7 @@ _NUTRIENT_COLUMNS: Final = {
     "fiber_g": FoodRef.fiber_g,
     "sodium_mg": FoodRef.sodium_mg,
 }
-"""`NutrientTotals` 의 합계 필드 ↔ `food_refs` 컬럼.
-
-합계와 결측 카운터가 **같은 목록에서 나와야** 한다. 따로 적으면 성분을 하나 더할 때
-합계만 늘고 카운터를 빠뜨려서, 그 성분만 조용히 부분합이 된다.
-"""
+"""`NutrientTotals` 의 합계 필드 ↔ `food_refs` 컬럼."""
 
 
 def _eaten_amount_g():
@@ -166,16 +167,35 @@ def _eaten_amount_g():
     )
 
 
-def _scaled(column, amount, usable):
+_ZERO_WHEN_EMPTY: Final = frozenset({"protein_g", "fiber_g", "sodium_mg"})
+"""컬럼이 비어 있으면 0 으로 더하는 성분. 열량은 빠진다(`NutrientTotals.kcal_missing`).
+값이 있는 음식이 하나도 없으면 합계를 쓰지 않는다(`NutrientTotals.known`)."""
+
+
+def _scaled(column, amount, usable, *, zero_when_empty: bool):
     """기준량 대비 실제 섭취량으로 환산한 성분값의 합.
 
     `food_refs` 의 성분은 `serving_size`(영양성분함량기준량, 보통 100g) 기준이다.
+
+    **영양소 컬럼만 비어 있으면 그 음식의 그 성분은 0 으로 더한다**(`zero_when_empty`).
+    매칭도 됐고 양도 아는 음식인데 `food_refs` 의 그 컬럼만 NULL 인 경우가 흔하다 — 공공 DB 에 식이섬유나
+    나트륨이 비어 있는 행이 많고, 시드 로더가 파싱 실패를 NULL 로 넣는다. 합계를
+    숨기면 대부분의 끼니가 "정보 없음" 이 되어, 끼니 합계(`services/meal.py::meal_nutrition`)
+    와 같은 규칙으로 0 으로 친다. 대가로 합계가 실제보다 작을 수 있다.
+
+    합산 대상(`usable`)이 하나도 없으면 `SUM` 이 NULL 이라 None 이 그대로 나간다.
+    합산 대상은 있는데 그 영양소 값이 전부 비어 있으면 SUM 은 0 이지만, 호출부가
+    `NutrientTotals.known` 으로 정보 없음으로 바꾼다.
 
     `amount` 를 인자로 받는 건 **호출부와 같은 식을 쓰기 위해서다.** 여기서 따로
     만들면 합계와 카운터가 서로 다른 양을 보게 되고, 한쪽만 고치는 실수가 난다.
     """
     return func.sum(
-        cast(column * amount / FoodRef.serving_size, Numeric(12, 3))
+        cast(
+            (func.coalesce(column, 0) if zero_when_empty else column)
+            * amount / FoodRef.serving_size,
+            Numeric(12, 3),
+        )
     ).filter(usable)
 
 
@@ -211,15 +231,14 @@ def sum_nutrients(db: Session, meal_id: uuid.UUID) -> NutrientTotals:
     stmt = (
         select(
             *(
-                _scaled(column, amount, usable).label(key)
+                _scaled(column, amount, usable, zero_when_empty=key in _ZERO_WHEN_EMPTY).label(key)
                 for key, column in _NUTRIENT_COLUMNS.items()
             ),
-            # **성분별 결측을 따로 센다.** 합산 대상인 항목인데 그 컬럼만 NULL 인
-            # 경우가 있고, SQL 의 SUM 은 그런 행을 조용히 건너뛴다. 안 세면 부분합이
-            # 완전한 값처럼 나간다.
+            func.count().filter(and_(usable, FoodRef.calories.is_(None))).label("kcal_missing"),
             *(
-                func.count().filter(and_(usable, column.is_(None))).label(f"{key}_missing")
+                func.count().filter(and_(usable, column.isnot(None))).label(f"{key}_known")
                 for key, column in _NUTRIENT_COLUMNS.items()
+                if key in _ZERO_WHEN_EMPTY
             ),
             func.count().filter(usable).label("counted"),
             # 제외 사유를 나눠 센다. 사용자에게 줄 안내가 다르다.
@@ -239,7 +258,8 @@ def sum_nutrients(db: Session, meal_id: uuid.UUID) -> NutrientTotals:
         counted=row.counted,
         unmatched=row.unmatched,
         no_amount=row.no_amount,
-        missing=MappingProxyType(
-            {key: getattr(row, f"{key}_missing") for key in _NUTRIENT_COLUMNS}
+        kcal_missing=row.kcal_missing,
+        known=MappingProxyType(
+            {key: getattr(row, f"{key}_known") for key in _ZERO_WHEN_EMPTY}
         ),
     )
