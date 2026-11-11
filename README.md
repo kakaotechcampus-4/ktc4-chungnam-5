@@ -1,10 +1,21 @@
 # ktc4-team-24
 카카오테크 캠퍼스 4기 2단계 팀 프로젝트 — 충남대 5팀
 
+<p align="center">
+  <a href="https://kakaotechcampus-4.github.io/ktc4-chungnam-5/project/">
+    <img src="docs/assets/readme-hero.png" alt="든든지기 — GLP-1 투약 단계를 인식해 같은 식사도 그 단계의 기준으로 평가하고 다음 끼니를 제안하는 식사 코치" width="860">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://kakaotechcampus-4.github.io/ktc4-chungnam-5/project/"><b>👉 테크스펙 · 협업문서 페이지 바로 가기</b></a>
+  <br>
+</p>
+
 ## 문서
 
-- [테크스펙 + 협업문서](https://kakaotechcampus-4.github.io/ktc4-chungnam-5/project/) — GitHub Pages
-  - 테크스펙: 요구사항 · 아키텍처 설계 · 인터페이스 명세 · 데이터 모델 · 테스트 전략 · 리스크
+- [테크스펙 + 협업문서](https://kakaotechcampus-4.github.io/ktc4-chungnam-5/project/)
+  - 테크스펙: 요구사항 · 아키텍처 설계 · 인터페이스 명세 · 리스크 · 테스트 전략
   - 협업문서: 그라운드 룰 · 브랜치 전략 · 코딩 컨벤션 · 코드 리뷰 기록
 
 ## 프로젝트 소개
