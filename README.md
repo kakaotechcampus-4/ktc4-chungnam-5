@@ -3,7 +3,7 @@
 
 <p align="center">
   <a href="https://kakaotechcampus-4.github.io/ktc4-chungnam-5/project/">
-    <img src="docs/assets/readme-hero.png" alt="든든지기 — GLP-1 투약 단계를 인식해 같은 식사도 그 단계의 기준으로 평가하고 다음 끼니를 제안하는 식사 코치" width="860">
+    <img src="docs/assets/readme-hero.png" alt="든든지기 — GLP-1 투약자를 위한 투약 단계별 식사 평가 및 코칭 서비스" width="860">
   </a>
 </p>
 
