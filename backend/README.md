@@ -188,8 +188,14 @@ docker exec glp1-db pg_dump -U glp1 -d glp1_dev -t food_refs --data-only -Fc -Z9
 
 > **원본 데이터에 결측이 많다.** `외식(프랜차이즈 등 업체 제공 영양정보)` 15,225건은
 > 지방 87% · 탄수화물 84% 가 비어 있다. 업체가 열량·단백질·나트륨까지만 제출하기 때문이다.
-> 가공식품DB 316,734건은 대부분 채워져 있다. **Rule Engine 의 Quality 채점은 영양소가
-> 없는 경우를 처리해야 한다** — `qqs_evaluations.quality_score` 를 NULL 허용으로 둔 게 이 때문이다.
+> 가공식품DB 316,734건은 대부분 채워져 있다. 그래서 Rule Engine 은 빈 값을 이렇게 다룬다
+> ([docs/be-qqs-scoring-rule.md](../docs/be-qqs-scoring-rule.md) 7절이 정본):
+>
+> - 일부 음식만 단백질 · 식이섬유 · 나트륨 값이 비면 0 으로 더한다
+> - 모든 음식에 식이섬유 · 나트륨 값이 없으면 그 항목을 Quality 에서 빼고 남은 가중치로 다시 나눈다
+> - 모든 음식에 단백질 값이 없으면 Quality 는 `null`, 열량이 하나라도 비면 Quantity 는 `null` 이다
+>
+> `qqs_evaluations.quality_score` 를 NULL 허용으로 둔 게 이 때문이다.
 
 ### 스키마 변경
 
