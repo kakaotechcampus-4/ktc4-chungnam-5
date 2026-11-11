@@ -1,37 +1,62 @@
 # infra — 로컬 개발 환경 · 운영 배포
 
 > 운영(EC2) 배포는 [아래 "운영 배포"](#운영-배포) 절. 위쪽은 전부 로컬 개발 얘기다.
+> 처음 띄우는 순서(LLM 키 · 스키마 · 시드 · 앱 연결)는 [루트 README "로컬 실행"](../README.md#로컬-실행)이 정본이다.
+> 여기에는 compose 파일 구성과 주소 · 큐 확인 방법을 둔다.
 
 로컬 개발 컨테이너는 전부 같은 compose 프로젝트(`infra`)에 속한다. 그래서 한 네트워크(`infra_default`)에
 붙고 **서비스 이름으로 서로를 부를 수 있다.**
 
-| 파일 | 서비스 | 컨테이너 | 호스트 포트 |
-|---|---|---|---|
-| `docker-compose.yml` | `db` | `glp1-db` | 5433 |
-| `docker-compose.ai-stub.yml` | `ai-stub` | `glp1-ai-stub` | 8001 |
-| `docker-compose.be.yml` | `api` · `worker` | `glp1-api` · `glp1-worker` | 8000 (api) |
+| 파일 | 서비스 | 컨테이너 | 호스트 포트 | 쓰는 때 |
+|---|---|---|---|---|
+| `docker-compose.yml` | `db` | `glp1-db` | 5433 | 항상 |
+| `docker-compose.ai.yml` | `ai` | `glp1-ai` | 8002 | 실제 AI(LLM 호출). `ai/.env` 에 LLM 키 · URL 이 있어야 한다 |
+| `docker-compose.ai-stub.yml` | `ai-stub` | `glp1-ai-stub` | 8001 | 키 없이 고정 응답으로 흐름만 볼 때 · 실패 경로 확인 |
+| `docker-compose.be.yml` | `api` · `worker` | `glp1-api` · `glp1-worker` | 8000 (api) | BE 를 컨테이너로 띄울 때 |
+
+BE 컨테이너는 **기본으로 ai-stub 에 붙는다.** 실제 AI 에 붙이려면 `BE_AI_SERVICE_BASE_URL=http://ai:8000` 을
+준 채로 `docker-compose.be.yml` 을 띄운다(아래).
 
 ---
 
 ## 전부 띄우기
+
+실제 AI 로 (LLM 키 필요):
+
+```powershell
+$env:BE_AI_SERVICE_BASE_URL = "http://ai:8000"   # Git Bash: export BE_AI_SERVICE_BASE_URL=http://ai:8000
+docker compose `
+  -f docker-compose.yml `
+  -f docker-compose.ai.yml `
+  -f docker-compose.be.yml `
+  up -d --build
+```
+
+AI 스텁으로 (키 불필요):
 
 ```powershell
 docker compose `
   -f docker-compose.yml `
   -f docker-compose.ai-stub.yml `
   -f docker-compose.be.yml `
-  up -d
+  up -d --build
 ```
+
+`BE_AI_SERVICE_BASE_URL` 은 `up` 할 때마다 그 터미널에 있어야 한다. 빠지면 api · worker 가 기본값인
+ai-stub 주소로 다시 만들어지고, ai-stub 을 띄우지 않았다면 식사 분석이 전부 실패한다.
+
+스키마와 공공 영양DB 시드는 컨테이너가 자동으로 넣지 않는다. 처음 한 번은
+`docker exec glp1-api alembic upgrade head` 와 시드 복원을 한다 — [루트 README](../README.md#1-전부-docker-로-띄우기) 참고.
 
 파일을 하나씩 띄워도 동작한다(같은 프로젝트라 네트워크를 공유한다). 다만 그때는
 compose 가 나머지 컨테이너를 모르는 것으로 보고 **`Found orphan containers` 경고**를 낸다.
 `-f` 를 모아 주면 사라진다. `--remove-orphans` 는 **쓰지 말 것.** `-f` 에 빠진 컨테이너를
 지워 버린다.
 
-내리기:
+내리기 — 띄울 때와 같은 `-f` 묶음으로:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.ai-stub.yml -f docker-compose.be.yml down
+docker compose -f docker-compose.yml -f docker-compose.ai.yml -f docker-compose.be.yml down
 ```
 
 ---
@@ -43,23 +68,31 @@ docker compose -f docker-compose.yml -f docker-compose.ai-stub.yml -f docker-com
 
 | 대상 | 호스트(venv 실행)에서 | 컨테이너 안에서 |
 |---|---|---|
+| ai | `http://localhost:8002` | `http://ai:8000` |
 | ai-stub | `http://localhost:8001` | `http://ai-stub:8000` |
 | db | `localhost:5433` | `db:5432` |
+| api 의 사진(`/media`) — AI 가 받아 가는 주소 | `http://127.0.0.1:8000/media` | `http://api:8000/media` |
 
 호스트 쪽 값은 `backend/.env` 에, 컨테이너 쪽 값은 `docker-compose.be.yml` 의
 `environment` 에 있다. 환경변수가 `.env` 보다 우선하므로 컨테이너에서는 compose 값이 이긴다.
 
-포트도 두 벌이다. `ai-stub` 은 컨테이너 안에서 8000 을 듣고 호스트 8001 로 매핑된다(`"8001:8000"`).
-BE API 가 호스트 8000 을 쓰기 때문에 겹치지 않게 옮긴 것이다.
+사진 주소는 **AI 쪽에서** 닿아야 한다. BE 를 venv 로, AI 를 컨테이너로 띄우면 AI 에게 `127.0.0.1` 은
+자기 자신이므로 `backend/.env` 의 `LOCAL_STORAGE_BASE_URL` 을 `http://host.docker.internal:8000/media` 로 바꾼다.
+
+포트도 두 벌이다. `ai` · `ai-stub` 은 컨테이너 안에서 8000 을 듣고 호스트 8002 · 8001 로 매핑된다.
+BE API 가 호스트 8000 을 쓰기 때문에 겹치지 않게 옮긴 것이다. 셋을 함께 띄울 수 있다.
 
 ---
 
 ## 왕복 확인
 
-전제는 ai-stub 뿐이다(`docker compose -f docker-compose.ai-stub.yml up -d` 또는 로컬
-uvicorn). 큐는 PostgreSQL 의 `task_queue` 테이블이라 따로 띄울 컨테이너가 없다.
+큐 ↔ AI 왕복을 **ai-stub 으로** 확인한다. 실패 경로를 `X-Stub-Scenario`(`AI_STUB_SCENARIO`) 로 일으키므로
+실제 AI 에는 쓸 수 없다. `backend\.env` 의 `AI_SERVICE_BASE_URL` 이 `http://localhost:8001` 이어야 한다.
+큐는 PostgreSQL 의 `task_queue` 테이블이라 DB 말고 따로 띄울 컨테이너가 없다.
 
 ```powershell
+docker compose -f docker-compose.yml -f docker-compose.ai-stub.yml up -d
+
 cd ..\backend
 .\.venv\Scripts\Activate.ps1
 python -m scripts.smoke_queue_ai
@@ -78,28 +111,27 @@ docker logs -f glp1-worker
 
 ## 큐 상태 보기
 
-**"처리 중" 이라는 상태 컬럼은 없다.** 워커는 행 잠금을 쥐고 있을 뿐이고, 그건 커밋
-전이라 다른 세션에 보이지 않는다. 대신 `task_queue` 를 만지며 트랜잭션을 연 채인
-커넥션 수로 근사한다 — 워커가 아닌 세션도 잡힐 수 있는 근사치다.
-
 ```powershell
-cd ../backend
+cd ..\backend
 .\.venv\Scripts\Activate.ps1
 python -m scripts.queue_status
 ```
 
 ```
-상태         건수  가장 오래된 것
+상태           건수  가장 오래된 것
 ------------------------------------------------
 DONE            5  2026-09-20 10:12:03+00:00
-PENDING          1  2026-09-20 10:15:40+00:00
+PENDING         1  2026-09-20 10:15:40+00:00
+PROCESSING      1  2026-09-20 10:15:38+00:00
 
-처리 중(작업 트랜잭션을 연 커넥션): 1
-  (근사치 — task_queue 를 만지며 트랜잭션을 연 커넥션을 센다. 워커가 아닌 세션도 잡힐 수 있다)
-  pid=1234 경과=0:00:03.128
+처리 중(PROCESSING): 1  — lease 만료 0건은 다음 claim 이 회수한다
+  meal.analyze     attempts=1 경과=0:00:03.128
 ```
 
-`FAILED` 가 있으면 목록과 함께 다시 넣는 SQL 을 같이 출력해 준다.
+처리 중인 작업은 `PROCESSING` 상태로 바로 보인다. 워커가 작업을 집을 때 상태 · lease 를 곧바로 커밋하기
+때문이다. lease(`QUEUE_LEASE_SEC`, 기본 120초)가 지난 행은 `(만료)` 로 표시된다 — 워커가 죽은 것이고,
+다음 `claim` 이 회수한다. `FAILED` 가 있으면 목록과 함께 다시 넣는 SQL 을 같이 출력해 준다.
+큐의 동작(lease · 재시도 · 격리)은 [backend/README.md](../backend/README.md#큐-사용법) 에 있다.
 
 ---
 
@@ -121,16 +153,26 @@ PENDING          1  2026-09-20 10:15:40+00:00
 
 ```
                          ┌─▶ api-blue  ─┐
-인터넷 ──80/443──▶ caddy ┤  (한쪽만 받음) ├──▶ db:5432
-                         └─▶ api-green ─┘
-                         api(별칭) ▲   │
-                       /internal  │   ▼ (큐: task_queue 테이블)
-                                  ai ◀── worker
+인터넷 ──80/443──▶ caddy ┤  (한쪽만 받음) ├──▶ db:5432 ◀── worker (큐: task_queue 테이블)
+                         └─▶ api-green ─┘                    │
+                                 ▲                            ▼
+                     api(별칭)/media ◀──── 사진 다운로드 ──── ai
 ```
+
+worker 가 큐에서 작업을 집어 ai 를 부르고, ai 는 내부 별칭 `api` 로 사진(`/media`)을 받아 간다
+(사진을 S3 에 두면 presigned URL 로 받는다 — 아래 "사진 저장소").
+ai → BE 의 tool 역호출(`/internal/v1`)은 compose 에 주소 · 토큰 자리만 있고 **BE 쪽 엔드포인트는 아직 없다.**
+
+### 사진 저장소
+
+기본은 로컬 디스크(`media` 볼륨, api-blue · api-green 공유)다. `.env.prod`(스테이징은 `.env.staging`)에
+`STORAGE_TYPE=s3` · `S3_BUCKET=<버킷>` 두 줄을 같이 넣으면 S3 에 저장한다(예시는 `.env.prod.example`).
+버킷은 운영 · 스테이징이 따로이고 리전은 서울 고정이다. **AWS 액세스 키는 넣지 않는다** — 서버의 인스턴스
+역할로 권한을 받는다. `S3_BUCKET` 없이 `s3` 로 두면 api 가 기동하지 않는다.
 
 ### 접근 규칙 (Caddyfile, 위에서부터)
 
-1. `/internal/*` → 404. AI 가 BE 를 다시 부르는 경로라 compose 내부 네트워크로만 닿는다
+1. `/internal/*` → 404. ai 의 tool 역호출용으로 남겨 둔 경로라 compose 내부 네트워크로만 닿게 한다 (지금은 엔드포인트 없음)
 2. `/health` → 통과. `/web/*`(평가용 웹 파일)도 통과하고, `/web` 은 `/web/` 로 보낸다 — 아래 "평가용 웹"
 3. `X-Demo-Key` 헤더가 그 사이트의 키(운영 `DEMO_KEY`, 스테이징 `STAGING_DEMO_KEY`)와 같거나, 접속 IP 가 `ALLOWED_IPS` 안이면 → api.
    팀원 IP 는 경로 제한 없이 **전체 API** 를 키 없이 통과한다 — Swagger 의 "Try it out" 요청에는
@@ -148,11 +190,14 @@ git clone https://github.com/kakaotechcampus-4/ktc4-chungnam-5.git /opt/glp1 && 
 cp .env.prod.example .env.prod && vi .env.prod   # 비밀값은 openssl rand -hex 32 로 만든다
 chmod 600 .env.prod
 ./deploy.sh
-docker compose -f docker-compose.prod.yml logs -f caddy   # 인증서 발급 로그 확인
+docker logs -f glp1-prod-caddy                   # 인증서 발급 로그 확인
 ```
 
+`.env.prod` 에 예시 값(`https://mlapi.run/<UUID>` 처럼 `<…>` 가 남은 값)이 있으면 `bg-deploy.sh` 가 빌드 전에
+키 이름을 출력하고 멈춘다. compose 의 `${X:?}` 는 빈 값만 막아서, 예시 값이 남으면 기동은 되고 호출할 때 500 이 나기 때문이다.
+
 스키마는 배포마다 `migrate`(일회성 `alembic upgrade head`)가 새 api 를 띄우기 전에 맞춘다. 공공 영양DB 시드는
-**처음 한 번만** 넣는다 (336,351건):
+**처음 한 번만** 넣는다 (원본 336,351건을 같은 이름끼리 합친 276,092건):
 
 ```bash
 docker exec -i glp1-prod-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --data-only --no-owner' \
@@ -179,7 +224,7 @@ api 는 `api-blue` · `api-green` 두 벌이고, 한쪽만 요청을 받는다. 
 3. 새 쪽을 띄우고 `/health/ready`(DB 까지 확인)로 healthy 를 기다린 뒤, Caddy 안에서도 닿는지 본다
 4. upstream 파일을 새 쪽으로 바꾸고 `caddy reload` — Caddy 는 다시 만들지 않으므로 끊기지 않는다
 5. 옛 요청이 끝나길 15초 기다린 뒤 옛 쪽 api 를 **정지만** 해 둔다 (롤백용)
-6. worker · ai 를 새 이미지로 올린다. 옛 쪽을 정지한 뒤라 내부 별칭 `api`(사진 주소, ai 의 `/internal` 역호출)가
+6. worker · ai 를 새 이미지로 올린다. 옛 쪽을 정지한 뒤라 내부 별칭 `api`(ai 가 받아 가는 사진 주소)가
    새 쪽 하나만 가리킨다
 
 1~3 중 하나라도 실패하면 전환하지 않고 끝난다. 사용자는 계속 옛 쪽을 쓰고, 워커도 옛 이미지로 다시 켜진다.
@@ -200,9 +245,10 @@ cat /opt/glp1-bg/upstreams/prod.caddy   # import gate glp1-prod-api-green:8000 {
 curl -s https://glp1-demo.duckdns.org/health    # version 이 이전 버전이면 완료
 ```
 
-ai 도 되돌리지 않는다. 롤백 뒤에는 **새 ai 가 옛 api 의 내부 API(`/internal/v1`)를 부른다.** 그래서 내부 API 도
-마이그레이션과 같은 규칙(Expand / Contract)을 따른다 — 엔드포인트·필드는 추가만 하고, 삭제나 의미 변경은
-ai 가 더 이상 쓰지 않게 된 다음 배포에서 한다.
+ai 는 되돌리지 않는다. 롤백 뒤에는 **옛 worker 가 새 ai 를 부른다.** 그래서 BE ↔ AI 계약
+(`ai-stub/schemas.py` · `ai/app/schemas.py`)도 마이그레이션과 같은 규칙(Expand / Contract)을 따른다 — 필드는
+추가만 하고, 삭제나 의미 변경은 옛 worker 가 더 이상 그 필드를 쓰지 않게 된 다음 배포에서 한다.
+나중에 ai 의 tool 역호출(`/internal/v1`)이 붙으면 반대 방향(새 ai → 옛 api)도 같은 규칙을 따른다.
 
 DB 는 되돌리지 않는다. 옛 코드와 호환되지 않는 마이그레이션이 들어갔다면 `bg-switch.sh` 로는 안 된다.
 그때는 새 이미지가 떠 있는 동안 먼저 DB 를 내린 뒤 이전 버전으로 다시 배포한다
@@ -220,7 +266,8 @@ docker exec glp1-prod-api-<지금 쪽> alembic downgrade <이전 버전의 head 
 
 ```bash
 cd /opt/glp1/infra
-docker compose -f docker-compose.prod.yml ps
+# compose 를 부를 때는 --env-file .env.prod 를 붙인다. 없으면 ${…:?} 검사에 걸려 ps · logs 도 멈춘다
+docker compose -f docker-compose.prod.yml --env-file .env.prod ps
 docker logs -f glp1-prod-worker
 
 # .env.prod 를 고친 뒤에는 restart 가 아니라 up -d 로 컨테이너를 다시 만든다 (환경변수는 생성 시점에 읽힌다)
@@ -234,10 +281,15 @@ docker exec glp1-prod-caddy caddy reload --config /etc/caddy/Caddyfile
   **`docker volume prune` 은 쓰지 않는다** — `db-data` · `media` · `caddy_data` 가 지워진다.
 - 서버는 **중지하지 말고 재부팅만** 한다. 중지 → 시작하면 공인 IP 가 바뀐다 (DuckDNS cron 이 따라가지만 몇 분 끊긴다).
 
-### AI 스텁으로 데모하기
+### AI 스텁으로 바꿔 붙이기
 
-실제 AI 의 엔드포인트가 아직 501 인 동안에는 식사 분석이 전부 FAILED 로 끝난다.
-그 기간에는 고정 더미 응답을 주는 `ai-stub` 을 붙인다. `.env.prod` 에 두 줄을 넣고 다시 배포한다.
+평소에는 실제 `ai` 컨테이너가 LLM 을 부른다. 사진 인식(`/analyze-meal`) · 끼니 피드백(`/short-feedback`) ·
+챗봇(`/chat`)이 구현돼 있고, 장기 피드백(`/long-feedback`)만 아직 501 이라 그 작업(`feedback.long`)은 재시도 끝에
+`FAILED` 로 격리된다 — [ai/README.md](../ai/README.md#api와-구현-상태).
+
+LLM 게이트웨이 장애 · 크레딧 소진처럼 실제 AI 를 쓸 수 없을 때, 또는 스테이징에서 크레딧을 아낄 때는
+고정 더미 응답을 주는 `ai-stub` 을 대신 붙인다. 스텁 응답은 실제 인식 결과가 아니므로 데모 화면 확인용이다.
+`.env.prod`(스테이징은 `.env.staging`)에 두 줄을 넣고 다시 배포한다.
 
 ```bash
 COMPOSE_PROFILES=stub
@@ -315,12 +367,10 @@ glp1-staging.duckdns.org ┘   (80/443 하나)     └─▶ glp1-staging-api-{b
 - DB·사진·큐는 볼륨이 따로라(`glp1-staging_*`) 운영 데이터와 섞이지 않는다. 데모 키는 따로다(`STAGING_DEMO_KEY`, 운영 `.env.prod` 에 둔다). 스테이징 APK 는 이 키로 빌드한다
 - 스테이징 컨테이너에는 `mem_limit`(쓸 수 있는 양, 합 약 1.8GiB)과 `oom_score_adj: 500`(서버 메모리가 모자랄 때 OOM killer 가 운영 대신 스테이징을 먼저 고름)이 있다
 - `deploy.sh` 와 `deploy-staging.sh` 는 같은 잠금(`/tmp/glp1-deploy.lock`)을 써서 한 번에 하나씩 돈다
-- 운영 `.env.prod` 에 `STAGING_DOMAIN` 이 **반드시** 있어야 한다 (비면 운영 배포가 기동 전에 멈춘다)
-- 이 변경 뒤 **첫** `deploy.sh` 전에 서버에서 네트워크를 한 번 만든다. 첫 배포는 서버에 있던 옛 `deploy.sh` 가 돌 수 있어(네트워크를 만들지 않는다) 먼저 손으로 만든다. 실패하면 한 번 더 실행한다 (워커가 내려가 있을 수 있다)
-
-```bash
-docker network inspect glp1-edge >/dev/null 2>&1 || docker network create glp1-edge
-```
+- 운영 `.env.prod` 에 `STAGING_DOMAIN` · `STAGING_DEMO_KEY` 가 **반드시** 있어야 한다 (비면 운영 배포가 기동 전에 멈춘다)
+- 두 스택이 함께 쓰는 외부 네트워크 `glp1-edge` 는 `deploy.sh` 가 없으면 만든다
+- 데모 당일에는 스테이징을 배포하지 않는다. 빌드가 운영 응답을 느리게 만들 수 있다. 필요하면 아래처럼 내린다
+- `docker volume prune` 금지는 스테이징 볼륨에도 똑같다
 
 ```bash
 /opt/glp1-staging/infra/deploy-staging.sh            # origin/develop
@@ -328,9 +378,38 @@ docker network inspect glp1-edge >/dev/null 2>&1 || docker network create glp1-e
 docker compose -p glp1-staging stop                  # 데모 당일 등 잠시 내릴 때
 ```
 
-처음 띄우는 절차(서브도메인·`.env.staging`·시드)는 `contracts/Deployment.md` E2 절을 따른다.
+#### 스테이징을 처음 띄울 때 (서버에서 한 번)
 
-로컬 측정(유휴 상태, Docker Desktop):
+1. DuckDNS 에 `glp1-staging` 서브도메인을 추가하고, IP 갱신 cron 의 `domains=` 를 `glp1-demo,glp1-staging` 으로 바꾼다
+2. 운영 `.env.prod` 에 `STAGING_DOMAIN` · `STAGING_DEMO_KEY`(운영 키와 다른 값)를 넣고 운영을 다시 배포한다.
+   운영 Caddy 가 스테이징 사이트를 받게 된다
+3. 스테이징 checkout 과 비밀값을 만들고 배포한다. `.env.staging` 은 `.env.prod` 를 복사해 DB 비밀번호와
+   내부 토큰만 새로 만든다 — 도메인 · 데모 키 값은 스테이징 compose 가 쓰지 않지만 `${…:?}` 검사 때문에 남겨 둔다
+
+   ```bash
+   sudo mkdir -p /opt/glp1-staging && sudo chown ubuntu:ubuntu /opt/glp1-staging
+   git clone https://github.com/kakaotechcampus-4/ktc4-chungnam-5.git /opt/glp1-staging
+   cd /opt/glp1-staging/infra
+   cp /opt/glp1/infra/.env.prod .env.staging && chmod 600 .env.staging
+   for k in DB_PASSWORD INTERNAL_SERVICE_TOKEN; do
+     sed -i "s|^$k=.*|$k=$(openssl rand -hex 32)|" .env.staging
+   done
+   ./deploy-staging.sh
+   ```
+
+   S3 사진 저장소를 켰다면 `.env.staging` 의 `S3_BUCKET` 은 스테이징 버킷으로 바꾼다.
+
+4. 스테이징 DB 에 공공 영양DB 시드를 넣는다 (처음 한 번만)
+
+   ```bash
+   docker exec -i glp1-staging-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --data-only --no-owner' \
+     < seed/food_refs_20260828.dump
+   ```
+
+확인: 스테이징 도메인의 `/health` 가 200(유효한 인증서), 키 없이 403 · `X-Demo-Key: <STAGING_DEMO_KEY>` 로 200 ·
+`/internal/*` 404, 운영 도메인 `/health` 도 그대로 200.
+
+로컬 측정(유휴 상태, Docker Desktop · Blue/Green 도입 전이라 api 가 하나다):
 
 | 컨테이너 | 메모리 (사용 / 한도) |
 |---|---|
